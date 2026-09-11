@@ -17,8 +17,8 @@ function normalizePrivateKey(key: string) {
 function isUsableKey(key: string | undefined): key is string {
   return Boolean(
     key &&
-      normalizePrivateKey(key).startsWith("-----BEGIN") &&
-      normalizePrivateKey(key).includes("-----END"),
+    normalizePrivateKey(key).startsWith("-----BEGIN") &&
+    normalizePrivateKey(key).includes("-----END"),
   );
 }
 
