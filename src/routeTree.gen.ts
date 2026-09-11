@@ -10,33 +10,336 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AboutRouteImport } from './routes/about'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as GuidelinesRouteImport } from './routes/guidelines'
+import { Route as LeaderboardsRouteImport } from './routes/leaderboards'
+import { Route as NotificationsRouteImport } from './routes/notifications'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as PostRouteImport } from './routes/post'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as RightsRouteImport } from './routes/rights'
+import { Route as SalariesRouteImport } from './routes/salaries'
+import { Route as SearchRouteImport } from './routes/search'
+import { Route as CompaniesIndexRouteImport } from './routes/companies.index'
+import { Route as CompaniesSlugRouteImport } from './routes/companies.$slug'
+import { Route as MessagesIndexRouteImport } from './routes/messages.index'
+import { Route as MessagesIdRouteImport } from './routes/messages.$id'
+import { Route as StoriesIdRouteImport } from './routes/stories.$id'
+import { Route as UUsernameRouteImport } from './routes/u.$username'
+import { Route as ApiPublicOwnerCompaniesRouteImport } from './routes/api/public/owner/companies'
+import { Route as ApiPublicOwnerReportsRouteImport } from './routes/api/public/owner/reports'
+import { Route as ApiPublicOwnerStatsRouteImport } from './routes/api/public/owner/stats'
+import { Route as ApiPublicOwnerStoriesRouteImport } from './routes/api/public/owner/stories'
+import { Route as ApiPublicOwnerUsersRouteImport } from './routes/api/public/owner/users'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GuidelinesRoute = GuidelinesRouteImport.update({
+  id: '/guidelines',
+  path: '/guidelines',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LeaderboardsRoute = LeaderboardsRouteImport.update({
+  id: '/leaderboards',
+  path: '/leaderboards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const NotificationsRoute = NotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PostRoute = PostRouteImport.update({
+  id: '/post',
+  path: '/post',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProfileRoute = ProfileRouteImport.update({
+  id: '/profile',
+  path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RightsRoute = RightsRouteImport.update({
+  id: '/rights',
+  path: '/rights',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SalariesRoute = SalariesRouteImport.update({
+  id: '/salaries',
+  path: '/salaries',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SearchRoute = SearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompaniesIndexRoute = CompaniesIndexRouteImport.update({
+  id: '/companies/',
+  path: '/companies/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
+  id: '/companies/$slug',
+  path: '/companies/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesIndexRoute = MessagesIndexRouteImport.update({
+  id: '/messages/',
+  path: '/messages/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MessagesIdRoute = MessagesIdRouteImport.update({
+  id: '/messages/$id',
+  path: '/messages/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const StoriesIdRoute = StoriesIdRouteImport.update({
+  id: '/stories/$id',
+  path: '/stories/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const UUsernameRoute = UUsernameRouteImport.update({
+  id: '/u/$username',
+  path: '/u/$username',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicOwnerCompaniesRoute = ApiPublicOwnerCompaniesRouteImport.update({
+  id: '/api/public/owner/companies',
+  path: '/api/public/owner/companies',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicOwnerReportsRoute = ApiPublicOwnerReportsRouteImport.update({
+  id: '/api/public/owner/reports',
+  path: '/api/public/owner/reports',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicOwnerStatsRoute = ApiPublicOwnerStatsRouteImport.update({
+  id: '/api/public/owner/stats',
+  path: '/api/public/owner/stats',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicOwnerStoriesRoute = ApiPublicOwnerStoriesRouteImport.update({
+  id: '/api/public/owner/stories',
+  path: '/api/public/owner/stories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicOwnerUsersRoute = ApiPublicOwnerUsersRouteImport.update({
+  id: '/api/public/owner/users',
+  path: '/api/public/owner/users',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/auth': typeof AuthRoute
+  '/guidelines': typeof GuidelinesRoute
+  '/leaderboards': typeof LeaderboardsRoute
+  '/notifications': typeof NotificationsRoute
+  '/onboarding': typeof OnboardingRoute
+  '/post': typeof PostRoute
+  '/privacy': typeof PrivacyRoute
+  '/profile': typeof ProfileRoute
+  '/rights': typeof RightsRoute
+  '/salaries': typeof SalariesRoute
+  '/search': typeof SearchRoute
+  '/companies/$slug': typeof CompaniesSlugRoute
+  '/messages/$id': typeof MessagesIdRoute
+  '/stories/$id': typeof StoriesIdRoute
+  '/u/$username': typeof UUsernameRoute
+  '/companies/': typeof CompaniesIndexRoute
+  '/messages/': typeof MessagesIndexRoute
+  '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
+  '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
+  '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
+  '/api/public/owner/stories': typeof ApiPublicOwnerStoriesRoute
+  '/api/public/owner/users': typeof ApiPublicOwnerUsersRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/auth': typeof AuthRoute
+  '/guidelines': typeof GuidelinesRoute
+  '/leaderboards': typeof LeaderboardsRoute
+  '/notifications': typeof NotificationsRoute
+  '/onboarding': typeof OnboardingRoute
+  '/post': typeof PostRoute
+  '/privacy': typeof PrivacyRoute
+  '/profile': typeof ProfileRoute
+  '/rights': typeof RightsRoute
+  '/salaries': typeof SalariesRoute
+  '/search': typeof SearchRoute
+  '/companies/$slug': typeof CompaniesSlugRoute
+  '/messages/$id': typeof MessagesIdRoute
+  '/stories/$id': typeof StoriesIdRoute
+  '/u/$username': typeof UUsernameRoute
+  '/companies': typeof CompaniesIndexRoute
+  '/messages': typeof MessagesIndexRoute
+  '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
+  '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
+  '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
+  '/api/public/owner/stories': typeof ApiPublicOwnerStoriesRoute
+  '/api/public/owner/users': typeof ApiPublicOwnerUsersRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
+  '/auth': typeof AuthRoute
+  '/guidelines': typeof GuidelinesRoute
+  '/leaderboards': typeof LeaderboardsRoute
+  '/notifications': typeof NotificationsRoute
+  '/onboarding': typeof OnboardingRoute
+  '/post': typeof PostRoute
+  '/privacy': typeof PrivacyRoute
+  '/profile': typeof ProfileRoute
+  '/rights': typeof RightsRoute
+  '/salaries': typeof SalariesRoute
+  '/search': typeof SearchRoute
+  '/companies/$slug': typeof CompaniesSlugRoute
+  '/messages/$id': typeof MessagesIdRoute
+  '/stories/$id': typeof StoriesIdRoute
+  '/u/$username': typeof UUsernameRoute
+  '/companies/': typeof CompaniesIndexRoute
+  '/messages/': typeof MessagesIndexRoute
+  '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
+  '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
+  '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
+  '/api/public/owner/stories': typeof ApiPublicOwnerStoriesRoute
+  '/api/public/owner/users': typeof ApiPublicOwnerUsersRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/about'
+    | '/auth'
+    | '/guidelines'
+    | '/leaderboards'
+    | '/notifications'
+    | '/onboarding'
+    | '/post'
+    | '/privacy'
+    | '/profile'
+    | '/rights'
+    | '/salaries'
+    | '/search'
+    | '/companies/$slug'
+    | '/messages/$id'
+    | '/stories/$id'
+    | '/u/$username'
+    | '/companies/'
+    | '/messages/'
+    | '/api/public/owner/companies'
+    | '/api/public/owner/reports'
+    | '/api/public/owner/stats'
+    | '/api/public/owner/stories'
+    | '/api/public/owner/users'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/about'
+    | '/auth'
+    | '/guidelines'
+    | '/leaderboards'
+    | '/notifications'
+    | '/onboarding'
+    | '/post'
+    | '/privacy'
+    | '/profile'
+    | '/rights'
+    | '/salaries'
+    | '/search'
+    | '/companies/$slug'
+    | '/messages/$id'
+    | '/stories/$id'
+    | '/u/$username'
+    | '/companies'
+    | '/messages'
+    | '/api/public/owner/companies'
+    | '/api/public/owner/reports'
+    | '/api/public/owner/stats'
+    | '/api/public/owner/stories'
+    | '/api/public/owner/users'
+  id:
+    | '__root__'
+    | '/'
+    | '/about'
+    | '/auth'
+    | '/guidelines'
+    | '/leaderboards'
+    | '/notifications'
+    | '/onboarding'
+    | '/post'
+    | '/privacy'
+    | '/profile'
+    | '/rights'
+    | '/salaries'
+    | '/search'
+    | '/companies/$slug'
+    | '/messages/$id'
+    | '/stories/$id'
+    | '/u/$username'
+    | '/companies/'
+    | '/messages/'
+    | '/api/public/owner/companies'
+    | '/api/public/owner/reports'
+    | '/api/public/owner/stats'
+    | '/api/public/owner/stories'
+    | '/api/public/owner/users'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AboutRoute: typeof AboutRoute
+  AuthRoute: typeof AuthRoute
+  GuidelinesRoute: typeof GuidelinesRoute
+  LeaderboardsRoute: typeof LeaderboardsRoute
+  NotificationsRoute: typeof NotificationsRoute
+  OnboardingRoute: typeof OnboardingRoute
+  PostRoute: typeof PostRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ProfileRoute: typeof ProfileRoute
+  RightsRoute: typeof RightsRoute
+  SalariesRoute: typeof SalariesRoute
+  SearchRoute: typeof SearchRoute
+  CompaniesSlugRoute: typeof CompaniesSlugRoute
+  MessagesIdRoute: typeof MessagesIdRoute
+  StoriesIdRoute: typeof StoriesIdRoute
+  UUsernameRoute: typeof UUsernameRoute
+  CompaniesIndexRoute: typeof CompaniesIndexRoute
+  MessagesIndexRoute: typeof MessagesIndexRoute
+  ApiPublicOwnerCompaniesRoute: typeof ApiPublicOwnerCompaniesRoute
+  ApiPublicOwnerReportsRoute: typeof ApiPublicOwnerReportsRoute
+  ApiPublicOwnerStatsRoute: typeof ApiPublicOwnerStatsRoute
+  ApiPublicOwnerStoriesRoute: typeof ApiPublicOwnerStoriesRoute
+  ApiPublicOwnerUsersRoute: typeof ApiPublicOwnerUsersRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +351,195 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/guidelines': {
+      id: '/guidelines'
+      path: '/guidelines'
+      fullPath: '/guidelines'
+      preLoaderRoute: typeof GuidelinesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/leaderboards': {
+      id: '/leaderboards'
+      path: '/leaderboards'
+      fullPath: '/leaderboards'
+      preLoaderRoute: typeof LeaderboardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/notifications': {
+      id: '/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof NotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/post': {
+      id: '/post'
+      path: '/post'
+      fullPath: '/post'
+      preLoaderRoute: typeof PostRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/profile': {
+      id: '/profile'
+      path: '/profile'
+      fullPath: '/profile'
+      preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/rights': {
+      id: '/rights'
+      path: '/rights'
+      fullPath: '/rights'
+      preLoaderRoute: typeof RightsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/salaries': {
+      id: '/salaries'
+      path: '/salaries'
+      fullPath: '/salaries'
+      preLoaderRoute: typeof SalariesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/search': {
+      id: '/search'
+      path: '/search'
+      fullPath: '/search'
+      preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/companies/': {
+      id: '/companies/'
+      path: '/companies'
+      fullPath: '/companies/'
+      preLoaderRoute: typeof CompaniesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/companies/$slug': {
+      id: '/companies/$slug'
+      path: '/companies/$slug'
+      fullPath: '/companies/$slug'
+      preLoaderRoute: typeof CompaniesSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/messages/': {
+      id: '/messages/'
+      path: '/messages'
+      fullPath: '/messages/'
+      preLoaderRoute: typeof MessagesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/messages/$id': {
+      id: '/messages/$id'
+      path: '/messages/$id'
+      fullPath: '/messages/$id'
+      preLoaderRoute: typeof MessagesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/stories/$id': {
+      id: '/stories/$id'
+      path: '/stories/$id'
+      fullPath: '/stories/$id'
+      preLoaderRoute: typeof StoriesIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/u/$username': {
+      id: '/u/$username'
+      path: '/u/$username'
+      fullPath: '/u/$username'
+      preLoaderRoute: typeof UUsernameRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/owner/companies': {
+      id: '/api/public/owner/companies'
+      path: '/api/public/owner/companies'
+      fullPath: '/api/public/owner/companies'
+      preLoaderRoute: typeof ApiPublicOwnerCompaniesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/owner/reports': {
+      id: '/api/public/owner/reports'
+      path: '/api/public/owner/reports'
+      fullPath: '/api/public/owner/reports'
+      preLoaderRoute: typeof ApiPublicOwnerReportsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/owner/stats': {
+      id: '/api/public/owner/stats'
+      path: '/api/public/owner/stats'
+      fullPath: '/api/public/owner/stats'
+      preLoaderRoute: typeof ApiPublicOwnerStatsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/owner/stories': {
+      id: '/api/public/owner/stories'
+      path: '/api/public/owner/stories'
+      fullPath: '/api/public/owner/stories'
+      preLoaderRoute: typeof ApiPublicOwnerStoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/owner/users': {
+      id: '/api/public/owner/users'
+      path: '/api/public/owner/users'
+      fullPath: '/api/public/owner/users'
+      preLoaderRoute: typeof ApiPublicOwnerUsersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AboutRoute: AboutRoute,
+  AuthRoute: AuthRoute,
+  GuidelinesRoute: GuidelinesRoute,
+  LeaderboardsRoute: LeaderboardsRoute,
+  NotificationsRoute: NotificationsRoute,
+  OnboardingRoute: OnboardingRoute,
+  PostRoute: PostRoute,
+  PrivacyRoute: PrivacyRoute,
+  ProfileRoute: ProfileRoute,
+  RightsRoute: RightsRoute,
+  SalariesRoute: SalariesRoute,
+  SearchRoute: SearchRoute,
+  CompaniesSlugRoute: CompaniesSlugRoute,
+  MessagesIdRoute: MessagesIdRoute,
+  StoriesIdRoute: StoriesIdRoute,
+  UUsernameRoute: UUsernameRoute,
+  CompaniesIndexRoute: CompaniesIndexRoute,
+  MessagesIndexRoute: MessagesIndexRoute,
+  ApiPublicOwnerCompaniesRoute: ApiPublicOwnerCompaniesRoute,
+  ApiPublicOwnerReportsRoute: ApiPublicOwnerReportsRoute,
+  ApiPublicOwnerStatsRoute: ApiPublicOwnerStatsRoute,
+  ApiPublicOwnerStoriesRoute: ApiPublicOwnerStoriesRoute,
+  ApiPublicOwnerUsersRoute: ApiPublicOwnerUsersRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
