@@ -223,10 +223,7 @@ export const addComment = createServerFn({ method: "POST" })
     const storySnap = await storyRef.get();
     const currentStory = storySnap.exists ? storySnap.data() : null;
 
-    const verificationSnap = await db
-      .collection("account_verifications")
-      .doc(context.userId)
-      .get();
+    const verificationSnap = await db.collection("account_verifications").doc(context.userId).get();
     const verification = verificationSnap.exists
       ? (verificationSnap.data() as {
           account_type?: string;
@@ -236,8 +233,8 @@ export const addComment = createServerFn({ method: "POST" })
       : null;
     const isOfficial = Boolean(
       verification?.account_type === "company" &&
-        verification.company_id &&
-        verification.company_id === currentStory?.["company_id"],
+      verification.company_id &&
+      verification.company_id === currentStory?.["company_id"],
     );
 
     await db
@@ -262,9 +259,7 @@ export const addComment = createServerFn({ method: "POST" })
 /** Toggles a like on a comment or reply. */
 export const likeComment = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ comment_id: z.string().uuid() }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ comment_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
     const likeRef = db.collection("comment_likes").doc(`${data.comment_id}:${context.userId}`);
@@ -304,13 +299,9 @@ export const getMyEngagement = createServerFn({ method: "POST" })
     ]);
 
     return {
-      likedCommentIds: likes.docs.map(
-        (doc) => (doc.data() as { comment_id: string }).comment_id,
-      ),
+      likedCommentIds: likes.docs.map((doc) => (doc.data() as { comment_id: string }).comment_id),
       votedKinds: votes.docs.map((doc) => (doc.data() as { kind: string }).kind),
-      reportedTargetIds: reports.docs.map(
-        (doc) => (doc.data() as { target_id: string }).target_id,
-      ),
+      reportedTargetIds: reports.docs.map((doc) => (doc.data() as { target_id: string }).target_id),
     };
   });
 

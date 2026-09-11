@@ -12,7 +12,6 @@ export const getRouter = () => {
   enableQueryPersistence(queryClient);
   hydratePreferences();
 
-
   const router = createRouter({
     routeTree,
     context: { queryClient },
@@ -25,4 +24,3 @@ export const getRouter = () => {
 
   return router;
 };
-

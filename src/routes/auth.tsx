@@ -11,18 +11,13 @@ import {
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
 import { EyeOff, Fingerprint, Loader2, ShieldCheck } from "lucide-react";
-import {
-  authenticateWithBiometric,
-  getCredentials,
-  markUnlocked,
-} from "@/lib/biometrics";
+import { authenticateWithBiometric, getCredentials, markUnlocked } from "@/lib/biometrics";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { getOnboardingState } from "@/lib/onboarding.functions";
-
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -133,8 +128,6 @@ function AuthPage() {
     }
   }
 
-
-
   return (
     <div className="mx-auto max-w-md animate-rise">
       <div className="glass-card rounded-2xl border border-border p-6">
@@ -233,8 +226,6 @@ function AuthPage() {
         <p className="mt-2 text-center text-xs text-muted-foreground">
           Google works only for existing accounts. New here? Sign up with email first.
         </p>
-
-
 
         <button
           type="button"

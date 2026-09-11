@@ -604,20 +604,42 @@
 }
 
 @keyframes banner-in {
-  0% { opacity: 0; transform: translateY(-14px) scale(0.97); filter: blur(6px); }
-  100% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.97);
+    filter: blur(6px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    filter: blur(0);
+  }
 }
 @keyframes banner-out {
-  0% { opacity: 1; transform: translateY(0) scale(1); }
-  100% { opacity: 0; transform: translateY(-10px) scale(0.97); }
+  0% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.97);
+  }
 }
 @keyframes banner-progress {
-  from { transform: scaleX(1); }
-  to { transform: scaleX(0); }
+  from {
+    transform: scaleX(1);
+  }
+  to {
+    transform: scaleX(0);
+  }
 }
 
-.animate-banner-in { animation: banner-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both; }
-.animate-banner-out { animation: banner-out 280ms ease-in both; }
+.animate-banner-in {
+  animation: banner-in 380ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-banner-out {
+  animation: banner-out 280ms ease-in both;
+}
 
 .reduce-motion *,
 .reduce-motion *::before,

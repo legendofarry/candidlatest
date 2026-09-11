@@ -4,11 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, CheckCheck, ImagePlus, Loader2, Send, Smile, X } from "lucide-react";
-import {
-  getConversation,
-  postMessage,
-  reactToMessage,
-} from "@/lib/messaging.functions";
+import { getConversation, postMessage, reactToMessage } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -87,8 +83,7 @@ function ChatScreen() {
   });
 
   const toggleReaction = useMutation({
-    mutationFn: async (input: { message_id: string; emoji: string }) =>
-      react({ data: input }),
+    mutationFn: async (input: { message_id: string; emoji: string }) => react({ data: input }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["conversation", id] }),
   });
 
@@ -135,8 +130,7 @@ function ChatScreen() {
       <button
         type="button"
         onClick={() =>
-          partner &&
-          navigate({ to: "/u/$username", params: { username: partner.username } })
+          partner && navigate({ to: "/u/$username", params: { username: partner.username } })
         }
         className="glass-card sticky top-[6.75rem] z-30 mb-4 flex items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-secondary/40"
       >
@@ -243,9 +237,7 @@ function ChatScreen() {
                     </Popover>
                     <span>{clock(message.created_at)}</span>
                     {mine ? (
-                      <CheckCheck
-                        className={cn("size-3.5", message.read_at && "text-primary")}
-                      />
+                      <CheckCheck className={cn("size-3.5", message.read_at && "text-primary")} />
                     ) : null}
                   </div>
 

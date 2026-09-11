@@ -108,9 +108,7 @@ function MessagesInbox() {
               >
                 <button
                   type="button"
-                  onClick={() =>
-                    navigate({ to: "/messages/$id", params: { id: item.id } })
-                  }
+                  onClick={() => navigate({ to: "/messages/$id", params: { id: item.id } })}
                   className="flex w-full items-center gap-3 rounded-2xl border border-border/70 bg-card/60 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
                 >
                   <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/5 font-display text-base font-semibold uppercase">

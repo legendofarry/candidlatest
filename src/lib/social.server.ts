@@ -60,9 +60,7 @@ export async function readFollowStats(profileId: string, viewerId: string | null
     followers: followers.size,
     following: following.size,
     isFollowing: viewerId
-      ? followers.docs.some(
-          (doc) => (doc.data() as FollowRecord).follower_id === viewerId,
-        )
+      ? followers.docs.some((doc) => (doc.data() as FollowRecord).follower_id === viewerId)
       : false,
     followerIds: followers.docs.map((doc) => (doc.data() as FollowRecord).follower_id),
     followingIds: following.docs.map((doc) => (doc.data() as FollowRecord).following_id),
@@ -192,8 +190,7 @@ export async function buildStoryCatchUp(storyId: string, userId: string) {
   const story = storyDoc.exists ? (storyDoc.data() as StoryRecord) : null;
   const fresh = comments
     .filter(
-      (comment) =>
-        comment.story_id === storyId && new Date(comment.created_at).getTime() > since,
+      (comment) => comment.story_id === storyId && new Date(comment.created_at).getTime() > since,
     )
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 

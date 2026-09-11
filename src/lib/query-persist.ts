@@ -35,7 +35,10 @@ export function enableQueryPersistence(queryClient: QueryClient) {
         const state = dehydrate(queryClient, {
           shouldDehydrateQuery: (query) => query.state.status === "success",
         });
-        localStorage.setItem(KEY, JSON.stringify({ savedAt: Date.now(), state } satisfies Snapshot));
+        localStorage.setItem(
+          KEY,
+          JSON.stringify({ savedAt: Date.now(), state } satisfies Snapshot),
+        );
       } catch {
         /* storage full or unavailable */
       }

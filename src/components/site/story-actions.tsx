@@ -14,7 +14,6 @@ import { formatDate } from "@/components/site/story-card";
 import { StorySocial } from "@/components/site/story-social";
 import { cn } from "@/lib/utils";
 
-
 /** Inline vote + comment bar so people can act without leaving the feed. */
 export function StoryActions({
   storyId,

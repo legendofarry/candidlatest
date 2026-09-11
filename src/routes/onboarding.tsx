@@ -249,7 +249,12 @@ function OnboardingPage() {
                 />
                 <AnimatePresence mode="wait">
                   {status === "checking" ? (
-                    <motion.span key="c" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
+                    <motion.span
+                      key="c"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                    >
                       <Loader2 className="size-4 animate-spin text-muted-foreground" />
                     </motion.span>
                   ) : status === "available" ? (

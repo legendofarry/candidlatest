@@ -32,10 +32,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getOnboardingState } from "@/lib/onboarding.functions";
-import {
-  claimVerificationBadge,
-  getVerificationState,
-} from "@/lib/verification.functions";
+import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
 import { PrivacySettings } from "@/components/site/privacy-settings";
 import { useAuth } from "@/hooks/useAuth";
@@ -330,7 +327,11 @@ function ProfilePage() {
       </SettingsGroup>
 
       {user ? (
-        <Button variant="outline" className="w-full text-danger" onClick={() => setConfirmSignOut(true)}>
+        <Button
+          variant="outline"
+          className="w-full text-danger"
+          onClick={() => setConfirmSignOut(true)}
+        >
           <LogOut className="size-4" /> Sign out
         </Button>
       ) : null}

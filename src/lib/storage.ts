@@ -30,7 +30,7 @@ export const storageService = {
   get<T>(key: string): T | null {
     try {
       const expiry = localStorage.getItem(CACHE_EXPIRY_KEY(key));
-      
+
       // Check if expired
       if (expiry && Date.now() > parseInt(expiry)) {
         storageService.remove(key);
@@ -38,7 +38,7 @@ export const storageService = {
       }
 
       const value = localStorage.getItem(CACHE_VALUE_KEY(key));
-      return value ? JSON.parse(value) as T : null;
+      return value ? (JSON.parse(value) as T) : null;
     } catch (error) {
       console.warn(`[storageService] Failed to get ${key}:`, error);
       return null;
@@ -90,7 +90,7 @@ export const storageService = {
 export function useLocalStorage<T>(
   key: string,
   initialValue: T,
-  options?: CacheOptions
+  options?: CacheOptions,
 ): [T, (value: T) => void] {
   const [state, setState] = React.useState<T>(() => {
     const stored = storageService.get<T>(key);

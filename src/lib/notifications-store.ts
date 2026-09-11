@@ -194,10 +194,14 @@ export function pushNotification(kind: NotifyKind, title: string, options?: Push
     const key = options?.dedupeKey ?? `${kind}:${title}`;
     const now = Date.now();
     const duplicate = notifications.find(
-      (n) => (n.dedupeKey ?? `${n.kind}:${n.title}`) === key && now - n.createdAt < DEDUPE_WINDOW_MS,
+      (n) =>
+        (n.dedupeKey ?? `${n.kind}:${n.title}`) === key && now - n.createdAt < DEDUPE_WINDOW_MS,
     );
     if (duplicate) {
-      notifications = [item, ...notifications.filter((n) => n.id !== duplicate.id)].slice(0, MAX_STORED);
+      notifications = [item, ...notifications.filter((n) => n.id !== duplicate.id)].slice(
+        0,
+        MAX_STORED,
+      );
     } else {
       notifications = [item, ...notifications].slice(0, MAX_STORED);
     }
@@ -205,7 +209,10 @@ export function pushNotification(kind: NotifyKind, title: string, options?: Push
   }
 
   if (!options?.silent) {
-    banners = [{ ...item, duration: options?.duration ?? (kind === "error" ? 6500 : 4500) }, ...banners].slice(0, 3);
+    banners = [
+      { ...item, duration: options?.duration ?? (kind === "error" ? 6500 : 4500) },
+      ...banners,
+    ].slice(0, 3);
   }
 
   emit();
@@ -232,10 +239,12 @@ export function pushInboxNotification(kind: NotifyKind, title: string, options?:
 }
 
 export const inbox = {
-  success: (title: string, options?: InboxOptions) => pushInboxNotification("success", title, options),
+  success: (title: string, options?: InboxOptions) =>
+    pushInboxNotification("success", title, options),
   error: (title: string, options?: InboxOptions) => pushInboxNotification("error", title, options),
   info: (title: string, options?: InboxOptions) => pushInboxNotification("info", title, options),
-  warning: (title: string, options?: InboxOptions) => pushInboxNotification("warning", title, options),
+  warning: (title: string, options?: InboxOptions) =>
+    pushInboxNotification("warning", title, options),
 };
 
 function withReadStamp(n: AppNotification): AppNotification {

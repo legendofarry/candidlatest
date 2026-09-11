@@ -114,8 +114,17 @@ export function BadgeClaimModal() {
             </p>
 
             <div className="mt-8 flex w-full flex-col gap-2">
-              <Button size="lg" className="glow-primary" disabled={busy} onClick={() => void onClaim()}>
-                {busy ? <Loader2 className="size-4 animate-spin" /> : <BadgeCheck className="size-4" />}
+              <Button
+                size="lg"
+                className="glow-primary"
+                disabled={busy}
+                onClick={() => void onClaim()}
+              >
+                {busy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <BadgeCheck className="size-4" />
+                )}
                 Claim badge
               </Button>
               <Button size="lg" variant="ghost" onClick={() => void onSnooze()}>

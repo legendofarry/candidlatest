@@ -122,7 +122,7 @@ export function NotificationsOverlay() {
   }, [notifications]);
 
   const detail =
-    view.name === "detail" ? notifications.find((n) => n.id === view.id) ?? null : null;
+    view.name === "detail" ? (notifications.find((n) => n.id === view.id) ?? null) : null;
 
   function activate(n: AppNotification) {
     markRead(n.id);
@@ -302,7 +302,10 @@ export function NotificationsOverlay() {
         ) : null}
       </AnimatePresence>
 
-      <AlertDialog open={pending !== null} onOpenChange={(next) => (next ? null : setPending(null))}>
+      <AlertDialog
+        open={pending !== null}
+        onOpenChange={(next) => (next ? null : setPending(null))}
+      >
         <AlertDialogContent className="z-[95]">
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -395,8 +398,7 @@ function Row({
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={(_, info) => {
         if (info.offset.x < -90) onRequest({ type: "delete", id: n.id });
-        else if (info.offset.x > 90)
-          onRequest({ type: n.read ? "unread" : "read", id: n.id });
+        else if (info.offset.x > 90) onRequest({ type: n.read ? "unread" : "read", id: n.id });
       }}
       className={cn(
         "group relative overflow-hidden rounded-2xl border border-border bg-card/60 backdrop-blur transition-colors hover:border-primary/40",

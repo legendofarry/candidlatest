@@ -65,10 +65,7 @@ function FeedPage() {
   const needle = q.trim().toLowerCase();
   const stories = (data?.stories ?? []).filter((story) =>
     needle
-      ? [story.title, story.body, story.company_name ?? ""]
-          .join(" ")
-          .toLowerCase()
-          .includes(needle)
+      ? [story.title, story.body, story.company_name ?? ""].join(" ").toLowerCase().includes(needle)
       : true,
   );
 
@@ -157,12 +154,9 @@ function FeedPage() {
               No stories match these filters yet.
             </p>
           ) : (
-            stories.map((story, index) => (
-              <StoryCard key={story.id} story={story} index={index} />
-            ))
+            stories.map((story, index) => <StoryCard key={story.id} story={story} index={index} />)
           )}
         </div>
-
 
         <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
           <div className="rounded-2xl border border-border bg-card p-4">
@@ -208,7 +202,6 @@ function SignalPanel() {
     >
       <div className="signal-grid absolute inset-0 rounded-3xl" />
       <div className="relative min-h-72 overflow-hidden rounded-3xl border border-white/10 bg-[oklch(0.135_0.014_285)] p-5 text-foreground shadow-2xl shadow-black/30 backdrop-blur-sm">
-
         <div className="flex items-center justify-between text-xs text-muted-foreground">
           <span className="flex items-center gap-2 font-medium text-foreground">
             <Activity className="size-4 text-primary" /> Candid pulse

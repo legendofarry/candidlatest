@@ -87,7 +87,10 @@ export async function checkUsernameAvailability(
 const FLAVOURS = ["real", "hq", "ke", "254", "official_ish", "here", "speaks", "daily"];
 
 function candidatesFor(seed: string): string[] {
-  const base = normalizeUsername(seed).replace(/[^a-z0-9._]/g, "").slice(0, 14) || "candid_user";
+  const base =
+    normalizeUsername(seed)
+      .replace(/[^a-z0-9._]/g, "")
+      .slice(0, 14) || "candid_user";
   const out = new Set<string>();
   for (const flavour of FLAVOURS) out.add(`${base}_${flavour}`.slice(0, USERNAME_MAX));
   for (let i = 0; i < 40; i += 1) {

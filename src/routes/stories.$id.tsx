@@ -20,7 +20,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StorySocial } from "@/components/site/story-social";
 
-
 const storyQuery = (id: string) =>
   queryOptions({ queryKey: ["story", id], queryFn: () => getStory({ data: { id } }) });
 
@@ -78,8 +77,7 @@ function StoryPage() {
 
   if (!data) return null;
   const { story, comments } = data;
-  const isReported =
-    locallyReported || (engagement.data?.reportedTargetIds ?? []).includes(id);
+  const isReported = locallyReported || (engagement.data?.reportedTargetIds ?? []).includes(id);
   const votedKinds = engagement.data?.votedKinds ?? [];
 
   return (
@@ -146,7 +144,6 @@ function StoryPage() {
         </Button>
         <StorySocial storyId={id} />
         <Button
-
           variant="ghost"
           className="ml-auto text-danger"
           disabled={!user || isReported}

@@ -135,10 +135,7 @@ export async function resolveVerification(
   await db
     .collection("profiles")
     .doc(userId)
-    .set(
-      { account_type: accountType, verified: badgeStatus === "claimed" },
-      { merge: true },
-    );
+    .set({ account_type: accountType, verified: badgeStatus === "claimed" }, { merge: true });
 
   return next;
 }

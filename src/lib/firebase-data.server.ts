@@ -94,7 +94,6 @@ export type PublicComment = CommentRecord & {
   replies: PublicComment[];
 };
 
-
 export type VoteRecord = {
   id: string;
   story_id: string;
@@ -358,8 +357,6 @@ export async function readAuthorUsernames(): Promise<Map<string, string>> {
   );
 }
 
-
-
 export async function getFilterOptionsData() {
   const companies = await readCollection<CompanyRecord>("companies");
   const industries = [
@@ -492,9 +489,9 @@ export async function getStoryView(id: string) {
       comment.is_official ??
       Boolean(
         verification &&
-          verification.account_type === "company" &&
-          verification.company_id &&
-          verification.company_id === story.company_id,
+        verification.account_type === "company" &&
+        verification.company_id &&
+        verification.company_id === story.company_id,
       );
     return {
       ...comment,

@@ -13,11 +13,7 @@ import {
   UserCheck,
 } from "lucide-react";
 import { useState } from "react";
-import {
-  getPublicProfile,
-  startConversation,
-  toggleBlockAccount,
-} from "@/lib/messaging.functions";
+import { getPublicProfile, startConversation, toggleBlockAccount } from "@/lib/messaging.functions";
 import { followAccount } from "@/lib/social.functions";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notifications-store";
@@ -84,7 +80,11 @@ function PublicProfilePage() {
       <EmptyState
         title="Profile not found"
         body={`We could not find anyone using @${username}.`}
-        action={<Button variant="outline" onClick={() => navigate({ to: "/" })}>Back to feed</Button>}
+        action={
+          <Button variant="outline" onClick={() => navigate({ to: "/" })}>
+            Back to feed
+          </Button>
+        }
       />
     );
   }

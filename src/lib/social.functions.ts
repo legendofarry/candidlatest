@@ -21,7 +21,11 @@ export const getFollowStats = createServerFn({ method: "POST" })
     const { readFollowStats } = await import("./social.server");
     const target = data.user_id ?? context.userId;
     const stats = await readFollowStats(target, context.userId);
-    return { followers: stats.followers, following: stats.following, isFollowing: stats.isFollowing };
+    return {
+      followers: stats.followers,
+      following: stats.following,
+      isFollowing: stats.isFollowing,
+    };
   });
 
 export const likeStory = createServerFn({ method: "POST" })

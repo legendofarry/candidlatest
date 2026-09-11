@@ -36,9 +36,7 @@ export const startConversation = createServerFn({ method: "POST" })
 
 export const getConversation = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ conversation_id: z.string().min(1) }).parse(input),
-  )
+  .inputValidator((input: unknown) => z.object({ conversation_id: z.string().min(1) }).parse(input))
   .handler(async ({ data, context }) => {
     const { readConversation } = await import("./messaging.server");
     return readConversation(context.userId, data.conversation_id);

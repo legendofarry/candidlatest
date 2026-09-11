@@ -99,13 +99,11 @@ async function readParticipants(ids: string[]): Promise<Map<string, ChatParticip
       ]);
       const profile = profileSnap.data() as ProfileRecord | undefined;
       const verification = verificationSnap.data() as
-        | { badge_status?: string; owner_verified?: boolean }
-        | undefined;
+        { badge_status?: string; owner_verified?: boolean } | undefined;
       map.set(id, {
         id,
         username: profile?.username ?? profile?.handle ?? "member",
-        verified:
-          verification?.badge_status === "claimed" || Boolean(verification?.owner_verified),
+        verified: verification?.badge_status === "claimed" || Boolean(verification?.owner_verified),
         official: id === CANDID_USER_ID,
       });
     }),
@@ -211,9 +209,7 @@ export async function listConversations(userId: string) {
         mine: record.last_sender_id === userId,
       };
     })
-    .sort(
-      (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
-    );
+    .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
 }
 
 export async function unreadMessageCount(userId: string) {

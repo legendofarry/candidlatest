@@ -69,9 +69,7 @@ export function StoryCard({ story, index = 0 }: { story: PublicStory; index?: nu
         {story.role_level ? <span>· {story.role_level}</span> : null}
       </div>
 
-      <h3 className="mt-2 text-lg font-semibold leading-snug">
-        {story.title}
-      </h3>
+      <h3 className="mt-2 text-lg font-semibold leading-snug">{story.title}</h3>
 
       <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{story.body}</p>
 

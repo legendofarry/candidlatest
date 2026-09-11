@@ -83,8 +83,7 @@ export function CommentThread({
   );
 
   const commentMutation = useMutation({
-    mutationFn: () =>
-      post({ data: { story_id: storyId, parent_id: replyTo?.id ?? null, body } }),
+    mutationFn: () => post({ data: { story_id: storyId, parent_id: replyTo?.id ?? null, body } }),
     onSuccess: () => {
       setBody("");
       setReplyTo(null);
@@ -277,7 +276,9 @@ function CommentRow({
                 className="inline-flex items-center gap-1 hover:text-foreground"
                 onClick={() => setOpen((value) => !value)}
               >
-                <ChevronDown className={cn("size-3.5 transition-transform", open && "rotate-180")} />
+                <ChevronDown
+                  className={cn("size-3.5 transition-transform", open && "rotate-180")}
+                />
                 {open ? "Hide" : `View ${comment.replies.length}`} repl
                 {comment.replies.length === 1 ? "y" : "ies"}
               </button>
@@ -293,9 +294,7 @@ function CommentRow({
             onClick={() => void toggleLike()}
             className="text-muted-foreground transition-transform active:scale-90 disabled:opacity-50"
           >
-            <Heart
-              className={cn("size-4", isLiked && "fill-danger text-danger")}
-            />
+            <Heart className={cn("size-4", isLiked && "fill-danger text-danger")} />
           </button>
           <span className="text-[10px] text-muted-foreground">{localLikes}</span>
 

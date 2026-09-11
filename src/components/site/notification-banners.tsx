@@ -1,9 +1,17 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { dismissBanner, useBanners, type BannerNotification, type NotifyKind } from "@/lib/notifications-store";
+import {
+  dismissBanner,
+  useBanners,
+  type BannerNotification,
+  type NotifyKind,
+} from "@/lib/notifications-store";
 
-const kindStyles: Record<NotifyKind, { icon: typeof Info; accent: string; ring: string; glow: string }> = {
+const kindStyles: Record<
+  NotifyKind,
+  { icon: typeof Info; accent: string; ring: string; glow: string }
+> = {
   success: {
     icon: CheckCircle2,
     accent: "text-emerald-400",
@@ -83,7 +91,10 @@ function Banner({ banner }: { banner: BannerNotification }) {
         </button>
       </div>
       <span
-        className={cn("absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current opacity-40", style.accent)}
+        className={cn(
+          "absolute inset-x-0 bottom-0 h-0.5 origin-left bg-current opacity-40",
+          style.accent,
+        )}
         style={{ animation: `banner-progress ${banner.duration}ms linear forwards` }}
       />
     </div>
