@@ -57,10 +57,17 @@ function parseServiceAccount(): ServiceAccountInput {
       "Missing Firebase admin credentials. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.",
     );
   }
+  const normalized = normalizePrivateKey(privateKey);
+  console.log("[firebase] credential shape", {
+    projectId,
+    hasClientEmail: Boolean(clientEmail),
+    keyLength: normalized.length,
+    lineCount: normalized.split("\n").length,
+  });
   return {
     projectId,
     clientEmail,
-    privateKey: normalizePrivateKey(privateKey),
+    privateKey: normalized,
   };
 }
 
