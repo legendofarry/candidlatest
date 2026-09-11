@@ -10,16 +10,25 @@ type ServiceAccountInput = {
 
 let firebaseAdminApp: App | undefined;
 
+/** Repair keys whose newlines were lost or escaped while travelling through env storage. */
 function normalizePrivateKey(key: string) {
-  return key.replace(/\\n/g, "\n").trim();
+  const unescaped = key.replace(/\\r/g, "").replace(/\\n/g, "\n").replace(/\r/g, "").trim();
+  const match = /-----BEGIN ([A-Z ]+)-----([\s\S]*?)-----END \1-----/.exec(unescaped);
+  if (!match) return unescaped;
+  const label = match[1]!;
+  const body = (match[2] ?? "").replace(/\s+/g, "");
+  const lines = body.match(/.{1,64}/g) ?? [];
+  return `-----BEGIN ${label}-----\n${lines.join("\n")}\n-----END ${label}-----\n`;
 }
 
 function isUsableKey(key: string | undefined): key is string {
-  return Boolean(
-    key &&
-    normalizePrivateKey(key).startsWith("-----BEGIN") &&
-    normalizePrivateKey(key).includes("-----END"),
-  );
+  if (!key) return false;
+  try {
+    createPrivateKey(normalizePrivateKey(key));
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /** Read credentials from the service-account JSON, falling back to the individual variables. */
@@ -42,7 +51,7 @@ function parseServiceAccount(): ServiceAccountInput {
         return { projectId, clientEmail, privateKey: normalizePrivateKey(privateKey) };
       }
       console.warn(
-        "[firebase] FIREBASE_SERVICE_ACCOUNT_JSON is incomplete or malformed; using FIREBASE_* variables instead.",
+        "[firebase] FIREBASE_SERVICE_ACCOUNT_JSON is incomplete or unreadable; using FIREBASE_* variables instead.",
       );
     } catch (error) {
       console.warn("[firebase] FIREBASE_SERVICE_ACCOUNT_JSON is not valid JSON.", error);
@@ -57,17 +66,10 @@ function parseServiceAccount(): ServiceAccountInput {
       "Missing Firebase admin credentials. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.",
     );
   }
-  const normalized = normalizePrivateKey(privateKey);
-  console.log("[firebase] credential shape", {
-    projectId,
-    hasClientEmail: Boolean(clientEmail),
-    keyLength: normalized.length,
-    lineCount: normalized.split("\n").length,
-  });
   return {
     projectId,
     clientEmail,
-    privateKey: normalized,
+    privateKey: normalizePrivateKey(privateKey),
   };
 }
 
