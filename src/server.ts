@@ -1,3 +1,12 @@
+import { fileURLToPath } from "node:url";
+import { dirname } from "node:path";
+
+// Polyfill __dirname and __filename for ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+globalThis.__dirname = __dirname;
+globalThis.__filename = __filename;
+
 import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
