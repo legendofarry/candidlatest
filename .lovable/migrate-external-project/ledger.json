@@ -1,0 +1,17 @@
+{
+  "source": "https://github.com/legendofarry/candid.git",
+  "capabilities": [
+    {"capability":"application code and routes","source":"GitHub repository","outcome":"preserve","status":"implementing","next_action":"copy and verify"},
+    {"capability":"Firebase authentication identities","source":"Firebase Auth","outcome":"preserve","status":"blocked","next_action":"connect original Firebase credentials"},
+    {"capability":"Firestore schema and records","source":"Firestore collections inferred from code; no export supplied","outcome":"preserve","status":"blocked","next_action":"connect original Firebase credentials or provide export"},
+    {"capability":"authorization","source":"Firebase token middleware and owner API key","outcome":"preserve","status":"implementing","next_action":"verify authenticated request"},
+    {"capability":"uploaded file bytes","source":"none detected","outcome":"preserve","status":"verified","next_action":"none"},
+    {"capability":"OpenRouter AI","source":"OPENROUTER_API_KEY","outcome":"preserve","status":"blocked","next_action":"add source key securely"},
+    {"capability":"owner public API endpoints","source":"TanStack server routes","outcome":"preserve","status":"implementing","next_action":"verify key-protected responses"},
+    {"capability":"callbacks and webhooks","source":"none detected","outcome":"preserve","status":"verified","next_action":"none"},
+    {"capability":"schedules","source":"none detected","outcome":"preserve","status":"verified","next_action":"none"},
+    {"capability":"secrets","source":"Firebase, OpenRouter, owner API key","outcome":"preserve","status":"blocked","next_action":"configure through secure secret flow"},
+    {"capability":"cutover","source":"Lovable preview and future publish","outcome":"preserve","status":"pending","next_action":"verify preview before publish"},
+    {"capability":"verification","source":"manual browser and runtime checks","outcome":"preserve","status":"pending","next_action":"run route and interaction checks"}
+  ]
+}
