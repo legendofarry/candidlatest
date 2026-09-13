@@ -26,6 +26,8 @@ import { Route as CompaniesIndexRouteImport } from './routes/companies.index'
 import { Route as CompaniesSlugRouteImport } from './routes/companies.$slug'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as MessagesIdRouteImport } from './routes/messages.$id'
+import { Route as SalariesIndexRouteImport } from './routes/salaries.index'
+import { Route as SalariesSlugRouteImport } from './routes/salaries.$slug'
 import { Route as StoriesIdRouteImport } from './routes/stories.$id'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as ApiPublicOwnerCompaniesRouteImport } from './routes/api/public/owner/companies'
@@ -119,6 +121,16 @@ const MessagesIdRoute = MessagesIdRouteImport.update({
   path: '/messages/$id',
   getParentRoute: () => rootRouteImport,
 } as any)
+const SalariesIndexRoute = SalariesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => SalariesRoute,
+} as any)
+const SalariesSlugRoute = SalariesSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => SalariesRoute,
+} as any)
 const StoriesIdRoute = StoriesIdRouteImport.update({
   id: '/stories/$id',
   path: '/stories/$id',
@@ -167,14 +179,16 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/rights': typeof RightsRoute
-  '/salaries': typeof SalariesRoute
+  '/salaries': typeof SalariesRouteWithChildren
   '/search': typeof SearchRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
+  '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
   '/u/$username': typeof UUsernameRoute
   '/companies/': typeof CompaniesIndexRoute
   '/messages/': typeof MessagesIndexRoute
+  '/salaries/': typeof SalariesIndexRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
   '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
@@ -193,14 +207,15 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/rights': typeof RightsRoute
-  '/salaries': typeof SalariesRoute
   '/search': typeof SearchRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
+  '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
   '/u/$username': typeof UUsernameRoute
   '/companies': typeof CompaniesIndexRoute
   '/messages': typeof MessagesIndexRoute
+  '/salaries': typeof SalariesIndexRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
   '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
@@ -220,14 +235,16 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/profile': typeof ProfileRoute
   '/rights': typeof RightsRoute
-  '/salaries': typeof SalariesRoute
+  '/salaries': typeof SalariesRouteWithChildren
   '/search': typeof SearchRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
+  '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
   '/u/$username': typeof UUsernameRoute
   '/companies/': typeof CompaniesIndexRoute
   '/messages/': typeof MessagesIndexRoute
+  '/salaries/': typeof SalariesIndexRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
   '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
@@ -252,10 +269,12 @@ export interface FileRouteTypes {
     | '/search'
     | '/companies/$slug'
     | '/messages/$id'
+    | '/salaries/$slug'
     | '/stories/$id'
     | '/u/$username'
     | '/companies/'
     | '/messages/'
+    | '/salaries/'
     | '/api/public/owner/companies'
     | '/api/public/owner/reports'
     | '/api/public/owner/stats'
@@ -274,14 +293,15 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/profile'
     | '/rights'
-    | '/salaries'
     | '/search'
     | '/companies/$slug'
     | '/messages/$id'
+    | '/salaries/$slug'
     | '/stories/$id'
     | '/u/$username'
     | '/companies'
     | '/messages'
+    | '/salaries'
     | '/api/public/owner/companies'
     | '/api/public/owner/reports'
     | '/api/public/owner/stats'
@@ -304,10 +324,12 @@ export interface FileRouteTypes {
     | '/search'
     | '/companies/$slug'
     | '/messages/$id'
+    | '/salaries/$slug'
     | '/stories/$id'
     | '/u/$username'
     | '/companies/'
     | '/messages/'
+    | '/salaries/'
     | '/api/public/owner/companies'
     | '/api/public/owner/reports'
     | '/api/public/owner/stats'
@@ -327,7 +349,7 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   ProfileRoute: typeof ProfileRoute
   RightsRoute: typeof RightsRoute
-  SalariesRoute: typeof SalariesRoute
+  SalariesRoute: typeof SalariesRouteWithChildren
   SearchRoute: typeof SearchRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   MessagesIdRoute: typeof MessagesIdRoute
@@ -463,6 +485,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof MessagesIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/salaries/': {
+      id: '/salaries/'
+      path: '/'
+      fullPath: '/salaries/'
+      preLoaderRoute: typeof SalariesIndexRouteImport
+      parentRoute: typeof SalariesRoute
+    }
+    '/salaries/$slug': {
+      id: '/salaries/$slug'
+      path: '/$slug'
+      fullPath: '/salaries/$slug'
+      preLoaderRoute: typeof SalariesSlugRouteImport
+      parentRoute: typeof SalariesRoute
+    }
     '/stories/$id': {
       id: '/stories/$id'
       path: '/stories/$id'
@@ -515,6 +551,20 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface SalariesRouteChildren {
+  SalariesSlugRoute: typeof SalariesSlugRoute
+  SalariesIndexRoute: typeof SalariesIndexRoute
+}
+
+const SalariesRouteChildren: SalariesRouteChildren = {
+  SalariesSlugRoute: SalariesSlugRoute,
+  SalariesIndexRoute: SalariesIndexRoute,
+}
+
+const SalariesRouteWithChildren = SalariesRoute._addFileChildren(
+  SalariesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
@@ -527,7 +577,7 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   ProfileRoute: ProfileRoute,
   RightsRoute: RightsRoute,
-  SalariesRoute: SalariesRoute,
+  SalariesRoute: SalariesRouteWithChildren,
   SearchRoute: SearchRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   MessagesIdRoute: MessagesIdRoute,
