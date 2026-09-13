@@ -143,6 +143,30 @@ export const getSalaryAggregates = createServerFn({ method: "GET" }).handler(asy
   }
 });
 
+export const getSalaryCompanies = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const { buildCompanySalaryDirectory } = await import("./firebase-data.server");
+    return { companies: await buildCompanySalaryDirectory() };
+  } catch (error) {
+    if (!isFirebaseReadUnavailable(error)) throw error;
+    console.warn("[getSalaryCompanies] Firebase public read unavailable", error);
+    return { companies: [] };
+  }
+});
+
+export const getCompanySalaries = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) => z.object({ slug: z.string().min(1) }).parse(input))
+  .handler(async ({ data }) => {
+    try {
+      const { buildCompanySalaryDetail } = await import("./firebase-data.server");
+      return await buildCompanySalaryDetail(data.slug);
+    } catch (error) {
+      if (!isFirebaseReadUnavailable(error)) throw error;
+      console.warn("[getCompanySalaries] Firebase public read unavailable", error);
+      return null;
+    }
+  });
+
 export const searchAll = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) =>
     z.object({ q: z.string().max(120).default("") }).parse(input ?? {}),
