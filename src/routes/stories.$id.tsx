@@ -19,6 +19,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StorySocial } from "@/components/site/story-social";
+import { StoryLocationTag } from "@/components/site/company-intel";
 
 const storyQuery = (id: string) =>
   queryOptions({ queryKey: ["story", id], queryFn: () => getStory({ data: { id } }) });
@@ -94,9 +95,13 @@ function StoryPage() {
             </Link>
           ) : null}
           <span>· {story.industry}</span>
-          <span className="inline-flex items-center gap-1">
-            <MapPin className="size-3" /> {story.county}
-          </span>
+          {story.company_id ? (
+            <StoryLocationTag companyId={story.company_id} county={story.county} />
+          ) : (
+            <span className="inline-flex items-center gap-1">
+              <MapPin className="size-3" /> {story.county}
+            </span>
+          )}
           <span>· {story.tenure}</span>
           <span>· {story.role_level}</span>
         </div>
