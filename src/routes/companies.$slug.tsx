@@ -6,6 +6,7 @@ import { StoryCard } from "@/components/site/story-card";
 import { ScoreBadge } from "@/routes/companies.index";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { CompanyIntelPanel } from "@/components/site/company-intel";
 
 const companyQuery = (slug: string) =>
   queryOptions({
@@ -97,8 +98,14 @@ function CompanyPage() {
         </div>
 
         <aside className="space-y-4">
+          <CompanyIntelPanel
+            companyId={company.id}
+            companyName={company.name}
+            metooTotal={stories.reduce((total, story) => total + Number(story.metoo ?? 0), 0)}
+          />
+
           <div className="rounded-2xl border border-border bg-card p-5">
-            <h2 className="text-sm font-semibold">Red-flag breakdown</h2>
+            <h2 className="text-sm font-semibold">Average scores</h2>
             <div className="mt-4 space-y-3">
               {METRICS.map(([key, label]) => {
                 const value = score ? Number(score[key] ?? 0) : 0;
