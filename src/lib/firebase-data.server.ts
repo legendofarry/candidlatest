@@ -333,6 +333,115 @@ export async function buildSalaryAggregates() {
   return rows.sort((a, b) => Number(b.reports ?? 0) - Number(a.reports ?? 0));
 }
 
+/** A typical range is only shown once this many people have contributed. */
+export const SALARY_MIN_CONTRIBUTIONS = 3;
+
+export type CompanySalarySummary = {
+  company_id: string;
+  name: string;
+  slug: string;
+  industry: string | null;
+  county: string | null;
+  contributions: number;
+  positions: number;
+  average_kes: number | null;
+};
+
+export type CompanyPositionSalary = {
+  role_title: string;
+  contributions: number;
+  average_kes: number;
+  low_kes: number;
+  high_kes: number;
+  range_visible: boolean;
+};
+
+function midpoint(report: SalaryReportRecord) {
+  return (Number(report.min_kes) + Number(report.max_kes)) / 2;
+}
+
+/** Company-first salary listing for the directory screen. */
+export async function buildCompanySalaryDirectory() {
+  const [companies, reports] = await Promise.all([
+    readCollection<CompanyRecord>("companies"),
+    readCollection<SalaryReportRecord>("salary_reports"),
+  ]);
+
+  const byCompany = new Map<string, SalaryReportRecord[]>();
+  for (const report of reports) {
+    if (!report.company_id) continue;
+    const list = byCompany.get(report.company_id) ?? [];
+    list.push(report);
+    byCompany.set(report.company_id, list);
+  }
+
+  const rows: CompanySalarySummary[] = [];
+  for (const company of companies) {
+    const items = byCompany.get(company.id) ?? [];
+    if (items.length === 0) continue;
+    const positions = new Set(items.map((item) => item.role_title.trim().toLowerCase()));
+    rows.push({
+      company_id: company.id,
+      name: company.name,
+      slug: company.slug,
+      industry: company.industry,
+      county: company.county,
+      contributions: items.length,
+      positions: positions.size,
+      average_kes:
+        items.length >= SALARY_MIN_CONTRIBUTIONS
+          ? Math.round(average(items.map(midpoint)) ?? 0)
+          : null,
+    });
+  }
+
+  return rows.sort((a, b) => b.contributions - a.contributions);
+}
+
+/** Per-position breakdown for one company. */
+export async function buildCompanySalaryDetail(slug: string) {
+  const companies = await readCollection<CompanyRecord>("companies");
+  const company = companies.find((entry) => entry.slug === slug) ?? null;
+  if (!company) return null;
+
+  const reports = (await readCollection<SalaryReportRecord>("salary_reports")).filter(
+    (report) => report.company_id === company.id,
+  );
+
+  const groups = new Map<string, SalaryReportRecord[]>();
+  for (const report of reports) {
+    const key = report.role_title.trim().toLowerCase();
+    const list = groups.get(key) ?? [];
+    list.push(report);
+    groups.set(key, list);
+  }
+
+  const positions: CompanyPositionSalary[] = [...groups.values()].map((items) => {
+    const visible = items.length >= SALARY_MIN_CONTRIBUTIONS;
+    return {
+      role_title: items[0]?.role_title ?? "—",
+      contributions: items.length,
+      average_kes: Math.round(average(items.map(midpoint)) ?? 0),
+      low_kes: Math.min(...items.map((item) => Number(item.min_kes))),
+      high_kes: Math.max(...items.map((item) => Number(item.max_kes))),
+      range_visible: visible,
+    };
+  });
+
+  return {
+    company: {
+      id: company.id,
+      name: company.name,
+      slug: company.slug,
+      industry: company.industry,
+      county: company.county,
+    },
+    contributions: reports.length,
+    minimum: SALARY_MIN_CONTRIBUTIONS,
+    positions: positions.sort((a, b) => b.contributions - a.contributions),
+  };
+}
+
 export type PublicStoryRecord = Omit<StoryRecord, "status" | "moderation_note"> & {
   body: string | null;
   created_at: string | null;
