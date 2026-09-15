@@ -127,15 +127,19 @@ function ProfilePage() {
     try {
       await declareType({ data: { accountType } });
       await queryClient.invalidateQueries({ queryKey: ["onboarding-state"] });
-      toast({
-        title: accountType === "company" ? "Employer account confirmed" : "Thanks — you are set",
-        body:
-          accountType === "company"
-            ? "You can now reply to stories about your company and add your location."
-            : "Your account is marked as an individual worker.",
-      });
+      toast.success(
+        accountType === "company" ? "Employer account confirmed" : "Thanks — you are set",
+        {
+          description:
+            accountType === "company"
+              ? "You can now reply to stories about your company and add your location."
+              : "Your account is marked as an individual worker.",
+        },
+      );
     } catch {
-      toast({ title: "Could not save that", body: "Check your connection and try again." });
+      toast.error("Could not save that", {
+        description: "Check your connection and try again.",
+      });
     } finally {
       setSavingType(false);
     }
