@@ -31,7 +31,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getOnboardingState } from "@/lib/onboarding.functions";
+import { declareAccountType, getOnboardingState } from "@/lib/onboarding.functions";
 import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
 import { PrivacySettings } from "@/components/site/privacy-settings";
@@ -112,6 +112,34 @@ function ProfilePage() {
     enabled: Boolean(user),
   });
   const socials = onboarding.data?.socials ?? null;
+
+  // Some accounts never got classified at signup. After a week we ask directly,
+  // because company replies and employer tools depend on knowing.
+  const declareType = useServerFn(declareAccountType);
+  const createdAt = user?.metadata?.creationTime ? Date.parse(user.metadata.creationTime) : null;
+  const olderThanAWeek = createdAt ? Date.now() - createdAt > 7 * 24 * 60 * 60 * 1000 : false;
+  const askAccountType =
+    Boolean(user) && onboarding.data?.accountType === "unknown" && olderThanAWeek;
+  const [savingType, setSavingType] = useState(false);
+
+  async function chooseAccountType(accountType: "individual" | "company") {
+    setSavingType(true);
+    try {
+      await declareType({ data: { accountType } });
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-state"] });
+      toast({
+        title: accountType === "company" ? "Employer account confirmed" : "Thanks — you are set",
+        body:
+          accountType === "company"
+            ? "You can now reply to stories about your company and add your location."
+            : "Your account is marked as an individual worker.",
+      });
+    } catch {
+      toast({ title: "Could not save that", body: "Check your connection and try again." });
+    } finally {
+      setSavingType(false);
+    }
+  }
   const socialLinks = socials
     ? (Object.entries(socials) as [string, string | null][]).filter(([, value]) => Boolean(value))
     : [];
@@ -217,6 +245,35 @@ function ProfilePage() {
       </section>
 
       <FollowedStories />
+
+      {askAccountType ? (
+        <SettingsGroup title="One quick question">
+          <div className="px-4 py-3">
+            <p className="text-sm font-medium">Are you here as a worker or an employer?</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              We never worked this out for your account. Employers get a reply tool and a company
+              page; workers keep posting anonymously as usual.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={savingType}
+                onClick={() => void chooseAccountType("individual")}
+              >
+                I am a worker
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={savingType}
+                onClick={() => void chooseAccountType("company")}
+              >
+                I represent a company
+              </Button>
+            </div>
+          </div>
+        </SettingsGroup>
+      ) : null}
 
       <SettingsGroup title="Security & fast access">
         <ToggleRow
