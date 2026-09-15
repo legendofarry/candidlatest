@@ -221,3 +221,15 @@ export function isIdleBeyond(timeoutMs: number): boolean {
   if (last === null) return false;
   return Date.now() - last > timeoutMs;
 }
+
+/** Broadcast so the gate can re-lock immediately, wherever it is mounted. */
+export const LOCK_EVENT = "candid:lock";
+
+export function requestLock() {
+  lockNow();
+  try {
+    window.dispatchEvent(new Event(LOCK_EVENT));
+  } catch {
+    /* ignore */
+  }
+}

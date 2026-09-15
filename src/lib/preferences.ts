@@ -5,6 +5,8 @@ export type Preferences = {
   biometricUnlock: boolean;
   /** Minutes of inactivity before the unlock screen returns. 0 = never. */
   autoLockMinutes: number;
+  /** Answer to the one-time "remember me next time?" question at sign-out. */
+  sessionMemory: "ask" | "lock" | "signout";
   reduceMotion: boolean;
   compactFeed: boolean;
   autoplayInsights: boolean;
@@ -26,6 +28,7 @@ const DEFAULTS: Preferences = {
   theme: "dark",
   biometricUnlock: false,
   autoLockMinutes: 5,
+  sessionMemory: "ask",
   reduceMotion: false,
   compactFeed: false,
   autoplayInsights: true,
