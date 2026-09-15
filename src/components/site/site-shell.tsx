@@ -29,6 +29,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
+import { hasCredentialFor, requestLock } from "@/lib/biometrics";
+import { setPreference, usePreferences } from "@/lib/preferences";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +78,27 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadCount();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [rememberChoice, setRememberChoice] = useState(false);
+  const prefs = usePreferences();
+  /** Locking is only an option once fast unlock is set up on this device. */
+  const canLock = Boolean(user && prefs.biometricUnlock && hasCredentialFor(user.uid));
+
+  /**
+   * Asked once: after the user says "remember this", leaving follows their
+   * answer instead of showing the question again.
+   */
+  function handleLeave() {
+    if (canLock && prefs.sessionMemory === "lock") {
+      requestLock();
+      return;
+    }
+    if (canLock && prefs.sessionMemory === "signout") {
+      void signOut();
+      return;
+    }
+    setRememberChoice(false);
+    setConfirmSignOut(true);
+  }
   const fetchUnreadMessages = useServerFn(getUnreadMessages);
   const { data: messageState } = useQuery({
     queryKey: ["unread-messages", user?.uid ?? null],
@@ -183,8 +206,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 })}
                 <DropdownMenuSeparator />
                 {user ? (
-                  <DropdownMenuItem onSelect={() => setConfirmSignOut(true)}>
-                    <LogOut className="size-4" /> Sign out
+                  <DropdownMenuItem onSelect={() => handleLeave()}>
+                    <LogOut className="size-4" /> {canLock ? "Lock or sign out" : "Sign out"}
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem asChild>
