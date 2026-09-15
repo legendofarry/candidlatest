@@ -8,6 +8,7 @@ import {
   hasCredentialFor,
   isIdleBeyond,
   isUnlockedThisSession,
+  LOCK_EVENT,
   lockNow,
   markUnlocked,
   touchActivity,
@@ -88,6 +89,14 @@ export function BiometricGate({ children }: { children: React.ReactNode }) {
       window.removeEventListener("focus", check);
     };
   }, [armed, timeoutMs, lockUp]);
+
+  // Manual lock requested elsewhere (e.g. from the sign-out dialog).
+  useEffect(() => {
+    if (!armed) return;
+    const onLock = () => lockUp();
+    window.addEventListener(LOCK_EVENT, onLock);
+    return () => window.removeEventListener(LOCK_EVENT, onLock);
+  }, [armed, lockUp]);
 
   async function unlock() {
     if (!user) return;
