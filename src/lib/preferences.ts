@@ -3,10 +3,21 @@ import { useSyncExternalStore } from "react";
 export type Preferences = {
   theme: "dark" | "light";
   biometricUnlock: boolean;
+  /** Minutes of inactivity before the unlock screen returns. 0 = never. */
+  autoLockMinutes: number;
   reduceMotion: boolean;
   compactFeed: boolean;
   autoplayInsights: boolean;
 };
+
+/** Choices offered in settings for the idle lock window. */
+export const AUTO_LOCK_CHOICES = [
+  { minutes: 1, label: "1 min" },
+  { minutes: 5, label: "5 min" },
+  { minutes: 15, label: "15 min" },
+  { minutes: 60, label: "1 hour" },
+  { minutes: 0, label: "Never" },
+] as const;
 
 const KEY = "candid_preferences";
 const THEME_KEY = "lo-theme";
@@ -14,6 +25,7 @@ const THEME_KEY = "lo-theme";
 const DEFAULTS: Preferences = {
   theme: "dark",
   biometricUnlock: false,
+  autoLockMinutes: 5,
   reduceMotion: false,
   compactFeed: false,
   autoplayInsights: true,
