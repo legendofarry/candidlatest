@@ -12,10 +12,11 @@
 - [x] Contribute flow requires picking company from in-app list
 
 ## Phase 11 — Polish and account-type nudges
-- [ ] Candid Pulse redesign with live animated data
-- [ ] Richer About screen + owner-updatable contact block
-- [ ] Sign-out asks once about remembering session
-- [ ] Account-type escalation prompt
+- [x] Candid Pulse redesign with live animated data
+- [x] Richer About screen + owner-updatable contact block
+- [x] Sign-out asks once about remembering session
+- [x] Account-type escalation prompt
+- [x] Idle auto-lock with fingerprint / face
 
 ## Loose ends
 - [ ] Rotate Firebase service-account key (user action)
