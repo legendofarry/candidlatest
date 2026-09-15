@@ -52,14 +52,22 @@ const SORTS = [
 
 function FeedPage() {
   const { data: filters } = useSuspenseQuery(filtersQuery);
+  const { data: initialFeed } = useSuspenseQuery(feedQuery);
   const [sort, setSort] = useState<"new" | "top" | "trending">("new");
   const [industry, setIndustry] = useState<string | null>(null);
   const [county, setCounty] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
+  /**
+   * The unfiltered view reuses the data the loader already fetched, so the
+   * server and the first client render agree (no hydration mismatch).
+   */
+  const isDefaultView = sort === "new" && industry === null && county === null;
+
   const { data, isPending } = useQuery({
     queryKey: ["stories", sort, industry, county],
     queryFn: () => listStories({ data: { sort, industry, county } }),
+    ...(isDefaultView ? { initialData: initialFeed } : {}),
   });
 
   const needle = q.trim().toLowerCase();
