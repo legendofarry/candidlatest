@@ -27,7 +27,10 @@ export const Route = createFileRoute("/api/public/owner/contact")({
         await getAdmin();
         const parsed = ContactInput.safeParse(await request.json().catch(() => null));
         if (!parsed.success) return json({ error: "Invalid contact payload" }, 400);
-        return json(await writeSiteContact(parsed.data));
+        const patch = Object.fromEntries(
+          Object.entries(parsed.data).filter(([, value]) => value !== undefined),
+        );
+        return json(await writeSiteContact(patch));
       },
     },
   },

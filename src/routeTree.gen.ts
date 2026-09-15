@@ -31,6 +31,7 @@ import { Route as SalariesSlugRouteImport } from './routes/salaries.$slug'
 import { Route as StoriesIdRouteImport } from './routes/stories.$id'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
 import { Route as ApiPublicOwnerCompaniesRouteImport } from './routes/api/public/owner/companies'
+import { Route as ApiPublicOwnerContactRouteImport } from './routes/api/public/owner/contact'
 import { Route as ApiPublicOwnerReportsRouteImport } from './routes/api/public/owner/reports'
 import { Route as ApiPublicOwnerStatsRouteImport } from './routes/api/public/owner/stats'
 import { Route as ApiPublicOwnerStoriesRouteImport } from './routes/api/public/owner/stories'
@@ -146,6 +147,11 @@ const ApiPublicOwnerCompaniesRoute = ApiPublicOwnerCompaniesRouteImport.update({
   path: '/api/public/owner/companies',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicOwnerContactRoute = ApiPublicOwnerContactRouteImport.update({
+  id: '/api/public/owner/contact',
+  path: '/api/public/owner/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicOwnerReportsRoute = ApiPublicOwnerReportsRouteImport.update({
   id: '/api/public/owner/reports',
   path: '/api/public/owner/reports',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/messages/': typeof MessagesIndexRoute
   '/salaries/': typeof SalariesIndexRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
+  '/api/public/owner/contact': typeof ApiPublicOwnerContactRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
   '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
   '/api/public/owner/stories': typeof ApiPublicOwnerStoriesRoute
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/messages': typeof MessagesIndexRoute
   '/salaries': typeof SalariesIndexRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
+  '/api/public/owner/contact': typeof ApiPublicOwnerContactRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
   '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
   '/api/public/owner/stories': typeof ApiPublicOwnerStoriesRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/messages/': typeof MessagesIndexRoute
   '/salaries/': typeof SalariesIndexRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
+  '/api/public/owner/contact': typeof ApiPublicOwnerContactRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
   '/api/public/owner/stats': typeof ApiPublicOwnerStatsRoute
   '/api/public/owner/stories': typeof ApiPublicOwnerStoriesRoute
@@ -276,6 +285,7 @@ export interface FileRouteTypes {
     | '/messages/'
     | '/salaries/'
     | '/api/public/owner/companies'
+    | '/api/public/owner/contact'
     | '/api/public/owner/reports'
     | '/api/public/owner/stats'
     | '/api/public/owner/stories'
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/messages'
     | '/salaries'
     | '/api/public/owner/companies'
+    | '/api/public/owner/contact'
     | '/api/public/owner/reports'
     | '/api/public/owner/stats'
     | '/api/public/owner/stories'
@@ -331,6 +342,7 @@ export interface FileRouteTypes {
     | '/messages/'
     | '/salaries/'
     | '/api/public/owner/companies'
+    | '/api/public/owner/contact'
     | '/api/public/owner/reports'
     | '/api/public/owner/stats'
     | '/api/public/owner/stories'
@@ -358,6 +370,7 @@ export interface RootRouteChildren {
   CompaniesIndexRoute: typeof CompaniesIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
   ApiPublicOwnerCompaniesRoute: typeof ApiPublicOwnerCompaniesRoute
+  ApiPublicOwnerContactRoute: typeof ApiPublicOwnerContactRoute
   ApiPublicOwnerReportsRoute: typeof ApiPublicOwnerReportsRoute
   ApiPublicOwnerStatsRoute: typeof ApiPublicOwnerStatsRoute
   ApiPublicOwnerStoriesRoute: typeof ApiPublicOwnerStoriesRoute
@@ -520,6 +533,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicOwnerCompaniesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/owner/contact': {
+      id: '/api/public/owner/contact'
+      path: '/api/public/owner/contact'
+      fullPath: '/api/public/owner/contact'
+      preLoaderRoute: typeof ApiPublicOwnerContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/owner/reports': {
       id: '/api/public/owner/reports'
       path: '/api/public/owner/reports'
@@ -586,6 +606,7 @@ const rootRouteChildren: RootRouteChildren = {
   CompaniesIndexRoute: CompaniesIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,
   ApiPublicOwnerCompaniesRoute: ApiPublicOwnerCompaniesRoute,
+  ApiPublicOwnerContactRoute: ApiPublicOwnerContactRoute,
   ApiPublicOwnerReportsRoute: ApiPublicOwnerReportsRoute,
   ApiPublicOwnerStatsRoute: ApiPublicOwnerStatsRoute,
   ApiPublicOwnerStoriesRoute: ApiPublicOwnerStoriesRoute,
