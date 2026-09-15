@@ -106,7 +106,7 @@ export async function suggestUsernames(seed: string, limit = 5, currentUserId?: 
   const found: string[] = [];
   for (const candidate of pool) {
     if (found.length >= limit) break;
-    // eslint-disable-next-line no-await-in-loop
+
     if (await isUsernameFree(candidate, currentUserId)) found.push(candidate);
   }
   return found;
@@ -191,4 +191,15 @@ export async function claimUsername(
 
   const profile = await readProfile(userId);
   return { ok: true, ...(profile ? { profile } : {}) };
+}
+
+/** Records a self-declared account type for accounts we could not classify. */
+export async function setAccountType(userId: string, accountType: "individual" | "company") {
+  const db = getFirestoreDb();
+  const now = new Date().toISOString();
+  await db
+    .collection("profiles")
+    .doc(userId)
+    .set({ id: userId, account_type: accountType, account_type_declared_at: now }, { merge: true });
+  return { ok: true as const, accountType };
 }

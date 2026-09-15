@@ -183,3 +183,53 @@ export function lockNow() {
     /* ignore */
   }
 }
+
+/* ------------------------------------------------------------------ *
+ * Idle auto-lock
+ *
+ * The session stays signed in (so the user rarely types a password),
+ * but the app re-locks behind the fingerprint / face scan once it has
+ * been idle or backgrounded for longer than the chosen window.
+ * ------------------------------------------------------------------ */
+
+const LAST_ACTIVE_KEY = "candid_last_active_at";
+
+/** Stamps "the user is here right now". Cheap enough for pointer events. */
+export function touchActivity() {
+  try {
+    localStorage.setItem(LAST_ACTIVE_KEY, String(Date.now()));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function getLastActiveAt(): number | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(LAST_ACTIVE_KEY);
+    const value = raw ? Number(raw) : NaN;
+    return Number.isFinite(value) ? value : null;
+  } catch {
+    return null;
+  }
+}
+
+/** True when the idle window has elapsed since the last recorded activity. */
+export function isIdleBeyond(timeoutMs: number): boolean {
+  if (timeoutMs <= 0) return false;
+  const last = getLastActiveAt();
+  if (last === null) return false;
+  return Date.now() - last > timeoutMs;
+}
+
+/** Broadcast so the gate can re-lock immediately, wherever it is mounted. */
+export const LOCK_EVENT = "candid:lock";
+
+export function requestLock() {
+  lockNow();
+  try {
+    window.dispatchEvent(new Event(LOCK_EVENT));
+  } catch {
+    /* ignore */
+  }
+}

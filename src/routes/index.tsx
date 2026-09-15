@@ -1,11 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
-import { Activity, Flame, MapPin, PenLine, ShieldCheck, TrendingUp } from "lucide-react";
+import { Flame, PenLine, ShieldCheck, TrendingUp } from "lucide-react";
 import { getFilterOptions, listStories } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
 import { PulseLoader } from "@/components/site/route-progress";
 import { FilterBar } from "@/components/site/filter-bar";
+import { CandidPulse } from "@/components/site/candid-pulse";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 
@@ -52,14 +53,22 @@ const SORTS = [
 
 function FeedPage() {
   const { data: filters } = useSuspenseQuery(filtersQuery);
+  const { data: initialFeed } = useSuspenseQuery(feedQuery);
   const [sort, setSort] = useState<"new" | "top" | "trending">("new");
   const [industry, setIndustry] = useState<string | null>(null);
   const [county, setCounty] = useState<string | null>(null);
   const [q, setQ] = useState("");
 
+  /**
+   * The unfiltered view reuses the data the loader already fetched, so the
+   * server and the first client render agree (no hydration mismatch).
+   */
+  const isDefaultView = sort === "new" && industry === null && county === null;
+
   const { data, isPending } = useQuery({
     queryKey: ["stories", sort, industry, county],
     queryFn: () => listStories({ data: { sort, industry, county } }),
+    ...(isDefaultView ? { initialData: initialFeed } : {}),
   });
 
   const needle = q.trim().toLowerCase();
@@ -98,7 +107,7 @@ function FeedPage() {
               </Button>
             </div>
           </div>
-          <SignalPanel />
+          <CandidPulse />
         </div>
       </section>
 
@@ -189,54 +198,6 @@ function FeedPage() {
             </Link>
           </div>
         </aside>
-      </div>
-    </div>
-  );
-}
-
-function SignalPanel() {
-  return (
-    <div
-      className="signal-panel dark relative mx-auto w-full max-w-md"
-      aria-label="Candid workplace signals"
-    >
-      <div className="signal-grid absolute inset-0 rounded-3xl" />
-      <div className="relative min-h-72 overflow-hidden rounded-3xl border border-white/10 bg-[oklch(0.135_0.014_285)] p-5 text-foreground shadow-2xl shadow-black/30 backdrop-blur-sm">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="flex items-center gap-2 font-medium text-foreground">
-            <Activity className="size-4 text-primary" /> Candid pulse
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className="size-1.5 animate-pulse rounded-full bg-primary" /> Anonymous signals
-          </span>
-        </div>
-
-        <div className="signal-orbit absolute left-1/2 top-[52%] size-44 -translate-x-1/2 -translate-y-1/2">
-          <span className="signal-ring signal-ring-one" />
-          <span className="signal-ring signal-ring-two" />
-          <span className="signal-ring signal-ring-three" />
-          <div className="signal-core">
-            <span className="text-2xl font-semibold text-foreground">LIVE</span>
-            <span className="mt-0.5 text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-              stories
-            </span>
-          </div>
-          <span className="signal-dot signal-dot-one" />
-          <span className="signal-dot signal-dot-two" />
-          <span className="signal-dot signal-dot-three" />
-        </div>
-
-        <span className="signal-tag signal-tag-pay">PAY</span>
-        <span className="signal-tag signal-tag-culture">CULTURE</span>
-        <span className="signal-tag signal-tag-workload">WORKLOAD</span>
-        <span className="signal-tag signal-tag-respect">RESPECT</span>
-
-        <div className="absolute inset-x-5 bottom-5 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
-          <span className="flex items-center gap-1.5 text-muted-foreground">
-            <MapPin className="size-3.5 text-verified" /> Nairobi · Kenya
-          </span>
-          <span className="text-primary">Signal detected</span>
-        </div>
       </div>
     </div>
   );

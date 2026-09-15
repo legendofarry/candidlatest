@@ -31,13 +31,13 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { getOnboardingState } from "@/lib/onboarding.functions";
+import { declareAccountType, getOnboardingState } from "@/lib/onboarding.functions";
 import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
 import { PrivacySettings } from "@/components/site/privacy-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { inbox, notify as toast, openNotifications } from "@/lib/notifications-store";
-import { setPreference, usePreferences } from "@/lib/preferences";
+import { AUTO_LOCK_CHOICES, setPreference, usePreferences } from "@/lib/preferences";
 import { clearPersistedQueries } from "@/lib/query-persist";
 import { storageService } from "@/lib/storage";
 import {
@@ -112,6 +112,38 @@ function ProfilePage() {
     enabled: Boolean(user),
   });
   const socials = onboarding.data?.socials ?? null;
+
+  // Some accounts never got classified at signup. After a week we ask directly,
+  // because company replies and employer tools depend on knowing.
+  const declareType = useServerFn(declareAccountType);
+  const createdAt = user?.metadata?.creationTime ? Date.parse(user.metadata.creationTime) : null;
+  const olderThanAWeek = createdAt ? Date.now() - createdAt > 7 * 24 * 60 * 60 * 1000 : false;
+  const askAccountType =
+    Boolean(user) && onboarding.data?.accountType === "unknown" && olderThanAWeek;
+  const [savingType, setSavingType] = useState(false);
+
+  async function chooseAccountType(accountType: "individual" | "company") {
+    setSavingType(true);
+    try {
+      await declareType({ data: { accountType } });
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-state"] });
+      toast.success(
+        accountType === "company" ? "Employer account confirmed" : "Thanks — you are set",
+        {
+          description:
+            accountType === "company"
+              ? "You can now reply to stories about your company and add your location."
+              : "Your account is marked as an individual worker.",
+        },
+      );
+    } catch {
+      toast.error("Could not save that", {
+        description: "Check your connection and try again.",
+      });
+    } finally {
+      setSavingType(false);
+    }
+  }
   const socialLinks = socials
     ? (Object.entries(socials) as [string, string | null][]).filter(([, value]) => Boolean(value))
     : [];
@@ -218,6 +250,35 @@ function ProfilePage() {
 
       <FollowedStories />
 
+      {askAccountType ? (
+        <SettingsGroup title="One quick question">
+          <div className="px-4 py-3">
+            <p className="text-sm font-medium">Are you here as a worker or an employer?</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              We never worked this out for your account. Employers get a reply tool and a company
+              page; workers keep posting anonymously as usual.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                disabled={savingType}
+                onClick={() => void chooseAccountType("individual")}
+              >
+                I am a worker
+              </Button>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={savingType}
+                onClick={() => void chooseAccountType("company")}
+              >
+                I represent a company
+              </Button>
+            </div>
+          </div>
+        </SettingsGroup>
+      ) : null}
+
       <SettingsGroup title="Security & fast access">
         <ToggleRow
           icon={<Fingerprint className="size-4" />}
@@ -237,6 +298,31 @@ function ProfilePage() {
           <p className="px-4 pb-3 text-xs text-muted-foreground">
             Registered: {getCredentials()[0]?.label}
           </p>
+        ) : null}
+        {prefs.biometricUnlock && enrolled ? (
+          <div className="border-t border-border px-4 py-3">
+            <p className="text-sm font-medium">Lock after inactivity</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              You stay signed in. Candid just asks for your fingerprint or face again when you come
+              back later.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {AUTO_LOCK_CHOICES.map((choice) => (
+                <button
+                  key={choice.minutes}
+                  type="button"
+                  onClick={() => setPreference("autoLockMinutes", choice.minutes)}
+                  className={
+                    prefs.autoLockMinutes === choice.minutes
+                      ? "rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                      : "rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  }
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
       </SettingsGroup>
 

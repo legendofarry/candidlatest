@@ -26,7 +26,13 @@ export function useCompanyIntel(companyId: string) {
 }
 
 /** Location chip on a story — hidden entirely when the employer has no location. */
-export function StoryLocationTag({ companyId, county }: { companyId: string; county: string | null }) {
+export function StoryLocationTag({
+  companyId,
+  county,
+}: {
+  companyId: string;
+  county: string | null;
+}) {
   const { data } = useCompanyIntel(companyId);
   const [open, setOpen] = useState(false);
   const location = data?.location;

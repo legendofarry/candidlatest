@@ -29,6 +29,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
+import { hasCredentialFor, requestLock } from "@/lib/biometrics";
+import { setPreference, usePreferences } from "@/lib/preferences";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -76,6 +78,27 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadCount();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [rememberChoice, setRememberChoice] = useState(false);
+  const prefs = usePreferences();
+  /** Locking is only an option once fast unlock is set up on this device. */
+  const canLock = Boolean(user && prefs.biometricUnlock && hasCredentialFor(user.uid));
+
+  /**
+   * Asked once: after the user says "remember this", leaving follows their
+   * answer instead of showing the question again.
+   */
+  function handleLeave() {
+    if (canLock && prefs.sessionMemory === "lock") {
+      requestLock();
+      return;
+    }
+    if (canLock && prefs.sessionMemory === "signout") {
+      void signOut();
+      return;
+    }
+    setRememberChoice(false);
+    setConfirmSignOut(true);
+  }
   const fetchUnreadMessages = useServerFn(getUnreadMessages);
   const { data: messageState } = useQuery({
     queryKey: ["unread-messages", user?.uid ?? null],
@@ -183,8 +206,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 })}
                 <DropdownMenuSeparator />
                 {user ? (
-                  <DropdownMenuItem onSelect={() => setConfirmSignOut(true)}>
-                    <LogOut className="size-4" /> Sign out
+                  <DropdownMenuItem onSelect={() => handleLeave()}>
+                    <LogOut className="size-4" /> {canLock ? "Lock or sign out" : "Sign out"}
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem asChild>
@@ -257,16 +280,44 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Sign out of Candid?</AlertDialogTitle>
+            <AlertDialogTitle>
+              {canLock ? "Leaving for now?" : "Sign out of Candid?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              You will need to sign in again to post stories, comment or vote.
+              {canLock
+                ? "You can stay signed in on this device and just lock Candid behind your fingerprint or face, or sign out completely."
+                : "You will need to sign in again to post stories, comment or vote."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {canLock ? (
+            <label className="flex items-start gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-[var(--primary)]"
+                checked={rememberChoice}
+                onChange={(event) => setRememberChoice(event.target.checked)}
+              />
+              Remember what I choose and stop asking.
+            </label>
+          ) : null}
           <AlertDialogFooter>
-            <AlertDialogCancel>Stay signed in</AlertDialogCancel>
+            <AlertDialogCancel>Stay here</AlertDialogCancel>
+            {canLock ? (
+              <AlertDialogAction
+                onClick={() => {
+                  setConfirmSignOut(false);
+                  if (rememberChoice) setPreference("sessionMemory", "lock");
+                  requestLock();
+                }}
+              >
+                Keep me signed in — just lock
+              </AlertDialogAction>
+            ) : null}
             <AlertDialogAction
+              className={canLock ? "bg-secondary text-foreground hover:bg-secondary/80" : ""}
               onClick={() => {
                 setConfirmSignOut(false);
+                if (canLock && rememberChoice) setPreference("sessionMemory", "signout");
                 void signOut();
               }}
             >

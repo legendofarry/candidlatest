@@ -28,7 +28,9 @@ export function MapModal({
   const hasPin = typeof target.lat === "number" && typeof target.lng === "number";
   const external =
     target.map_url ??
-    (hasPin ? `https://www.openstreetmap.org/?mlat=${target.lat}&mlon=${target.lng}#map=16/${target.lat}/${target.lng}` : null);
+    (hasPin
+      ? `https://www.openstreetmap.org/?mlat=${target.lat}&mlon=${target.lng}#map=16/${target.lat}/${target.lng}`
+      : null);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

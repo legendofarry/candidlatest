@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Fingerprint, Loader2, LogOut, ScanFace } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
@@ -6,13 +6,23 @@ import { usePreferences } from "@/lib/preferences";
 import {
   authenticateWithBiometric,
   hasCredentialFor,
+  isIdleBeyond,
   isUnlockedThisSession,
+  LOCK_EVENT,
+  lockNow,
   markUnlocked,
+  touchActivity,
 } from "@/lib/biometrics";
 
+/** How often we re-check the idle clock while the app is open. */
+const IDLE_POLL_MS = 15_000;
+/** Activity that counts as "the user is still here". */
+const ACTIVITY_EVENTS = ["pointerdown", "keydown", "scroll", "touchstart"] as const;
+
 /**
- * When the user enabled fast unlock, a fresh page load asks for the
- * fingerprint / face scan before revealing the app.
+ * Keeps the Firebase session signed in for a long time, but hides the app
+ * behind a fingerprint / face scan when it is opened fresh, backgrounded,
+ * or left idle past the chosen window.
  */
 export function BiometricGate({ children }: { children: React.ReactNode }) {
   const { user, loading, signOut } = useAuth();
@@ -21,18 +31,73 @@ export function BiometricGate({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
+  const armed =
+    Boolean(user) && prefs.biometricUnlock && Boolean(user && hasCredentialFor(user.uid));
+  const lockedRef = useRef(locked);
+  lockedRef.current = locked;
+
+  const timeoutMs = prefs.autoLockMinutes > 0 ? prefs.autoLockMinutes * 60_000 : 0;
+
+  const lockUp = useCallback(() => {
+    lockNow();
+    setFailed(false);
+    setLocked(true);
+  }, []);
+
+  // Initial decision on load / sign-in.
   useEffect(() => {
     if (loading) return;
-    if (!user || !prefs.biometricUnlock) {
+    if (!armed) {
       setLocked(false);
       return;
     }
-    if (!hasCredentialFor(user.uid)) {
-      setLocked(false);
-      return;
+    if (!isUnlockedThisSession() || isIdleBeyond(timeoutMs)) {
+      lockUp();
     }
-    setLocked(!isUnlockedThisSession());
-  }, [loading, user, prefs.biometricUnlock]);
+  }, [loading, armed, timeoutMs, lockUp]);
+
+  // Idle clock: stamp activity while unlocked, re-lock once the window passes.
+  useEffect(() => {
+    if (!armed || timeoutMs === 0) return;
+
+    const stamp = () => {
+      if (!lockedRef.current) touchActivity();
+    };
+    stamp();
+    for (const event of ACTIVITY_EVENTS) {
+      window.addEventListener(event, stamp, { passive: true });
+    }
+
+    const check = () => {
+      if (!lockedRef.current && isIdleBeyond(timeoutMs)) lockUp();
+    };
+    const timer = window.setInterval(check, IDLE_POLL_MS);
+
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        stamp();
+      } else {
+        check();
+      }
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("focus", check);
+
+    return () => {
+      for (const event of ACTIVITY_EVENTS) window.removeEventListener(event, stamp);
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("focus", check);
+    };
+  }, [armed, timeoutMs, lockUp]);
+
+  // Manual lock requested elsewhere (e.g. from the sign-out dialog).
+  useEffect(() => {
+    if (!armed) return;
+    const onLock = () => lockUp();
+    window.addEventListener(LOCK_EVENT, onLock);
+    return () => window.removeEventListener(LOCK_EVENT, onLock);
+  }, [armed, lockUp]);
 
   async function unlock() {
     if (!user) return;
@@ -42,6 +107,7 @@ export function BiometricGate({ children }: { children: React.ReactNode }) {
     setBusy(false);
     if (ok) {
       markUnlocked();
+      touchActivity();
       setLocked(false);
     } else {
       setFailed(true);
