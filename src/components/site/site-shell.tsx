@@ -257,16 +257,42 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Sign out of Candid?</AlertDialogTitle>
+            <AlertDialogTitle>{canLock ? "Leaving for now?" : "Sign out of Candid?"}</AlertDialogTitle>
             <AlertDialogDescription>
-              You will need to sign in again to post stories, comment or vote.
+              {canLock
+                ? "You can stay signed in on this device and just lock Candid behind your fingerprint or face, or sign out completely."
+                : "You will need to sign in again to post stories, comment or vote."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {canLock ? (
+            <label className="flex items-start gap-2 text-sm text-muted-foreground">
+              <input
+                type="checkbox"
+                className="mt-0.5 size-4 accent-[var(--primary)]"
+                checked={rememberChoice}
+                onChange={(event) => setRememberChoice(event.target.checked)}
+              />
+              Remember what I choose and stop asking.
+            </label>
+          ) : null}
           <AlertDialogFooter>
-            <AlertDialogCancel>Stay signed in</AlertDialogCancel>
+            <AlertDialogCancel>Stay here</AlertDialogCancel>
+            {canLock ? (
+              <AlertDialogAction
+                onClick={() => {
+                  setConfirmSignOut(false);
+                  if (rememberChoice) setPreference("sessionMemory", "lock");
+                  requestLock();
+                }}
+              >
+                Keep me signed in — just lock
+              </AlertDialogAction>
+            ) : null}
             <AlertDialogAction
+              className={canLock ? "bg-secondary text-foreground hover:bg-secondary/80" : ""}
               onClick={() => {
                 setConfirmSignOut(false);
+                if (canLock && rememberChoice) setPreference("sessionMemory", "signout");
                 void signOut();
               }}
             >
