@@ -280,7 +280,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>{canLock ? "Leaving for now?" : "Sign out of Candid?"}</AlertDialogTitle>
+            <AlertDialogTitle>
+              {canLock ? "Leaving for now?" : "Sign out of Candid?"}
+            </AlertDialogTitle>
             <AlertDialogDescription>
               {canLock
                 ? "You can stay signed in on this device and just lock Candid behind your fingerprint or face, or sign out completely."

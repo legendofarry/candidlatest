@@ -31,7 +31,8 @@ export function BiometricGate({ children }: { children: React.ReactNode }) {
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const armed = Boolean(user) && prefs.biometricUnlock && Boolean(user && hasCredentialFor(user.uid));
+  const armed =
+    Boolean(user) && prefs.biometricUnlock && Boolean(user && hasCredentialFor(user.uid));
   const lockedRef = useRef(locked);
   lockedRef.current = locked;
 

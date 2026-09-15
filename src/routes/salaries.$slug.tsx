@@ -168,11 +168,7 @@ function CompanySalaryPage() {
           <span className="text-xs text-muted-foreground">
             Page {page + 1} of {pages}
           </span>
-          <Button
-            variant="outline"
-            disabled={page >= pages - 1}
-            onClick={() => setPage(page + 1)}
-          >
+          <Button variant="outline" disabled={page >= pages - 1} onClick={() => setPage(page + 1)}>
             Next
           </Button>
         </div>

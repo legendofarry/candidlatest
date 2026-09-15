@@ -34,7 +34,8 @@ export const Route = createFileRoute("/about")({
 function AboutPage() {
   const { data: contact } = useSuspenseQuery(contactQuery);
   const hasContact = Boolean(
-    contact && (contact.email || contact.phone || contact.whatsapp || contact.x || contact.instagram),
+    contact &&
+    (contact.email || contact.phone || contact.whatsapp || contact.x || contact.instagram),
   );
 
   return (
@@ -55,7 +56,9 @@ function AboutPage() {
         <h2>What you can do here</h2>
         <ul className="mt-2">
           <li>Read exit stories by employer, industry or county.</li>
-          <li>Check a company&apos;s red flags, ratings and whether people would work there again.</li>
+          <li>
+            Check a company&apos;s red flags, ratings and whether people would work there again.
+          </li>
           <li>See what roles actually pay, contributed by people who held them.</li>
           <li>Follow a company or a story and get told when something new lands.</li>
           <li>Message other members privately, on your own privacy terms.</li>
@@ -67,7 +70,9 @@ function AboutPage() {
           <li>You need an account so votes and stories cannot be spammed.</li>
           <li>Your email and name are never published. You appear as a random handle.</li>
           <li>Employers cannot see who wrote a story, and neither can other readers.</li>
-          <li>Never include your own full name, ID number, or a colleague&apos;s name in a story.</li>
+          <li>
+            Never include your own full name, ID number, or a colleague&apos;s name in a story.
+          </li>
         </ul>
       </section>
       <section>
