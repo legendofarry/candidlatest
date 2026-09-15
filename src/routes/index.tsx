@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useHydrated } from "@tanstack/react-router";
 import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Activity, Flame, MapPin, PenLine, ShieldCheck, TrendingUp } from "lucide-react";
@@ -142,7 +142,7 @@ function FeedPage() {
             ]}
           />
 
-          {isPending ? (
+          {isPending || !hydrated ? (
             <div className="space-y-4">
               <PulseLoader label="Loading stories" />
               {[0, 1, 2].map((i) => (
