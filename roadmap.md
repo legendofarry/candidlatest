@@ -19,4 +19,4 @@
 
 ## Loose ends
 - [ ] Rotate Firebase service-account key (user action)
-- [ ] Fix feed hydration warning
+- [x] Fix feed hydration warning
