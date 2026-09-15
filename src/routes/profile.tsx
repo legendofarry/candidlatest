@@ -37,7 +37,7 @@ import { FollowedStories } from "@/components/site/followed-stories";
 import { PrivacySettings } from "@/components/site/privacy-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { inbox, notify as toast, openNotifications } from "@/lib/notifications-store";
-import { setPreference, usePreferences } from "@/lib/preferences";
+import { AUTO_LOCK_CHOICES, setPreference, usePreferences } from "@/lib/preferences";
 import { clearPersistedQueries } from "@/lib/query-persist";
 import { storageService } from "@/lib/storage";
 import {
@@ -237,6 +237,31 @@ function ProfilePage() {
           <p className="px-4 pb-3 text-xs text-muted-foreground">
             Registered: {getCredentials()[0]?.label}
           </p>
+        ) : null}
+        {prefs.biometricUnlock && enrolled ? (
+          <div className="border-t border-border px-4 py-3">
+            <p className="text-sm font-medium">Lock after inactivity</p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              You stay signed in. Candid just asks for your fingerprint or face again when you come
+              back later.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {AUTO_LOCK_CHOICES.map((choice) => (
+                <button
+                  key={choice.minutes}
+                  type="button"
+                  onClick={() => setPreference("autoLockMinutes", choice.minutes)}
+                  className={
+                    prefs.autoLockMinutes === choice.minutes
+                      ? "rounded-full bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground"
+                      : "rounded-full border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
+                  }
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+          </div>
         ) : null}
       </SettingsGroup>
 
