@@ -53,3 +53,17 @@ export const completeOnboarding = createServerFn({ method: "POST" })
     const { claimUsername } = await import("./onboarding.server");
     return claimUsername(context.userId, data.username, data.socials);
   });
+
+/**
+ * Lets someone whose account type could never be classified tell us directly,
+ * instead of being stuck as "unknown" forever.
+ */
+export const declareAccountType = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ accountType: z.enum(["individual", "company"]) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { setAccountType } = await import("./onboarding.server");
+    return setAccountType(context.userId, data.accountType);
+  });

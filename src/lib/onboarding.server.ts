@@ -192,3 +192,17 @@ export async function claimUsername(
   const profile = await readProfile(userId);
   return { ok: true, ...(profile ? { profile } : {}) };
 }
+
+/** Records a self-declared account type for accounts we could not classify. */
+export async function setAccountType(userId: string, accountType: "individual" | "company") {
+  const db = getFirestoreDb();
+  const now = new Date().toISOString();
+  await db
+    .collection("profiles")
+    .doc(userId)
+    .set(
+      { id: userId, account_type: accountType, account_type_declared_at: now },
+      { merge: true },
+    );
+  return { ok: true as const, accountType };
+}

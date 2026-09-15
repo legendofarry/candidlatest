@@ -180,3 +180,25 @@ export const searchAll = createServerFn({ method: "GET" })
       return { companies: [], stories: [] };
     }
   });
+
+export const getPulse = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const { buildPulse } = await import("./site.server");
+    return await buildPulse();
+  } catch (error) {
+    if (!isFirebaseReadUnavailable(error)) throw error;
+    console.warn("[getPulse] Firebase public read unavailable", error);
+    return null;
+  }
+});
+
+export const getSiteContact = createServerFn({ method: "GET" }).handler(async () => {
+  try {
+    const { readSiteContact } = await import("./site.server");
+    return await readSiteContact();
+  } catch (error) {
+    if (!isFirebaseReadUnavailable(error)) throw error;
+    console.warn("[getSiteContact] Firebase public read unavailable", error);
+    return null;
+  }
+});
