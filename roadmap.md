@@ -23,7 +23,7 @@
 - [x] Fix feed hydration warning
 
 ## Mobile display fixes
-- [ ] Give feed actions stable, unsqueezed tap targets
-- [ ] Remove salary-directory horizontal overlap
-- [ ] Confirm signed-out username display and legacy anonymous records
-- [ ] Remove Candid Pulse hydration mismatch
+- [x] Give feed actions stable, unsqueezed tap targets
+- [x] Remove salary-directory horizontal overlap
+- [x] Confirm signed-out username display and legacy anonymous records
+- [x] Remove Candid Pulse hydration mismatch

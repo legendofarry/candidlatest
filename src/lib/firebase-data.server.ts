@@ -512,7 +512,9 @@ export async function getPublicStories(input: {
         metoo: story.metoo,
         upvotes: story.upvotes,
         would_work_again: story.would_work_again,
-        author_username: story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null,
+        author_username:
+          story.author_username ??
+          (story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null),
       };
     });
 

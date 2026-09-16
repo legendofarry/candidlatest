@@ -58,7 +58,7 @@ function SalaryDirectory() {
   );
 
   return (
-    <div className="space-y-6">
+    <div className="min-w-0 space-y-6 overflow-x-clip">
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Salary honesty</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
@@ -85,7 +85,7 @@ function SalaryDirectory() {
                   <Link
                     to="/salaries/$slug"
                     params={{ slug: row.slug }}
-                    className="flex items-center gap-3 rounded-2xl border border-border bg-card p-4 transition hover:-translate-y-0.5 hover:border-primary/50"
+                    className="grid min-w-0 grid-cols-[auto_minmax(0,1fr)_minmax(0,6.5rem)] items-center gap-2 rounded-2xl border border-border bg-card p-3 transition hover:-translate-y-0.5 hover:border-primary/50 sm:grid-cols-[auto_minmax(0,1fr)_auto_auto] sm:gap-3 sm:p-4"
                   >
                     <Building2 className="size-5 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
@@ -96,15 +96,15 @@ function SalaryDirectory() {
                         {row.contributions === 1 ? "" : "s"}
                       </p>
                     </div>
-                    <div className="text-right text-sm">
-                      <span className="font-medium text-primary">
+                    <div className="min-w-0 text-right text-xs sm:text-sm">
+                      <span className="block break-words font-medium leading-tight text-primary">
                         {row.average_kes === null ? "Not enough data" : kes(row.average_kes)}
                       </span>
                       {row.average_kes !== null ? (
                         <p className="text-[11px] text-muted-foreground">average</p>
                       ) : null}
                     </div>
-                    <ChevronRight className="size-4 text-muted-foreground" />
+                    <ChevronRight className="hidden size-4 text-muted-foreground sm:block" />
                   </Link>
                 </li>
               ))}

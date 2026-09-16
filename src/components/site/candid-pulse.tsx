@@ -45,6 +45,7 @@ function Stat({ label, value }: { label: string; value: number }) {
  * recently. Numbers are live, refreshed on a slow interval.
  */
 export function CandidPulse() {
+  const [hydrated, setHydrated] = useState(false);
   const { data } = useQuery({
     queryKey: ["pulse"],
     queryFn: () => getPulse(),
@@ -52,7 +53,11 @@ export function CandidPulse() {
     staleTime: 30_000,
   });
 
-  const maxReason = Math.max(1, ...(data?.topReasons ?? []).map((row) => row.count));
+  useEffect(() => setHydrated(true), []);
+
+  const pulse = hydrated ? data : undefined;
+
+  const maxReason = Math.max(1, ...(pulse?.topReasons ?? []).map((row) => row.count));
 
   return (
     <div
@@ -76,21 +81,21 @@ export function CandidPulse() {
         </p>
 
         <div className="mt-4 grid grid-cols-3 gap-2">
-          <Stat label="Stories" value={data?.storiesTotal ?? 0} />
-          <Stat label="This week" value={data?.storiesLast7Days ?? 0} />
-          <Stat label="Employers" value={data?.companies ?? 0} />
+          <Stat label="Stories" value={pulse?.storiesTotal ?? 0} />
+          <Stat label="This week" value={pulse?.storiesLast7Days ?? 0} />
+          <Stat label="Employers" value={pulse?.companies ?? 0} />
         </div>
 
         <div className="mt-4 space-y-2">
           <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
             Top reasons for leaving
           </p>
-          {(data?.topReasons ?? []).length === 0 ? (
+          {(pulse?.topReasons ?? []).length === 0 ? (
             <p className="text-xs text-muted-foreground">
               No stories yet — the first one will show up here.
             </p>
           ) : (
-            (data?.topReasons ?? []).map((row) => (
+            (pulse?.topReasons ?? []).map((row) => (
               <div key={row.reason} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <span className="truncate capitalize text-foreground/90">{row.reason}</span>
@@ -109,9 +114,9 @@ export function CandidPulse() {
 
         <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
           <span className="flex items-center gap-1.5 text-muted-foreground">
-            <MapPin className="size-3.5 text-verified" /> {data?.counties ?? 0} counties covered
+            <MapPin className="size-3.5 text-verified" /> {pulse?.counties ?? 0} counties covered
           </span>
-          <span className="text-primary">{data?.storiesLast24Hours ?? 0} in 24h</span>
+          <span className="text-primary">{pulse?.storiesLast24Hours ?? 0} in 24h</span>
         </div>
       </div>
     </div>
