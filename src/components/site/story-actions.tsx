@@ -77,7 +77,7 @@ export function StoryActions({
 
   return (
     <div onClick={stop} className="relative z-10">
-      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border pt-3">
+      <div className="mt-3 grid grid-cols-6 items-center gap-1 border-t border-border pt-3 sm:flex sm:flex-wrap sm:gap-1.5">
         <ActionChip
           icon={<ArrowBigUp className="size-4 text-primary" />}
           label={`${upvotes + optimistic.up}`}
@@ -87,7 +87,7 @@ export function StoryActions({
         />
         <ActionChip
           icon={<Users className="size-4" />}
-          label={`${metoo + optimistic.metoo} me too`}
+          label={`${metoo + optimistic.metoo}`}
           hint="This happened to me too"
           disabled={!user || voteMutation.isPending}
           onClick={() => voteMutation.mutate("metoo")}
@@ -99,14 +99,14 @@ export function StoryActions({
           active={open}
           onClick={() => setOpen((value) => !value)}
         />
-        <StorySocial storyId={storyId} />
+        <StorySocial storyId={storyId} className="contents sm:flex" />
 
         <ActionChip
           icon={<Flag className="size-4" />}
           label={reported ? "Reported" : ""}
           hint={reported ? "Already reported" : "Report"}
           disabled={!user || reported}
-          className="ml-auto text-danger"
+          className="text-danger sm:ml-auto"
           onClick={() => setReportOpen(true)}
         />
       </div>
@@ -213,7 +213,7 @@ function ActionChip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground active:scale-95 disabled:opacity-50",
+        "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-transparent px-1 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground active:scale-95 disabled:opacity-50 sm:w-auto sm:rounded-full sm:px-2.5",
         active && "border-primary/40 bg-primary/10 text-foreground",
         className,
       )}

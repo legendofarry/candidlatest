@@ -54,7 +54,7 @@ export function StorySocial({ storyId, className }: { storyId: string; className
         disabled={!user || likeMutation.isPending}
         onClick={() => likeMutation.mutate()}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground active:scale-95 disabled:opacity-50",
+          "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-transparent px-1 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground active:scale-95 disabled:opacity-50 sm:w-auto sm:rounded-full sm:px-2.5",
           liked && "border-danger/40 bg-danger/10 text-danger",
         )}
       >
@@ -67,7 +67,7 @@ export function StorySocial({ storyId, className }: { storyId: string; className
         disabled={!user || followMutation.isPending}
         onClick={() => followMutation.mutate()}
         className={cn(
-          "inline-flex items-center gap-1.5 rounded-full border border-transparent px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground active:scale-95 disabled:opacity-50",
+          "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-transparent px-1 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground active:scale-95 disabled:opacity-50 sm:w-auto sm:rounded-full sm:px-2.5",
           following && "border-primary/40 bg-primary/10 text-foreground",
         )}
       >

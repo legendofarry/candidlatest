@@ -21,3 +21,9 @@
 ## Loose ends
 - [ ] Rotate Firebase service-account key (user action)
 - [x] Fix feed hydration warning
+
+## Mobile display fixes
+- [x] Give feed actions stable, unsqueezed tap targets
+- [x] Remove salary-directory horizontal overlap
+- [x] Confirm signed-out username display and legacy anonymous records
+- [x] Remove Candid Pulse hydration mismatch
