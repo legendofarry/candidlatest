@@ -63,6 +63,7 @@ export type StoryRecord = {
   industry: string | null;
   would_work_again: boolean | null;
   author_id: string | null;
+  author_username?: string | null;
   status: "published" | "pending" | "hidden";
   moderation_note: string | null;
   upvotes: number;
