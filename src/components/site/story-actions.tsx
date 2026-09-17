@@ -35,10 +35,12 @@ export function StoryActions({
   commentCount: number;
 }) {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const vote = useServerFn(castVote);
   const comment = useServerFn(addComment);
   const [open, setOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reported, setReported] = useState(false);
   const [body, setBody] = useState("");
@@ -51,7 +53,7 @@ export function StoryActions({
   const thread = useQuery({
     queryKey: ["story", storyId],
     queryFn: () => getStory({ data: { id: storyId } }),
-    enabled: open,
+    enabled: open || sheetOpen,
   });
 
   const voteMutation = useMutation({
@@ -104,8 +106,8 @@ export function StoryActions({
           icon={<MessageSquare className="size-4" />}
           label={`${commentCount + optimistic.comments}`}
           hint="Comments"
-          active={open}
-          onClick={() => setOpen((value) => !value)}
+          active={open || sheetOpen}
+          onClick={() => (isMobile ? setSheetOpen(true) : setOpen((value) => !value))}
         />
         <StorySocial storyId={storyId} className="contents sm:flex" />
 
