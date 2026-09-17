@@ -27,3 +27,9 @@
 - [x] Remove salary-directory horizontal overlap
 - [x] Confirm signed-out username display and legacy anonymous records
 - [x] Remove Candid Pulse hydration mismatch
+
+## Feature sprints (user-app side)
+- [x] Sprint 1 — Post-story flow: employer autocomplete + duplicate detection, custom reason tags, position field, optional private employment evidence
+- [x] Sprint 2 — Mobile comment bottom sheet, reusable confirmation dialogs
+- [x] Sprint 3 — @mention notifications with deep links, notification archive tabs, company-tag alerts
+- [ ] Sprint 4 — Help & Support screen (FAQs, email/WhatsApp, ticket form, live chat)
