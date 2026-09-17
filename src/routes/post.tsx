@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -10,6 +10,7 @@ import {
   FileUp,
   Lock,
   ShieldCheck,
+  Trash2,
   X,
 } from "lucide-react";
 import { ref as storageRef, uploadBytes } from "firebase/storage";
@@ -23,6 +24,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import { cn } from "@/lib/utils";
 
 const filtersQuery = queryOptions({ queryKey: ["filters"], queryFn: () => getFilterOptions() });
@@ -88,7 +90,23 @@ function PostPage() {
   const [evidenceNote, setEvidenceNote] = useState("");
   const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [discardOpen, setDiscardOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const dirty =
+    companyName.trim().length > 0 ||
+    reasons.length > 0 ||
+    title.trim().length > 0 ||
+    body.trim().length > 0;
+
+  useEffect(() => {
+    if (!dirty) return;
+    const handler = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+    };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [dirty]);
 
   if (loading) return null;
 
