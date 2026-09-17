@@ -4,6 +4,7 @@ import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 import {
   generateId,
   queryFirst,
+  readCollection,
   type CompanyRecord,
   type ProfileRecord,
   type StoryRecord,
@@ -75,8 +76,23 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
     const slug = slugify(data.name);
-    const existing = (await queryFirst<CompanyRecord>("companies", "slug", slug)) ?? null;
-    if (existing) return existing;
+
+    const { findCompanyMatches } = await import("./company-match");
+    const all = await readCollection<CompanyRecord>("companies");
+    const exact =
+      all.find((company) => company.slug === slug) ??
+      findCompanyMatches(data.name, all, 1)[0] ??
+      null;
+    if (exact) {
+      // Remember this alternate spelling so future matches resolve here.
+      const aliases = new Set([...(exact.aliases ?? [])]);
+      if (![exact.name, ...aliases].some((n) => n.toLowerCase() === data.name.toLowerCase())) {
+        aliases.add(data.name);
+        await db.collection("companies").doc(exact.id).update({ aliases: [...aliases] });
+        exact.aliases = [...aliases];
+      }
+      return exact;
+    }
 
     const created: CompanyRecord = {
       id: generateId(),
@@ -86,6 +102,7 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       county: data.county,
       verified: false,
       created_at: new Date().toISOString(),
+      aliases: [],
     };
     await db.collection("companies").doc(created.id).set(created);
 
