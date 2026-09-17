@@ -317,10 +317,13 @@ export function NotificationsOverlay() {
                       {notifications.length === 0 ? (
                         <div className="rounded-3xl border border-dashed border-border p-12 text-center">
                           <Bell className="mx-auto size-6 text-muted-foreground" />
-                          <p className="mt-3 text-sm font-medium">You&apos;re all caught up</p>
+                          <p className="mt-3 text-sm font-medium">
+                            {tab === "archive" ? "Archive is empty" : "You're all caught up"}
+                          </p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Replies, mentions, followers and messages from Candid land here.
-                            Everyday confirmations stay as quick toasts.
+                            {tab === "archive"
+                              ? "Archived notifications land here. You can restore or delete them."
+                              : "Replies, mentions, followers and messages from Candid land here. Everyday confirmations stay as quick toasts."}
                           </p>
                         </div>
                       ) : (
@@ -357,18 +360,26 @@ export function NotificationsOverlay() {
             <AlertDialogTitle>
               {pending?.type === "clear"
                 ? "Clear every notification?"
-                : pending?.type === "delete"
-                  ? "Delete this notification?"
-                  : pending?.type === "unread"
-                    ? "Mark as unread?"
-                    : "Mark as read?"}
+                : pending?.type === "emptyArchive"
+                  ? "Empty the archive?"
+                  : pending?.type === "delete"
+                    ? "Delete this notification?"
+                    : pending?.type === "archive"
+                      ? "Archive this notification?"
+                      : pending?.type === "unarchive"
+                        ? "Move back to inbox?"
+                        : pending?.type === "unread"
+                          ? "Mark as unread?"
+                          : "Mark as read?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pending?.type === "clear"
-                ? "This removes all notifications from this device. It cannot be undone."
-                : pending?.type === "delete"
-                  ? "It will be removed from this device. It cannot be undone."
-                  : "You can change this again at any time."}
+                ? "This removes all inbox notifications from this device. It cannot be undone."
+                : pending?.type === "emptyArchive"
+                  ? "This permanently deletes everything in the archive. It cannot be undone."
+                  : pending?.type === "delete"
+                    ? "It will be removed from this device. It cannot be undone."
+                    : "You can change this again at any time."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -502,6 +513,21 @@ function Row({
               onSelect={() => onRequest({ type: n.read ? "unread" : "read", id: n.id })}
             >
               <MailOpen className="size-4" /> Mark as {n.read ? "unread" : "read"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                onRequest({ type: n.archived ? "unarchive" : "archive", id: n.id })
+              }
+            >
+              {n.archived ? (
+                <>
+                  <ArchiveRestore className="size-4" /> Move to inbox
+                </>
+              ) : (
+                <>
+                  <Archive className="size-4" /> Archive
+                </>
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onRequest({ type: "delete", id: n.id })}>
               <Trash2 className="size-4" /> Delete
