@@ -293,6 +293,31 @@ export const addComment = createServerFn({ method: "POST" })
         created_at: new Date().toISOString(),
       });
     await storyRef.update({ comment_count: Number(currentStory?.["comment_count"] ?? 0) + 1 });
+
+    // Notify @mentioned users (deep link scrolls to and expands this comment).
+    try {
+      const { resolveMentionedUserIds, pushServerNotification } = await import(
+        "./notifications.server"
+      );
+      const mentioned = await resolveMentionedUserIds(data.body, context.userId);
+      const authorName = profile?.username ? `@${profile.username}` : "Someone";
+      const storyTitle =
+        typeof currentStory?.["title"] === "string" ? currentStory["title"] : "a story";
+      await Promise.all(
+        mentioned.map((userId) =>
+          pushServerNotification({
+            userId,
+            kind: "info",
+            title: `${authorName} mentioned you`,
+            description: `In a comment on “${storyTitle}”`,
+            link: `/stories/${data.story_id}?comment=${commentId}`,
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error("[addComment] mention notifications failed", error);
+    }
+
     return { ok: true, id: commentId };
   });
 
