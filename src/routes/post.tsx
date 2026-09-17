@@ -543,13 +543,33 @@ function PostPage() {
             <Button variant="ghost" disabled={step === 0} onClick={() => setStep((s) => s - 1)}>
               <ArrowLeft className="size-4" /> Back
             </Button>
+            {dirty && !submitting ? (
+              <Button
+                variant="ghost"
+                className="text-danger"
+                onClick={() => setDiscardOpen(true)}
+              >
+                <Trash2 className="size-4" /> Discard
+              </Button>
+            ) : null}
             {step < 4 ? (
               <Button disabled={!canContinue} onClick={() => setStep((s) => s + 1)}>
                 Continue <ArrowRight className="size-4" />
               </Button>
             ) : null}
           </div>
+
+          <ConfirmDialog
+            open={discardOpen}
+            onOpenChange={setDiscardOpen}
+            title="Discard this story?"
+            description="Everything you've written here will be lost. This cannot be undone."
+            confirmLabel="Discard draft"
+            destructive
+            onConfirm={() => navigate({ to: "/" })}
+          />
         </div>
+
 
         <aside className="space-y-4 rounded-3xl border border-danger/30 bg-danger/5 p-5 text-sm">
           <h2 className="flex items-center gap-2 font-semibold">
