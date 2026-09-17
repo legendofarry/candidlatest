@@ -151,7 +151,10 @@ export function NotificationsOverlay() {
     if (pending.type === "delete") removeNotification(pending.id);
     if (pending.type === "read") markRead(pending.id);
     if (pending.type === "unread") markUnread(pending.id);
+    if (pending.type === "archive") archiveNotification(pending.id);
+    if (pending.type === "unarchive") unarchiveNotification(pending.id);
     if (pending.type === "clear") clearNotifications();
+    if (pending.type === "emptyArchive") clearArchived();
     setPending(null);
   }
 
@@ -227,7 +230,7 @@ export function NotificationsOverlay() {
                         variant="outline"
                         size="sm"
                         onClick={markAllRead}
-                        disabled={unread === 0}
+                        disabled={unread === 0 || tab === "archive"}
                       >
                         <CheckCheck className="size-4" />
                         <span className="hidden sm:inline">Mark all read</span>
@@ -235,9 +238,13 @@ export function NotificationsOverlay() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Clear all notifications"
+                        aria-label={
+                          tab === "archive" ? "Empty archive" : "Clear all notifications"
+                        }
                         disabled={notifications.length === 0}
-                        onClick={() => setPending({ type: "clear" })}
+                        onClick={() =>
+                          setPending({ type: tab === "archive" ? "emptyArchive" : "clear" })
+                        }
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -253,6 +260,33 @@ export function NotificationsOverlay() {
                   </Button>
                 </div>
               </header>
+
+              {view.name === "list" ? (
+                <div className="flex gap-1 border-b border-border/70 px-4 pb-0 pt-2 sm:px-6">
+                  {(
+                    [
+                      { key: "inbox", label: "Inbox", count: all.length - archivedCount },
+                      { key: "archive", label: "Archive", count: archivedCount },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setTab(item.key)}
+                      className={cn(
+                        "rounded-t-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors",
+                        tab === item.key &&
+                          "bg-primary/10 font-medium text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary))]",
+                      )}
+                    >
+                      {item.label}
+                      {item.count > 0 ? (
+                        <span className="ml-1.5 text-xs text-muted-foreground">{item.count}</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
               <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6">
                 <AnimatePresence mode="wait" initial={false}>
