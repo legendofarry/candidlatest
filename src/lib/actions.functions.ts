@@ -139,12 +139,23 @@ export const createStory = createServerFn({ method: "POST" })
         company_id: z.string().uuid(),
         title: z.string().min(8).max(160),
         body: z.string().min(60).max(6000),
-        reasons: z.array(z.enum(REASONS)).min(1).max(6),
+        reasons: z.array(z.string().trim().min(2).max(60)).min(1).max(10),
         role_level: z.string().max(40).nullable().default(null),
+        position: z.string().max(80).nullable().default(null),
         county: z.string().max(60).nullable().default(null),
         tenure: z.string().max(40).nullable().default(null),
         industry: z.string().max(80).nullable().default(null),
         would_work_again: z.boolean().nullable().default(null),
+        evidence: z
+          .object({
+            note: z.string().max(1000).nullable().default(null),
+            files: z
+              .array(z.object({ path: z.string().max(300), name: z.string().max(160) }))
+              .max(5)
+              .default([]),
+          })
+          .nullable()
+          .default(null),
       })
       .parse(input),
   )
@@ -160,6 +171,10 @@ export const createStory = createServerFn({ method: "POST" })
     const company = await queryFirst<CompanyRecord>("companies", "id", data.company_id);
     if (!company) throw new Error("Company not found");
 
+    const hasEvidence = Boolean(
+      data.evidence && (data.evidence.files.length > 0 || data.evidence.note?.trim()),
+    );
+
     const storyId = generateId();
     const created: StoryRecord = {
       id: storyId,
@@ -170,6 +185,7 @@ export const createStory = createServerFn({ method: "POST" })
       body: data.body.trim(),
       reasons: data.reasons,
       role_level: data.role_level,
+      position: data.position?.trim() || null,
       county: data.county,
       tenure: data.tenure,
       industry: data.industry ?? company.industry,
@@ -177,6 +193,7 @@ export const createStory = createServerFn({ method: "POST" })
       author_id: context.userId,
       status: screen.verdict === "publish" ? "published" : "pending",
       moderation_note: screen.verdict === "publish" ? null : screen.reason,
+      evidence_status: hasEvidence ? "pending_review" : null,
       upvotes: 0,
       metoo: 0,
       comment_count: 0,
@@ -184,6 +201,23 @@ export const createStory = createServerFn({ method: "POST" })
     };
 
     await db.collection("stories").doc(storyId).set(created);
+
+    if (hasEvidence && data.evidence) {
+      await db
+        .collection("employment_evidence")
+        .doc(storyId)
+        .set({
+          id: storyId,
+          story_id: storyId,
+          company_id: company.id,
+          user_id: context.userId,
+          note: data.evidence.note?.trim() || null,
+          files: data.evidence.files,
+          status: "pending_review",
+          created_at: new Date().toISOString(),
+        });
+    }
+
     return { ok: true as const, id: created.id, status: created.status };
   });
 
