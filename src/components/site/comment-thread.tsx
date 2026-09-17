@@ -251,6 +251,7 @@ function CommentRow({
 
   return (
     <motion.div
+      id={`comment-${comment.id}`}
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
@@ -358,6 +359,7 @@ function CommentRow({
                 depth={depth + 1}
                 liked={liked}
                 reported={reported}
+                focusCommentId={focusCommentId}
                 onReply={onReply}
                 onChanged={onChanged}
               />
