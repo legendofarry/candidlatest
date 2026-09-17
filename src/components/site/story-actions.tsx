@@ -5,11 +5,19 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowBigUp, Flag, Loader2, MessageSquare, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { notify as toast } from "@/lib/notifications-store";
 import { addComment, castVote } from "@/lib/actions.functions";
 import { ReportDialog } from "@/components/site/report-dialog";
+import { CommentThread } from "@/components/site/comment-thread";
 import { getStory } from "@/lib/public.functions";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatDate } from "@/components/site/story-card";
 import { StorySocial } from "@/components/site/story-social";
 import { cn } from "@/lib/utils";
