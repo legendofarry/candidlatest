@@ -25,6 +25,9 @@ const storyQuery = (id: string) =>
   queryOptions({ queryKey: ["story", id], queryFn: () => getStory({ data: { id } }) });
 
 export const Route = createFileRoute("/stories/$id")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    comment: typeof search["comment"] === "string" ? search["comment"] : undefined,
+  }),
   loader: async ({ context, params }) => {
     const data = await context.queryClient.ensureQueryData(storyQuery(params.id));
     if (!data) throw notFound();
@@ -167,7 +170,12 @@ function StoryPage() {
         </p>
       ) : null}
 
-      <CommentThread storyId={id} comments={comments} total={countComments(comments)} />
+      <CommentThread
+        storyId={id}
+        comments={comments}
+        total={countComments(comments)}
+        focusCommentId={focusCommentId}
+      />
 
       <ReportDialog
         open={reportOpen}
