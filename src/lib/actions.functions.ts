@@ -11,17 +11,6 @@ import {
 } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
 
-const REASONS = [
-  "delayed salary",
-  "unpaid overtime",
-  "harassment",
-  "tribalism / nepotism",
-  "no contract",
-  "wrongful dismissal",
-  "no statutory deductions",
-  "toxic management",
-  "good exit",
-] as const;
 
 function slugify(name: string) {
   return name
