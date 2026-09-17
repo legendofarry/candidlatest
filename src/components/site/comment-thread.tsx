@@ -55,10 +55,13 @@ export function CommentThread({
   storyId,
   comments,
   total,
+  focusCommentId,
 }: {
   storyId: string;
   comments: ThreadComment[];
   total: number;
+  /** Deep-linked comment (from a mention notification) to reveal and scroll to. */
+  focusCommentId?: string | undefined;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -66,6 +69,16 @@ export function CommentThread({
   const engagementFn = useServerFn(getMyEngagement);
   const [body, setBody] = useState("");
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
+
+  useEffect(() => {
+    if (!focusCommentId) return;
+    const el = document.getElementById(`comment-${focusCommentId}`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("ring-2", "ring-primary/50");
+    const timer = setTimeout(() => el.classList.remove("ring-2", "ring-primary/50"), 4000);
+    return () => clearTimeout(timer);
+  }, [focusCommentId, comments]);
 
   const engagement = useQuery({
     queryKey: ["engagement", storyId, user?.uid ?? "anon"],
@@ -112,6 +125,7 @@ export function CommentThread({
               depth={0}
               liked={liked}
               reported={reported}
+              focusCommentId={focusCommentId}
               onReply={setReplyTo}
               onChanged={() => {
                 void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
