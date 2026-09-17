@@ -1,12 +1,24 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
-import { AlertTriangle, ArrowLeft, ArrowRight, ShieldCheck } from "lucide-react";
+import { useRef, useState } from "react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Building2,
+  FileUp,
+  Lock,
+  ShieldCheck,
+  X,
+} from "lucide-react";
+import { ref as storageRef, uploadBytes } from "firebase/storage";
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { getFilterOptions } from "@/lib/public.functions";
 import { createStory, ensureProfile, findOrCreateCompany } from "@/lib/actions.functions";
+import { findCompanyMatches } from "@/lib/company-match";
 import { useAuth } from "@/hooks/useAuth";
+import { firebaseStorage } from "@/integrations/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -50,6 +62,8 @@ export const Route = createFileRoute("/post")({
   component: PostPage,
 });
 
+type EvidenceFile = { file: File; path: string };
+
 function PostPage() {
   const { data: filters } = useSuspenseQuery(filtersQuery);
   const { user, loading } = useAuth();
@@ -64,12 +78,17 @@ function PostPage() {
   const [industry, setIndustry] = useState("");
   const [county, setCounty] = useState("");
   const [reasons, setReasons] = useState<string[]>([]);
+  const [customReason, setCustomReason] = useState("");
   const [tenure, setTenure] = useState("");
   const [roleLevel, setRoleLevel] = useState("");
+  const [position, setPosition] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [wouldReturn, setWouldReturn] = useState<boolean | null>(null);
+  const [evidenceNote, setEvidenceNote] = useState("");
+  const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   if (loading) return null;
 
@@ -91,6 +110,35 @@ function PostPage() {
 
   const steps = ["Employer", "What happened", "Your role", "Your story", "Anonymity"];
 
+  const matches = findCompanyMatches(companyName, filters.companies, 5);
+  const exactMatch = matches.some((m) => m.name.toLowerCase() === companyName.trim().toLowerCase());
+
+  function addCustomReason(raw: string) {
+    const value = raw.replace(/,+$/, "").trim();
+    if (value.length < 2) return;
+    if (reasons.some((r) => r.toLowerCase() === value.toLowerCase())) {
+      setCustomReason("");
+      return;
+    }
+    if (reasons.length >= 10) return;
+    setReasons((current) => [...current, value]);
+    setCustomReason("");
+  }
+
+  function onPickFiles(list: FileList | null) {
+    if (!list) return;
+    const next = [...evidenceFiles];
+    for (const file of Array.from(list)) {
+      if (next.length >= 5) break;
+      if (file.size > 8 * 1024 * 1024) {
+        toast.error(`${file.name} is larger than 8MB`);
+        continue;
+      }
+      next.push({ file, path: "" });
+    }
+    setEvidenceFiles(next);
+  }
+
   async function submit() {
     setSubmitting(true);
     try {
@@ -98,17 +146,32 @@ function PostPage() {
       const company = await findCompany({
         data: { name: companyName.trim(), industry: industry || null, county: county || null },
       });
+
+      let evidence: { note: string | null; files: { path: string; name: string }[] } | null = null;
+      if (evidenceFiles.length > 0 || evidenceNote.trim()) {
+        const draftId = crypto.randomUUID();
+        const uploaded: { path: string; name: string }[] = [];
+        for (const item of evidenceFiles) {
+          const path = `evidence/${user!.uid}/${draftId}/${item.file.name}`;
+          await uploadBytes(storageRef(firebaseStorage, path), item.file);
+          uploaded.push({ path, name: item.file.name });
+        }
+        evidence = { note: evidenceNote.trim() || null, files: uploaded };
+      }
+
       const result = await create({
         data: {
           company_id: company.id,
           title: title.trim(),
           body: body.trim(),
-          reasons: reasons as (typeof REASONS)[number][],
+          reasons,
           role_level: roleLevel || null,
+          position: position.trim() || null,
           county: county || null,
           tenure: tenure || null,
           industry: industry || company.industry || null,
           would_work_again: wouldReturn,
+          evidence,
         },
       });
 
@@ -165,28 +228,57 @@ function PostPage() {
           {step === 0 ? (
             <>
               <div className="space-y-2">
-                <Label htmlFor="company">Employer name</Label>
+                <Label htmlFor="company">Who was your employer?</Label>
                 <Input
                   id="company"
                   value={companyName}
                   onChange={(event) => setCompanyName(event.target.value)}
-                  placeholder="e.g. Sokoni Bank Kenya"
-                  list="company-list"
+                  placeholder="e.g. Sky Minimart, Naivas, a boda stage"
+                  autoComplete="off"
                 />
-                <datalist id="company-list">
-                  {filters.companies.map((company) => (
-                    <option key={company.slug} value={company.name} />
-                  ))}
-                </datalist>
+                <p className="text-xs text-muted-foreground">
+                  The shop, company, or person you worked for — whatever name everyone knows it by.
+                </p>
+
+                {matches.length > 0 && !exactMatch ? (
+                  <div className="space-y-1.5 rounded-2xl border border-border bg-secondary/40 p-3">
+                    <p className="text-xs font-medium text-muted-foreground">
+                      {matches.length === 1
+                        ? "Possible existing employer — is this the same business?"
+                        : "Possible existing employers — is one of these the same business?"}
+                    </p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {matches.map((match) => (
+                        <button
+                          key={match.slug}
+                          type="button"
+                          onClick={() => setCompanyName(match.name)}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm hover:border-primary/50"
+                        >
+                          <Building2 className="size-3.5 text-primary" />
+                          {match.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+
+                {companyName.trim().length > 1 && matches.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
+                    Can't find your employer? No problem — posting adds "
+                    <span className="font-medium text-foreground">{companyName.trim()}</span>" to
+                    the directory so others can find it too.
+                  </p>
+                ) : null}
               </div>
               <ChipField
-                label="Industry"
+                label="What kind of work do they do? (industry)"
                 options={filters.industries}
                 value={industry}
                 onChange={setIndustry}
               />
               <ChipField
-                label="County"
+                label="Which county is this?"
                 options={filters.counties}
                 value={county}
                 onChange={setCounty}
@@ -195,36 +287,101 @@ function PostPage() {
           ) : null}
 
           {step === 1 ? (
-            <div className="space-y-2">
-              <Label>Why did you leave? Pick all that apply</Label>
-              <div className="flex flex-wrap gap-1.5">
-                {REASONS.map((reason) => (
-                  <button
-                    key={reason}
-                    onClick={() =>
-                      setReasons((current) =>
-                        current.includes(reason)
-                          ? current.filter((item) => item !== reason)
-                          : [...current, reason],
-                      )
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label>Why did you leave? Pick all that apply</Label>
+                <div className="flex flex-wrap gap-1.5">
+                  {REASONS.map((reason) => (
+                    <button
+                      key={reason}
+                      type="button"
+                      onClick={() =>
+                        setReasons((current) =>
+                          current.includes(reason)
+                            ? current.filter((item) => item !== reason)
+                            : [...current, reason],
+                        )
+                      }
+                      className={cn(
+                        "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
+                        reasons.includes(reason) && "border-primary/50 bg-primary/10 text-foreground",
+                      )}
+                    >
+                      {reason}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="custom-reason">Or type your own</Label>
+                <Input
+                  id="custom-reason"
+                  value={customReason}
+                  onChange={(event) => {
+                    const value = event.target.value;
+                    if (value.endsWith(",")) {
+                      addCustomReason(value);
+                    } else {
+                      setCustomReason(value);
                     }
-                    className={cn(
-                      "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
-                      reasons.includes(reason) && "border-primary/50 bg-primary/10 text-foreground",
-                    )}
-                  >
-                    {reason}
-                  </button>
-                ))}
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addCustomReason(customReason);
+                    }
+                  }}
+                  placeholder="Type a reason, then press Enter or comma"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Each comma or Enter saves it as its own reason.
+                </p>
+                {reasons.filter((r) => !(REASONS as readonly string[]).includes(r)).length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {reasons
+                      .filter((r) => !(REASONS as readonly string[]).includes(r))
+                      .map((reason) => (
+                        <span
+                          key={reason}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm"
+                        >
+                          {reason}
+                          <button
+                            type="button"
+                            aria-label={`Remove ${reason}`}
+                            onClick={() =>
+                              setReasons((current) => current.filter((item) => item !== reason))
+                            }
+                          >
+                            <X className="size-3.5" />
+                          </button>
+                        </span>
+                      ))}
+                  </div>
+                ) : null}
               </div>
             </div>
           ) : null}
 
           {step === 2 ? (
             <>
-              <ChipField label="Tenure" options={TENURES} value={tenure} onChange={setTenure} />
+              <div className="space-y-2">
+                <Label htmlFor="position">What was your job title there?</Label>
+                <Input
+                  id="position"
+                  value={position}
+                  onChange={(event) => setPosition(event.target.value)}
+                  placeholder="e.g. Cashier, Graphic Designer, Accountant, Rider"
+                />
+                <p className="text-xs text-muted-foreground">
+                  Different positions are paid and treated differently — this keeps your story (and
+                  salary data) accurate.
+                </p>
+              </div>
+              <ChipField label="How long did you work there?" options={TENURES} value={tenure} onChange={setTenure} />
               <ChipField
-                label="Role level"
+                label="How senior were you?"
                 options={LEVELS}
                 value={roleLevel}
                 onChange={setRoleLevel}
@@ -238,6 +395,7 @@ function PostPage() {
                   ].map((option) => (
                     <button
                       key={option.label}
+                      type="button"
                       onClick={() => setWouldReturn(option.value)}
                       className={cn(
                         "rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground",
@@ -281,16 +439,82 @@ function PostPage() {
           ) : null}
 
           {step === 4 ? (
-            <div className="space-y-3 text-sm">
+            <div className="space-y-4 text-sm">
               <h2 className="text-lg font-semibold">Before you publish</h2>
               <ul className="space-y-2 text-muted-foreground">
-                <li>
-                  · Your story publishes under an anonymous handle. Your email is never shown.
-                </li>
+                <li>· Your story publishes under an anonymous handle. Your email is never shown.</li>
                 <li>· Do not name individual colleagues, managers or clients.</li>
                 <li>· Stick to what you experienced or can describe factually.</li>
                 <li>· An automated screen checks every story before it goes live.</li>
               </ul>
+
+              <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
+                <h3 className="flex items-center gap-2 font-semibold">
+                  <Lock className="size-4 text-primary" /> Prove you worked there (optional,
+                  private)
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  Attach anything that shows you worked there — staff ID, contract or exit letter,
+                  work email, or an M-Pesa statement/screenshot of salary payments. It is{" "}
+                  <span className="font-medium text-foreground">never published</span> and never
+                  shown to the employer — only moderators review it.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Paid via M-Pesa from your boss's personal number? That's normal for small
+                  businesses — just add a short note below telling us.
+                </p>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,application/pdf"
+                  multiple
+                  className="hidden"
+                  onChange={(event) => {
+                    onPickFiles(event.target.files);
+                    event.target.value = "";
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={evidenceFiles.length >= 5}
+                >
+                  <FileUp className="size-4" /> Attach evidence ({evidenceFiles.length}/5)
+                </Button>
+                {evidenceFiles.length > 0 ? (
+                  <ul className="space-y-1">
+                    {evidenceFiles.map((item, index) => (
+                      <li
+                        key={`${item.file.name}-${index}`}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs"
+                      >
+                        <span className="truncate">{item.file.name}</span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${item.file.name}`}
+                          onClick={() =>
+                            setEvidenceFiles((current) =>
+                              current.filter((_, i) => i !== index),
+                            )
+                          }
+                        >
+                          <X className="size-3.5" />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+                <Textarea
+                  rows={2}
+                  value={evidenceNote}
+                  onChange={(event) => setEvidenceNote(event.target.value)}
+                  placeholder="Optional note, e.g. “Salary came from the owner's personal M-Pesa, name Peter K.”"
+                />
+              </div>
+
               <Button className="w-full glow-primary" disabled={submitting} onClick={submit}>
                 {submitting ? "Screening and publishing…" : "Publish anonymously"}
               </Button>
@@ -347,6 +571,7 @@ function ChipField({
         {options.map((option) => (
           <button
             key={option}
+            type="button"
             onClick={() => onChange(value === option ? "" : option)}
             className={cn(
               "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
@@ -360,7 +585,7 @@ function ChipField({
       <Input
         value={value}
         onChange={(event) => onChange(event.target.value)}
-        placeholder={`Or type a ${label.toLowerCase()}`}
+        placeholder={`Or type it yourself`}
       />
     </div>
   );
