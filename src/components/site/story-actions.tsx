@@ -5,11 +5,19 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowBigUp, Flag, Loader2, MessageSquare, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { notify as toast } from "@/lib/notifications-store";
 import { addComment, castVote } from "@/lib/actions.functions";
 import { ReportDialog } from "@/components/site/report-dialog";
+import { CommentThread } from "@/components/site/comment-thread";
 import { getStory } from "@/lib/public.functions";
 import { useAuth } from "@/hooks/useAuth";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { formatDate } from "@/components/site/story-card";
 import { StorySocial } from "@/components/site/story-social";
 import { cn } from "@/lib/utils";
@@ -27,10 +35,12 @@ export function StoryActions({
   commentCount: number;
 }) {
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const vote = useServerFn(castVote);
   const comment = useServerFn(addComment);
   const [open, setOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [reported, setReported] = useState(false);
   const [body, setBody] = useState("");
@@ -43,7 +53,7 @@ export function StoryActions({
   const thread = useQuery({
     queryKey: ["story", storyId],
     queryFn: () => getStory({ data: { id: storyId } }),
-    enabled: open,
+    enabled: open || sheetOpen,
   });
 
   const voteMutation = useMutation({
@@ -96,8 +106,8 @@ export function StoryActions({
           icon={<MessageSquare className="size-4" />}
           label={`${commentCount + optimistic.comments}`}
           hint="Comments"
-          active={open}
-          onClick={() => setOpen((value) => !value)}
+          active={open || sheetOpen}
+          onClick={() => (isMobile ? setSheetOpen(true) : setOpen((value) => !value))}
         />
         <StorySocial storyId={storyId} className="contents sm:flex" />
 
@@ -184,6 +194,27 @@ export function StoryActions({
           )}
         </div>
       ) : null}
+
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader className="border-b border-border pb-3 text-left">
+            <DrawerTitle className="text-sm">Comments</DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-y-auto">
+            {thread.isPending ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                Loading comments…
+              </p>
+            ) : (
+              <CommentThread
+                storyId={storyId}
+                comments={thread.data?.comments ?? []}
+                total={commentCount + optimistic.comments}
+              />
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }

@@ -29,6 +29,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
+import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
 import { setPreference, usePreferences } from "@/lib/preferences";
 import {
@@ -75,6 +76,7 @@ function isNestedRoute(pathname: string) {
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
+  useServerNotificationsSync();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadCount();
   const [confirmSignOut, setConfirmSignOut] = useState(false);

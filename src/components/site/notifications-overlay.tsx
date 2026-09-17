@@ -3,6 +3,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   Bell,
   CheckCheck,
@@ -33,7 +35,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  archiveNotification,
   backToNotificationList,
+  clearArchived,
   clearNotifications,
   closeNotifications,
   markAllRead,
@@ -42,6 +46,7 @@ import {
   openNotificationDetail,
   pruneExpired,
   removeNotification,
+  unarchiveNotification,
   useNotifications,
   useNotificationsOverlay,
   type AppNotification,
@@ -72,16 +77,23 @@ type PendingAction =
   | { type: "delete"; id: string }
   | { type: "read"; id: string }
   | { type: "unread"; id: string }
-  | { type: "clear" };
+  | { type: "archive"; id: string }
+  | { type: "unarchive"; id: string }
+  | { type: "clear" }
+  | { type: "emptyArchive" };
 
 export function NotificationsOverlay() {
   const { open, view } = useNotificationsOverlay();
-  const notifications = useNotifications();
+  const all = useNotifications();
   const navigate = useNavigate();
   const [pending, setPending] = useState<PendingAction | null>(null);
+  const [tab, setTab] = useState<"inbox" | "archive">("inbox");
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  const unread = notifications.reduce((total, n) => total + (n.read ? 0 : 1), 0);
+  const notifications = all.filter((n) => (tab === "archive" ? n.archived : !n.archived));
+  const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
+
+  const unread = all.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0);
 
   // Sweep expired one-time notices whenever the centre is opened.
   useEffect(() => {
@@ -139,7 +151,10 @@ export function NotificationsOverlay() {
     if (pending.type === "delete") removeNotification(pending.id);
     if (pending.type === "read") markRead(pending.id);
     if (pending.type === "unread") markUnread(pending.id);
+    if (pending.type === "archive") archiveNotification(pending.id);
+    if (pending.type === "unarchive") unarchiveNotification(pending.id);
     if (pending.type === "clear") clearNotifications();
+    if (pending.type === "emptyArchive") clearArchived();
     setPending(null);
   }
 
@@ -215,7 +230,7 @@ export function NotificationsOverlay() {
                         variant="outline"
                         size="sm"
                         onClick={markAllRead}
-                        disabled={unread === 0}
+                        disabled={unread === 0 || tab === "archive"}
                       >
                         <CheckCheck className="size-4" />
                         <span className="hidden sm:inline">Mark all read</span>
@@ -223,9 +238,13 @@ export function NotificationsOverlay() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label="Clear all notifications"
+                        aria-label={
+                          tab === "archive" ? "Empty archive" : "Clear all notifications"
+                        }
                         disabled={notifications.length === 0}
-                        onClick={() => setPending({ type: "clear" })}
+                        onClick={() =>
+                          setPending({ type: tab === "archive" ? "emptyArchive" : "clear" })
+                        }
                       >
                         <Trash2 className="size-4" />
                       </Button>
@@ -241,6 +260,33 @@ export function NotificationsOverlay() {
                   </Button>
                 </div>
               </header>
+
+              {view.name === "list" ? (
+                <div className="flex gap-1 border-b border-border/70 px-4 pb-0 pt-2 sm:px-6">
+                  {(
+                    [
+                      { key: "inbox", label: "Inbox", count: all.length - archivedCount },
+                      { key: "archive", label: "Archive", count: archivedCount },
+                    ] as const
+                  ).map((item) => (
+                    <button
+                      key={item.key}
+                      type="button"
+                      onClick={() => setTab(item.key)}
+                      className={cn(
+                        "rounded-t-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors",
+                        tab === item.key &&
+                          "bg-primary/10 font-medium text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary))]",
+                      )}
+                    >
+                      {item.label}
+                      {item.count > 0 ? (
+                        <span className="ml-1.5 text-xs text-muted-foreground">{item.count}</span>
+                      ) : null}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
               <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6">
                 <AnimatePresence mode="wait" initial={false}>
@@ -271,10 +317,13 @@ export function NotificationsOverlay() {
                       {notifications.length === 0 ? (
                         <div className="rounded-3xl border border-dashed border-border p-12 text-center">
                           <Bell className="mx-auto size-6 text-muted-foreground" />
-                          <p className="mt-3 text-sm font-medium">You&apos;re all caught up</p>
+                          <p className="mt-3 text-sm font-medium">
+                            {tab === "archive" ? "Archive is empty" : "You're all caught up"}
+                          </p>
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Replies, mentions, followers and messages from Candid land here.
-                            Everyday confirmations stay as quick toasts.
+                            {tab === "archive"
+                              ? "Archived notifications land here. You can restore or delete them."
+                              : "Replies, mentions, followers and messages from Candid land here. Everyday confirmations stay as quick toasts."}
                           </p>
                         </div>
                       ) : (
@@ -311,18 +360,26 @@ export function NotificationsOverlay() {
             <AlertDialogTitle>
               {pending?.type === "clear"
                 ? "Clear every notification?"
-                : pending?.type === "delete"
-                  ? "Delete this notification?"
-                  : pending?.type === "unread"
-                    ? "Mark as unread?"
-                    : "Mark as read?"}
+                : pending?.type === "emptyArchive"
+                  ? "Empty the archive?"
+                  : pending?.type === "delete"
+                    ? "Delete this notification?"
+                    : pending?.type === "archive"
+                      ? "Archive this notification?"
+                      : pending?.type === "unarchive"
+                        ? "Move back to inbox?"
+                        : pending?.type === "unread"
+                          ? "Mark as unread?"
+                          : "Mark as read?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {pending?.type === "clear"
-                ? "This removes all notifications from this device. It cannot be undone."
-                : pending?.type === "delete"
-                  ? "It will be removed from this device. It cannot be undone."
-                  : "You can change this again at any time."}
+                ? "This removes all inbox notifications from this device. It cannot be undone."
+                : pending?.type === "emptyArchive"
+                  ? "This permanently deletes everything in the archive. It cannot be undone."
+                  : pending?.type === "delete"
+                    ? "It will be removed from this device. It cannot be undone."
+                    : "You can change this again at any time."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -456,6 +513,21 @@ function Row({
               onSelect={() => onRequest({ type: n.read ? "unread" : "read", id: n.id })}
             >
               <MailOpen className="size-4" /> Mark as {n.read ? "unread" : "read"}
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={() =>
+                onRequest({ type: n.archived ? "unarchive" : "archive", id: n.id })
+              }
+            >
+              {n.archived ? (
+                <>
+                  <ArchiveRestore className="size-4" /> Move to inbox
+                </>
+              ) : (
+                <>
+                  <Archive className="size-4" /> Archive
+                </>
+              )}
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={() => onRequest({ type: "delete", id: n.id })}>
               <Trash2 className="size-4" /> Delete

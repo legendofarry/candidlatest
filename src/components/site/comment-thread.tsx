@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -55,10 +55,13 @@ export function CommentThread({
   storyId,
   comments,
   total,
+  focusCommentId,
 }: {
   storyId: string;
   comments: ThreadComment[];
   total: number;
+  /** Deep-linked comment (from a mention notification) to reveal and scroll to. */
+  focusCommentId?: string | undefined;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -66,6 +69,16 @@ export function CommentThread({
   const engagementFn = useServerFn(getMyEngagement);
   const [body, setBody] = useState("");
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
+
+  useEffect(() => {
+    if (!focusCommentId) return;
+    const el = document.getElementById(`comment-${focusCommentId}`);
+    if (!el) return;
+    el.scrollIntoView({ block: "center", behavior: "smooth" });
+    el.classList.add("ring-2", "ring-primary/50");
+    const timer = setTimeout(() => el.classList.remove("ring-2", "ring-primary/50"), 4000);
+    return () => clearTimeout(timer);
+  }, [focusCommentId, comments]);
 
   const engagement = useQuery({
     queryKey: ["engagement", storyId, user?.uid ?? "anon"],
@@ -112,6 +125,7 @@ export function CommentThread({
               depth={0}
               liked={liked}
               reported={reported}
+              focusCommentId={focusCommentId}
               onReply={setReplyTo}
               onChanged={() => {
                 void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
@@ -178,12 +192,18 @@ export function CommentThread({
   );
 }
 
+function subtreeContains(comment: ThreadComment, id: string): boolean {
+  if (comment.id === id) return true;
+  return comment.replies.some((reply) => subtreeContains(reply, id));
+}
+
 function CommentRow({
   comment,
   storyId,
   depth,
   liked,
   reported,
+  focusCommentId,
   onReply,
   onChanged,
 }: {
@@ -192,12 +212,16 @@ function CommentRow({
   depth: number;
   liked: Set<string>;
   reported: Set<string>;
+  focusCommentId?: string | undefined;
   onReply: (comment: ThreadComment) => void;
   onChanged: () => void;
 }) {
   const { user } = useAuth();
   const like = useServerFn(likeComment);
-  const [open, setOpen] = useState(depth === 0 && comment.replies.some((r) => r.is_official));
+  const [open, setOpen] = useState(
+    (depth === 0 && comment.replies.some((r) => r.is_official)) ||
+      (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
+  );
   const [reportOpen, setReportOpen] = useState(false);
   const [localLiked, setLocalLiked] = useState<boolean | null>(null);
   const [localLikes, setLocalLikes] = useState(comment.likes);
@@ -227,6 +251,7 @@ function CommentRow({
 
   return (
     <motion.div
+      id={`comment-${comment.id}`}
       layout
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
@@ -334,6 +359,7 @@ function CommentRow({
                 depth={depth + 1}
                 liked={liked}
                 reported={reported}
+                focusCommentId={focusCommentId}
                 onReply={onReply}
                 onChanged={onChanged}
               />

@@ -14,6 +14,7 @@ export type AppNotification = {
   description?: string | undefined;
   createdAt: number;
   read: boolean;
+  archived?: boolean | undefined;
   category?: NotifyCategory;
   link?: NotifyLink | undefined;
   /** Epoch ms after which a one-time system notice is swept from storage. */
@@ -283,6 +284,71 @@ export function removeNotification(id: string) {
   emit();
 }
 
+export function archiveNotification(id: string) {
+  notifications = notifications.map((n) => (n.id === id ? { ...n, archived: true } : n));
+  persist();
+  emit();
+}
+
+export function unarchiveNotification(id: string) {
+  notifications = notifications.map((n) =>
+    n.id === id ? { ...n, archived: undefined } : n,
+  );
+  persist();
+  emit();
+}
+
+export function archiveAll() {
+  notifications = notifications.map((n) => (n.archived ? n : { ...n, archived: true }));
+  persist();
+  emit();
+}
+
+export function clearArchived() {
+  notifications = notifications.filter((n) => !n.archived);
+  persist();
+  emit();
+}
+
+/**
+ * Idempotently merges durable server-side notifications into the local inbox.
+ * Existing server ids are skipped, so polling never duplicates rows.
+ */
+export function ingestServerNotifications(
+  items: {
+    id: string;
+    kind: NotifyKind;
+    title: string;
+    description?: string | undefined;
+    link?: string | undefined;
+    createdAt: number;
+  }[],
+) {
+  const known = new Set(
+    notifications.map((n) => n.dedupeKey).filter((key): key is string => Boolean(key)),
+  );
+  const fresh = items
+    .filter((item) => !known.has(`srv:${item.id}`))
+    .map<AppNotification>((item) => ({
+      id: `srv-${item.id}`,
+      kind: item.kind,
+      title: item.title,
+      description: item.description,
+      createdAt: item.createdAt,
+      read: false,
+      category: "action",
+      link: item.link ? { href: item.link } : undefined,
+      dedupeKey: `srv:${item.id}`,
+    }));
+  if (fresh.length === 0) return 0;
+  notifications = [...notifications, ...fresh]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, MAX_STORED);
+  persist();
+  emit();
+  return fresh.length;
+}
+
 export function clearNotifications() {
   notifications = [];
   persist();
@@ -312,7 +378,7 @@ export function useBanners() {
 export function useUnreadCount() {
   return useSyncExternalStore(
     subscribe,
-    () => notifications.reduce((total, n) => total + (n.read ? 0 : 1), 0),
+    () => notifications.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0),
     () => 0,
   );
 }

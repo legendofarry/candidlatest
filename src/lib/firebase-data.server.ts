@@ -10,6 +10,8 @@ export type CompanyRecord = {
   county: string | null;
   verified: boolean;
   created_at: string;
+  aliases?: string[];
+  claimed_by?: string | null;
 };
 
 export type CompanyAIProfileRecord = {
@@ -58,6 +60,7 @@ export type StoryRecord = {
   body: string;
   reasons: string[];
   role_level: string | null;
+  position?: string | null;
   county: string | null;
   tenure: string | null;
   industry: string | null;
@@ -66,6 +69,7 @@ export type StoryRecord = {
   author_username?: string | null;
   status: "published" | "pending" | "hidden";
   moderation_note: string | null;
+  evidence_status?: "pending_review" | "reviewed" | null;
   upvotes: number;
   metoo: number;
   comment_count: number;

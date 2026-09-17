@@ -4,23 +4,13 @@ import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 import {
   generateId,
   queryFirst,
+  readCollection,
   type CompanyRecord,
   type ProfileRecord,
   type StoryRecord,
 } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
 
-const REASONS = [
-  "delayed salary",
-  "unpaid overtime",
-  "harassment",
-  "tribalism / nepotism",
-  "no contract",
-  "wrongful dismissal",
-  "no statutory deductions",
-  "toxic management",
-  "good exit",
-] as const;
 
 function slugify(name: string) {
   return name
@@ -75,8 +65,23 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
     const slug = slugify(data.name);
-    const existing = (await queryFirst<CompanyRecord>("companies", "slug", slug)) ?? null;
-    if (existing) return existing;
+
+    const { findCompanyMatches } = await import("./company-match");
+    const all = await readCollection<CompanyRecord>("companies");
+    const exact =
+      all.find((company) => company.slug === slug) ??
+      findCompanyMatches(data.name, all, 1)[0] ??
+      null;
+    if (exact) {
+      // Remember this alternate spelling so future matches resolve here.
+      const aliases = new Set([...(exact.aliases ?? [])]);
+      if (![exact.name, ...aliases].some((n) => n.toLowerCase() === data.name.toLowerCase())) {
+        aliases.add(data.name);
+        await db.collection("companies").doc(exact.id).update({ aliases: [...aliases] });
+        exact.aliases = [...aliases];
+      }
+      return exact;
+    }
 
     const created: CompanyRecord = {
       id: generateId(),
@@ -86,6 +91,7 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       county: data.county,
       verified: false,
       created_at: new Date().toISOString(),
+      aliases: [],
     };
     await db.collection("companies").doc(created.id).set(created);
 
@@ -122,12 +128,23 @@ export const createStory = createServerFn({ method: "POST" })
         company_id: z.string().uuid(),
         title: z.string().min(8).max(160),
         body: z.string().min(60).max(6000),
-        reasons: z.array(z.enum(REASONS)).min(1).max(6),
+        reasons: z.array(z.string().trim().min(2).max(60)).min(1).max(10),
         role_level: z.string().max(40).nullable().default(null),
+        position: z.string().max(80).nullable().default(null),
         county: z.string().max(60).nullable().default(null),
         tenure: z.string().max(40).nullable().default(null),
         industry: z.string().max(80).nullable().default(null),
         would_work_again: z.boolean().nullable().default(null),
+        evidence: z
+          .object({
+            note: z.string().max(1000).nullable().default(null),
+            files: z
+              .array(z.object({ path: z.string().max(300), name: z.string().max(160) }))
+              .max(5)
+              .default([]),
+          })
+          .nullable()
+          .default(null),
       })
       .parse(input),
   )
@@ -143,6 +160,10 @@ export const createStory = createServerFn({ method: "POST" })
     const company = await queryFirst<CompanyRecord>("companies", "id", data.company_id);
     if (!company) throw new Error("Company not found");
 
+    const hasEvidence = Boolean(
+      data.evidence && (data.evidence.files.length > 0 || data.evidence.note?.trim()),
+    );
+
     const storyId = generateId();
     const created: StoryRecord = {
       id: storyId,
@@ -153,6 +174,7 @@ export const createStory = createServerFn({ method: "POST" })
       body: data.body.trim(),
       reasons: data.reasons,
       role_level: data.role_level,
+      position: data.position?.trim() || null,
       county: data.county,
       tenure: data.tenure,
       industry: data.industry ?? company.industry,
@@ -160,6 +182,7 @@ export const createStory = createServerFn({ method: "POST" })
       author_id: context.userId,
       status: screen.verdict === "publish" ? "published" : "pending",
       moderation_note: screen.verdict === "publish" ? null : screen.reason,
+      evidence_status: hasEvidence ? "pending_review" : null,
       upvotes: 0,
       metoo: 0,
       comment_count: 0,
@@ -167,6 +190,49 @@ export const createStory = createServerFn({ method: "POST" })
     };
 
     await db.collection("stories").doc(storyId).set(created);
+
+    if (hasEvidence && data.evidence) {
+      await db
+        .collection("employment_evidence")
+        .doc(storyId)
+        .set({
+          id: storyId,
+          story_id: storyId,
+          company_id: company.id,
+          user_id: context.userId,
+          note: data.evidence.note?.trim() || null,
+          files: data.evidence.files,
+          status: "pending_review",
+          created_at: new Date().toISOString(),
+        });
+    }
+
+    // Tell the company's claimed account it was tagged in a new live story.
+    if (created.status === "published") {
+      try {
+        const owners = await db
+          .collection("account_verifications")
+          .where("company_id", "==", company.id)
+          .get();
+        if (!owners.empty) {
+          const { pushServerNotification } = await import("./notifications.server");
+          await Promise.all(
+            owners.docs.map((doc) =>
+              pushServerNotification({
+                userId: doc.id,
+                kind: "info",
+                title: `${company.name} was tagged in a new story`,
+                description: `“${created.title}”`,
+                link: `/stories/${created.id}`,
+              }),
+            ),
+          );
+        }
+      } catch (error) {
+        console.error("[createStory] company tag notification failed", error);
+      }
+    }
+
     return { ok: true as const, id: created.id, status: created.status };
   });
 
@@ -253,6 +319,31 @@ export const addComment = createServerFn({ method: "POST" })
         created_at: new Date().toISOString(),
       });
     await storyRef.update({ comment_count: Number(currentStory?.["comment_count"] ?? 0) + 1 });
+
+    // Notify @mentioned users (deep link scrolls to and expands this comment).
+    try {
+      const { resolveMentionedUserIds, pushServerNotification } = await import(
+        "./notifications.server"
+      );
+      const mentioned = await resolveMentionedUserIds(data.body, context.userId);
+      const authorName = profile?.username ? `@${profile.username}` : "Someone";
+      const storyTitle =
+        typeof currentStory?.["title"] === "string" ? currentStory["title"] : "a story";
+      await Promise.all(
+        mentioned.map((userId) =>
+          pushServerNotification({
+            userId,
+            kind: "info",
+            title: `${authorName} mentioned you`,
+            description: `In a comment on “${storyTitle}”`,
+            link: `/stories/${data.story_id}?comment=${commentId}`,
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error("[addComment] mention notifications failed", error);
+    }
+
     return { ok: true, id: commentId };
   });
 
