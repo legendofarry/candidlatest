@@ -3,6 +3,8 @@ import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
+  Archive,
+  ArchiveRestore,
   ArrowLeft,
   Bell,
   CheckCheck,
@@ -33,7 +35,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+  archiveNotification,
   backToNotificationList,
+  clearArchived,
   clearNotifications,
   closeNotifications,
   markAllRead,
@@ -42,6 +46,7 @@ import {
   openNotificationDetail,
   pruneExpired,
   removeNotification,
+  unarchiveNotification,
   useNotifications,
   useNotificationsOverlay,
   type AppNotification,
@@ -72,16 +77,23 @@ type PendingAction =
   | { type: "delete"; id: string }
   | { type: "read"; id: string }
   | { type: "unread"; id: string }
-  | { type: "clear" };
+  | { type: "archive"; id: string }
+  | { type: "unarchive"; id: string }
+  | { type: "clear" }
+  | { type: "emptyArchive" };
 
 export function NotificationsOverlay() {
   const { open, view } = useNotificationsOverlay();
-  const notifications = useNotifications();
+  const all = useNotifications();
   const navigate = useNavigate();
   const [pending, setPending] = useState<PendingAction | null>(null);
+  const [tab, setTab] = useState<"inbox" | "archive">("inbox");
   const panelRef = useRef<HTMLDivElement | null>(null);
 
-  const unread = notifications.reduce((total, n) => total + (n.read ? 0 : 1), 0);
+  const notifications = all.filter((n) => (tab === "archive" ? n.archived : !n.archived));
+  const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
+
+  const unread = all.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0);
 
   // Sweep expired one-time notices whenever the centre is opened.
   useEffect(() => {
