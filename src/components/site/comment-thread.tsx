@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -192,12 +192,18 @@ export function CommentThread({
   );
 }
 
+function subtreeContains(comment: ThreadComment, id: string): boolean {
+  if (comment.id === id) return true;
+  return comment.replies.some((reply) => subtreeContains(reply, id));
+}
+
 function CommentRow({
   comment,
   storyId,
   depth,
   liked,
   reported,
+  focusCommentId,
   onReply,
   onChanged,
 }: {
@@ -206,12 +212,16 @@ function CommentRow({
   depth: number;
   liked: Set<string>;
   reported: Set<string>;
+  focusCommentId?: string | undefined;
   onReply: (comment: ThreadComment) => void;
   onChanged: () => void;
 }) {
   const { user } = useAuth();
   const like = useServerFn(likeComment);
-  const [open, setOpen] = useState(depth === 0 && comment.replies.some((r) => r.is_official));
+  const [open, setOpen] = useState(
+    (depth === 0 && comment.replies.some((r) => r.is_official)) ||
+      (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
+  );
   const [reportOpen, setReportOpen] = useState(false);
   const [localLiked, setLocalLiked] = useState<boolean | null>(null);
   const [localLikes, setLocalLikes] = useState(comment.likes);
