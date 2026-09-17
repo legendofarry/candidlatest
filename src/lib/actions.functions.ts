@@ -207,6 +207,32 @@ export const createStory = createServerFn({ method: "POST" })
         });
     }
 
+    // Tell the company's claimed account it was tagged in a new live story.
+    if (created.status === "published") {
+      try {
+        const owners = await db
+          .collection("account_verifications")
+          .where("company_id", "==", company.id)
+          .get();
+        if (!owners.empty) {
+          const { pushServerNotification } = await import("./notifications.server");
+          await Promise.all(
+            owners.docs.map((doc) =>
+              pushServerNotification({
+                userId: doc.id,
+                kind: "info",
+                title: `${company.name} was tagged in a new story`,
+                description: `“${created.title}”`,
+                link: `/stories/${created.id}`,
+              }),
+            ),
+          );
+        }
+      } catch (error) {
+        console.error("[createStory] company tag notification failed", error);
+      }
+    }
+
     return { ok: true as const, id: created.id, status: created.status };
   });
 
