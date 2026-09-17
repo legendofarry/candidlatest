@@ -194,6 +194,27 @@ export function StoryActions({
           )}
         </div>
       ) : null}
+
+      <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
+        <DrawerContent className="max-h-[85vh]">
+          <DrawerHeader className="border-b border-border pb-3 text-left">
+            <DrawerTitle className="text-sm">Comments</DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-y-auto">
+            {thread.isPending ? (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                Loading comments…
+              </p>
+            ) : (
+              <CommentThread
+                storyId={storyId}
+                comments={thread.data?.comments ?? []}
+                total={commentCount + optimistic.comments}
+              />
+            )}
+          </div>
+        </DrawerContent>
+      </Drawer>
     </div>
   );
 }
