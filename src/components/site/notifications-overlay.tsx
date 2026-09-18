@@ -164,7 +164,7 @@ export function NotificationsOverlay() {
         {open ? (
           <motion.div
             key="notifications-overlay"
-            className="pointer-events-none fixed inset-0 z-[70] flex flex-col pt-16 sm:pt-0"
+            className="pointer-events-none fixed inset-0 z-[70] flex flex-col pt-16 sm:pt-0 md:items-end md:justify-start md:pt-28 md:pr-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -174,7 +174,7 @@ export function NotificationsOverlay() {
             aria-label="Notifications"
           >
             <motion.div
-              className="pointer-events-auto absolute inset-0 top-16 bg-background/80 backdrop-blur-xl sm:top-0"
+              className="pointer-events-auto absolute inset-0 top-16 bg-background/80 backdrop-blur-xl sm:top-0 md:pointer-events-none md:bg-transparent md:backdrop-blur-none"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -187,10 +187,10 @@ export function NotificationsOverlay() {
             <motion.div
               ref={panelRef}
               tabIndex={-1}
-              className="pointer-events-auto relative flex h-full w-full flex-col outline-none sm:mx-auto sm:my-6 sm:h-[calc(100%-3rem)] sm:max-w-2xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:bg-card/70 sm:shadow-2xl"
-              initial={{ y: 32, opacity: 0, scale: 0.98 }}
-              animate={{ y: 0, opacity: 1, scale: 1 }}
-              exit={{ y: 24, opacity: 0, scale: 0.98 }}
+              className="pointer-events-auto relative flex h-full w-full flex-col outline-none sm:mx-auto sm:my-6 sm:h-[calc(100%-3rem)] sm:max-w-2xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:bg-card/70 sm:shadow-2xl md:m-0 md:h-[calc(100vh-8rem)] md:w-[32rem] md:max-w-none md:bg-card md:shadow-2xl"
+              initial={{ y: 32, opacity: 0, x: 0, scale: 0.98 }}
+              animate={{ y: 0, opacity: 1, x: 0, scale: 1 }}
+              exit={{ y: 24, opacity: 0, x: 40, scale: 0.98 }}
               transition={{ type: "spring", stiffness: 320, damping: 30 }}
             >
               <header className="flex items-center gap-3 border-b border-border/70 px-4 py-4 sm:px-6">
@@ -238,9 +238,7 @@ export function NotificationsOverlay() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        aria-label={
-                          tab === "archive" ? "Empty archive" : "Clear all notifications"
-                        }
+                        aria-label={tab === "archive" ? "Empty archive" : "Clear all notifications"}
                         disabled={notifications.length === 0}
                         onClick={() =>
                           setPending({ type: tab === "archive" ? "emptyArchive" : "clear" })
@@ -515,9 +513,7 @@ function Row({
               <MailOpen className="size-4" /> Mark as {n.read ? "unread" : "read"}
             </DropdownMenuItem>
             <DropdownMenuItem
-              onSelect={() =>
-                onRequest({ type: n.archived ? "unarchive" : "archive", id: n.id })
-              }
+              onSelect={() => onRequest({ type: n.archived ? "unarchive" : "archive", id: n.id })}
             >
               {n.archived ? (
                 <>

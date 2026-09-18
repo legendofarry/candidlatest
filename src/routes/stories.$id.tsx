@@ -85,7 +85,7 @@ function StoryPage() {
   const votedKinds = engagement.data?.votedKinds ?? [];
 
   return (
-    <article className="mx-auto max-w-3xl space-y-6">
+    <article className="mx-auto w-full max-w-3xl space-y-6 md:mx-0 md:max-w-none">
       <div className="animate-fade">
         <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
           {story.company_slug ? (

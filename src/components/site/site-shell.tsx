@@ -1,38 +1,43 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Building2,
+  FileText,
   Flame,
   Home,
   Info,
+  LifeBuoy,
   LogOut,
   MessagesSquare,
-  MoreHorizontal,
   PenLine,
   Search,
+  ShieldCheck,
   Trophy,
   UserRound,
   Wallet,
+  X,
 } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { BiometricGate } from "@/components/site/biometric-gate";
 import { BackButton } from "@/components/site/back-button";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/site/theme-toggle";
 import { SplashScreen } from "@/components/site/splash-screen";
-import { SupportChat } from "@/components/site/support-chat";
 import { RouteProgress } from "@/components/site/route-progress";
 import { NotificationBanners } from "@/components/site/notification-banners";
 import { NotificationsOverlay } from "@/components/site/notifications-overlay";
 import { BadgeClaimModal } from "@/components/site/badge-claim-modal";
+import { SupportChat } from "@/components/site/support-chat";
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
-import { useQuery } from "@tanstack/react-query";
-import { useServerFn } from "@tanstack/react-start";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
 import { setPreference, usePreferences } from "@/lib/preferences";
+import { ProfilePage } from "@/routes/profile";
+import { MessagesInbox } from "@/routes/messages.index";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,66 +48,58 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-/** Primary tabs — kept deliberately small so the bottom bar stays sleek. */
-const nav = [
+const primaryNav = [
   { to: "/", label: "Feed", icon: Home },
   { to: "/companies", label: "Companies", icon: Building2 },
-  { to: "/post", label: "Post", icon: PenLine },
-  { to: "/profile", label: "Profile", icon: UserRound },
 ] as const;
 
-/** Secondary destinations live in the header overflow menu. */
-const moreNav = [
+const exploreNav = [
   { to: "/salaries", label: "Salary insights", icon: Wallet },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/about", label: "About Candid", icon: Info },
-  { to: "/support", label: "Help & support", icon: MessagesSquare },
+  { to: "/guidelines", label: "Community guidelines", icon: FileText },
+  { to: "/rights", label: "Safety & your rights", icon: ShieldCheck },
+  { to: "/support", label: "Help & support", icon: LifeBuoy },
 ] as const;
 
-/** Routes rendered as nested/detail views: no bottom nav, always a back action. */
 function isNestedRoute(pathname: string) {
-  if (pathname === "/") return false;
-  if (nav.some((item) => item.to === pathname)) return false;
-  return true;
+  return !["/", "/companies", "/profile"].includes(pathname);
 }
+
+function nestedTitle(pathname: string) {
+  if (pathname.startsWith("/stories/")) return "Story";
+  if (pathname.startsWith("/companies/")) return "Company";
+  if (pathname.startsWith("/messages/")) return "Conversation";
+  if (pathname.startsWith("/salaries/")) return "Salary insight";
+  return (
+    {
+      "/search": "Search",
+      "/post": "Post a story",
+      "/support": "Help & support",
+      "/about": "About Candid",
+      "/guidelines": "Community guidelines",
+      "/rights": "Safety & your rights",
+      "/privacy": "Privacy & disclaimer",
+      "/leaderboards": "Leaderboards",
+      "/messages": "Messages",
+    }[pathname] ?? "Back"
+  );
+}
+
+type RightPanel = "profile" | "messages" | null;
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
   useServerNotificationsSync();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadCount();
+  const [rightPanel, setRightPanel] = useState<RightPanel>(null);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [rememberChoice, setRememberChoice] = useState(false);
   const prefs = usePreferences();
-  /** Locking is only an option once fast unlock is set up on this device. */
   const canLock = Boolean(user && prefs.biometricUnlock && hasCredentialFor(user.uid));
-
-  /**
-   * Asked once: after the user says "remember this", leaving follows their
-   * answer instead of showing the question again.
-   */
-  function handleLeave() {
-    if (canLock && prefs.sessionMemory === "lock") {
-      requestLock();
-      return;
-    }
-    if (canLock && prefs.sessionMemory === "signout") {
-      void signOut();
-      return;
-    }
-    setRememberChoice(false);
-    setConfirmSignOut(true);
-  }
   const fetchUnreadMessages = useServerFn(getUnreadMessages);
   const { data: messageState } = useQuery({
     queryKey: ["unread-messages", user?.uid ?? null],
@@ -110,13 +107,24 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     enabled: Boolean(user),
     refetchInterval: 20000,
   });
-  const unreadMessages = messageState?.unread ?? 0;
-
   const nested = isNestedRoute(pathname);
-  const showFooter = pathname === "/";
+
+  useEffect(() => {
+    if (pathname === "/profile") setRightPanel("profile");
+    if (pathname.startsWith("/messages")) setRightPanel("messages");
+  }, [pathname]);
+
+  function handleLeave() {
+    if (canLock && prefs.sessionMemory === "lock") return requestLock();
+    if (canLock && prefs.sessionMemory === "signout") return void signOut();
+    setRememberChoice(false);
+    setConfirmSignOut(true);
+  }
+  const togglePanel = (panel: Exclude<RightPanel, null>) =>
+    setRightPanel((current) => (current === panel ? null : panel));
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background md:pb-6">
       <SplashScreen />
       <RouteProgress />
       <NotificationBanners />
@@ -129,38 +137,19 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             <Flame className="size-5 text-primary" />
             <span className="font-display text-lg font-semibold tracking-tight">Candid</span>
           </Link>
-
-          <nav className="ml-6 hidden items-center gap-1 md:flex">
-            {nav.map((item) => (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "rounded-full px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                  pathname === item.to && "bg-secondary text-foreground",
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
-
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <Link
-              to="/messages"
-              aria-label="Messages"
+            <button
+              type="button"
+              onClick={() => togglePanel("messages")}
+              aria-label="Open messages"
               className={cn(
                 "relative inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                pathname.startsWith("/messages") && "bg-secondary text-foreground",
+                rightPanel === "messages" && "bg-secondary text-foreground",
               )}
             >
               <MessagesSquare className="size-4" />
-              {unreadMessages > 0 ? (
-                <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-                  {unreadMessages > 9 ? "9+" : unreadMessages}
-                </span>
-              ) : null}
-            </Link>
+              {(messageState?.unread ?? 0) > 0 ? <Count value={messageState!.unread} /> : null}
+            </button>
             <Link
               to="/search"
               aria-label="Search Candid"
@@ -178,11 +167,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               className="relative inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
             >
               <Bell className="size-4" />
-              {unread > 0 ? (
-                <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
-                  {unread > 9 ? "9+" : unread}
-                </span>
-              ) : null}
+              {unread > 0 ? <Count value={unread} /> : null}
             </button>
             <ThemeToggle />
             <Button asChild size="sm" className="glow-primary hidden sm:inline-flex">
@@ -190,101 +175,134 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <PenLine className="size-4" /> Post a story
               </Link>
             </Button>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" aria-label="More">
-                  <MoreHorizontal className="size-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel>Explore</DropdownMenuLabel>
-                {moreNav.map((item) => {
-                  const Icon = item.icon;
-                  return (
-                    <DropdownMenuItem key={item.to} asChild>
-                      <Link to={item.to}>
-                        <Icon className="size-4" /> {item.label}
-                      </Link>
-                    </DropdownMenuItem>
-                  );
-                })}
-                <DropdownMenuSeparator />
-                {user ? (
-                  <DropdownMenuItem onSelect={() => handleLeave()}>
-                    <LogOut className="size-4" /> {canLock ? "Lock or sign out" : "Sign out"}
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem asChild>
-                    <Link to="/auth">Sign in</Link>
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            {user ? (
+              <Button variant="ghost" size="icon" aria-label="Sign out" onClick={handleLeave}>
+                <LogOut className="size-4" />
+              </Button>
+            ) : (
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/auth">Sign in</Link>
+              </Button>
+            )}
           </div>
         </div>
-
         {nested ? (
-          <div className="app-shell flex h-11 items-center border-t border-border/60">
-            <BackButton />
+          <div className="app-shell h-11">
+            <div className="flex h-full items-center border-t border-border/60 md:ml-80">
+              <div className="flex w-full items-center">
+                <BackButton label={nestedTitle(pathname)} />
+              </div>
+            </div>
           </div>
         ) : null}
       </header>
 
-      <main className={cn("app-shell pt-6 md:pb-16", nested ? "pb-10" : "pb-28")}>
-        <BiometricGate>{children}</BiometricGate>
-      </main>
-
-      {showFooter ? (
-        <footer className="border-t border-border py-10 text-sm text-muted-foreground">
-          <div className="app-shell flex flex-wrap gap-x-6 gap-y-2">
-            <Link to="/about" className="hover:text-foreground">
-              About
-            </Link>
-            <Link to="/guidelines" className="hover:text-foreground">
-              Community guidelines
-            </Link>
-            <Link to="/rights" className="hover:text-foreground">
-              Safety &amp; your rights
-            </Link>
-            <Link to="/privacy" className="hover:text-foreground">
-              Privacy &amp; disclaimer
-            </Link>
-            <Link to="/support" className="hover:text-foreground">
-              Help &amp; support
-            </Link>
-            <span className="w-full pt-2 text-xs">
-              Stories are personal opinions of anonymous contributors. Employers have a right of
-              reply.
-            </span>
+      <div className="app-shell relative">
+        <aside
+          className={cn(
+            "fixed bottom-0 left-0 z-30 hidden w-72 flex-col border-r border-border bg-card/85 p-4 shadow-sm backdrop-blur md:flex",
+            nested ? "top-28" : "top-20",
+          )}
+        >
+          <nav className="space-y-1" aria-label="Main navigation">
+            {primaryNav.map((item) => (
+              <SidebarLink key={item.to} item={item} active={pathname === item.to} />
+            ))}
+            <button
+              type="button"
+              onClick={() => togglePanel("profile")}
+              className={cn(
+                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                rightPanel === "profile" && "bg-secondary text-foreground",
+              )}
+            >
+              <UserRound className="size-4" />
+              Profile
+            </button>
+          </nav>
+          <div className="my-4 border-t border-border" />
+          <nav className="space-y-1" aria-label="Explore Candid">
+            {exploreNav.map((item) => (
+              <SidebarLink key={item.to} item={item} active={pathname === item.to} />
+            ))}
+          </nav>
+          <div className="mt-auto rounded-2xl bg-secondary/70 p-3 text-xs text-muted-foreground">
+            Your identity is never shown on the stories you share.
           </div>
-        </footer>
-      ) : null}
-
-      {nested ? null : (
-        <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border glass-card md:hidden">
-          <div className="grid grid-cols-4">
-            {nav.map((item) => {
-              const Icon = item.icon;
-              const active = pathname === item.to;
-              return (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  className={cn(
-                    "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors",
-                    active && "text-primary",
-                  )}
-                >
-                  <Icon className="size-5" />
-                  {item.label}
-                </Link>
-              );
-            })}
-          </div>
-        </nav>
-      )}
-
+        </aside>
+        <main className={cn("min-w-0 pt-6 md:pb-10 md:pl-80", nested ? "pb-10" : "pb-28")}>
+          <BiometricGate>{children}</BiometricGate>
+        </main>
+        {pathname === "/" ? (
+          <footer className="border-t border-border py-10 text-sm text-muted-foreground md:ml-80">
+            <div className="flex flex-wrap gap-x-6 gap-y-2">
+              <Link to="/about" className="hover:text-foreground">
+                About
+              </Link>
+              <Link to="/guidelines" className="hover:text-foreground">
+                Community guidelines
+              </Link>
+              <Link to="/rights" className="hover:text-foreground">
+                Safety &amp; your rights
+              </Link>
+              <Link to="/privacy" className="hover:text-foreground">
+                Privacy &amp; disclaimer
+              </Link>
+              <Link to="/support" className="hover:text-foreground">
+                Help &amp; support
+              </Link>
+              <span className="w-full pt-2 text-xs">
+                Stories are personal opinions of anonymous contributors. Employers have a right of
+                reply.
+              </span>
+            </div>
+          </footer>
+        ) : null}
+      </div>
+      <RightWorkspace
+        open={rightPanel === "profile"}
+        title="Your profile"
+        onClose={() => setRightPanel(null)}
+      >
+        <ProfilePage />
+      </RightWorkspace>
+      <RightWorkspace
+        open={rightPanel === "messages"}
+        title="Messages"
+        onClose={() => setRightPanel(null)}
+      >
+        <MessagesInbox />
+      </RightWorkspace>
+      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border glass-card md:hidden">
+        <div className="grid grid-cols-3">
+          {primaryNav.map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.to}
+                to={item.to}
+                className={cn(
+                  "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors",
+                  pathname === item.to && "text-primary",
+                )}
+              >
+                <Icon className="size-5" />
+                {item.label}
+              </Link>
+            );
+          })}
+          <Link
+            to="/profile"
+            className={cn(
+              "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground",
+              pathname === "/profile" && "text-primary",
+            )}
+          >
+            <UserRound className="size-5" />
+            Profile
+          </Link>
+        </div>
+      </nav>
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -335,5 +353,58 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+function Count({ value }: { value: number }) {
+  return (
+    <span className="absolute right-1 top-1 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-bold text-primary-foreground">
+      {value > 9 ? "9+" : value}
+    </span>
+  );
+}
+function SidebarLink({
+  item,
+  active,
+}: {
+  item: (typeof primaryNav)[number] | (typeof exploreNav)[number];
+  active: boolean;
+}) {
+  const Icon = item.icon;
+  return (
+    <Link
+      to={item.to}
+      className={cn(
+        "flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+        active && "bg-secondary text-foreground",
+      )}
+    >
+      <Icon className="size-4" />
+      {item.label}
+    </Link>
+  );
+}
+function RightWorkspace({
+  open,
+  title,
+  onClose,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+}) {
+  if (!open) return null;
+  return (
+    <aside className="fixed bottom-6 right-6 top-28 z-[70] hidden w-[32rem] animate-[desktop-drawer-in_220ms_cubic-bezier(0.16,1,0.3,1)] overflow-hidden rounded-3xl border border-border bg-card shadow-2xl md:flex md:flex-col">
+      <header className="flex shrink-0 items-center justify-between border-b border-border px-5 py-4">
+        <h2 className="font-display text-lg font-semibold">{title}</h2>
+        <Button variant="ghost" size="icon" onClick={onClose} aria-label={`Close ${title}`}>
+          <X className="size-4" />
+        </Button>
+      </header>
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">{children}</div>
+    </aside>
   );
 }

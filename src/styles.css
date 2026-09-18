@@ -79,6 +79,17 @@
   }
 }
 
+@keyframes desktop-drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(1.25rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 @keyframes shimmer {
   from {
     background-position: -200% 0;
@@ -235,12 +246,19 @@
   }
 }
 
+/* Desktop has room for a more comfortable reading scale than a phone-sized canvas. */
+@media (min-width: 768px) {
+  html {
+    font-size: 17px;
+  }
+}
+
 @utility mesh-hero {
   background-image: var(--gradient-hero);
 }
 
 @utility app-shell {
-  width: min(calc(100% - clamp(2rem, 5vw, 6rem)), 96rem);
+  width: min(calc(100% - clamp(2rem, 5vw, 6rem)), 112rem);
   margin-inline: auto;
 }
 

@@ -23,14 +23,11 @@ export type ConversationRecord = {
   unread: Record<string, number>;
 };
 
-export type Attachment = { url: string; name: string; kind: "image" | "file" };
-
 export type MessageRecord = {
   id: string;
   conversation_id: string;
   sender_id: string;
   body: string;
-  attachment: Attachment | null;
   created_at: string;
   read_at: string | null;
   reactions: Record<string, string[]>;
@@ -280,12 +277,7 @@ export async function readConversation(userId: string, conversationId: string) {
   };
 }
 
-export async function sendMessage(input: {
-  userId: string;
-  conversationId: string;
-  body: string;
-  attachment: Attachment | null;
-}) {
+export async function sendMessage(input: { userId: string; conversationId: string; body: string }) {
   const db = getFirestoreDb();
   const ref = db.collection("conversations").doc(input.conversationId);
   const snap = await ref.get();
@@ -303,14 +295,13 @@ export async function sendMessage(input: {
     conversation_id: input.conversationId,
     sender_id: input.userId,
     body: input.body,
-    attachment: input.attachment,
     created_at: now(),
     read_at: null,
     reactions: {},
   };
   await messageRef.set(message);
   await ref.update({
-    last_message: input.body || (input.attachment ? "Attachment" : ""),
+    last_message: input.body,
     last_message_at: message.created_at,
     last_sender_id: input.userId,
     [`unread.${otherId}`]: (record.unread?.[otherId] ?? 0) + 1,

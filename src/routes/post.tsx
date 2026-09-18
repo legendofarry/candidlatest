@@ -7,19 +7,16 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
-  FileUp,
   Lock,
   ShieldCheck,
   Trash2,
   X,
 } from "lucide-react";
-import { ref as storageRef, uploadBytes } from "firebase/storage";
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { getFilterOptions } from "@/lib/public.functions";
 import { createStory, ensureProfile, findOrCreateCompany } from "@/lib/actions.functions";
 import { findCompanyMatches } from "@/lib/company-match";
 import { useAuth } from "@/hooks/useAuth";
-import { firebaseStorage } from "@/integrations/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -64,8 +61,6 @@ export const Route = createFileRoute("/post")({
   component: PostPage,
 });
 
-type EvidenceFile = { file: File; path: string };
-
 function PostPage() {
   const { data: filters } = useSuspenseQuery(filtersQuery);
   const { user, loading } = useAuth();
@@ -88,10 +83,8 @@ function PostPage() {
   const [body, setBody] = useState("");
   const [wouldReturn, setWouldReturn] = useState<boolean | null>(null);
   const [evidenceNote, setEvidenceNote] = useState("");
-  const [evidenceFiles, setEvidenceFiles] = useState<EvidenceFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const dirty =
     companyName.trim().length > 0 ||
@@ -143,20 +136,6 @@ function PostPage() {
     setCustomReason("");
   }
 
-  function onPickFiles(list: FileList | null) {
-    if (!list) return;
-    const next = [...evidenceFiles];
-    for (const file of Array.from(list)) {
-      if (next.length >= 5) break;
-      if (file.size > 8 * 1024 * 1024) {
-        toast.error(`${file.name} is larger than 8MB`);
-        continue;
-      }
-      next.push({ file, path: "" });
-    }
-    setEvidenceFiles(next);
-  }
-
   async function submit() {
     setSubmitting(true);
     try {
@@ -165,17 +144,7 @@ function PostPage() {
         data: { name: companyName.trim(), industry: industry || null, county: county || null },
       });
 
-      let evidence: { note: string | null; files: { path: string; name: string }[] } | null = null;
-      if (evidenceFiles.length > 0 || evidenceNote.trim()) {
-        const draftId = crypto.randomUUID();
-        const uploaded: { path: string; name: string }[] = [];
-        for (const item of evidenceFiles) {
-          const path = `evidence/${user!.uid}/${draftId}/${item.file.name}`;
-          await uploadBytes(storageRef(firebaseStorage, path), item.file);
-          uploaded.push({ path, name: item.file.name });
-        }
-        evidence = { note: evidenceNote.trim() || null, files: uploaded };
-      }
+      const evidence = evidenceNote.trim() ? { note: evidenceNote.trim() } : null;
 
       const result = await create({
         data: {
@@ -222,7 +191,7 @@ function PostPage() {
   ][step];
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-6 md:mx-0 md:max-w-none">
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Share your exit story</h1>
         <div className="mt-4 flex gap-1.5">
@@ -241,7 +210,7 @@ function PostPage() {
         </p>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-[1fr_240px]">
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
         <div className="space-y-5 rounded-3xl border border-border bg-card p-6">
           {step === 0 ? (
             <>
@@ -322,7 +291,8 @@ function PostPage() {
                       }
                       className={cn(
                         "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
-                        reasons.includes(reason) && "border-primary/50 bg-primary/10 text-foreground",
+                        reasons.includes(reason) &&
+                          "border-primary/50 bg-primary/10 text-foreground",
                       )}
                     >
                       {reason}
@@ -397,7 +367,12 @@ function PostPage() {
                   salary data) accurate.
                 </p>
               </div>
-              <ChipField label="How long did you work there?" options={TENURES} value={tenure} onChange={setTenure} />
+              <ChipField
+                label="How long did you work there?"
+                options={TENURES}
+                value={tenure}
+                onChange={setTenure}
+              />
               <ChipField
                 label="How senior were you?"
                 options={LEVELS}
@@ -460,7 +435,9 @@ function PostPage() {
             <div className="space-y-4 text-sm">
               <h2 className="text-lg font-semibold">Before you publish</h2>
               <ul className="space-y-2 text-muted-foreground">
-                <li>· Your story publishes under an anonymous handle. Your email is never shown.</li>
+                <li>
+                  · Your story publishes under an anonymous handle. Your email is never shown.
+                </li>
                 <li>· Do not name individual colleagues, managers or clients.</li>
                 <li>· Stick to what you experienced or can describe factually.</li>
                 <li>· An automated screen checks every story before it goes live.</li>
@@ -472,64 +449,21 @@ function PostPage() {
                   private)
                 </h3>
                 <p className="text-xs text-muted-foreground">
-                  Attach anything that shows you worked there — staff ID, contract or exit letter,
-                  work email, or an M-Pesa statement/screenshot of salary payments. It is{" "}
+                  File uploads are not accepted. If helpful, leave a short private note with context
+                  a moderator can use when reviewing your story. It is{" "}
                   <span className="font-medium text-foreground">never published</span> and never
-                  shown to the employer — only moderators review it.
+                  shown to the employer.
                 </p>
                 <p className="text-xs text-muted-foreground">
                   Paid via M-Pesa from your boss's personal number? That's normal for small
                   businesses — just add a short note below telling us.
                 </p>
 
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,application/pdf"
-                  multiple
-                  className="hidden"
-                  onChange={(event) => {
-                    onPickFiles(event.target.files);
-                    event.target.value = "";
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={evidenceFiles.length >= 5}
-                >
-                  <FileUp className="size-4" /> Attach evidence ({evidenceFiles.length}/5)
-                </Button>
-                {evidenceFiles.length > 0 ? (
-                  <ul className="space-y-1">
-                    {evidenceFiles.map((item, index) => (
-                      <li
-                        key={`${item.file.name}-${index}`}
-                        className="flex items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-1.5 text-xs"
-                      >
-                        <span className="truncate">{item.file.name}</span>
-                        <button
-                          type="button"
-                          aria-label={`Remove ${item.file.name}`}
-                          onClick={() =>
-                            setEvidenceFiles((current) =>
-                              current.filter((_, i) => i !== index),
-                            )
-                          }
-                        >
-                          <X className="size-3.5" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
                 <Textarea
                   rows={2}
                   value={evidenceNote}
                   onChange={(event) => setEvidenceNote(event.target.value)}
-                  placeholder="Optional note, e.g. “Salary came from the owner's personal M-Pesa, name Peter K.”"
+                  placeholder="Optional private note, e.g. “Salary came from the owner's personal M-Pesa.”"
                 />
               </div>
 
@@ -544,11 +478,7 @@ function PostPage() {
               <ArrowLeft className="size-4" /> Back
             </Button>
             {dirty && !submitting ? (
-              <Button
-                variant="ghost"
-                className="text-danger"
-                onClick={() => setDiscardOpen(true)}
-              >
+              <Button variant="ghost" className="text-danger" onClick={() => setDiscardOpen(true)}>
                 <Trash2 className="size-4" /> Discard
               </Button>
             ) : null}
@@ -569,7 +499,6 @@ function PostPage() {
             onConfirm={() => navigate({ to: "/" })}
           />
         </div>
-
 
         <aside className="space-y-4 rounded-3xl border border-danger/30 bg-danger/5 p-5 text-sm">
           <h2 className="flex items-center gap-2 font-semibold">

@@ -38,7 +38,7 @@ function SearchPage() {
   });
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="mx-auto w-full max-w-3xl space-y-6 md:mx-0 md:max-w-none">
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Search</h1>
         <p className="mt-2 text-muted-foreground">

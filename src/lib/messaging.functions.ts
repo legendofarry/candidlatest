@@ -2,15 +2,6 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 
-const attachmentSchema = z
-  .object({
-    url: z.string().min(1),
-    name: z.string().min(1),
-    kind: z.enum(["image", "file"]),
-  })
-  .nullable()
-  .default(null);
-
 export const getConversations = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .handler(async ({ context }) => {
@@ -49,18 +40,16 @@ export const postMessage = createServerFn({ method: "POST" })
       .object({
         conversation_id: z.string().min(1),
         body: z.string().max(4000).default(""),
-        attachment: attachmentSchema,
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { sendMessage } = await import("./messaging.server");
-    if (!data.body.trim() && !data.attachment) throw new Error("Write something first.");
+    if (!data.body.trim()) throw new Error("Write something first.");
     return sendMessage({
       userId: context.userId,
       conversationId: data.conversation_id,
       body: data.body.trim(),
-      attachment: data.attachment,
     });
   });
 

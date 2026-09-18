@@ -8,7 +8,7 @@ export function ProsePage({
   children: React.ReactNode;
 }) {
   return (
-    <article className="mx-auto max-w-2xl animate-rise space-y-6">
+    <article className="mx-auto w-full max-w-2xl animate-rise space-y-6 md:mx-0 md:max-w-none">
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">{title}</h1>
         <p className="mt-3 text-muted-foreground">{intro}</p>

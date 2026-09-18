@@ -107,11 +107,13 @@ export function NotificationBanners() {
 
   return (
     <div
-      className="pointer-events-none fixed inset-x-0 z-[80] flex flex-col items-center gap-2 px-3 sm:left-auto sm:right-4 sm:w-[380px] sm:items-end sm:px-0"
+      className="pointer-events-none fixed inset-x-0 z-[90] flex flex-col items-center gap-3 px-4 md:px-0"
       style={{ top: "calc(env(safe-area-inset-top, 0px) + 5.25rem)" }}
     >
       {banners.map((banner) => (
-        <Banner key={banner.id} banner={banner} />
+        <div key={banner.id} className="w-full max-w-xl md:max-w-2xl">
+          <Banner banner={banner} />
+        </div>
       ))}
     </div>
   );

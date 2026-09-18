@@ -83,7 +83,7 @@ function FeedPage() {
   return (
     <div className="space-y-8">
       <section className="mesh-hero animate-fade relative overflow-hidden rounded-3xl border border-border p-6 md:p-12">
-        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.15fr)_minmax(300px,0.85fr)] lg:gap-12">
+        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
               <ShieldCheck className="size-3.5 text-verified" /> Anonymous by design · Kenya
@@ -111,7 +111,7 @@ function FeedPage() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_240px] xl:grid-cols-[minmax(0,1fr)_minmax(240px,320px)] 2xl:grid-cols-[minmax(640px,1fr)_320px]">
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div className="min-w-0 space-y-4">
           <FilterBar
             query={q}

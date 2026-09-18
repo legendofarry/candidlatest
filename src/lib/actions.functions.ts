@@ -11,7 +11,6 @@ import {
 } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
 
-
 function slugify(name: string) {
   return name
     .toLowerCase()
@@ -77,7 +76,10 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       const aliases = new Set([...(exact.aliases ?? [])]);
       if (![exact.name, ...aliases].some((n) => n.toLowerCase() === data.name.toLowerCase())) {
         aliases.add(data.name);
-        await db.collection("companies").doc(exact.id).update({ aliases: [...aliases] });
+        await db
+          .collection("companies")
+          .doc(exact.id)
+          .update({ aliases: [...aliases] });
         exact.aliases = [...aliases];
       }
       return exact;
@@ -138,10 +140,6 @@ export const createStory = createServerFn({ method: "POST" })
         evidence: z
           .object({
             note: z.string().max(1000).nullable().default(null),
-            files: z
-              .array(z.object({ path: z.string().max(300), name: z.string().max(160) }))
-              .max(5)
-              .default([]),
           })
           .nullable()
           .default(null),
@@ -160,9 +158,7 @@ export const createStory = createServerFn({ method: "POST" })
     const company = await queryFirst<CompanyRecord>("companies", "id", data.company_id);
     if (!company) throw new Error("Company not found");
 
-    const hasEvidence = Boolean(
-      data.evidence && (data.evidence.files.length > 0 || data.evidence.note?.trim()),
-    );
+    const hasEvidence = Boolean(data.evidence?.note?.trim());
 
     const storyId = generateId();
     const created: StoryRecord = {
@@ -201,7 +197,6 @@ export const createStory = createServerFn({ method: "POST" })
           company_id: company.id,
           user_id: context.userId,
           note: data.evidence.note?.trim() || null,
-          files: data.evidence.files,
           status: "pending_review",
           created_at: new Date().toISOString(),
         });
@@ -322,9 +317,8 @@ export const addComment = createServerFn({ method: "POST" })
 
     // Notify @mentioned users (deep link scrolls to and expands this comment).
     try {
-      const { resolveMentionedUserIds, pushServerNotification } = await import(
-        "./notifications.server"
-      );
+      const { resolveMentionedUserIds, pushServerNotification } =
+        await import("./notifications.server");
       const mentioned = await resolveMentionedUserIds(data.body, context.userId);
       const authorName = profile?.username ? `@${profile.username}` : "Someone";
       const storyTitle =

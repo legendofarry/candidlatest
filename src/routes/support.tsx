@@ -68,7 +68,7 @@ function SupportPage() {
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
-    <div className="mx-auto max-w-3xl pb-10">
+    <div className="mx-auto w-full max-w-3xl pb-10 md:mx-0 md:max-w-none">
       <header className="rounded-3xl bg-secondary/70 p-7 md:p-10">
         <ShieldCheck className="size-8 text-primary" />
         <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight md:text-4xl">

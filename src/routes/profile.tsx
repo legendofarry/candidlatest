@@ -69,7 +69,7 @@ export const Route = createFileRoute("/profile")({
   component: ProfilePage,
 });
 
-function ProfilePage() {
+export function ProfilePage() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
   const prefs = usePreferences();

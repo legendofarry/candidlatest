@@ -39,7 +39,7 @@ function timeAgo(iso: string) {
   return `${Math.round(hours / 24)}d`;
 }
 
-function MessagesInbox() {
+export function MessagesInbox() {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const fetchConversations = useServerFn(getConversations);
