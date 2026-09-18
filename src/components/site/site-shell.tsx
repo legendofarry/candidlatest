@@ -20,6 +20,7 @@ import { BackButton } from "@/components/site/back-button";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/site/theme-toggle";
 import { SplashScreen } from "@/components/site/splash-screen";
+import { SupportChat } from "@/components/site/support-chat";
 import { RouteProgress } from "@/components/site/route-progress";
 import { NotificationBanners } from "@/components/site/notification-banners";
 import { NotificationsOverlay } from "@/components/site/notifications-overlay";
@@ -65,6 +66,7 @@ const moreNav = [
   { to: "/salaries", label: "Salary insights", icon: Wallet },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
   { to: "/about", label: "About Candid", icon: Info },
+  { to: "/support", label: "Help & support", icon: MessagesSquare },
 ] as const;
 
 /** Routes rendered as nested/detail views: no bottom nav, always a back action. */
@@ -120,6 +122,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <NotificationBanners />
       <NotificationsOverlay />
       <BadgeClaimModal />
+      <SupportChat />
       <header className="sticky top-0 z-[80] border-b border-border glass-card">
         <div className="app-shell flex h-16 items-center gap-3">
           <Link to="/" className="flex items-center gap-2">
@@ -246,6 +249,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             </Link>
             <Link to="/privacy" className="hover:text-foreground">
               Privacy &amp; disclaimer
+            </Link>
+            <Link to="/support" className="hover:text-foreground">
+              Help &amp; support
             </Link>
             <span className="w-full pt-2 text-xs">
               Stories are personal opinions of anonymous contributors. Employers have a right of
