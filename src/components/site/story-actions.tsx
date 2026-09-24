@@ -5,12 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { ArrowBigUp, Flag, Loader2, MessageSquare, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { notify as toast } from "@/lib/notifications-store";
 import { addComment, castVote } from "@/lib/actions.functions";
 import { ReportDialog } from "@/components/site/report-dialog";
@@ -28,11 +23,15 @@ export function StoryActions({
   upvotes,
   metoo,
   commentCount,
+  discussionOpen = false,
+  onToggleDiscussion,
 }: {
   storyId: string;
   upvotes: number;
   metoo: number;
   commentCount: number;
+  discussionOpen?: boolean;
+  onToggleDiscussion?: (() => void) | undefined;
 }) {
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -53,7 +52,7 @@ export function StoryActions({
   const thread = useQuery({
     queryKey: ["story", storyId],
     queryFn: () => getStory({ data: { id: storyId } }),
-    enabled: open || sheetOpen,
+    enabled: open || sheetOpen || discussionOpen,
   });
 
   const voteMutation = useMutation({
@@ -106,8 +105,16 @@ export function StoryActions({
           icon={<MessageSquare className="size-4" />}
           label={`${commentCount + optimistic.comments}`}
           hint="Comments"
-          active={open || sheetOpen}
-          onClick={() => (isMobile ? setSheetOpen(true) : setOpen((value) => !value))}
+          active={discussionOpen || open || sheetOpen}
+          onClick={() => {
+            if (isMobile || !window.matchMedia("(min-width: 1024px)").matches) {
+              setSheetOpen(true);
+            } else if (onToggleDiscussion) {
+              onToggleDiscussion();
+            } else {
+              setOpen((value) => !value);
+            }
+          }}
         />
         <StorySocial storyId={storyId} className="contents sm:flex" />
 

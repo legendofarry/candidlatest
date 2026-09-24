@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/site/confirm-dialog";
+import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { cn } from "@/lib/utils";
 
 const filtersQuery = queryOptions({ queryKey: ["filters"], queryFn: () => getFilterOptions() });
@@ -192,19 +193,12 @@ function PostPage() {
   ][step];
 
   return (
-    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(163,230,53,0.18),_transparent_25%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))]">
-      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl">
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/" })}
-          className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-2 text-sm text-foreground shadow-lg backdrop-blur md:left-6 md:top-6"
-        >
-          <ArrowLeft className="size-4" />
-          Back
-        </button>
+    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(163,230,53,0.18),_transparent_25%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
+      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
+        <FloatingBackButton onClick={() => navigate({ to: "/" })} />
 
-        <div className="grid min-h-screen md:grid-cols-[1.05fr_1.2fr]">
-          <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#0f172a_0%,#111827_30%,#0f172a_100%)] md:sticky md:top-0 md:flex md:h-screen md:items-center md:justify-center md:p-12">
+        <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
+          <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#0f172a_0%,#111827_30%,#0f172a_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, y: 18 }}
               animate={{ opacity: 1, y: 0 }}
@@ -245,7 +239,7 @@ function PostPage() {
             </motion.div>
           </div>
 
-          <div className="flex items-center p-4 md:p-8">
+          <div className="flex items-center p-4 md:h-dvh md:overflow-y-auto md:p-8">
             <div className="w-full space-y-6">
               <header className="pt-12 md:pt-0">
                 <h1 className="text-3xl font-semibold md:text-4xl">Share your exit story</h1>

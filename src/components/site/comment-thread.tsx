@@ -38,6 +38,8 @@ export type ThreadComment = {
   replies: ThreadComment[];
 };
 
+export type CommentSortMode = "top" | "newest" | "helpful";
+
 function timeAgo(value: string) {
   const diff = Math.max(0, Date.now() - new Date(value).getTime());
   const mins = Math.floor(diff / 60000);
@@ -56,12 +58,16 @@ export function CommentThread({
   comments,
   total,
   focusCommentId,
+  sortMode = "top",
+  panelMode = false,
 }: {
   storyId: string;
   comments: ThreadComment[];
   total: number;
   /** Deep-linked comment (from a mention notification) to reveal and scroll to. */
   focusCommentId?: string | undefined;
+  sortMode?: CommentSortMode;
+  panelMode?: boolean;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -94,6 +100,18 @@ export function CommentThread({
     () => new Set(engagement.data?.reportedTargetIds ?? []),
     [engagement.data?.reportedTargetIds],
   );
+  const sortedComments = useMemo(() => {
+    const dateOrder = (a: ThreadComment, b: ThreadComment) =>
+      new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    return [...comments].sort((a, b) => {
+      if (a.is_official !== b.is_official) return a.is_official ? -1 : 1;
+      if (sortMode === "newest") return dateOrder(a, b);
+      if (sortMode === "helpful") return b.likes - a.likes || dateOrder(a, b);
+      const aScore = a.likes + a.replies.length * 2;
+      const bScore = b.likes + b.replies.length * 2;
+      return bScore - aScore || dateOrder(a, b);
+    });
+  }, [comments, sortMode]);
 
   const commentMutation = useMutation({
     mutationFn: () => post({ data: { story_id: storyId, parent_id: replyTo?.id ?? null, body } }),
@@ -107,17 +125,30 @@ export function CommentThread({
   });
 
   return (
-    <section className="rounded-2xl border border-border bg-card">
-      <header className="flex items-center gap-2 border-b border-border px-4 py-3">
+    <section
+      className={cn(
+        "rounded-2xl border border-border bg-card",
+        panelMode &&
+          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
+      )}
+    >
+      <header
+        className={cn(
+          "flex items-center gap-2 border-b border-border px-4 py-3",
+          panelMode && "hidden",
+        )}
+      >
         <h2 className="text-sm font-semibold">{total} comments</h2>
         <span className="ml-auto text-[11px] text-muted-foreground">
           Official replies pinned first
         </span>
       </header>
 
-      <div className="divide-y divide-border/60">
+      <div
+        className={cn("divide-y divide-border/60", panelMode && "min-h-0 flex-1 overflow-y-auto")}
+      >
         <AnimatePresence initial={false}>
-          {comments.map((comment) => (
+          {sortedComments.map((comment) => (
             <CommentRow
               key={comment.id}
               comment={comment}
@@ -141,7 +172,12 @@ export function CommentThread({
         ) : null}
       </div>
 
-      <div className="sticky bottom-0 rounded-b-2xl border-t border-border bg-card/95 p-3 backdrop-blur">
+      <div
+        className={cn(
+          "sticky bottom-0 rounded-b-2xl border-t border-border bg-card/95 p-3 backdrop-blur",
+          panelMode && "relative shrink-0 rounded-none",
+        )}
+      >
         {user ? (
           <>
             {replyTo ? (

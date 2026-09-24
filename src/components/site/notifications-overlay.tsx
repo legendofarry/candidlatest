@@ -13,6 +13,7 @@ import {
   Info,
   MailOpen,
   MoreVertical,
+  Sparkles,
   Trash2,
   X,
   XCircle,
@@ -39,6 +40,7 @@ import {
   backToNotificationList,
   clearArchived,
   clearNotifications,
+  clearDemoNotifications,
   closeNotifications,
   markAllRead,
   markRead,
@@ -46,6 +48,7 @@ import {
   openNotificationDetail,
   pruneExpired,
   removeNotification,
+  seedDemoNotifications,
   unarchiveNotification,
   useNotifications,
   useNotificationsOverlay,
@@ -53,6 +56,7 @@ import {
   type NotifyKind,
 } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
+import { openMessagePanel } from "@/lib/message-panel-state";
 
 const kindMeta: Record<NotifyKind, { icon: typeof Info; tint: string; ring: string }> = {
   success: { icon: CheckCircle2, tint: "text-emerald-400", ring: "bg-emerald-400/10" },
@@ -92,6 +96,7 @@ export function NotificationsOverlay() {
 
   const notifications = all.filter((n) => (tab === "archive" ? n.archived : !n.archived));
   const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
+  const hasDemo = all.some((n) => n.demo);
 
   const unread = all.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0);
 
@@ -140,6 +145,11 @@ export function NotificationsOverlay() {
     markRead(n.id);
     if (n.link?.href) {
       closeNotifications();
+      const messageMatch = n.link.href.match(/^\/messages\/([^/?#]+)/);
+      if (messageMatch?.[1] && window.matchMedia("(min-width: 1280px)").matches) {
+        openMessagePanel(decodeURIComponent(messageMatch[1]));
+        return;
+      }
       void navigate({ to: n.link.href as never });
       return;
     }
@@ -158,13 +168,68 @@ export function NotificationsOverlay() {
     setPending(null);
   }
 
+  function renderNotificationList() {
+    return notifications.length === 0 ? (
+      <div className="rounded-3xl border border-dashed border-border p-12 text-center">
+        <Bell className="mx-auto size-6 text-muted-foreground" />
+        <p className="mt-3 text-sm font-medium">
+          {tab === "archive" ? "Archive is empty" : "You're all caught up"}
+        </p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {tab === "archive"
+            ? "Archived notifications land here. You can restore or delete them."
+            : "Replies, mentions, followers and messages from Candid land here. Everyday confirmations stay as quick toasts."}
+        </p>
+      </div>
+    ) : (
+      <div className="space-y-6">
+        <Group label="Today" items={groups.today} onActivate={activate} onRequest={setPending} />
+        <Group
+          label="Earlier"
+          items={groups.earlier}
+          onActivate={activate}
+          onRequest={setPending}
+        />
+      </div>
+    );
+  }
+
+  function renderTabs() {
+    return (
+      <div className="flex gap-1 border-b border-border/70 px-4 pb-0 pt-2 sm:px-6">
+        {(
+          [
+            { key: "inbox", label: "Inbox", count: all.length - archivedCount },
+            { key: "archive", label: "Archive", count: archivedCount },
+          ] as const
+        ).map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            onClick={() => setTab(item.key)}
+            className={cn(
+              "rounded-t-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors",
+              tab === item.key &&
+                "bg-primary/10 font-medium text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary))]",
+            )}
+          >
+            {item.label}
+            {item.count > 0 ? (
+              <span className="ml-1.5 text-xs text-muted-foreground">{item.count}</span>
+            ) : null}
+          </button>
+        ))}
+      </div>
+    );
+  }
+
   return (
     <>
       <AnimatePresence>
         {open ? (
           <motion.div
             key="notifications-overlay"
-            className="pointer-events-none fixed inset-0 z-[70] flex flex-col pt-16 sm:pt-0 md:items-end md:justify-start md:pt-28 md:pr-6"
+            className="pointer-events-none fixed inset-0 z-[90] flex flex-col pt-16 sm:pt-0 md:items-end md:justify-start md:pt-28 md:pr-6 xl:flex-row-reverse xl:items-start xl:gap-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -174,7 +239,7 @@ export function NotificationsOverlay() {
             aria-label="Notifications"
           >
             <motion.div
-              className="pointer-events-auto absolute inset-0 top-16 bg-background/80 sm:top-0 md:pointer-events-none md:bg-transparent"
+              className="pointer-events-auto absolute inset-0 top-16 bg-background/75 backdrop-blur-sm sm:top-0 md:bg-background/45"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -187,7 +252,7 @@ export function NotificationsOverlay() {
             <motion.div
               ref={panelRef}
               tabIndex={-1}
-              className="pointer-events-auto relative flex h-full w-full flex-col outline-none sm:mx-auto sm:my-6 sm:h-[calc(100%-3rem)] sm:max-w-2xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:bg-card/70 sm:shadow-2xl md:m-0 md:h-[calc(100vh-8rem)] md:w-[32rem] md:max-w-none md:bg-card md:shadow-2xl"
+              className="pointer-events-auto relative flex h-full w-full flex-col outline-none sm:mx-auto sm:my-6 sm:h-[calc(100%-3rem)] sm:max-w-2xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:bg-card/70 sm:shadow-2xl md:m-0 md:h-[calc(100vh-8rem)] md:w-[32rem] md:max-w-none md:bg-card md:shadow-2xl xl:shrink-0"
               initial={{ y: 32, opacity: 0, x: 0, scale: 0.98 }}
               animate={{ y: 0, opacity: 1, x: 0, scale: 1 }}
               exit={{ y: 24, opacity: 0, x: 40, scale: 0.98 }}
@@ -202,52 +267,87 @@ export function NotificationsOverlay() {
                     </div>
                   </div>
                 ) : (
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Back to notifications"
-                    onClick={backToNotificationList}
-                  >
-                    <ArrowLeft className="size-4" />
-                  </Button>
+                  <>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Back to notifications"
+                      className="xl:hidden"
+                      onClick={backToNotificationList}
+                    >
+                      <ArrowLeft className="size-4" />
+                    </Button>
+                    <div className="relative hidden xl:block">
+                      <span className="absolute inset-0 -z-10 rounded-2xl bg-primary/25 blur-xl" />
+                      <div className="rounded-2xl border border-border bg-secondary/60 p-2.5">
+                        <Bell className="size-4 text-primary" />
+                      </div>
+                    </div>
+                  </>
                 )}
 
                 <div className="min-w-0">
                   <h2 className="font-display text-lg font-semibold tracking-tight">
-                    {view.name === "list" ? "Notifications" : "Notification"}
+                    <span className={view.name === "detail" ? "xl:hidden" : ""}>
+                      {view.name === "list" ? "Notifications" : "Notification"}
+                    </span>
+                    {view.name === "detail" ? (
+                      <span className="hidden xl:inline">Notifications</span>
+                    ) : null}
                   </h2>
-                  {view.name === "list" ? (
-                    <p className="text-xs text-muted-foreground">
+                  {view.name === "list" || view.name === "detail" ? (
+                    <p
+                      className={cn(
+                        "text-xs text-muted-foreground",
+                        view.name === "detail" && "hidden xl:block",
+                      )}
+                    >
                       {unread > 0 ? `${unread} unread` : "You're all caught up"}
                     </p>
                   ) : null}
                 </div>
 
-                <div className="ml-auto flex items-center gap-1">
-                  {view.name === "list" ? (
-                    <>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={markAllRead}
-                        disabled={unread === 0 || tab === "archive"}
-                      >
-                        <CheckCheck className="size-4" />
-                        <span className="hidden sm:inline">Mark all read</span>
-                      </Button>
+                <div
+                  className={cn(
+                    "ml-auto flex items-center gap-1",
+                    view.name === "detail" && "hidden xl:flex",
+                  )}
+                >
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={markAllRead}
+                      disabled={unread === 0 || tab === "archive"}
+                    >
+                      <CheckCheck className="size-4" />
+                      <span className="hidden sm:inline">Mark all read</span>
+                    </Button>
+                    {tab === "inbox" ? (
                       <Button
                         variant="ghost"
-                        size="icon"
-                        aria-label={tab === "archive" ? "Empty archive" : "Clear all notifications"}
-                        disabled={notifications.length === 0}
-                        onClick={() =>
-                          setPending({ type: tab === "archive" ? "emptyArchive" : "clear" })
+                        size="sm"
+                        aria-label={
+                          hasDemo ? "Clear demo notifications" : "Load demo notifications"
                         }
+                        onClick={hasDemo ? clearDemoNotifications : seedDemoNotifications}
                       >
-                        <Trash2 className="size-4" />
+                        <Sparkles className="size-4" />
+                        <span className="hidden sm:inline">{hasDemo ? "Clear demo" : "Demo"}</span>
                       </Button>
-                    </>
-                  ) : null}
+                    ) : null}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label={tab === "archive" ? "Empty archive" : "Clear all notifications"}
+                      disabled={notifications.length === 0}
+                      onClick={() =>
+                        setPending({ type: tab === "archive" ? "emptyArchive" : "clear" })
+                      }
+                    >
+                      <Trash2 className="size-4" />
+                    </Button>
+                  </>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -260,91 +360,85 @@ export function NotificationsOverlay() {
               </header>
 
               {view.name === "list" ? (
-                <div className="flex gap-1 border-b border-border/70 px-4 pb-0 pt-2 sm:px-6">
-                  {(
-                    [
-                      { key: "inbox", label: "Inbox", count: all.length - archivedCount },
-                      { key: "archive", label: "Archive", count: archivedCount },
-                    ] as const
-                  ).map((item) => (
-                    <button
-                      key={item.key}
-                      type="button"
-                      onClick={() => setTab(item.key)}
-                      className={cn(
-                        "rounded-t-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors",
-                        tab === item.key &&
-                          "bg-primary/10 font-medium text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary))]",
-                      )}
-                    >
-                      {item.label}
-                      {item.count > 0 ? (
-                        <span className="ml-1.5 text-xs text-muted-foreground">{item.count}</span>
-                      ) : null}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
+                renderTabs()
+              ) : (
+                <div className="hidden xl:block">{renderTabs()}</div>
+              )}
 
-              <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6">
-                <AnimatePresence mode="wait" initial={false}>
-                  {view.name === "detail" ? (
-                    <motion.div
-                      key="detail"
-                      initial={{ opacity: 0, x: 24 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 24 }}
-                      transition={{ duration: 0.2 }}
-                    >
+              {view.name === "list" ? (
+                <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6">
+                  {renderNotificationList()}
+                </div>
+              ) : (
+                <>
+                  <div className="hidden flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6 xl:block">
+                    {renderNotificationList()}
+                  </div>
+                  <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6 xl:hidden">
+                    <AnimatePresence mode="wait" initial={false}>
                       {detail ? (
-                        <DetailCard notification={detail} />
+                        <motion.div
+                          key="detail"
+                          initial={{ opacity: 0, x: 24 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          exit={{ opacity: 0, x: 24 }}
+                          transition={{ duration: 0.2 }}
+                        >
+                          <DetailCard notification={detail} />
+                        </motion.div>
                       ) : (
                         <p className="py-16 text-center text-sm text-muted-foreground">
                           This notification is no longer available.
                         </p>
                       )}
-                    </motion.div>
-                  ) : (
-                    <motion.div
-                      key="list"
-                      initial={{ opacity: 0, x: -16 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -16 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      {notifications.length === 0 ? (
-                        <div className="rounded-3xl border border-dashed border-border p-12 text-center">
-                          <Bell className="mx-auto size-6 text-muted-foreground" />
-                          <p className="mt-3 text-sm font-medium">
-                            {tab === "archive" ? "Archive is empty" : "You're all caught up"}
-                          </p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {tab === "archive"
-                              ? "Archived notifications land here. You can restore or delete them."
-                              : "Replies, mentions, followers and messages from Candid land here. Everyday confirmations stay as quick toasts."}
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="space-y-6">
-                          <Group
-                            label="Today"
-                            items={groups.today}
-                            onActivate={activate}
-                            onRequest={setPending}
-                          />
-                          <Group
-                            label="Earlier"
-                            items={groups.earlier}
-                            onActivate={activate}
-                            onRequest={setPending}
-                          />
-                        </div>
-                      )}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              </div>
+                    </AnimatePresence>
+                  </div>
+                </>
+              )}
             </motion.div>
+
+            {view.name === "detail" ? (
+              <motion.section
+                aria-label="Notification details"
+                className="pointer-events-auto relative hidden h-[calc(100vh-8rem)] w-[32rem] shrink-0 flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-2xl xl:flex"
+                initial={{ x: 48, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                exit={{ x: 32, opacity: 0 }}
+                transition={{ type: "spring", stiffness: 320, damping: 30 }}
+              >
+                <header className="flex items-center gap-3 border-b border-border/70 px-4 py-4 sm:px-6">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Back to notification list"
+                    onClick={backToNotificationList}
+                  >
+                    <ArrowLeft className="size-4" />
+                  </Button>
+                  <h2 className="font-display text-lg font-semibold tracking-tight">
+                    Notification
+                  </h2>
+                  <Button
+                    className="ml-auto"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Close notification details"
+                    onClick={backToNotificationList}
+                  >
+                    <X className="size-4" />
+                  </Button>
+                </header>
+                <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6">
+                  {detail ? (
+                    <DetailCard notification={detail} actions={false} />
+                  ) : (
+                    <p className="py-16 text-center text-sm text-muted-foreground">
+                      This notification is no longer available.
+                    </p>
+                  )}
+                </div>
+              </motion.section>
+            ) : null}
           </motion.div>
         ) : null}
       </AnimatePresence>
@@ -478,6 +572,11 @@ function Row({
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="truncate text-sm font-semibold">{n.title}</span>
+            {n.demo ? (
+              <span className="shrink-0 rounded border border-primary/30 px-1 py-0.5 text-[9px] font-semibold uppercase text-primary">
+                Demo
+              </span>
+            ) : null}
             {!n.read ? <span className="size-1.5 rounded-full bg-primary" /> : null}
           </span>
           {n.description ? (
@@ -537,7 +636,13 @@ function Row({
   );
 }
 
-function DetailCard({ notification: n }: { notification: AppNotification }) {
+function DetailCard({
+  notification: n,
+  actions = true,
+}: {
+  notification: AppNotification;
+  actions?: boolean;
+}) {
   const meta = kindMeta[n.kind];
   const Icon = meta.icon;
   return (
@@ -550,14 +655,16 @@ function DetailCard({ notification: n }: { notification: AppNotification }) {
       {n.description ? (
         <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{n.description}</p>
       ) : null}
-      <div className="mt-6 flex gap-2">
-        <Button variant="outline" size="sm" onClick={backToNotificationList}>
-          <ArrowLeft className="size-4" /> Back
-        </Button>
-        <Button variant="ghost" size="sm" onClick={closeNotifications}>
-          Close
-        </Button>
-      </div>
+      {actions ? (
+        <div className="mt-6 flex gap-2">
+          <Button variant="outline" size="sm" onClick={backToNotificationList}>
+            <ArrowLeft className="size-4" /> Back
+          </Button>
+          <Button variant="ghost" size="sm" onClick={closeNotifications}>
+            Close
+          </Button>
+        </div>
+      ) : null}
     </article>
   );
 }

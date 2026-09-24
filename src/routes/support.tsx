@@ -3,7 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowLeft, Mail, MessageCircle, Send, ShieldCheck } from "lucide-react";
+import { Mail, MessageCircle, Send, ShieldCheck } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { createSupportTicket } from "@/lib/support.functions";
+import { FloatingBackButton } from "@/components/site/floating-back-button";
 
 export const Route = createFileRoute("/support")({
   head: () => ({
@@ -70,19 +71,12 @@ function SupportPage() {
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
-    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.18),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))]">
-      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl">
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/" })}
-          aria-label="Back to Candid"
-          className="fixed left-4 top-4 z-20 inline-flex size-11 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-lg backdrop-blur transition-transform hover:-translate-x-0.5 md:left-6 md:top-6"
-        >
-          <ArrowLeft className="size-5" />
-        </button>
+    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.18),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
+      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
+        <FloatingBackButton onClick={() => navigate({ to: "/" })} />
 
-        <div className="grid min-h-screen md:grid-cols-[1.05fr_1.2fr]">
-          <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(140deg,#182c31_0%,#20272d_55%,#29251f_100%)] md:sticky md:top-0 md:flex md:h-screen md:items-center md:justify-center md:p-12">
+        <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
+          <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(140deg,#182c31_0%,#20272d_55%,#29251f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, x: -18 }}
               animate={{ opacity: 1, x: 0 }}
@@ -125,7 +119,7 @@ function SupportPage() {
             </motion.div>
           </div>
 
-          <div className="overflow-y-auto p-5 md:p-8">
+          <div className="overflow-y-auto p-5 md:h-dvh md:min-h-0 md:p-8">
             <div className="mx-auto max-w-3xl py-10 md:py-12">
               <header className="rounded-3xl bg-secondary/70 p-7 md:p-10">
                 <ShieldCheck className="size-8 text-primary" />

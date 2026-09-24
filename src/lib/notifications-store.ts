@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { DEMO_CONVERSATION_ID, seedDemoConversation } from "./demo-messaging";
 
 export type NotifyKind = "success" | "error" | "info" | "warning";
 
@@ -16,6 +17,7 @@ export type AppNotification = {
   read: boolean;
   archived?: boolean | undefined;
   category?: NotifyCategory;
+  demo?: boolean;
   link?: NotifyLink | undefined;
   /** Epoch ms after which a one-time system notice is swept from storage. */
   expiresAt?: number | undefined;
@@ -239,6 +241,58 @@ export function pushInboxNotification(kind: NotifyKind, title: string, options?:
   return pushNotification(kind, title, { ...options, persist: true });
 }
 
+export function seedDemoNotifications() {
+  hydrate();
+  seedDemoConversation();
+  const now = Date.now();
+  const samples: AppNotification[] = [
+    {
+      id: "demo-notification-message",
+      kind: "info",
+      title: "New message from Candid team",
+      description: "A sample message is waiting in your demo conversation.",
+      createdAt: now - 2 * 60_000,
+      read: false,
+      category: "social",
+      demo: true,
+      link: { href: `/messages/${DEMO_CONVERSATION_ID}`, label: "Open demo chat" },
+    },
+    {
+      id: "demo-notification-reply",
+      kind: "success",
+      title: "Your story received a response",
+      description: "This sample notification lets you try read, archive and delete actions.",
+      createdAt: now - 34 * 60_000,
+      read: false,
+      category: "social",
+      demo: true,
+    },
+    {
+      id: "demo-notification-tip",
+      kind: "warning",
+      title: "Review your privacy settings",
+      description: "A sample system update. Open it to test the notification detail view.",
+      createdAt: now - 26 * 60 * 60_000,
+      read: true,
+      category: "system",
+      demo: true,
+    },
+  ];
+  const existing = new Set(notifications.map((item) => item.id));
+  notifications = [...samples.filter((item) => !existing.has(item.id)), ...notifications].slice(
+    0,
+    MAX_STORED,
+  );
+  persist();
+  emit();
+}
+
+export function clearDemoNotifications() {
+  notifications = notifications.filter((item) => !item.demo);
+  persist();
+  emit();
+}
+
 export const inbox = {
   success: (title: string, options?: InboxOptions) =>
     pushInboxNotification("success", title, options),
@@ -291,9 +345,7 @@ export function archiveNotification(id: string) {
 }
 
 export function unarchiveNotification(id: string) {
-  notifications = notifications.map((n) =>
-    n.id === id ? { ...n, archived: undefined } : n,
-  );
+  notifications = notifications.map((n) => (n.id === id ? { ...n, archived: undefined } : n));
   persist();
   emit();
 }

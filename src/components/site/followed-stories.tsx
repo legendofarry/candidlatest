@@ -3,7 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion, AnimatePresence } from "motion/react";
-import { Bookmark, Loader2, Sparkles } from "lucide-react";
+import { ArrowRight, Bookmark, Loader2, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   getFollowStats,
@@ -58,32 +58,57 @@ export function FollowedStories() {
   const list = stories.data ?? [];
 
   return (
-    <section className="glass-card animate-rise rounded-2xl border border-border p-5">
-      <div className="flex items-center gap-4">
-        <div className="text-sm">
-          <span className="font-semibold">{stats.data?.followers ?? 0}</span>{" "}
-          <span className="text-muted-foreground">followers</span>
+    <section className="glass-card animate-rise rounded-2xl border border-border p-5 md:p-6">
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Bookmark className="size-5" />
         </div>
-        <div className="text-sm">
-          <span className="font-semibold">{stats.data?.following ?? 0}</span>{" "}
-          <span className="text-muted-foreground">following</span>
-        </div>
-        <div className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <Bookmark className="size-4" /> {list.length} followed stories
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+            Your activity
+          </p>
+          <h2 className="mt-0.5 font-display text-lg font-semibold">Stories you follow</h2>
         </div>
       </div>
 
-      <ul className="mt-4 space-y-2">
+      <div className="mt-5 grid grid-cols-3 gap-2">
+        <FollowMetric label="Followers" value={stats.data?.followers ?? 0} />
+        <FollowMetric label="Following" value={stats.data?.following ?? 0} />
+        <FollowMetric label="Stories" value={list.length} />
+      </div>
+
+      <ul className="mt-4 space-y-2.5">
         {stories.isPending ? (
-          <li className="text-xs text-muted-foreground">Loading followed stories…</li>
+          <li className="rounded-xl border border-border bg-card/50 px-4 py-3 text-sm text-muted-foreground">
+            Loading followed stories…
+          </li>
         ) : list.length === 0 ? (
-          <li className="text-xs text-muted-foreground">
-            Follow a story from the feed to track how it unfolds.
+          <li className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-border bg-secondary/30 p-4">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background text-muted-foreground">
+              <Bookmark className="size-4" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-medium">Your reading list starts here</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Follow a story to keep up with new replies and updates.
+              </p>
+            </div>
+            <Button asChild size="sm" variant="ghost" className="ml-auto">
+              <Link to="/">
+                Explore feed <ArrowRight className="size-4" />
+              </Link>
+            </Button>
           </li>
         ) : null}
 
-        {list.map((item) => (
-          <li key={item.story_id} className="rounded-xl border border-border bg-card/60 p-3">
+        {list.map((item, index) => (
+          <motion.li
+            key={item.story_id}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.25, delay: index * 0.04 }}
+            className="rounded-xl border border-border bg-card/60 p-3 transition-colors hover:bg-secondary/40"
+          >
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
                 <Link
@@ -127,9 +152,18 @@ export function FollowedStories() {
                 </motion.p>
               ) : null}
             </AnimatePresence>
-          </li>
+          </motion.li>
         ))}
       </ul>
     </section>
+  );
+}
+
+function FollowMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-border/70 bg-secondary/35 px-3 py-2.5">
+      <p className="text-xl font-semibold tabular-nums">{value}</p>
+      <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{label}</p>
+    </div>
   );
 }

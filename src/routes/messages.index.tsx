@@ -2,11 +2,16 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeCheck, MessagesSquare, Sparkles } from "lucide-react";
+import { BadgeCheck, MessagesSquare, Sparkles, Trash2 } from "lucide-react";
 import { getConversations } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import {
+  clearDemoConversation,
+  seedDemoConversation,
+  useDemoConversation,
+} from "@/lib/demo-messaging";
 
 export const Route = createFileRoute("/messages/")({
   head: () => ({
@@ -39,10 +44,15 @@ function timeAgo(iso: string) {
   return `${Math.round(hours / 24)}d`;
 }
 
-export function MessagesInbox() {
+export function MessagesInbox({
+  onSelectConversation,
+}: {
+  onSelectConversation?: (conversationId: string) => void;
+} = {}) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const fetchConversations = useServerFn(getConversations);
+  const demo = useDemoConversation();
 
   const { data, isLoading } = useQuery({
     queryKey: ["conversations", user?.uid],
@@ -51,22 +61,22 @@ export function MessagesInbox() {
     refetchInterval: 15000,
   });
 
-  if (!loading && !user) {
-    return (
-      <div className="mx-auto max-w-md py-16 text-center">
-        <MessagesSquare className="mx-auto size-10 text-primary" />
-        <h1 className="mt-4 font-display text-2xl font-semibold">Sign in to see messages</h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Your conversations stay private to your account.
-        </p>
-        <Button className="mt-6" onClick={() => navigate({ to: "/auth" })}>
-          Sign in
-        </Button>
-      </div>
-    );
-  }
-
-  const conversations = data ?? [];
+  const conversations = [
+    ...(demo
+      ? [
+          {
+            id: demo.id,
+            with: demo.with,
+            last_message: demo.last_message,
+            last_message_at: demo.last_message_at,
+            unread: demo.unread,
+            mine: demo.mine,
+            demo: true,
+          },
+        ]
+      : []),
+    ...(data ?? []).map((item) => ({ ...item, demo: false })),
+  ].sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
 
   return (
     <div className="mx-auto max-w-2xl">
@@ -75,9 +85,25 @@ export function MessagesInbox() {
         <p className="mt-1 text-sm text-muted-foreground">
           Private one-to-one chats. Candid can always reach you with important updates.
         </p>
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          {demo ? (
+            <Button variant="outline" size="sm" onClick={clearDemoConversation}>
+              <Trash2 className="size-4" /> Clear demo chat
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" onClick={seedDemoConversation}>
+              <Sparkles className="size-4" /> Load demo chat
+            </Button>
+          )}
+          {!user && !loading ? (
+            <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/auth" })}>
+              Sign in for private messages
+            </Button>
+          ) : null}
+        </div>
       </header>
 
-      {isLoading ? (
+      {isLoading && !demo ? (
         <div className="space-y-3">
           {[0, 1, 2].map((index) => (
             <div key={index} className="h-20 animate-pulse rounded-2xl bg-secondary/60" />
@@ -108,7 +134,11 @@ export function MessagesInbox() {
               >
                 <button
                   type="button"
-                  onClick={() => navigate({ to: "/messages/$id", params: { id: item.id } })}
+                  onClick={() =>
+                    onSelectConversation
+                      ? onSelectConversation(item.id)
+                      : void navigate({ to: "/messages/$id", params: { id: item.id } })
+                  }
                   className="flex w-full items-center gap-3 rounded-2xl border border-border/70 bg-card/60 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
                 >
                   <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/5 font-display text-base font-semibold uppercase">
@@ -119,6 +149,11 @@ export function MessagesInbox() {
                       <span className="truncate font-medium">@{item.with?.username}</span>
                       {item.with?.verified ? (
                         <BadgeCheck className="size-4 shrink-0 text-primary" />
+                      ) : null}
+                      {item.demo ? (
+                        <span className="rounded border border-primary/30 px-1 py-0.5 text-[9px] font-semibold uppercase text-primary">
+                          Demo
+                        </span>
                       ) : null}
                       <span className="ml-auto text-xs text-muted-foreground">
                         {timeAgo(item.last_message_at)}

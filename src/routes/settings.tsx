@@ -34,6 +34,7 @@ import {
   registerBiometric,
 } from "@/lib/biometrics";
 import { cn } from "@/lib/utils";
+import { FloatingBackButton } from "@/components/site/floating-back-button";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -82,17 +83,10 @@ function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <button
-        type="button"
-        onClick={() => navigate({ to: "/" })}
-        aria-label="Back to Candid"
-        className="fixed left-5 top-5 z-30 inline-flex size-11 items-center justify-center rounded-full border border-border bg-background/90 text-foreground shadow-lg backdrop-blur transition-transform hover:-translate-x-0.5 md:left-7 md:top-7"
-      >
-        <ArrowLeft className="size-5" />
-      </button>
-      <div className="grid min-h-screen lg:grid-cols-[minmax(340px,0.86fr)_1.14fr]">
-        <section className="relative hidden min-h-screen overflow-hidden bg-[#132523] px-12 py-24 text-white lg:flex lg:items-center">
+    <div className="min-h-screen bg-background md:h-dvh md:overflow-hidden">
+      <FloatingBackButton onClick={() => navigate({ to: "/" })} />
+      <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[minmax(280px,0.86fr)_1.14fr]">
+        <section className="relative hidden min-h-screen overflow-hidden bg-[#132523] px-7 py-16 text-white md:flex md:h-dvh md:items-center lg:px-12 lg:py-24">
           <div className="absolute inset-0 bg-[linear-gradient(145deg,#182c28_0%,#17212c_55%,#29271d_100%)]" />
           <div className="absolute inset-0 opacity-20" aria-hidden>
             <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_15%,#65c5a1,transparent_40%),radial-gradient(ellipse_at_85%_90%,#e2ac63,transparent_42%)]" />
@@ -150,7 +144,7 @@ function SettingsPage() {
           </div>
         </section>
 
-        <section className="min-h-screen overflow-y-auto px-5 pb-12 pt-24 sm:px-10 lg:px-12 lg:pt-16">
+        <section className="min-h-screen overflow-y-auto px-5 pb-12 pt-24 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}

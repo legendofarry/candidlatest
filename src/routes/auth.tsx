@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { getOnboardingState } from "@/lib/onboarding.functions";
+import { FloatingBackButton } from "@/components/site/floating-back-button";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -130,19 +131,12 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(134,239,172,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(99,102,241,0.18),_transparent_28%),hsl(var(--background))]">
-      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/80 shadow-2xl backdrop-blur-xl">
-        <button
-          type="button"
-          onClick={() => navigate({ to: "/" })}
-          className="absolute left-4 top-4 z-20 inline-flex items-center gap-2 rounded-full border border-border bg-background/70 px-3 py-2 text-sm text-foreground shadow-lg backdrop-blur md:left-6 md:top-6"
-        >
-          <EyeOff className="size-4" />
-          Close
-        </button>
+    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(134,239,172,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(99,102,241,0.18),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
+      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/80 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
+        <FloatingBackButton onClick={() => navigate({ to: "/" })} />
 
-        <div className="grid min-h-screen md:grid-cols-2">
-          <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#10251d_0%,#13212b_52%,#22271f_100%)] md:sticky md:top-0 md:flex md:h-screen md:items-center md:justify-center md:p-12">
+        <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-2">
+          <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#10251d_0%,#13212b_52%,#22271f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
@@ -180,7 +174,7 @@ function AuthPage() {
             </motion.div>
           </div>
 
-          <div className="flex items-center justify-center p-5 md:p-10">
+          <div className="flex items-center justify-center p-5 md:h-dvh md:overflow-y-auto md:p-10">
             <div className="w-full max-w-md animate-rise">
               <div className="rounded-3xl border border-border bg-background/80 p-6 shadow-xl md:p-8">
                 <div className="flex items-center gap-2 text-primary">

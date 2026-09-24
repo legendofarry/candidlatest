@@ -1,9 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
+import { AnimatePresence } from "motion/react";
 import { Flame, PenLine, ShieldCheck, TrendingUp } from "lucide-react";
 import { getFilterOptions, listStories } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
+import type { PublicStory } from "@/components/site/story-card";
+import { FeedDiscussionPanel } from "@/components/site/feed-discussion-panel";
 import { PulseLoader } from "@/components/site/route-progress";
 import { FilterBar } from "@/components/site/filter-bar";
 import { CandidPulse } from "@/components/site/candid-pulse";
@@ -58,6 +61,7 @@ function FeedPage() {
   const [industry, setIndustry] = useState<string | null>(null);
   const [county, setCounty] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [activeDiscussion, setActiveDiscussion] = useState<PublicStory | null>(null);
 
   /**
    * The unfiltered view reuses the data the loader already fetched, so the
@@ -163,41 +167,61 @@ function FeedPage() {
               No stories match these filters yet.
             </p>
           ) : (
-            stories.map((story, index) => <StoryCard key={story.id} story={story} index={index} />)
+            stories.map((story, index) => (
+              <StoryCard
+                key={story.id}
+                story={story}
+                index={index}
+                discussionOpen={activeDiscussion?.id === story.id}
+                onToggleDiscussion={() =>
+                  setActiveDiscussion((current) => (current?.id === story.id ? null : story))
+                }
+              />
+            ))
           )}
         </div>
 
-        <aside className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <TrendingUp className="size-4 text-primary" /> Most discussed
-            </h2>
-            <ul className="mt-3 space-y-2 text-sm">
-              {filters.companies.slice(0, 6).map((company) => (
-                <li key={company.slug}>
-                  <Link
-                    to="/companies/$slug"
-                    params={{ slug: company.slug }}
-                    className="text-muted-foreground hover:text-primary"
-                  >
-                    {company.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
-            <h2 className="flex items-center gap-2 font-semibold">
-              <Flame className="size-4 text-danger" /> Know your rights
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              Unpaid salary, no contract or forced overtime? See what Kenyan labour law says.
-            </p>
-            <Link to="/rights" className="mt-2 inline-block font-medium text-danger">
-              Read the basics →
-            </Link>
-          </div>
-        </aside>
+        <AnimatePresence mode="wait" initial={false}>
+          {activeDiscussion ? (
+            <FeedDiscussionPanel
+              key={`discussion-${activeDiscussion.id}`}
+              story={activeDiscussion}
+              onClose={() => setActiveDiscussion(null)}
+            />
+          ) : (
+            <aside key="feed-highlights" className="space-y-4 lg:sticky lg:top-20 lg:self-start">
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                  <TrendingUp className="size-4 text-primary" /> Most discussed
+                </h2>
+                <ul className="mt-3 space-y-2 text-sm">
+                  {filters.companies.slice(0, 6).map((company) => (
+                    <li key={company.slug}>
+                      <Link
+                        to="/companies/$slug"
+                        params={{ slug: company.slug }}
+                        className="text-muted-foreground hover:text-primary"
+                      >
+                        {company.name}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              <div className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
+                <h2 className="flex items-center gap-2 font-semibold">
+                  <Flame className="size-4 text-danger" /> Know your rights
+                </h2>
+                <p className="mt-2 text-muted-foreground">
+                  Unpaid salary, no contract or forced overtime? See what Kenyan labour law says.
+                </p>
+                <Link to="/rights" className="mt-2 inline-block font-medium text-danger">
+                  Read the basics →
+                </Link>
+              </div>
+            </aside>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeCheck, CheckCheck, Loader2, Send, Smile } from "lucide-react";
+import { BadgeCheck, CheckCheck, Loader2, Send, Smile, Sparkles } from "lucide-react";
 import { getConversation, postMessage, reactToMessage } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -11,6 +11,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
+import {
+  DEMO_CONVERSATION_ID,
+  markDemoConversationRead,
+  seedDemoConversation,
+  sendDemoMessage,
+  toggleDemoReaction,
+  useDemoConversation,
+} from "@/lib/demo-messaging";
 
 export const Route = createFileRoute("/messages/$id")({
   head: () => ({
@@ -38,12 +46,22 @@ function clock(iso: string) {
 
 function ChatScreen() {
   const { id } = useParams({ from: "/messages/$id" });
+  return (
+    <div className="xl:hidden">
+      <MessagesThread id={id} />
+    </div>
+  );
+}
+
+export function MessagesThread({ id, inSidebar = false }: { id: string; inSidebar?: boolean }) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchConversation = useServerFn(getConversation);
   const sendMessage = useServerFn(postMessage);
   const react = useServerFn(reactToMessage);
+  const demoConversation = useDemoConversation();
+  const isDemo = id === DEMO_CONVERSATION_ID;
 
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -51,11 +69,18 @@ function ChatScreen() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["conversation", id],
     queryFn: () => fetchConversation({ data: { conversation_id: id } }),
-    enabled: Boolean(user),
-    refetchInterval: 8000,
+    enabled: Boolean(user) && !isDemo,
+    refetchInterval: isDemo ? false : 8000,
   });
 
-  const messages = useMemo(() => data?.messages ?? [], [data]);
+  useEffect(() => {
+    if (!isDemo) return;
+    if (!demoConversation) seedDemoConversation();
+    else markDemoConversationRead();
+  }, [demoConversation, isDemo]);
+
+  const conversation = isDemo ? demoConversation : data;
+  const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -63,9 +88,7 @@ function ChatScreen() {
 
   const send = useMutation({
     mutationFn: async () =>
-      sendMessage({
-        data: { conversation_id: id, body: draft },
-      }),
+      isDemo ? sendDemoMessage(draft) : sendMessage({ data: { conversation_id: id, body: draft } }),
     onSuccess: () => {
       setDraft("");
       void queryClient.invalidateQueries({ queryKey: ["conversation", id] });
@@ -75,11 +98,14 @@ function ChatScreen() {
   });
 
   const toggleReaction = useMutation({
-    mutationFn: async (input: { message_id: string; emoji: string }) => react({ data: input }),
+    mutationFn: async (input: { message_id: string; emoji: string }) => {
+      if (isDemo) return toggleDemoReaction(input.message_id, input.emoji);
+      return react({ data: input });
+    },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["conversation", id] }),
   });
 
-  if (error) {
+  if (error && !isDemo) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <p className="font-medium">This conversation is not available.</p>
@@ -90,16 +116,25 @@ function ChatScreen() {
     );
   }
 
-  const partner = data?.with;
+  const partner = conversation?.with;
 
   return (
-    <div className="mx-auto flex min-h-[70vh] w-full max-w-2xl flex-col md:mx-0 md:max-w-none">
+    <div
+      className={cn(
+        "mx-auto flex w-full max-w-2xl flex-col md:mx-0 md:max-w-none",
+        inSidebar ? "h-full min-h-0" : "min-h-[70vh]",
+      )}
+    >
       <button
         type="button"
-        onClick={() =>
-          partner && navigate({ to: "/u/$username", params: { username: partner.username } })
-        }
-        className="glass-card sticky top-[6.75rem] z-30 mb-4 flex items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-secondary/40"
+        onClick={() => {
+          if (!isDemo && partner)
+            void navigate({ to: "/u/$username", params: { username: partner.username } });
+        }}
+        className={cn(
+          "glass-card mb-4 flex items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-secondary/40",
+          !inSidebar && "sticky top-[6.75rem] z-30",
+        )}
       >
         <span className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/5 font-display font-semibold uppercase">
           {partner?.username?.slice(0, 2) ?? "··"}
@@ -108,15 +143,20 @@ function ChatScreen() {
           <span className="flex items-center gap-1.5 font-medium">
             @{partner?.username ?? "…"}
             {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
+            {isDemo ? <Sparkles className="size-4 text-primary" /> : null}
           </span>
           <span className="block text-xs text-muted-foreground">
-            {partner?.official ? "Official Candid account" : "Tap to view profile"}
+            {isDemo
+              ? "Demo conversation · stored on this device"
+              : partner?.official
+                ? "Official Candid account"
+                : "Tap to view profile"}
           </span>
         </span>
       </button>
 
-      <div className="flex-1 space-y-3 pb-4">
-        {isLoading ? (
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-4">
+        {isLoading && !isDemo ? (
           <div className="flex justify-center py-10">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
@@ -128,7 +168,7 @@ function ChatScreen() {
 
         <AnimatePresence initial={false}>
           {messages.map((message) => {
-            const mine = message.sender_id === user?.uid;
+            const mine = message.sender_id === (isDemo ? "demo-me" : user?.uid);
             const reactions = Object.entries(message.reactions ?? {}).filter(
               ([, ids]) => ids.length > 0,
             );
@@ -213,9 +253,9 @@ function ChatScreen() {
         <div ref={bottomRef} />
       </div>
 
-      {data && !data.can_send ? (
+      {conversation && !conversation.can_send ? (
         <p className="rounded-2xl border border-border bg-secondary/40 p-4 text-center text-sm text-muted-foreground">
-          {data.blocked_reason}
+          {conversation.blocked_reason}
         </p>
       ) : (
         <div className="glass-card sticky bottom-4 rounded-3xl p-2">

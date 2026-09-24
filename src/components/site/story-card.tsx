@@ -26,7 +26,17 @@ export function reasonTone(reason: string) {
   return reason === "good exit" ? "verified" : "danger";
 }
 
-export function StoryCard({ story, index = 0 }: { story: PublicStory; index?: number }) {
+export function StoryCard({
+  story,
+  index = 0,
+  discussionOpen = false,
+  onToggleDiscussion,
+}: {
+  story: PublicStory;
+  index?: number;
+  discussionOpen?: boolean;
+  onToggleDiscussion?: (() => void) | undefined;
+}) {
   const navigate = useNavigate();
   const open = () => {
     if (story.id) void navigate({ to: "/stories/$id", params: { id: story.id } });
@@ -43,7 +53,9 @@ export function StoryCard({ story, index = 0 }: { story: PublicStory; index?: nu
           open();
         }
       }}
-      className="animate-rise cursor-pointer rounded-2xl border border-border bg-card p-5 shadow-[var(--shadow-card)] transition-transform hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={`animate-rise cursor-pointer rounded-2xl border bg-card p-5 shadow-[var(--shadow-card)] transition-all hover:-translate-y-0.5 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+        discussionOpen ? "border-primary/60 ring-1 ring-primary/30" : "border-border"
+      }`}
       style={{ animationDelay: `${Math.min(index, 8) * 60}ms` }}
     >
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -102,6 +114,8 @@ export function StoryCard({ story, index = 0 }: { story: PublicStory; index?: nu
           upvotes={story.upvotes ?? 0}
           metoo={story.metoo ?? 0}
           commentCount={story.comment_count ?? 0}
+          discussionOpen={discussionOpen}
+          onToggleDiscussion={onToggleDiscussion}
         />
       ) : null}
     </article>

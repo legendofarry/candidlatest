@@ -33,9 +33,13 @@ function useCountUp(target: number, duration = 900) {
 function Stat({ label, value }: { label: string; value: number }) {
   const shown = useCountUp(value);
   return (
-    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
-      <p className="text-lg font-semibold leading-none text-foreground tabular-nums">{shown}</p>
-      <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+    <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-2 xl:px-4 xl:py-3">
+      <p className="text-lg font-semibold leading-none text-foreground tabular-nums xl:text-2xl">
+        {shown}
+      </p>
+      <p className="mt-1 text-[10px] uppercase tracking-[0.14em] text-muted-foreground xl:text-xs">
+        {label}
+      </p>
     </div>
   );
 }
@@ -61,33 +65,33 @@ export function CandidPulse() {
 
   return (
     <div
-      className="signal-panel dark relative mx-auto w-full max-w-md"
+      className="signal-panel dark relative mx-auto w-full max-w-md xl:max-w-none"
       aria-label="Candid Pulse — live workplace signals"
     >
       <div className="signal-grid absolute inset-0 rounded-3xl" />
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[oklch(0.135_0.014_285)] p-5 text-foreground shadow-2xl shadow-black/30 backdrop-blur-sm">
-        <div className="flex items-center justify-between text-xs">
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[oklch(0.135_0.014_285)] p-5 text-foreground shadow-2xl shadow-black/30 backdrop-blur-sm xl:p-7">
+        <div className="flex items-center justify-between text-xs xl:text-sm">
           <span className="flex items-center gap-2 font-medium text-foreground">
-            <Activity className="size-4 text-primary" /> Candid Pulse
+            <Activity className="size-4 text-primary xl:size-5" /> Candid Pulse
           </span>
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <span className="size-1.5 animate-pulse rounded-full bg-primary" /> Live
           </span>
         </div>
 
-        <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-2 text-xs leading-relaxed text-muted-foreground xl:mt-3 xl:text-sm">
           What Kenyan workers reported this week — the reasons people are actually leaving, counted
           as stories come in.
         </p>
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
+        <div className="mt-4 grid grid-cols-3 gap-2 xl:mt-5 xl:gap-3">
           <Stat label="Stories" value={pulse?.storiesTotal ?? 0} />
           <Stat label="This week" value={pulse?.storiesLast7Days ?? 0} />
           <Stat label="Employers" value={pulse?.companies ?? 0} />
         </div>
 
-        <div className="mt-4 space-y-2">
-          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+        <div className="mt-4 space-y-2 xl:mt-5 xl:space-y-3">
+          <p className="text-[10px] uppercase tracking-[0.18em] text-muted-foreground xl:text-xs">
             Top reasons for leaving
           </p>
           {(pulse?.topReasons ?? []).length === 0 ? (
@@ -97,11 +101,11 @@ export function CandidPulse() {
           ) : (
             (pulse?.topReasons ?? []).map((row) => (
               <div key={row.reason} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
+                <div className="flex items-center justify-between text-xs xl:text-sm">
                   <span className="truncate capitalize text-foreground/90">{row.reason}</span>
                   <span className="tabular-nums text-muted-foreground">{row.count}</span>
                 </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div className="h-1.5 overflow-hidden rounded-full bg-white/10 xl:h-2">
                   <div
                     className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
                     style={{ width: `${Math.round((row.count / maxReason) * 100)}%` }}
@@ -112,7 +116,7 @@ export function CandidPulse() {
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs">
+        <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs xl:mt-5 xl:px-4 xl:py-3 xl:text-sm">
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <MapPin className="size-3.5 text-verified" /> {pulse?.counties ?? 0} counties covered
           </span>
