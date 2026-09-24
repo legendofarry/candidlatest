@@ -96,7 +96,6 @@ function SupportPage() {
         >
           <Mail className="size-5 text-primary" />
           <h2 className="mt-3 font-semibold">Email us</h2>
-          <p className="mt-1 text-sm text-muted-foreground">moderation.mails.go@gmail.com</p>
         </a>
         <a
           href="https://wa.me/254715198636?text=Hi%20Candid%20team%2C%20I%20need%20help%20with%20…"
@@ -106,7 +105,6 @@ function SupportPage() {
         >
           <MessageCircle className="size-5 text-primary" />
           <h2 className="mt-3 font-semibold">WhatsApp</h2>
-          <p className="mt-1 text-sm text-muted-foreground">+254 715 198636</p>
         </a>
       </section>
       <section className="mt-8 rounded-3xl border border-border bg-card p-5 md:p-7">

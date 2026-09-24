@@ -58,9 +58,6 @@ const primaryNav = [
 const exploreNav = [
   { to: "/salaries", label: "Salary insights", icon: Wallet },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
-  { to: "/about", label: "About Candid", icon: Info },
-  { to: "/guidelines", label: "Community guidelines", icon: FileText },
-  { to: "/rights", label: "Safety & your rights", icon: ShieldCheck },
   { to: "/support", label: "Help & support", icon: LifeBuoy },
 ] as const;
 
@@ -150,6 +147,19 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <MessagesSquare className="size-4" />
               {(messageState?.unread ?? 0) > 0 ? <Count value={messageState!.unread} /> : null}
             </button>
+            {user ? (
+              <button
+                type="button"
+                onClick={() => togglePanel("profile")}
+                aria-label="Open profile"
+                className={cn(
+                  "inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                  rightPanel === "profile" && "bg-secondary text-foreground",
+                )}
+              >
+                <UserRound className="size-4" />
+              </button>
+            ) : null}
             <Link
               to="/search"
               aria-label="Search Candid"
@@ -208,17 +218,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             {primaryNav.map((item) => (
               <SidebarLink key={item.to} item={item} active={pathname === item.to} />
             ))}
-            <button
-              type="button"
-              onClick={() => togglePanel("profile")}
-              className={cn(
-                "flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                rightPanel === "profile" && "bg-secondary text-foreground",
-              )}
-            >
-              <UserRound className="size-4" />
-              Profile
-            </button>
           </nav>
           <div className="my-4 border-t border-border" />
           <nav className="space-y-1" aria-label="Explore Candid">
@@ -274,7 +273,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <MessagesInbox />
       </RightWorkspace>
       <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border glass-card md:hidden">
-        <div className="grid grid-cols-3">
+        <div className="grid grid-cols-2">
           {primaryNav.map((item) => {
             const Icon = item.icon;
             return (
@@ -291,16 +290,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               </Link>
             );
           })}
-          <Link
-            to="/profile"
-            className={cn(
-              "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground",
-              pathname === "/profile" && "text-primary",
-            )}
-          >
-            <UserRound className="size-5" />
-            Profile
-          </Link>
         </div>
       </nav>
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
