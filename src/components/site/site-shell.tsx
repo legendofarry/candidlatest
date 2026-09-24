@@ -3,16 +3,15 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Building2,
-  FileText,
+  ChevronDown,
   Flame,
   Home,
-  Info,
   LifeBuoy,
   LogOut,
   MessagesSquare,
   PenLine,
   Search,
-  ShieldCheck,
+  Settings,
   Trophy,
   UserRound,
   Wallet,
@@ -36,7 +35,6 @@ import { useAuth } from "@/hooks/useAuth";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
 import { setPreference, usePreferences } from "@/lib/preferences";
-import { ProfilePage } from "@/routes/profile";
 import { MessagesInbox } from "@/routes/messages.index";
 import {
   AlertDialog,
@@ -58,7 +56,6 @@ const primaryNav = [
 const exploreNav = [
   { to: "/salaries", label: "Salary insights", icon: Wallet },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
-  { to: "/support", label: "Help & support", icon: LifeBuoy },
 ] as const;
 
 function isNestedRoute(pathname: string) {
@@ -85,7 +82,7 @@ function nestedTitle(pathname: string) {
   );
 }
 
-type RightPanel = "profile" | "messages" | null;
+type RightPanel = "messages" | null;
 
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
@@ -93,6 +90,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadCount();
   const [rightPanel, setRightPanel] = useState<RightPanel>(null);
+  const [showMoreNav, setShowMoreNav] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [rememberChoice, setRememberChoice] = useState(false);
   const prefs = usePreferences();
@@ -105,11 +104,28 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     refetchInterval: 20000,
   });
   const nested = isNestedRoute(pathname);
+  const standaloneDesktopRoute = [
+    "/auth",
+    "/post",
+    "/support",
+    "/settings",
+    "/onboarding",
+  ].includes(pathname);
 
   useEffect(() => {
-    if (pathname === "/profile") setRightPanel("profile");
     if (pathname.startsWith("/messages")) setRightPanel("messages");
+    setUserMenuOpen(false);
   }, [pathname]);
+
+  const userInitials =
+    user?.displayName
+      ?.split(/\s+/)
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") ||
+    user?.email?.slice(0, 2).toUpperCase() ||
+    "U";
 
   function handleLeave() {
     if (canLock && prefs.sessionMemory === "lock") return requestLock();
@@ -128,7 +144,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <NotificationsOverlay />
       <BadgeClaimModal />
       <SupportChat />
-      <header className="sticky top-0 z-[80] border-b border-border glass-card">
+      <header
+        className={cn(
+          "sticky top-0 z-[80] border-b border-border glass-card",
+          standaloneDesktopRoute && "md:hidden",
+        )}
+      >
         <div className="app-shell flex h-16 items-center gap-3">
           <Link to="/" className="flex items-center gap-2">
             <Flame className="size-5 text-primary" />
@@ -147,19 +168,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <MessagesSquare className="size-4" />
               {(messageState?.unread ?? 0) > 0 ? <Count value={messageState!.unread} /> : null}
             </button>
-            {user ? (
-              <button
-                type="button"
-                onClick={() => togglePanel("profile")}
-                aria-label="Open profile"
-                className={cn(
-                  "inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                  rightPanel === "profile" && "bg-secondary text-foreground",
-                )}
-              >
-                <UserRound className="size-4" />
-              </button>
-            ) : null}
             <Link
               to="/search"
               aria-label="Search Candid"
@@ -185,15 +193,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 <PenLine className="size-4" /> Post a story
               </Link>
             </Button>
-            {user ? (
-              <Button variant="ghost" size="icon" aria-label="Sign out" onClick={handleLeave}>
-                <LogOut className="size-4" />
-              </Button>
-            ) : (
+            {!user ? (
               <Button asChild variant="ghost" size="sm">
                 <Link to="/auth">Sign in</Link>
               </Button>
-            )}
+            ) : null}
           </div>
         </div>
         {nested ? (
@@ -212,24 +216,115 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           className={cn(
             "fixed bottom-0 left-0 z-30 hidden w-72 flex-col border-r border-border bg-card/85 p-4 shadow-sm backdrop-blur md:flex",
             nested ? "top-28" : "top-20",
+            standaloneDesktopRoute && "md:hidden",
           )}
         >
           <nav className="space-y-1" aria-label="Main navigation">
             {primaryNav.map((item) => (
               <SidebarLink key={item.to} item={item} active={pathname === item.to} />
             ))}
+            <button
+              type="button"
+              onClick={() => setShowMoreNav((current) => !current)}
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                showMoreNav && "bg-secondary text-foreground",
+              )}
+            >
+              <span className="flex items-center gap-3">
+                <span className="inline-flex size-4 items-center justify-center rounded-full border border-current">
+                  <ChevronDown
+                    className={cn("size-3 transition-transform", showMoreNav && "rotate-180")}
+                  />
+                </span>
+                More
+              </span>
+            </button>
+            {showMoreNav ? (
+              <div className="space-y-1 overflow-hidden pl-2">
+                {exploreNav.map((item) => (
+                  <SidebarLink key={item.to} item={item} active={pathname === item.to} />
+                ))}
+              </div>
+            ) : null}
           </nav>
           <div className="my-4 border-t border-border" />
-          <nav className="space-y-1" aria-label="Explore Candid">
-            {exploreNav.map((item) => (
-              <SidebarLink key={item.to} item={item} active={pathname === item.to} />
-            ))}
-          </nav>
-          <div className="mt-auto rounded-2xl bg-secondary/70 p-3 text-xs text-muted-foreground">
-            Your identity is never shown on the stories you share.
+          <div className="mt-auto flex items-center gap-2">
+            {user ? (
+              <div className="relative min-w-0 flex-1">
+                <button
+                  type="button"
+                  onClick={() => setUserMenuOpen((current) => !current)}
+                  className="flex w-full items-center gap-2.5 rounded-2xl border border-border bg-secondary/40 px-2 py-1.5 text-left shadow-sm transition-colors hover:bg-secondary"
+                >
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-xs font-semibold text-primary-foreground">
+                    {userInitials}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-[11px] font-medium text-foreground">
+                      {user.email || user.displayName || "My account"}
+                    </div>
+                    <div className="text-[10px] text-muted-foreground">Member</div>
+                  </div>
+                  <ChevronDown
+                    className={cn(
+                      "size-3.5 shrink-0 text-muted-foreground transition-transform",
+                      userMenuOpen && "rotate-180",
+                    )}
+                  />
+                </button>
+                {userMenuOpen ? (
+                  <div className="absolute bottom-full left-0 z-10 mb-2 w-[220px] rounded-2xl border border-border bg-popover p-2 text-sm shadow-2xl backdrop-blur">
+                    <div className="space-y-1">
+                      <Link
+                        to="/profile"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-foreground hover:bg-secondary"
+                      >
+                        <UserRound className="size-4" /> Profile
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={() => setUserMenuOpen(false)}
+                        className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-foreground hover:bg-secondary"
+                      >
+                        <Settings className="size-4" /> Settings
+                      </Link>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setUserMenuOpen(false);
+                          handleLeave();
+                        }}
+                        className="flex w-full items-center gap-2 rounded-xl px-2 py-2 text-left text-foreground hover:bg-secondary"
+                      >
+                        <LogOut className="size-4" /> Log out
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+            <Link
+              to="/support"
+              aria-label="Help & support"
+              className={cn(
+                "inline-flex size-9 shrink-0 items-center justify-center rounded-full border border-border bg-secondary/40 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                pathname === "/support" && "bg-secondary text-foreground",
+              )}
+            >
+              <LifeBuoy className="size-4" />
+            </Link>
           </div>
         </aside>
-        <main className={cn("min-w-0 pt-6 md:pb-10 md:pl-80", nested ? "pb-10" : "pb-28")}>
+        <main
+          className={cn(
+            "min-w-0 pt-6 md:pb-10 md:pl-80",
+            nested ? "pb-10" : "pb-28",
+            standaloneDesktopRoute &&
+              "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
+          )}
+        >
           <BiometricGate>{children}</BiometricGate>
         </main>
         {pathname === "/" ? (
@@ -258,13 +353,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           </footer>
         ) : null}
       </div>
-      <RightWorkspace
-        open={rightPanel === "profile"}
-        title="Your profile"
-        onClose={() => setRightPanel(null)}
-      >
-        <ProfilePage />
-      </RightWorkspace>
+      {rightPanel ? (
+        <button
+          type="button"
+          aria-label="Close drawer"
+          className="fixed inset-0 z-[60] hidden bg-black/15 backdrop-blur-[2px] md:block"
+          onClick={() => setRightPanel(null)}
+        />
+      ) : null}
       <RightWorkspace
         open={rightPanel === "messages"}
         title="Messages"

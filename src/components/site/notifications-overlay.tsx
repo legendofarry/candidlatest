@@ -174,7 +174,7 @@ export function NotificationsOverlay() {
             aria-label="Notifications"
           >
             <motion.div
-              className="pointer-events-auto absolute inset-0 top-16 bg-background/80 backdrop-blur-xl sm:top-0 md:pointer-events-none md:bg-transparent md:backdrop-blur-none"
+              className="pointer-events-auto absolute inset-0 top-16 bg-background/80 sm:top-0 md:pointer-events-none md:bg-transparent"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}

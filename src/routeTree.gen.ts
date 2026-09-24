@@ -22,6 +22,7 @@ import { Route as ProfileRouteImport } from './routes/profile'
 import { Route as RightsRouteImport } from './routes/rights'
 import { Route as SalariesRouteImport } from './routes/salaries'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as CompaniesIndexRouteImport } from './routes/companies.index'
 import { Route as CompaniesSlugRouteImport } from './routes/companies.$slug'
@@ -101,6 +102,11 @@ const SalariesRoute = SalariesRouteImport.update({
 const SearchRoute = SearchRouteImport.update({
   id: '/search',
   path: '/search',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SettingsRoute = SettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SupportRoute = SupportRouteImport.update({
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/rights': typeof RightsRoute
   '/salaries': typeof SalariesRouteWithChildren
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/profile': typeof ProfileRoute
   '/rights': typeof RightsRoute
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/rights': typeof RightsRoute
   '/salaries': typeof SalariesRouteWithChildren
   '/search': typeof SearchRoute
+  '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
@@ -285,6 +294,7 @@ export interface FileRouteTypes {
     | '/rights'
     | '/salaries'
     | '/search'
+    | '/settings'
     | '/support'
     | '/companies/$slug'
     | '/messages/$id'
@@ -314,6 +324,7 @@ export interface FileRouteTypes {
     | '/profile'
     | '/rights'
     | '/search'
+    | '/settings'
     | '/support'
     | '/companies/$slug'
     | '/messages/$id'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/rights'
     | '/salaries'
     | '/search'
+    | '/settings'
     | '/support'
     | '/companies/$slug'
     | '/messages/$id'
@@ -375,6 +387,7 @@ export interface RootRouteChildren {
   RightsRoute: typeof RightsRoute
   SalariesRoute: typeof SalariesRouteWithChildren
   SearchRoute: typeof SearchRoute
+  SettingsRoute: typeof SettingsRoute
   SupportRoute: typeof SupportRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   MessagesIdRoute: typeof MessagesIdRoute
@@ -481,6 +494,13 @@ declare module '@tanstack/react-router' {
       path: '/search'
       fullPath: '/search'
       preLoaderRoute: typeof SearchRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/settings': {
+      id: '/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof SettingsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/support': {
@@ -619,6 +639,7 @@ const rootRouteChildren: RootRouteChildren = {
   RightsRoute: RightsRoute,
   SalariesRoute: SalariesRouteWithChildren,
   SearchRoute: SearchRoute,
+  SettingsRoute: SettingsRoute,
   SupportRoute: SupportRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   MessagesIdRoute: MessagesIdRoute,
