@@ -64,7 +64,7 @@ export function FeedDiscussionPanel({
         </div>
 
         <div
-          role="tablist"
+          role="group"
           aria-label="Sort comments"
           className="mt-4 grid grid-cols-3 gap-1 rounded-xl bg-secondary/60 p-1"
         >
@@ -72,8 +72,7 @@ export function FeedDiscussionPanel({
             <button
               key={value}
               type="button"
-              role="tab"
-              aria-selected={sortMode === value}
+              aria-pressed={sortMode === value}
               onClick={() => setSortMode(value)}
               className={cn(
                 "flex min-w-0 items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground",
