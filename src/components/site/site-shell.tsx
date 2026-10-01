@@ -178,8 +178,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     setRightPanel((current) => (current === panel ? null : panel));
   };
 
+  const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
 
   return (
+
     <div className="min-h-screen bg-background md:pb-6">
       <SplashScreen />
       <RouteProgress />
