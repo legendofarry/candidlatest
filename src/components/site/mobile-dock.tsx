@@ -131,26 +131,6 @@ export function MobileDock({
         </nav>
       </div>
 
-      <Drawer open={sheet === "explore"} onOpenChange={(open) => setSheet(open ? "explore" : null)}>
-        <DrawerContent className="md:hidden">
-          <DrawerHeader className="text-left">
-            <DrawerTitle>Explore Candid</DrawerTitle>
-            <DrawerDescription>Companies, pay data and help, all in one place.</DrawerDescription>
-          </DrawerHeader>
-          <div className="space-y-1.5 px-4 pb-8">
-            {exploreLinks.map((item) => (
-              <SheetRow
-                key={item.to}
-                to={item.to}
-                icon={item.icon}
-                label={item.label}
-                hint={item.hint}
-                active={pathname.startsWith(item.to)}
-              />
-            ))}
-          </div>
-        </DrawerContent>
-      </Drawer>
 
       <Drawer open={sheet === "you"} onOpenChange={(open) => setSheet(open ? "you" : null)}>
         <DrawerContent className="md:hidden">
