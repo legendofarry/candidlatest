@@ -13,7 +13,6 @@ import {
   Info,
   MailOpen,
   MoreVertical,
-  Sparkles,
   Trash2,
   X,
   XCircle,
@@ -40,7 +39,6 @@ import {
   backToNotificationList,
   clearArchived,
   clearNotifications,
-  clearDemoNotifications,
   closeNotifications,
   markAllRead,
   markRead,
@@ -48,7 +46,6 @@ import {
   openNotificationDetail,
   pruneExpired,
   removeNotification,
-  seedDemoNotifications,
   unarchiveNotification,
   useNotifications,
   useNotificationsOverlay,
@@ -96,7 +93,6 @@ export function NotificationsOverlay() {
 
   const notifications = all.filter((n) => (tab === "archive" ? n.archived : !n.archived));
   const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
-  const hasDemo = all.some((n) => n.demo);
 
   const unread = all.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0);
 
@@ -323,19 +319,6 @@ export function NotificationsOverlay() {
                       <CheckCheck className="size-4" />
                       <span className="hidden sm:inline">Mark all read</span>
                     </Button>
-                    {tab === "inbox" ? (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        aria-label={
-                          hasDemo ? "Clear demo notifications" : "Load demo notifications"
-                        }
-                        onClick={hasDemo ? clearDemoNotifications : seedDemoNotifications}
-                      >
-                        <Sparkles className="size-4" />
-                        <span className="hidden sm:inline">{hasDemo ? "Clear demo" : "Demo"}</span>
-                      </Button>
-                    ) : null}
                     <Button
                       variant="ghost"
                       size="icon"
@@ -572,11 +555,6 @@ function Row({
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2">
             <span className="truncate text-sm font-semibold">{n.title}</span>
-            {n.demo ? (
-              <span className="shrink-0 rounded border border-primary/30 px-1 py-0.5 text-[9px] font-semibold uppercase text-primary">
-                Demo
-              </span>
-            ) : null}
             {!n.read ? <span className="size-1.5 rounded-full bg-primary" /> : null}
           </span>
           {n.description ? (

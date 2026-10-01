@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeCheck, CheckCheck, Loader2, Send, Smile, Sparkles } from "lucide-react";
+import { BadgeCheck, CheckCheck, Loader2, Send, Smile } from "lucide-react";
 import { getConversation, postMessage, reactToMessage } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -11,14 +11,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
-import {
-  DEMO_CONVERSATION_ID,
-  markDemoConversationRead,
-  seedDemoConversation,
-  sendDemoMessage,
-  toggleDemoReaction,
-  useDemoConversation,
-} from "@/lib/demo-messaging";
 
 export const Route = createFileRoute("/messages/$id")({
   head: () => ({
@@ -60,8 +52,6 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const fetchConversation = useServerFn(getConversation);
   const sendMessage = useServerFn(postMessage);
   const react = useServerFn(reactToMessage);
-  const demoConversation = useDemoConversation();
-  const isDemo = id === DEMO_CONVERSATION_ID;
 
   const [draft, setDraft] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -69,17 +59,11 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const { data, isLoading, error } = useQuery({
     queryKey: ["conversation", id],
     queryFn: () => fetchConversation({ data: { conversation_id: id } }),
-    enabled: Boolean(user) && !isDemo,
-    refetchInterval: isDemo ? false : 8000,
+    enabled: Boolean(user),
+    refetchInterval: 8000,
   });
 
-  useEffect(() => {
-    if (!isDemo) return;
-    if (!demoConversation) seedDemoConversation();
-    else markDemoConversationRead();
-  }, [demoConversation, isDemo]);
-
-  const conversation = isDemo ? demoConversation : data;
+  const conversation = data;
   const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
 
   useEffect(() => {
@@ -87,8 +71,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   }, [messages.length]);
 
   const send = useMutation({
-    mutationFn: async () =>
-      isDemo ? sendDemoMessage(draft) : sendMessage({ data: { conversation_id: id, body: draft } }),
+    mutationFn: async () => sendMessage({ data: { conversation_id: id, body: draft } }),
     onSuccess: () => {
       setDraft("");
       void queryClient.invalidateQueries({ queryKey: ["conversation", id] });
@@ -98,14 +81,11 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   });
 
   const toggleReaction = useMutation({
-    mutationFn: async (input: { message_id: string; emoji: string }) => {
-      if (isDemo) return toggleDemoReaction(input.message_id, input.emoji);
-      return react({ data: input });
-    },
+    mutationFn: async (input: { message_id: string; emoji: string }) => react({ data: input }),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["conversation", id] }),
   });
 
-  if (error && !isDemo) {
+  if (error) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <p className="font-medium">This conversation is not available.</p>
@@ -128,8 +108,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
       <button
         type="button"
         onClick={() => {
-          if (!isDemo && partner)
-            void navigate({ to: "/u/$username", params: { username: partner.username } });
+          if (partner) void navigate({ to: "/u/$username", params: { username: partner.username } });
         }}
         className={cn(
           "glass-card mb-4 flex items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-secondary/40",
@@ -143,20 +122,15 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           <span className="flex items-center gap-1.5 font-medium">
             @{partner?.username ?? "…"}
             {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
-            {isDemo ? <Sparkles className="size-4 text-primary" /> : null}
           </span>
           <span className="block text-xs text-muted-foreground">
-            {isDemo
-              ? "Demo conversation · stored on this device"
-              : partner?.official
-                ? "Official Candid account"
-                : "Tap to view profile"}
+            {partner?.official ? "Official Candid account" : "Tap to view profile"}
           </span>
         </span>
       </button>
 
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-4">
-        {isLoading && !isDemo ? (
+        {isLoading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
@@ -168,7 +142,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
 
         <AnimatePresence initial={false}>
           {messages.map((message) => {
-            const mine = message.sender_id === (isDemo ? "demo-me" : user?.uid);
+            const mine = message.sender_id === user?.uid;
             const reactions = Object.entries(message.reactions ?? {}).filter(
               ([, ids]) => ids.length > 0,
             );

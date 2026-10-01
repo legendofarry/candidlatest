@@ -77,6 +77,14 @@ export async function logOwnerAction(input: {
     });
 }
 
+export async function auditOwnerAction(input: Parameters<typeof logOwnerAction>[0]) {
+  try {
+    await logOwnerAction(input);
+  } catch (error) {
+    console.error("[owner audit] Could not persist action", error);
+  }
+}
+
 export function pagination(url: URL) {
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50), 1), 200);
   const offset = Math.max(Number(url.searchParams.get("offset") ?? 0), 0);

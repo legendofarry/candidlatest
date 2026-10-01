@@ -21,9 +21,15 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
       throw new Error("Unauthorized: Firebase token missing uid");
     }
 
+    const db = getFirestoreDb();
+    const profile = await db.collection("profiles").doc(decoded.uid).get();
+    if (profile.exists && (profile.data() as { banned?: boolean }).banned) {
+      throw new Error("This account has been restricted.");
+    }
+
     return next({
       context: {
-        db: getFirestoreDb(),
+        db,
         userId: decoded.uid,
         claims: decoded,
       },

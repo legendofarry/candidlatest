@@ -32,6 +32,13 @@ import { Route as SalariesIndexRouteImport } from './routes/salaries.index'
 import { Route as SalariesSlugRouteImport } from './routes/salaries.$slug'
 import { Route as StoriesIdRouteImport } from './routes/stories.$id'
 import { Route as UUsernameRouteImport } from './routes/u.$username'
+import { Route as ApiDevDatabaseRouteImport } from './routes/api/dev/database'
+import { Route as ApiDevDatabaseBackupRouteImport } from './routes/api/dev/database.backup'
+import { Route as ApiDevDatabaseClearRouteImport } from './routes/api/dev/database.clear'
+import { Route as ApiDevDatabaseRestoreRouteImport } from './routes/api/dev/database.restore'
+import { Route as ApiPublicOwnerActionsRouteImport } from './routes/api/public/owner/actions'
+import { Route as ApiPublicOwnerAuditRouteImport } from './routes/api/public/owner/audit'
+import { Route as ApiPublicOwnerCommentsRouteImport } from './routes/api/public/owner/comments'
 import { Route as ApiPublicOwnerCompaniesRouteImport } from './routes/api/public/owner/companies'
 import { Route as ApiPublicOwnerContactRouteImport } from './routes/api/public/owner/contact'
 import { Route as ApiPublicOwnerReportsRouteImport } from './routes/api/public/owner/reports'
@@ -154,6 +161,41 @@ const UUsernameRoute = UUsernameRouteImport.update({
   path: '/u/$username',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiDevDatabaseRoute = ApiDevDatabaseRouteImport.update({
+  id: '/api/dev/database',
+  path: '/api/dev/database',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDevDatabaseBackupRoute = ApiDevDatabaseBackupRouteImport.update({
+  id: '/backup',
+  path: '/backup',
+  getParentRoute: () => ApiDevDatabaseRoute,
+} as any)
+const ApiDevDatabaseClearRoute = ApiDevDatabaseClearRouteImport.update({
+  id: '/clear',
+  path: '/clear',
+  getParentRoute: () => ApiDevDatabaseRoute,
+} as any)
+const ApiDevDatabaseRestoreRoute = ApiDevDatabaseRestoreRouteImport.update({
+  id: '/restore',
+  path: '/restore',
+  getParentRoute: () => ApiDevDatabaseRoute,
+} as any)
+const ApiPublicOwnerActionsRoute = ApiPublicOwnerActionsRouteImport.update({
+  id: '/api/public/owner/actions',
+  path: '/api/public/owner/actions',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicOwnerAuditRoute = ApiPublicOwnerAuditRouteImport.update({
+  id: '/api/public/owner/audit',
+  path: '/api/public/owner/audit',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiPublicOwnerCommentsRoute = ApiPublicOwnerCommentsRouteImport.update({
+  id: '/api/public/owner/comments',
+  path: '/api/public/owner/comments',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicOwnerCompaniesRoute = ApiPublicOwnerCompaniesRouteImport.update({
   id: '/api/public/owner/companies',
   path: '/api/public/owner/companies',
@@ -209,6 +251,13 @@ export interface FileRoutesByFullPath {
   '/companies/': typeof CompaniesIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/salaries/': typeof SalariesIndexRoute
+  '/api/dev/database': typeof ApiDevDatabaseRouteWithChildren
+  '/api/dev/database/backup': typeof ApiDevDatabaseBackupRoute
+  '/api/dev/database/clear': typeof ApiDevDatabaseClearRoute
+  '/api/dev/database/restore': typeof ApiDevDatabaseRestoreRoute
+  '/api/public/owner/actions': typeof ApiPublicOwnerActionsRoute
+  '/api/public/owner/audit': typeof ApiPublicOwnerAuditRoute
+  '/api/public/owner/comments': typeof ApiPublicOwnerCommentsRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
   '/api/public/owner/contact': typeof ApiPublicOwnerContactRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
@@ -239,6 +288,13 @@ export interface FileRoutesByTo {
   '/companies': typeof CompaniesIndexRoute
   '/messages': typeof MessagesIndexRoute
   '/salaries': typeof SalariesIndexRoute
+  '/api/dev/database': typeof ApiDevDatabaseRouteWithChildren
+  '/api/dev/database/backup': typeof ApiDevDatabaseBackupRoute
+  '/api/dev/database/clear': typeof ApiDevDatabaseClearRoute
+  '/api/dev/database/restore': typeof ApiDevDatabaseRestoreRoute
+  '/api/public/owner/actions': typeof ApiPublicOwnerActionsRoute
+  '/api/public/owner/audit': typeof ApiPublicOwnerAuditRoute
+  '/api/public/owner/comments': typeof ApiPublicOwnerCommentsRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
   '/api/public/owner/contact': typeof ApiPublicOwnerContactRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
@@ -271,6 +327,13 @@ export interface FileRoutesById {
   '/companies/': typeof CompaniesIndexRoute
   '/messages/': typeof MessagesIndexRoute
   '/salaries/': typeof SalariesIndexRoute
+  '/api/dev/database': typeof ApiDevDatabaseRouteWithChildren
+  '/api/dev/database/backup': typeof ApiDevDatabaseBackupRoute
+  '/api/dev/database/clear': typeof ApiDevDatabaseClearRoute
+  '/api/dev/database/restore': typeof ApiDevDatabaseRestoreRoute
+  '/api/public/owner/actions': typeof ApiPublicOwnerActionsRoute
+  '/api/public/owner/audit': typeof ApiPublicOwnerAuditRoute
+  '/api/public/owner/comments': typeof ApiPublicOwnerCommentsRoute
   '/api/public/owner/companies': typeof ApiPublicOwnerCompaniesRoute
   '/api/public/owner/contact': typeof ApiPublicOwnerContactRoute
   '/api/public/owner/reports': typeof ApiPublicOwnerReportsRoute
@@ -304,6 +367,13 @@ export interface FileRouteTypes {
     | '/companies/'
     | '/messages/'
     | '/salaries/'
+    | '/api/dev/database'
+    | '/api/dev/database/backup'
+    | '/api/dev/database/clear'
+    | '/api/dev/database/restore'
+    | '/api/public/owner/actions'
+    | '/api/public/owner/audit'
+    | '/api/public/owner/comments'
     | '/api/public/owner/companies'
     | '/api/public/owner/contact'
     | '/api/public/owner/reports'
@@ -334,6 +404,13 @@ export interface FileRouteTypes {
     | '/companies'
     | '/messages'
     | '/salaries'
+    | '/api/dev/database'
+    | '/api/dev/database/backup'
+    | '/api/dev/database/clear'
+    | '/api/dev/database/restore'
+    | '/api/public/owner/actions'
+    | '/api/public/owner/audit'
+    | '/api/public/owner/comments'
     | '/api/public/owner/companies'
     | '/api/public/owner/contact'
     | '/api/public/owner/reports'
@@ -365,6 +442,13 @@ export interface FileRouteTypes {
     | '/companies/'
     | '/messages/'
     | '/salaries/'
+    | '/api/dev/database'
+    | '/api/dev/database/backup'
+    | '/api/dev/database/clear'
+    | '/api/dev/database/restore'
+    | '/api/public/owner/actions'
+    | '/api/public/owner/audit'
+    | '/api/public/owner/comments'
     | '/api/public/owner/companies'
     | '/api/public/owner/contact'
     | '/api/public/owner/reports'
@@ -395,6 +479,10 @@ export interface RootRouteChildren {
   UUsernameRoute: typeof UUsernameRoute
   CompaniesIndexRoute: typeof CompaniesIndexRoute
   MessagesIndexRoute: typeof MessagesIndexRoute
+  ApiDevDatabaseRoute: typeof ApiDevDatabaseRouteWithChildren
+  ApiPublicOwnerActionsRoute: typeof ApiPublicOwnerActionsRoute
+  ApiPublicOwnerAuditRoute: typeof ApiPublicOwnerAuditRoute
+  ApiPublicOwnerCommentsRoute: typeof ApiPublicOwnerCommentsRoute
   ApiPublicOwnerCompaniesRoute: typeof ApiPublicOwnerCompaniesRoute
   ApiPublicOwnerContactRoute: typeof ApiPublicOwnerContactRoute
   ApiPublicOwnerReportsRoute: typeof ApiPublicOwnerReportsRoute
@@ -566,6 +654,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof UUsernameRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/dev/database': {
+      id: '/api/dev/database'
+      path: '/api/dev/database'
+      fullPath: '/api/dev/database'
+      preLoaderRoute: typeof ApiDevDatabaseRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/dev/database/backup': {
+      id: '/api/dev/database/backup'
+      path: '/backup'
+      fullPath: '/api/dev/database/backup'
+      preLoaderRoute: typeof ApiDevDatabaseBackupRouteImport
+      parentRoute: typeof ApiDevDatabaseRoute
+    }
+    '/api/dev/database/clear': {
+      id: '/api/dev/database/clear'
+      path: '/clear'
+      fullPath: '/api/dev/database/clear'
+      preLoaderRoute: typeof ApiDevDatabaseClearRouteImport
+      parentRoute: typeof ApiDevDatabaseRoute
+    }
+    '/api/dev/database/restore': {
+      id: '/api/dev/database/restore'
+      path: '/restore'
+      fullPath: '/api/dev/database/restore'
+      preLoaderRoute: typeof ApiDevDatabaseRestoreRouteImport
+      parentRoute: typeof ApiDevDatabaseRoute
+    }
+    '/api/public/owner/actions': {
+      id: '/api/public/owner/actions'
+      path: '/api/public/owner/actions'
+      fullPath: '/api/public/owner/actions'
+      preLoaderRoute: typeof ApiPublicOwnerActionsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/owner/audit': {
+      id: '/api/public/owner/audit'
+      path: '/api/public/owner/audit'
+      fullPath: '/api/public/owner/audit'
+      preLoaderRoute: typeof ApiPublicOwnerAuditRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/owner/comments': {
+      id: '/api/public/owner/comments'
+      path: '/api/public/owner/comments'
+      fullPath: '/api/public/owner/comments'
+      preLoaderRoute: typeof ApiPublicOwnerCommentsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/owner/companies': {
       id: '/api/public/owner/companies'
       path: '/api/public/owner/companies'
@@ -625,6 +762,22 @@ const SalariesRouteWithChildren = SalariesRoute._addFileChildren(
   SalariesRouteChildren,
 )
 
+interface ApiDevDatabaseRouteChildren {
+  ApiDevDatabaseBackupRoute: typeof ApiDevDatabaseBackupRoute
+  ApiDevDatabaseClearRoute: typeof ApiDevDatabaseClearRoute
+  ApiDevDatabaseRestoreRoute: typeof ApiDevDatabaseRestoreRoute
+}
+
+const ApiDevDatabaseRouteChildren: ApiDevDatabaseRouteChildren = {
+  ApiDevDatabaseBackupRoute: ApiDevDatabaseBackupRoute,
+  ApiDevDatabaseClearRoute: ApiDevDatabaseClearRoute,
+  ApiDevDatabaseRestoreRoute: ApiDevDatabaseRestoreRoute,
+}
+
+const ApiDevDatabaseRouteWithChildren = ApiDevDatabaseRoute._addFileChildren(
+  ApiDevDatabaseRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
@@ -647,6 +800,10 @@ const rootRouteChildren: RootRouteChildren = {
   UUsernameRoute: UUsernameRoute,
   CompaniesIndexRoute: CompaniesIndexRoute,
   MessagesIndexRoute: MessagesIndexRoute,
+  ApiDevDatabaseRoute: ApiDevDatabaseRouteWithChildren,
+  ApiPublicOwnerActionsRoute: ApiPublicOwnerActionsRoute,
+  ApiPublicOwnerAuditRoute: ApiPublicOwnerAuditRoute,
+  ApiPublicOwnerCommentsRoute: ApiPublicOwnerCommentsRoute,
   ApiPublicOwnerCompaniesRoute: ApiPublicOwnerCompaniesRoute,
   ApiPublicOwnerContactRoute: ApiPublicOwnerContactRoute,
   ApiPublicOwnerReportsRoute: ApiPublicOwnerReportsRoute,

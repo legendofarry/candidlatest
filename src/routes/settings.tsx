@@ -35,6 +35,7 @@ import {
 } from "@/lib/biometrics";
 import { cn } from "@/lib/utils";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
+import { DevDatabaseTools } from "@/components/site/dev-database-tools";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -284,6 +285,7 @@ function SettingsPage() {
                       }}
                     />
                   </SettingsGroup>
+                  {import.meta.env.DEV ? <DevDatabaseTools user={user} /> : null}
                 </div>
 
                 <div id="privacy">

@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { readSiteContact, writeSiteContact } from "@/lib/site.server";
-import { getAdmin, json, verifyOwnerKey } from "@/lib/owner-api.server";
+import { auditOwnerAction, getAdmin, json, verifyOwnerKey } from "@/lib/owner-api.server";
 
 const ContactInput = z.object({
   email: z.string().max(160).nullable().optional(),
@@ -30,7 +30,14 @@ export const Route = createFileRoute("/api/public/owner/contact")({
         const patch = Object.fromEntries(
           Object.entries(parsed.data).filter(([, value]) => value !== undefined),
         );
-        return json(await writeSiteContact(patch));
+        const contact = await writeSiteContact(patch);
+        await auditOwnerAction({
+          action: "contact.updated",
+          targetType: "site_settings",
+          targetId: "contact",
+          payload: { fields: Object.keys(patch) },
+        });
+        return json(contact);
       },
     },
   },
