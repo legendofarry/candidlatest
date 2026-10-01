@@ -66,9 +66,12 @@ const exploreNav = [
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
 ] as const;
 
+const dockRoots = ["/", "/companies", "/salaries", "/profile"];
+
 function isNestedRoute(pathname: string) {
   return !["/", "/companies", "/profile", "/salaries", "/leaderboards"].includes(pathname);
 }
+
 
 function nestedTitle(pathname: string) {
   if (pathname.startsWith("/stories/")) return "Story";
