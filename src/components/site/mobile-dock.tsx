@@ -292,8 +292,8 @@ function DockShell({
 }: {
   active: boolean;
   label: string;
-  badge?: number;
-  initials?: string;
+  badge?: number | undefined;
+  initials?: string | undefined;
   icon: typeof Home;
 }) {
   return (
@@ -354,8 +354,8 @@ function DockTab({
   label: string;
   icon: typeof Home;
   active: boolean;
-  badge?: number;
-  exact?: boolean;
+  badge?: number | undefined;
+  exact?: boolean | undefined;
 }) {
   return (
     <Link to={to} aria-current={active ? "page" : undefined} className={tabClass} data-exact={exact}>
@@ -375,8 +375,8 @@ function DockButton({
   label: string;
   icon: typeof Home;
   active: boolean;
-  badge?: number;
-  initials?: string;
+  badge?: number | undefined;
+  initials?: string | undefined;
   onClick: () => void;
 }) {
   return (
