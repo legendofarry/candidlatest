@@ -25,17 +25,14 @@ import {
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 
-type DockSheet = "explore" | "you" | null;
+type DockSheet = "you" | null;
 
-const exploreLinks = [
-  { to: "/companies", label: "Companies", icon: Building2, hint: "Ratings, intel and right of reply" },
-  { to: "/salaries", label: "Salary insights", icon: Wallet, hint: "What employers really pay" },
-  { to: "/leaderboards", label: "Leaderboards", icon: Trophy, hint: "Most discussed workplaces" },
+const moreLinks = [
   { to: "/search", label: "Search", icon: Search, hint: "Find a story or employer" },
+  { to: "/leaderboards", label: "Leaderboards", icon: Trophy, hint: "Most discussed workplaces" },
   { to: "/support", label: "Help & support", icon: LifeBuoy, hint: "FAQs, email and WhatsApp" },
 ] as const;
 
-const exploreRoots = ["/companies", "/salaries", "/leaderboards", "/search", "/support"];
 
 export function MobileDock({
   signedIn,
