@@ -29,6 +29,8 @@ import { NotificationBanners } from "@/components/site/notification-banners";
 import { NotificationsOverlay } from "@/components/site/notifications-overlay";
 import { BadgeClaimModal } from "@/components/site/badge-claim-modal";
 import { SupportChat } from "@/components/site/support-chat";
+import { MobileDock } from "@/components/site/mobile-dock";
+
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
