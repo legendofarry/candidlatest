@@ -37,14 +37,13 @@ const moreLinks = [
 export function MobileDock({
   signedIn,
   userInitials,
-  unreadMessages,
   onLeave,
 }: {
   signedIn: boolean;
   userInitials: string;
-  unreadMessages: number;
   onLeave: () => void;
 }) {
+
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadCount();
   const [sheet, setSheet] = useState<DockSheet>(null);
