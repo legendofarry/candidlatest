@@ -338,12 +338,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </aside>
         <main
           className={cn(
-            "min-w-0 pt-6 md:pb-10 md:pl-80",
-            nested ? "pb-10" : "pb-28",
+            "min-w-0 pb-32 pt-6 md:pb-10 md:pl-80",
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
         >
+
           {nested && !standaloneDesktopRoute ? (
             <div className="mb-4">
               <BackButton compact label={nestedTitle(pathname)} />
