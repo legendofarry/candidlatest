@@ -408,26 +408,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       >
         <MessagesThread id={decodeURIComponent(activeConversationId ?? "")} inSidebar />
       </RightWorkspace>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border glass-card md:hidden">
-        <div className="grid grid-cols-2">
-          {primaryNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors",
-                  pathname === item.to && "text-primary",
-                )}
-              >
-                <Icon className="size-5" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <MobileDock
+        signedIn={Boolean(user)}
+        userInitials={userInitials}
+        unreadMessages={messageState?.unread ?? 0}
+        onLeave={handleLeave}
+      />
+
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
           <AlertDialogHeader>
