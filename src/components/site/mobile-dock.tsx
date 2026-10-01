@@ -95,26 +95,19 @@ export function MobileDock({
           className="pointer-events-auto relative mx-3 w-full max-w-md rounded-[1.75rem] border border-border/70 glass-card px-2 pb-1.5 pt-2 shadow-2xl"
         >
           <div className="grid grid-cols-[1fr_1fr_4.5rem_1fr_1fr] items-end">
+            <DockTab to="/" label="Feed" icon={Home} active={pathname === "/"} exact />
             <DockTab
-              to="/"
-              label="Feed"
-              icon={Home}
-              active={pathname === "/"}
-              exact
-            />
-            <DockButton
-              label="Explore"
-              icon={Compass}
-              active={exploreActive}
-              onClick={() => setSheet("explore")}
+              to="/companies"
+              label="Companies"
+              icon={Building2}
+              active={pathname.startsWith("/companies")}
             />
             <div aria-hidden className="h-0" />
             <DockTab
-              to="/messages"
-              label="Chats"
-              icon={MessagesSquare}
-              active={pathname.startsWith("/messages")}
-              badge={unreadMessages}
+              to="/salaries"
+              label="Salaries"
+              icon={Wallet}
+              active={pathname.startsWith("/salaries")}
             />
             <DockButton
               label="You"
@@ -125,6 +118,7 @@ export function MobileDock({
               onClick={() => setSheet("you")}
             />
           </div>
+
 
           <Link
             to="/post"
