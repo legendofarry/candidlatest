@@ -165,8 +165,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     if (selectedConversationId) closeMessagePanel();
     else void navigate({ to: "/messages" });
   }
-  const togglePanel = (panel: Exclude<RightPanel, null>) =>
+  const togglePanel = (panel: Exclude<RightPanel, null>) => {
+    if (panel === "messages" && !window.matchMedia("(min-width: 768px)").matches) {
+      void navigate({ to: "/messages" });
+      return;
+    }
     setRightPanel((current) => (current === panel ? null : panel));
+  };
+
 
   return (
     <div className="min-h-screen bg-background md:pb-6">
