@@ -3,7 +3,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Building2,
-  Compass,
   Home,
   LifeBuoy,
   LogOut,
