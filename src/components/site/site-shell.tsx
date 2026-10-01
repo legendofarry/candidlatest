@@ -194,10 +194,20 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="app-shell flex h-16 items-center gap-3">
-          <Link to="/" className="flex items-center gap-2">
-            <Flame className="size-5 text-primary" />
-            <span className="font-display text-lg font-semibold tracking-tight">Candid</span>
-          </Link>
+          {nested && !standaloneDesktopRoute ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <BackButton compact label={nestedTitle(pathname)} />
+              <span className="truncate font-display text-base font-semibold tracking-tight">
+                {nestedTitle(pathname)}
+              </span>
+            </div>
+          ) : (
+            <Link to="/" className="flex items-center gap-2">
+              <Flame className="size-5 text-primary" />
+              <span className="font-display text-lg font-semibold tracking-tight">Candid</span>
+            </Link>
+          )}
+
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <button
               type="button"
