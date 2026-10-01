@@ -359,19 +359,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </aside>
         <main
           className={cn(
-            "min-w-0 pb-32 pt-6 md:pb-10 md:pl-80",
+            "min-w-0 pt-6 md:pb-10 md:pl-80",
+            showDock ? "pb-32" : "pb-10",
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
         >
-
-          {nested && !standaloneDesktopRoute ? (
-            <div className="mb-4">
-              <BackButton compact label={nestedTitle(pathname)} />
-            </div>
-          ) : null}
           <BiometricGate>{children}</BiometricGate>
         </main>
+
         {pathname === "/" ? (
           <footer className="border-t border-border py-10 text-sm text-muted-foreground md:ml-80">
             <div className="flex flex-wrap gap-x-6 gap-y-2">
