@@ -427,12 +427,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       >
         <MessagesThread id={decodeURIComponent(activeConversationId ?? "")} inSidebar />
       </RightWorkspace>
-      <MobileDock
-        signedIn={Boolean(user)}
-        userInitials={userInitials}
-        unreadMessages={messageState?.unread ?? 0}
-        onLeave={handleLeave}
-      />
+      {showDock ? (
+        <MobileDock signedIn={Boolean(user)} userInitials={userInitials} onLeave={handleLeave} />
+      ) : null}
+
 
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
