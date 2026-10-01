@@ -209,7 +209,28 @@ export function MobileDock({
                 active={pathname.startsWith("/auth")}
               />
             )}
+            <div className="my-2 border-t border-border" />
+            {signedIn ? (
+              <SheetRow
+                to="/messages"
+                icon={MessagesSquare}
+                label="Chats"
+                hint="Private replies and follow-ups"
+                active={pathname.startsWith("/messages")}
+              />
+            ) : null}
+            {moreLinks.map((item) => (
+              <SheetRow
+                key={item.to}
+                to={item.to}
+                icon={item.icon}
+                label={item.label}
+                hint={item.hint}
+                active={pathname.startsWith(item.to)}
+              />
+            ))}
           </div>
+
         </DrawerContent>
       </Drawer>
     </>
