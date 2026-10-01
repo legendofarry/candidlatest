@@ -76,10 +76,10 @@ export function MobileDock({
     };
   }, []);
 
-  const exploreActive = exploreRoots.some((root) => pathname.startsWith(root));
-  const youActive = ["/profile", "/settings", "/notifications"].some((root) =>
-    pathname.startsWith(root),
+  const youActive = ["/profile", "/settings", "/notifications", "/search", "/leaderboards", "/support"].some(
+    (root) => pathname.startsWith(root),
   );
+
 
   return (
     <>
