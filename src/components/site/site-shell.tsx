@@ -29,6 +29,8 @@ import { NotificationBanners } from "@/components/site/notification-banners";
 import { NotificationsOverlay } from "@/components/site/notifications-overlay";
 import { BadgeClaimModal } from "@/components/site/badge-claim-modal";
 import { SupportChat } from "@/components/site/support-chat";
+import { MobileDock } from "@/components/site/mobile-dock";
+
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
@@ -165,8 +167,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     if (selectedConversationId) closeMessagePanel();
     else void navigate({ to: "/messages" });
   }
-  const togglePanel = (panel: Exclude<RightPanel, null>) =>
+  const togglePanel = (panel: Exclude<RightPanel, null>) => {
+    if (panel === "messages" && !window.matchMedia("(min-width: 768px)").matches) {
+      void navigate({ to: "/messages" });
+      return;
+    }
     setRightPanel((current) => (current === panel ? null : panel));
+  };
+
 
   return (
     <div className="min-h-screen bg-background md:pb-6">
@@ -338,12 +346,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </aside>
         <main
           className={cn(
-            "min-w-0 pt-6 md:pb-10 md:pl-80",
-            nested ? "pb-10" : "pb-28",
+            "min-w-0 pb-32 pt-6 md:pb-10 md:pl-80",
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
         >
+
           {nested && !standaloneDesktopRoute ? (
             <div className="mb-4">
               <BackButton compact label={nestedTitle(pathname)} />
@@ -408,26 +416,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       >
         <MessagesThread id={decodeURIComponent(activeConversationId ?? "")} inSidebar />
       </RightWorkspace>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border glass-card md:hidden">
-        <div className="grid grid-cols-2">
-          {primaryNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors",
-                  pathname === item.to && "text-primary",
-                )}
-              >
-                <Icon className="size-5" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      <MobileDock
+        signedIn={Boolean(user)}
+        userInitials={userInitials}
+        unreadMessages={messageState?.unread ?? 0}
+        onLeave={handleLeave}
+      />
+
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
           <AlertDialogHeader>
