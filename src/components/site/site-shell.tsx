@@ -72,7 +72,6 @@ function isNestedRoute(pathname: string) {
   return !["/", "/companies", "/profile", "/salaries", "/leaderboards"].includes(pathname);
 }
 
-
 function nestedTitle(pathname: string) {
   if (pathname.startsWith("/stories/")) return "Story";
   if (pathname.startsWith("/companies/")) return "Company";
@@ -181,7 +180,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
 
   return (
-
     <div className="min-h-screen bg-background md:pb-6">
       <SplashScreen />
       <RouteProgress />
@@ -430,7 +428,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       {showDock ? (
         <MobileDock signedIn={Boolean(user)} userInitials={userInitials} onLeave={handleLeave} />
       ) : null}
-
 
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>

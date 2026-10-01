@@ -32,7 +32,6 @@ const moreLinks = [
   { to: "/support", label: "Help & support", icon: LifeBuoy, hint: "FAQs, email and WhatsApp" },
 ] as const;
 
-
 export function MobileDock({
   signedIn,
   userInitials,
@@ -42,7 +41,6 @@ export function MobileDock({
   userInitials: string;
   onLeave: () => void;
 }) {
-
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadCount();
   const [sheet, setSheet] = useState<DockSheet>(null);
@@ -75,10 +73,14 @@ export function MobileDock({
     };
   }, []);
 
-  const youActive = ["/profile", "/settings", "/notifications", "/search", "/leaderboards", "/support"].some(
-    (root) => pathname.startsWith(root),
-  );
-
+  const youActive = [
+    "/profile",
+    "/settings",
+    "/notifications",
+    "/search",
+    "/leaderboards",
+    "/support",
+  ].some((root) => pathname.startsWith(root));
 
   return (
     <>
@@ -118,7 +120,6 @@ export function MobileDock({
             />
           </div>
 
-
           <Link
             to="/post"
             aria-label="Post a story"
@@ -129,7 +130,6 @@ export function MobileDock({
           </Link>
         </nav>
       </div>
-
 
       <Drawer open={sheet === "you"} onOpenChange={(open) => setSheet(open ? "you" : null)}>
         <DrawerContent className="md:hidden">
@@ -229,7 +229,6 @@ export function MobileDock({
               />
             ))}
           </div>
-
         </DrawerContent>
       </Drawer>
     </>
@@ -348,7 +347,12 @@ function DockTab({
   exact?: boolean | undefined;
 }) {
   return (
-    <Link to={to} aria-current={active ? "page" : undefined} className={tabClass} data-exact={exact}>
+    <Link
+      to={to}
+      aria-current={active ? "page" : undefined}
+      className={tabClass}
+      data-exact={exact}
+    >
       <DockShell active={active} label={label} icon={icon} badge={badge} />
     </Link>
   );
