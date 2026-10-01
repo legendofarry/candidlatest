@@ -3,7 +3,6 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Building2,
-  Compass,
   Home,
   LifeBuoy,
   LogOut,
@@ -25,27 +24,21 @@ import {
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 
-type DockSheet = "explore" | "you" | null;
+type DockSheet = "you" | null;
 
-const exploreLinks = [
-  { to: "/companies", label: "Companies", icon: Building2, hint: "Ratings, intel and right of reply" },
-  { to: "/salaries", label: "Salary insights", icon: Wallet, hint: "What employers really pay" },
-  { to: "/leaderboards", label: "Leaderboards", icon: Trophy, hint: "Most discussed workplaces" },
+const moreLinks = [
   { to: "/search", label: "Search", icon: Search, hint: "Find a story or employer" },
+  { to: "/leaderboards", label: "Leaderboards", icon: Trophy, hint: "Most discussed workplaces" },
   { to: "/support", label: "Help & support", icon: LifeBuoy, hint: "FAQs, email and WhatsApp" },
 ] as const;
-
-const exploreRoots = ["/companies", "/salaries", "/leaderboards", "/search", "/support"];
 
 export function MobileDock({
   signedIn,
   userInitials,
-  unreadMessages,
   onLeave,
 }: {
   signedIn: boolean;
   userInitials: string;
-  unreadMessages: number;
   onLeave: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -80,10 +73,14 @@ export function MobileDock({
     };
   }, []);
 
-  const exploreActive = exploreRoots.some((root) => pathname.startsWith(root));
-  const youActive = ["/profile", "/settings", "/notifications"].some((root) =>
-    pathname.startsWith(root),
-  );
+  const youActive = [
+    "/profile",
+    "/settings",
+    "/notifications",
+    "/search",
+    "/leaderboards",
+    "/support",
+  ].some((root) => pathname.startsWith(root));
 
   return (
     <>
@@ -99,26 +96,19 @@ export function MobileDock({
           className="pointer-events-auto relative mx-3 w-full max-w-md rounded-[1.75rem] border border-border/70 glass-card px-2 pb-1.5 pt-2 shadow-2xl"
         >
           <div className="grid grid-cols-[1fr_1fr_4.5rem_1fr_1fr] items-end">
+            <DockTab to="/" label="Feed" icon={Home} active={pathname === "/"} exact />
             <DockTab
-              to="/"
-              label="Feed"
-              icon={Home}
-              active={pathname === "/"}
-              exact
-            />
-            <DockButton
-              label="Explore"
-              icon={Compass}
-              active={exploreActive}
-              onClick={() => setSheet("explore")}
+              to="/companies"
+              label="Companies"
+              icon={Building2}
+              active={pathname.startsWith("/companies")}
             />
             <div aria-hidden className="h-0" />
             <DockTab
-              to="/messages"
-              label="Chats"
-              icon={MessagesSquare}
-              active={pathname.startsWith("/messages")}
-              badge={unreadMessages}
+              to="/salaries"
+              label="Salaries"
+              icon={Wallet}
+              active={pathname.startsWith("/salaries")}
             />
             <DockButton
               label="You"
@@ -140,27 +130,6 @@ export function MobileDock({
           </Link>
         </nav>
       </div>
-
-      <Drawer open={sheet === "explore"} onOpenChange={(open) => setSheet(open ? "explore" : null)}>
-        <DrawerContent className="md:hidden">
-          <DrawerHeader className="text-left">
-            <DrawerTitle>Explore Candid</DrawerTitle>
-            <DrawerDescription>Companies, pay data and help, all in one place.</DrawerDescription>
-          </DrawerHeader>
-          <div className="space-y-1.5 px-4 pb-8">
-            {exploreLinks.map((item) => (
-              <SheetRow
-                key={item.to}
-                to={item.to}
-                icon={item.icon}
-                label={item.label}
-                hint={item.hint}
-                active={pathname.startsWith(item.to)}
-              />
-            ))}
-          </div>
-        </DrawerContent>
-      </Drawer>
 
       <Drawer open={sheet === "you"} onOpenChange={(open) => setSheet(open ? "you" : null)}>
         <DrawerContent className="md:hidden">
@@ -239,6 +208,26 @@ export function MobileDock({
                 active={pathname.startsWith("/auth")}
               />
             )}
+            <div className="my-2 border-t border-border" />
+            {signedIn ? (
+              <SheetRow
+                to="/messages"
+                icon={MessagesSquare}
+                label="Chats"
+                hint="Private replies and follow-ups"
+                active={pathname.startsWith("/messages")}
+              />
+            ) : null}
+            {moreLinks.map((item) => (
+              <SheetRow
+                key={item.to}
+                to={item.to}
+                icon={item.icon}
+                label={item.label}
+                hint={item.hint}
+                active={pathname.startsWith(item.to)}
+              />
+            ))}
           </div>
         </DrawerContent>
       </Drawer>
@@ -358,7 +347,12 @@ function DockTab({
   exact?: boolean | undefined;
 }) {
   return (
-    <Link to={to} aria-current={active ? "page" : undefined} className={tabClass} data-exact={exact}>
+    <Link
+      to={to}
+      aria-current={active ? "page" : undefined}
+      className={tabClass}
+      data-exact={exact}
+    >
       <DockShell active={active} label={label} icon={icon} badge={badge} />
     </Link>
   );
