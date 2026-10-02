@@ -42,7 +42,7 @@ function StatInner({ label, value }: { label: string; value: number }) {
       <p className="text-3xl font-bold leading-none text-foreground tabular-nums xl:text-2xl">
         {shown}
       </p>
-      <p className="mt-1.5 flex items-center gap-0.5 text-xs uppercase tracking-[0.12em] text-muted-foreground">
+      <p className="mt-1.5 flex items-center gap-0.5 whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground">
         {label} <ChevronRight className="size-3" />
       </p>
     </>
