@@ -1,11 +1,24 @@
-import { fileURLToPath } from "node:url";
-import { dirname } from "node:path";
+// Polyfill __dirname/__filename defensively; import.meta.url may be absent on the edge.
+try {
+  const g = globalThis as Record<string, unknown>;
+  if (typeof g["__dirname"] === "undefined") {
+    g["__filename"] = "/bundle/index.mjs";
+    g["__dirname"] = "/bundle";
+  }
+} catch {
+  /* ignore */
+}
 
-// Polyfill __dirname and __filename for ES modules
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-globalThis.__dirname = __dirname;
-globalThis.__filename = __filename;
+/** Mirror Worker env bindings into process.env so server code can read secrets. */
+function mirrorEnv(env: unknown) {
+  if (!env || typeof env !== "object") return;
+  const proc = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process;
+  if (!proc) return;
+  proc.env ??= {};
+  for (const [key, value] of Object.entries(env as Record<string, unknown>)) {
+    if (typeof value === "string" && proc.env[key] === undefined) proc.env[key] = value;
+  }
+}
 
 import "./lib/error-capture";
 
