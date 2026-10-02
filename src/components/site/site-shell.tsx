@@ -69,7 +69,7 @@ const exploreNav = [
 const dockRoots = ["/", "/companies", "/salaries", "/profile"];
 
 function isNestedRoute(pathname: string) {
-  return !["/", "/companies", "/profile", "/salaries", "/leaderboards"].includes(pathname);
+  return !["/", "/companies", "/profile", "/salaries"].includes(pathname);
 }
 
 function nestedTitle(pathname: string) {
@@ -126,6 +126,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/settings",
     "/onboarding",
   ].includes(pathname);
+  const fullscreenRoute = ["/auth", "/onboarding"].includes(pathname);
+  const headerBack = nested && (!standaloneDesktopRoute || pathname === "/support");
 
   useEffect(() => {
     if (pathname === "/messages" || pathname === "/messages/" || routeConversationId)
@@ -186,15 +188,16 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <NotificationBanners />
       <NotificationsOverlay />
       <BadgeClaimModal />
-      <SupportChat />
+      {fullscreenRoute ? null : <SupportChat raised={dockRoots.includes(pathname)} />}
       <header
         className={cn(
           "sticky top-0 z-[80] border-b border-border glass-card",
           standaloneDesktopRoute && "md:hidden",
+          fullscreenRoute && "hidden",
         )}
       >
         <div className="app-shell flex h-16 items-center gap-3">
-          {nested && !standaloneDesktopRoute ? (
+          {headerBack ? (
             <div className="flex min-w-0 items-center gap-2">
               <BackButton compact label={nestedTitle(pathname)} />
               <span className="truncate font-display text-base font-semibold tracking-tight">
@@ -359,7 +362,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </aside>
         <main
           className={cn(
-            "min-w-0 pt-6 md:pb-10 md:pl-80",
+            "min-w-0 md:pb-10 md:pl-80",
+            fullscreenRoute ? "pt-0" : "pt-6",
             showDock ? "pb-32" : "pb-10",
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",

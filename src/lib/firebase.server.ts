@@ -95,6 +95,18 @@ export function getFirebaseAuth() {
   return getAuth(getFirebaseAdminApp());
 }
 
+let firestoreConfigured = false;
+
 export function getFirestoreDb() {
-  return getFirestore(getFirebaseAdminApp());
+  const db = getFirestore(getFirebaseAdminApp());
+  if (!firestoreConfigured) {
+    // The edge runtime has no raw sockets/HTTP2, so gRPC fails; use REST transport.
+    try {
+      db.settings({ preferRest: true, ignoreUndefinedProperties: true });
+    } catch {
+      /* settings already applied */
+    }
+    firestoreConfigured = true;
+  }
+  return db;
 }
