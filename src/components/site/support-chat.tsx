@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { getSupportConversation, sendSupportMessage } from "@/lib/support.functions";
 
-export function SupportChat() {
+export function SupportChat({ raised = false }: { raised?: boolean }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -40,20 +40,21 @@ export function SupportChat() {
   }
 
   return (
-    <div className="fixed bottom-20 right-4 z-[70] md:bottom-6 md:right-6">
+    <div className={`fixed right-4 z-[95] md:bottom-6 md:right-6 ${raised ? "bottom-28" : "bottom-6"}`}>
       {open ? (
-        <section className="mb-3 flex h-[min(32rem,calc(100vh-7rem))] w-[min(22rem,calc(100vw-2rem))] flex-col overflow-hidden rounded-3xl border border-border bg-background shadow-2xl">
-          <header className="flex items-center gap-3 border-b border-border px-4 py-3">
+        <section className="fixed inset-0 z-[100] flex h-dvh w-full flex-col overflow-hidden bg-background animate-in slide-in-from-bottom-8 fade-in duration-300 md:static md:mb-3 md:h-[min(32rem,calc(100vh-7rem))] md:w-[22rem] md:rounded-3xl md:border md:border-border md:shadow-2xl">
+          <header className="flex items-center gap-3 border-b border-border px-4 py-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
             <span className="flex size-9 items-center justify-center rounded-full bg-primary text-primary-foreground">
               <MessageCircle className="size-4" />
             </span>
             <span className="min-w-0 flex-1">
               <strong className="block text-sm">Candid support</strong>
-              <small className="text-muted-foreground">We usually reply within a day.</small>
+              <small className="flex items-center gap-1.5 text-muted-foreground"><span className="size-1.5 animate-pulse rounded-full bg-verified" /> We usually reply within a day.</small>
             </span>
             <Button
               variant="ghost"
               size="icon"
+              className="size-10 rounded-full bg-secondary"
               aria-label="Close support chat"
               onClick={() => setOpen(false)}
             >
@@ -98,13 +99,13 @@ export function SupportChat() {
                 ))}
                 <div ref={bottomRef} />
               </div>
-              <form onSubmit={submit} className="flex gap-2 border-t border-border p-3">
+              <form onSubmit={submit} className="flex gap-2 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
                 <input
                   value={body}
                   onChange={(event) => setBody(event.target.value)}
                   maxLength={4000}
                   placeholder="Write a message…"
-                  className="min-w-0 flex-1 bg-transparent px-2 text-sm outline-none"
+                  className="min-w-0 flex-1 rounded-full bg-secondary px-4 py-2.5 text-base outline-none md:text-sm"
                 />
                 <Button
                   size="icon"
@@ -122,7 +123,7 @@ export function SupportChat() {
       <Button
         onClick={() => setOpen((value) => !value)}
         size="icon"
-        className="size-12 rounded-full shadow-lg"
+        className={`size-12 rounded-full shadow-lg shadow-primary/30 transition-transform active:scale-90 ${open ? "hidden md:inline-flex" : ""}`}
         aria-label="Open support chat"
       >
         <MessageCircle className="size-5" />
