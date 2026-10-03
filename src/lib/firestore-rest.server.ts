@@ -7,7 +7,7 @@ import { importPKCS8, SignJWT } from "jose";
 
 export type DocumentData = Record<string, any>;
 type Credentials = { projectId: string; clientEmail: string; privateKey: string };
-type FsValue = Record<string, any>;
+type FsValue = any;
 
 const IDENT = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const quote = (seg: string) => (IDENT.test(seg) ? seg : "`" + seg.replace(/[`\\]/g, "\\$&") + "`");
@@ -82,7 +82,7 @@ export class DocumentSnapshot {
   get exists() {
     return this.fields !== undefined;
   }
-  data(): DocumentData | undefined {
+  data(): any {
     return this.fields ? { ...this.fields } : undefined;
   }
   get(field: string) {
