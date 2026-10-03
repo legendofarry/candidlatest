@@ -1,5 +1,5 @@
-import { randomUUID } from "node:crypto";
-import type { DocumentData, QueryDocumentSnapshot } from "firebase-admin/firestore";
+const randomUUID = () => crypto.randomUUID();
+import type { DocumentData, QueryDocumentSnapshot } from "./firestore-rest.server";
 import { getFirestoreDb } from "./firebase.server";
 
 export type CompanyRecord = {
