@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
@@ -30,6 +30,7 @@ import { NotificationsOverlay } from "@/components/site/notifications-overlay";
 import { BadgeClaimModal } from "@/components/site/badge-claim-modal";
 import { SupportChat } from "@/components/site/support-chat";
 import { MobileDock } from "@/components/site/mobile-dock";
+import { InstallBanner } from "@/components/site/install-banner";
 
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { getUnreadMessages } from "@/lib/messaging.functions";
@@ -42,6 +43,8 @@ import { MessagesThread } from "@/routes/messages.$id";
 import {
   closeMessagePanel,
   openMessagePanel,
+  rememberConversation,
+  useLastConversationId,
   useSelectedConversationId,
 } from "@/lib/message-panel-state";
 import {
@@ -92,8 +95,6 @@ function nestedTitle(pathname: string) {
   );
 }
 
-type RightPanel = "messages" | null;
-
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
   useServerNotificationsSync();
@@ -101,10 +102,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const routeConversationId = pathname.match(/^\/messages\/([^/]+)\/?$/)?.[1];
   const selectedConversationId = useSelectedConversationId();
+  const lastConversationId = useLastConversationId();
   const activeConversationId = selectedConversationId ?? routeConversationId;
   const unread = useUnreadCount();
-  const [rightPanel, setRightPanel] = useState<RightPanel>(null);
-  const messagePanelOpen = rightPanel === "messages" || Boolean(activeConversationId);
+  const [messagesOpen, setMessagesOpen] = useState(false);
+  const onMessagesRoute = pathname === "/messages" || pathname === "/messages/" || Boolean(routeConversationId);
+  const messagesVisible = messagesOpen || Boolean(activeConversationId) || onMessagesRoute;
+  const messagePanelOpen = messagesVisible;
+  const returnPathRef = useRef("/");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [rememberChoice, setRememberChoice] = useState(false);
@@ -126,15 +131,17 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/settings",
     "/onboarding",
   ].includes(pathname);
-  const fullscreenRoute = ["/auth", "/onboarding"].includes(pathname);
+  const fullscreenRoute = ["/auth", "/onboarding", "/download"].includes(pathname);
   const headerBack = nested && (!standaloneDesktopRoute || pathname === "/support");
 
   useEffect(() => {
-    if (pathname === "/messages" || pathname === "/messages/" || routeConversationId)
-      setRightPanel("messages");
-    else {
+    if (onMessagesRoute) {
+      setMessagesOpen(true);
+      if (routeConversationId) rememberConversation(routeConversationId);
+    } else {
+      setMessagesOpen(false);
       closeMessagePanel();
-      setRightPanel(null);
+      returnPathRef.current = pathname;
     }
     setUserMenuOpen(false);
   }, [pathname, routeConversationId]);
@@ -157,9 +164,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }
 
   function closeMessages() {
-    setRightPanel(null);
+    setMessagesOpen(false);
     closeMessagePanel();
-    if (routeConversationId) void navigate({ to: "/" });
+    if (onMessagesRoute) void navigate({ to: returnPathRef.current });
   }
 
   function selectConversation(conversationId: string) {
@@ -171,13 +178,21 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     if (selectedConversationId) closeMessagePanel();
     else void navigate({ to: "/messages" });
   }
-  const togglePanel = (panel: Exclude<RightPanel, null>) => {
-    if (panel === "messages" && !window.matchMedia("(min-width: 768px)").matches) {
-      void navigate({ to: "/messages" });
+  function openMessages() {
+    const resumeId = activeConversationId ?? lastConversationId;
+    if (!onMessagesRoute && !window.matchMedia("(min-width: 768px)").matches) {
+      if (resumeId) void navigate({ to: "/messages/$id", params: { id: resumeId } });
+      else void navigate({ to: "/messages" });
       return;
     }
-    setRightPanel((current) => (current === panel ? null : panel));
-  };
+    setMessagesOpen(true);
+    if (resumeId && !onMessagesRoute) openMessagePanel(resumeId);
+  }
+
+  function toggleMessages() {
+    if (messagesVisible) closeMessages();
+    else openMessages();
+  }
 
   const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
 
@@ -214,11 +229,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <button
               type="button"
-              onClick={() => togglePanel("messages")}
-              aria-label="Open messages"
+              onClick={toggleMessages}
+              aria-label="Toggle messages"
               className={cn(
                 "relative inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                rightPanel === "messages" && "bg-secondary text-foreground",
+                messagesVisible && "bg-secondary text-foreground",
               )}
             >
               <MessagesSquare className="size-4" />
@@ -432,6 +447,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       {showDock ? (
         <MobileDock signedIn={Boolean(user)} userInitials={userInitials} onLeave={handleLeave} />
       ) : null}
+      <InstallBanner />
 
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
