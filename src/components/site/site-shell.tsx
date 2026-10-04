@@ -571,7 +571,7 @@ function RightWorkspace({
           <X className="size-4" />
         </Button>
       </header>
-      <div className={cn("min-h-0 flex-1 overflow-y-auto p-5", bodyClassName)}>{children}</div>
+      <div data-messages-scroll className={cn("min-h-0 flex-1 overflow-y-auto p-5", bodyClassName)}>{children}</div>
     </aside>
   );
 }
