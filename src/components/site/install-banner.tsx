@@ -78,7 +78,6 @@ export function InstallBanner() {
         </div>
         <Link
           to="/download"
-          size="sm"
           className="inline-flex h-9 shrink-0 items-center rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground"
         >
           Install
