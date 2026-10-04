@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as DownloadRouteImport } from './routes/download'
 import { Route as GuidelinesRouteImport } from './routes/guidelines'
 import { Route as LeaderboardsRouteImport } from './routes/leaderboards'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -52,6 +53,11 @@ const AboutRoute = AboutRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadRoute = DownloadRouteImport.update({
+  id: '/download',
+  path: '/download',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GuidelinesRoute = GuidelinesRouteImport.update({
@@ -189,6 +195,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/download': typeof DownloadRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
   '/notifications': typeof NotificationsRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/download': typeof DownloadRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
   '/notifications': typeof NotificationsRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/download': typeof DownloadRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
   '/notifications': typeof NotificationsRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/auth'
+    | '/download'
     | '/guidelines'
     | '/leaderboards'
     | '/notifications'
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/auth'
+    | '/download'
     | '/guidelines'
     | '/leaderboards'
     | '/notifications'
@@ -345,6 +356,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/auth'
+    | '/download'
     | '/guidelines'
     | '/leaderboards'
     | '/notifications'
@@ -377,6 +389,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
+  DownloadRoute: typeof DownloadRoute
   GuidelinesRoute: typeof GuidelinesRoute
   LeaderboardsRoute: typeof LeaderboardsRoute
   NotificationsRoute: typeof NotificationsRoute
@@ -424,6 +437,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download': {
+      id: '/download'
+      path: '/download'
+      fullPath: '/download'
+      preLoaderRoute: typeof DownloadRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/guidelines': {
@@ -629,6 +649,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
+  DownloadRoute: DownloadRoute,
   GuidelinesRoute: GuidelinesRoute,
   LeaderboardsRoute: LeaderboardsRoute,
   NotificationsRoute: NotificationsRoute,

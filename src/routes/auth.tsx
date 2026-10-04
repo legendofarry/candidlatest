@@ -19,7 +19,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { getOnboardingState } from "@/lib/onboarding.functions";
-import { FloatingBackButton } from "@/components/site/floating-back-button";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -133,7 +132,6 @@ function AuthPage() {
   return (
     <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(134,239,172,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(99,102,241,0.18),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
       <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/80 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
-        <FloatingBackButton onClick={() => navigate({ to: "/" })} />
 
         <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-2">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#10251d_0%,#13212b_52%,#22271f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
