@@ -78,9 +78,15 @@ function FeedPage() {
   const needle = q.trim().toLowerCase();
   const stories = (data?.stories ?? []).filter((story) =>
     needle
-      ? [story.title, story.body, story.company_name ?? ""].join(" ").toLowerCase().includes(needle)
+      ? [story.title, story.body, story.company_name ?? "", ...((story as { reasons?: string[] }).reasons ?? [])].join(" ").toLowerCase().includes(needle)
       : true,
   );
+
+  function scrollToFeed() {
+    requestAnimationFrame(() =>
+      document.getElementById("feed")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+    );
+  }
 
   const canReset = Boolean(needle) || industry !== null || county !== null || sort !== "new";
 
@@ -111,12 +117,25 @@ function FeedPage() {
               </Button>
             </div>
           </div>
-          <CandidPulse />
+          <CandidPulse
+            onReason={(reason) => {
+              setQ(reason);
+              scrollToFeed();
+            }}
+            onStories={() => {
+              setSort("new");
+              scrollToFeed();
+            }}
+            onThisWeek={() => {
+              setSort("trending");
+              scrollToFeed();
+            }}
+          />
         </div>
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div className="min-w-0 space-y-4">
+        <div id="feed" className="min-w-0 scroll-mt-20 space-y-4">
           <FilterBar
             query={q}
             onQueryChange={setQ}

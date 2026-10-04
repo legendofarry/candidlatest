@@ -29,6 +29,8 @@ import { NotificationBanners } from "@/components/site/notification-banners";
 import { NotificationsOverlay } from "@/components/site/notifications-overlay";
 import { BadgeClaimModal } from "@/components/site/badge-claim-modal";
 import { SupportChat } from "@/components/site/support-chat";
+import { MobileDock } from "@/components/site/mobile-dock";
+
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
@@ -64,8 +66,10 @@ const exploreNav = [
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
 ] as const;
 
+const dockRoots = ["/", "/companies", "/salaries", "/profile"];
+
 function isNestedRoute(pathname: string) {
-  return !["/", "/companies", "/profile", "/salaries", "/leaderboards"].includes(pathname);
+  return !["/", "/companies", "/profile", "/salaries"].includes(pathname);
 }
 
 function nestedTitle(pathname: string) {
@@ -122,6 +126,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/settings",
     "/onboarding",
   ].includes(pathname);
+  const fullscreenRoute = ["/auth", "/onboarding"].includes(pathname);
+  const headerBack = nested && (!standaloneDesktopRoute || pathname === "/support");
 
   useEffect(() => {
     if (pathname === "/messages" || pathname === "/messages/" || routeConversationId)
@@ -165,8 +171,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     if (selectedConversationId) closeMessagePanel();
     else void navigate({ to: "/messages" });
   }
-  const togglePanel = (panel: Exclude<RightPanel, null>) =>
+  const togglePanel = (panel: Exclude<RightPanel, null>) => {
+    if (panel === "messages" && !window.matchMedia("(min-width: 768px)").matches) {
+      void navigate({ to: "/messages" });
+      return;
+    }
     setRightPanel((current) => (current === panel ? null : panel));
+  };
+
+  const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
 
   return (
     <div className="min-h-screen bg-background md:pb-6">
@@ -175,18 +188,29 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <NotificationBanners />
       <NotificationsOverlay />
       <BadgeClaimModal />
-      <SupportChat />
+      {fullscreenRoute ? null : <SupportChat raised={dockRoots.includes(pathname)} />}
       <header
         className={cn(
           "sticky top-0 z-[80] border-b border-border glass-card",
           standaloneDesktopRoute && "md:hidden",
+          fullscreenRoute && "hidden",
         )}
       >
         <div className="app-shell flex h-16 items-center gap-3">
-          <Link to="/" className="flex items-center gap-2">
-            <Flame className="size-5 text-primary" />
-            <span className="font-display text-lg font-semibold tracking-tight">Candid</span>
-          </Link>
+          {headerBack ? (
+            <div className="flex min-w-0 items-center gap-2">
+              <BackButton compact label={nestedTitle(pathname)} />
+              <span className="truncate font-display text-base font-semibold tracking-tight">
+                {nestedTitle(pathname)}
+              </span>
+            </div>
+          ) : (
+            <Link to="/" className="flex items-center gap-2">
+              <Flame className="size-5 text-primary" />
+              <span className="font-display text-lg font-semibold tracking-tight">Candid</span>
+            </Link>
+          )}
+
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <button
               type="button"
@@ -338,19 +362,16 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </aside>
         <main
           className={cn(
-            "min-w-0 pt-6 md:pb-10 md:pl-80",
-            nested ? "pb-10" : "pb-28",
+            "min-w-0 md:pb-10 md:pl-80",
+            fullscreenRoute ? "pt-0" : "pt-6",
+            showDock ? "pb-32" : "pb-10",
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
         >
-          {nested && !standaloneDesktopRoute ? (
-            <div className="mb-4">
-              <BackButton compact label={nestedTitle(pathname)} />
-            </div>
-          ) : null}
           <BiometricGate>{children}</BiometricGate>
         </main>
+
         {pathname === "/" ? (
           <footer className="border-t border-border py-10 text-sm text-muted-foreground md:ml-80">
             <div className="flex flex-wrap gap-x-6 gap-y-2">
@@ -408,26 +429,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       >
         <MessagesThread id={decodeURIComponent(activeConversationId ?? "")} inSidebar />
       </RightWorkspace>
-      <nav className="fixed inset-x-0 bottom-0 z-40 border-t border-border glass-card md:hidden">
-        <div className="grid grid-cols-2">
-          {primaryNav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                className={cn(
-                  "flex flex-col items-center gap-1 py-2.5 text-[11px] font-medium text-muted-foreground transition-colors",
-                  pathname === item.to && "text-primary",
-                )}
-              >
-                <Icon className="size-5" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </div>
-      </nav>
+      {showDock ? (
+        <MobileDock signedIn={Boolean(user)} userInitials={userInitials} onLeave={handleLeave} />
+      ) : null}
+
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>
           <AlertDialogHeader>

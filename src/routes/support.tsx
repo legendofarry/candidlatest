@@ -73,7 +73,7 @@ function SupportPage() {
   return (
     <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.18),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
       <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
-        <FloatingBackButton onClick={() => navigate({ to: "/" })} />
+        <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
 
         <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(140deg,#182c31_0%,#20272d_55%,#29251f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
