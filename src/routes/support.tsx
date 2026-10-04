@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -60,7 +60,6 @@ const faqs = [
 ];
 
 function SupportPage() {
-  const navigate = useNavigate();
   const submitTicket = useServerFn(createSupportTicket);
   const [form, setForm] = useState({ full_name: "", contact: "", category: "story", message: "" });
   const mutation = useMutation({

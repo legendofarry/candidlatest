@@ -1,9 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, MessagesSquare, Sparkles, Trash2 } from "lucide-react";
 import { getConversations } from "@/lib/messaging.functions";
+import { readInboxScroll, saveInboxScroll } from "@/lib/message-panel-state";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -53,6 +55,8 @@ export function MessagesInbox({
   const navigate = useNavigate();
   const fetchConversations = useServerFn(getConversations);
   const demo = useDemoConversation();
+  const listRef = useRef<HTMLDivElement>(null);
+  const restoredRef = useRef(false);
 
   const { data, isLoading } = useQuery({
     queryKey: ["conversations", user?.uid],
@@ -60,6 +64,34 @@ export function MessagesInbox({
     enabled: Boolean(user),
     refetchInterval: 15000,
   });
+
+  // Restore the previous inbox scroll position once the list has rendered.
+  useEffect(() => {
+    if (isLoading || restoredRef.current) return;
+    restoredRef.current = true;
+    const saved = readInboxScroll();
+    if (saved <= 0) return;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const drawer = listRef.current?.closest(
+          "[data-messages-scroll]",
+        ) as HTMLElement | null;
+        if (drawer) drawer.scrollTop = saved;
+        else window.scrollTo({ top: saved });
+      });
+    });
+  }, [isLoading]);
+
+  // Remember the inbox scroll position so reopening messages resumes where it was.
+  useEffect(() => {
+    const drawer = listRef.current?.closest(
+      "[data-messages-scroll]",
+    ) as HTMLElement | null;
+    const target: HTMLElement | Window = drawer ?? window;
+    const handler = () => saveInboxScroll(drawer ? drawer.scrollTop : window.scrollY);
+    target.addEventListener("scroll", handler, { passive: true });
+    return () => target.removeEventListener("scroll", handler);
+  }, []);
 
   const conversations = [
     ...(demo
@@ -79,7 +111,7 @@ export function MessagesInbox({
   ].sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
 
   return (
-    <div className="mx-auto max-w-2xl">
+    <div ref={listRef} className="mx-auto max-w-2xl">
       <header className="mb-6">
         <h1 className="font-display text-3xl font-semibold tracking-tight">Messages</h1>
         <p className="mt-1 text-sm text-muted-foreground">
