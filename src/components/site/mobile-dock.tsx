@@ -3,8 +3,8 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Building2,
+  Headset,
   Home,
-  LifeBuoy,
   LogOut,
   MessagesSquare,
   PenLine,
@@ -29,7 +29,7 @@ type DockSheet = "you" | null;
 const moreLinks = [
   { to: "/search", label: "Search", icon: Search, hint: "Find a story or employer" },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy, hint: "Most discussed workplaces" },
-  { to: "/support", label: "Help & support", icon: LifeBuoy, hint: "FAQs, email and WhatsApp" },
+  { to: "/support", label: "Help & support", icon: Headset, hint: "FAQs, email and WhatsApp" },
 ] as const;
 
 export function MobileDock({

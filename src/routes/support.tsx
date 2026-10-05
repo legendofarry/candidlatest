@@ -3,7 +3,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Mail, MessageCircle, Send, ShieldCheck } from "lucide-react";
+import { Headset, Mail, MessageCircle, Send, ShieldCheck } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -81,7 +81,7 @@ function SupportPage() {
               className="relative w-full max-w-xl space-y-6"
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-sky-400/30 bg-sky-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-sky-200">
-                <ShieldCheck className="size-3.5" />
+                <Headset className="size-3.5" />
                 Help desk
               </div>
               <h2 className="max-w-md text-4xl font-semibold tracking-tight text-white">
@@ -119,7 +119,7 @@ function SupportPage() {
           <div className="overflow-y-auto p-5 md:h-dvh md:min-h-0 md:p-8">
             <div className="mx-auto max-w-3xl py-10 md:py-12">
               <header className="rounded-3xl bg-secondary/70 p-7 md:p-10">
-                <ShieldCheck className="size-8 text-primary" />
+                <Headset className="size-8 text-primary" />
                 <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight md:text-4xl">
                   Help & support
                 </h1>

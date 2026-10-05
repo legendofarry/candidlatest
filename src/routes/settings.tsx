@@ -9,7 +9,7 @@ import {
   BookOpen,
   Fingerprint,
   Gauge,
-  LifeBuoy,
+  Headset,
   Moon,
   RefreshCw,
   ScrollText,
@@ -293,7 +293,7 @@ function SettingsPage() {
                 <div id="help">
                   <SettingsGroup title="Help & information">
                     <LinkRow
-                      icon={<LifeBuoy className="size-4" />}
+                      icon={<Headset className="size-4" />}
                       title="Help & support"
                       description="Get help with your account, a story or privacy."
                       to="/support"

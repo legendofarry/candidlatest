@@ -5,8 +5,8 @@ import {
   Building2,
   ChevronDown,
   Flame,
+  Headset,
   Home,
-  LifeBuoy,
   LogOut,
   MessagesSquare,
   PenLine,
@@ -312,7 +312,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 pathname === "/support" && "bg-secondary text-foreground",
               )}
             >
-              <LifeBuoy className="size-5" />
+              <Headset className="size-5" />
               Help &amp; support
             </Link>
             {user ? (
