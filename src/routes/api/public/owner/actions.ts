@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { FieldValue } from "firebase-admin/firestore";
 import { z } from "zod";
 import { readCollection, readDocument, type CommentRecord } from "@/lib/firebase-data.server";
+import { FieldValue } from "@/lib/firestore-rest.server";
 import { auditOwnerAction, getAdmin, json, verifyOwnerKey } from "@/lib/owner-api.server";
 
 const documentId = z

@@ -52,7 +52,14 @@ function leafPaths(data: DocumentData, prefix: string[] = []): string[] {
   for (const [k, v] of Object.entries(data)) {
     if (v === undefined) continue;
     const path = [...prefix, k];
-    if (v && typeof v === "object" && !Array.isArray(v) && !(v instanceof Date) && Object.keys(v).length)
+    if (
+      v &&
+      typeof v === "object" &&
+      !Array.isArray(v) &&
+      !(v instanceof Date) &&
+      !(v instanceof IncrementTransform) &&
+      Object.keys(v).length
+    )
       paths.push(...leafPaths(v, path));
     else paths.push(path.map(quote).join("."));
   }
@@ -107,6 +114,17 @@ export class QuerySnapshot {
 type Write = Record<string, unknown>;
 type SetOptions = { merge?: boolean };
 
+class IncrementTransform {
+  constructor(readonly operand: number) {}
+}
+
+/** Firestore field transforms supported by the REST client. */
+export const FieldValue = {
+  increment(operand: number) {
+    return new IncrementTransform(operand);
+  },
+};
+
 export class DocumentReference {
   constructor(
     readonly db: Firestore,
@@ -133,9 +151,29 @@ export class DocumentReference {
   }
   updateWrite(data: DocumentData): Write {
     const { nested, paths } = expandUpdate(data);
+    const fieldTransforms: Array<Record<string, unknown>> = [];
+    const transformedPaths = new Set<string>();
+    for (const [key, value] of Object.entries(data)) {
+      if (value === undefined) continue;
+      const fieldPath = key.split(".").map(quote).join(".");
+      if (value instanceof IncrementTransform) {
+        fieldTransforms.push({ fieldPath, increment: encode(value.operand) });
+        transformedPaths.add(fieldPath);
+      }
+    }
+    const updatePaths = paths.filter((path) => !transformedPaths.has(path));
+
+    if (fieldTransforms.length > 0 && updatePaths.length === 0) {
+      return {
+        transform: { document: this.name, fieldTransforms },
+        currentDocument: { exists: true },
+      };
+    }
+
     return {
       update: { name: this.name, fields: encodeFields(nested) },
-      updateMask: { fieldPaths: paths },
+      updateMask: { fieldPaths: updatePaths },
+      ...(fieldTransforms.length > 0 ? { updateTransforms: fieldTransforms } : {}),
       currentDocument: { exists: true },
     };
   }

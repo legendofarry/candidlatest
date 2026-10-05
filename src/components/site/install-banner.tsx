@@ -64,9 +64,9 @@ export function InstallBanner() {
     <div
       role="region"
       aria-label="Install the Candid app"
-      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5.75rem)] z-[70] md:hidden"
+      className="pointer-events-none fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+5rem)] z-[82] md:hidden"
     >
-      <div className="glass-card flex items-center gap-3 rounded-2xl border border-border p-3 shadow-2xl">
+      <div className="pointer-events-auto glass-card flex items-center gap-3 rounded-2xl border border-border bg-card/90 p-3 shadow-[0_18px_40px_rgba(0,0,0,0.28)] backdrop-blur-xl">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15">
           <Flame className="size-5 text-primary" />
         </span>
