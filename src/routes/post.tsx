@@ -195,7 +195,10 @@ function PostPage() {
   return (
     <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(163,230,53,0.18),_transparent_25%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
       <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
-        <FloatingBackButton onClick={() => navigate({ to: "/" })} />
+        <FloatingBackButton
+          onClick={() => navigate({ to: "/" })}
+          className="hidden md:inline-flex"
+        />
 
         <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#0f172a_0%,#111827_30%,#0f172a_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
@@ -260,7 +263,7 @@ function PostPage() {
               </header>
 
               <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="space-y-5 rounded-3xl border border-border bg-card p-6">
+                <div className="space-y-5 rounded-none border-0 bg-transparent p-0 md:rounded-3xl md:border md:border-border md:bg-card md:p-6">
                   {step === 0 ? (
                     <>
                       <div className="space-y-2">

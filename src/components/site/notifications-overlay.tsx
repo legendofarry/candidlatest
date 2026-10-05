@@ -225,7 +225,7 @@ export function NotificationsOverlay() {
         {open ? (
           <motion.div
             key="notifications-overlay"
-            className="pointer-events-none fixed inset-0 z-[90] flex flex-col pt-16 sm:pt-0 md:items-end md:justify-start md:pt-28 md:pr-6 xl:flex-row-reverse xl:items-start xl:gap-3"
+            className="pointer-events-none fixed inset-0 z-[90] flex flex-col pt-0 md:items-end md:justify-start md:pt-28 md:pr-6 xl:flex-row-reverse xl:items-start xl:gap-3"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -235,7 +235,7 @@ export function NotificationsOverlay() {
             aria-label="Notifications"
           >
             <motion.div
-              className="pointer-events-auto absolute inset-0 top-16 bg-background/75 backdrop-blur-sm sm:top-0 md:bg-background/45"
+              className="pointer-events-auto absolute inset-0 bg-background/75 backdrop-blur-sm md:bg-background/45"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -367,7 +367,7 @@ export function NotificationsOverlay() {
                           exit={{ opacity: 0, x: 24 }}
                           transition={{ duration: 0.2 }}
                         >
-                          <DetailCard notification={detail} />
+                          <DetailCard notification={detail} actions={false} />
                         </motion.div>
                       ) : (
                         <p className="py-16 text-center text-sm text-muted-foreground">

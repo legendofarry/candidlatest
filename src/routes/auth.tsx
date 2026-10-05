@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
@@ -11,7 +11,7 @@ import {
   signOut,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
-import { EyeOff, Fingerprint, Loader2, ShieldCheck } from "lucide-react";
+import { EyeOff, Fingerprint, Flame, Loader2, ShieldCheck } from "lucide-react";
 import { authenticateWithBiometric, getCredentials, markUnlocked } from "@/lib/biometrics";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { Button } from "@/components/ui/button";
@@ -19,6 +19,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { getOnboardingState } from "@/lib/onboarding.functions";
+import { useAuth } from "@/hooks/useAuth";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -43,12 +44,28 @@ export const Route = createFileRoute("/auth")({
 
 function AuthPage() {
   const navigate = useNavigate();
+  const { user, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [hasBiometric, setHasBiometric] = useState(false);
   const fetchOnboardingState = useServerFn(getOnboardingState);
+
+  useEffect(() => {
+    if (authLoading || !user) return;
+    let active = true;
+    void fetchOnboardingState()
+      .then((state) => {
+        if (active) void navigate({ to: state.needsOnboarding ? "/onboarding" : "/" });
+      })
+      .catch(() => {
+        if (active) void navigate({ to: "/onboarding" });
+      });
+    return () => {
+      active = false;
+    };
+  }, [authLoading, user, fetchOnboardingState, navigate]);
 
   /** Send people who have not claimed a username to onboarding first. */
   async function continueAfterAuth() {
@@ -63,6 +80,15 @@ function AuthPage() {
   useEffect(() => {
     setHasBiometric(getCredentials().length > 0);
   }, []);
+
+  if (authLoading || user) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-background px-6 text-sm text-muted-foreground">
+        <Loader2 className="mr-2 size-4 animate-spin" />
+        {user ? "Opening your account…" : "Checking your session…"}
+      </div>
+    );
+  }
 
   async function biometricUnlock() {
     setBusy(true);
@@ -131,8 +157,7 @@ function AuthPage() {
 
   return (
     <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(134,239,172,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(99,102,241,0.18),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
-      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/80 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
-
+      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/80 md:shadow-2xl md:backdrop-blur-xl">
         <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-2">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#10251d_0%,#13212b_52%,#22271f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
@@ -172,9 +197,21 @@ function AuthPage() {
             </motion.div>
           </div>
 
-          <div className="flex items-center justify-center p-5 md:h-dvh md:overflow-y-auto md:p-10">
+          <div className="flex items-center justify-center px-5 py-8 md:h-dvh md:overflow-y-auto md:p-10">
             <div className="w-full max-w-md animate-rise">
-              <div className="rounded-3xl border border-border bg-background/80 p-6 shadow-xl md:p-8">
+              <Link
+                to="/"
+                className="mb-8 inline-flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-foreground md:hidden"
+              >
+                <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                  <Flame className="size-5" />
+                </span>
+                Candid
+                <span className="ml-1 text-xs font-normal text-muted-foreground">
+                  · anonymous by design
+                </span>
+              </Link>
+              <div className="rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-3xl md:border md:border-border md:bg-background/80 md:p-8 md:shadow-xl">
                 <div className="flex items-center gap-2 text-primary">
                   <EyeOff className="size-5" />
                   <span className="text-xs font-semibold uppercase tracking-wider">
@@ -281,7 +318,7 @@ function AuthPage() {
                     : "Already have an account? Sign in"}
                 </button>
 
-                <p className="mt-6 flex items-start gap-2 rounded-xl bg-secondary/60 p-3 text-xs text-muted-foreground">
+                <p className="mt-6 flex items-start gap-2 border-l-2 border-primary/40 py-1 pl-3 text-xs text-muted-foreground md:rounded-xl md:border-0 md:bg-secondary/60 md:p-3">
                   <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verified" />
                   Use a personal email, not your work email. We never publish emails, and employers
                   cannot see who posted.

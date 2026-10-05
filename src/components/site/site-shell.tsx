@@ -32,7 +32,11 @@ import { SupportChat } from "@/components/site/support-chat";
 import { MobileDock } from "@/components/site/mobile-dock";
 import { InstallBanner } from "@/components/site/install-banner";
 
-import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
+import {
+  toggleNotifications,
+  useNotificationsOverlay,
+  useUnreadCount,
+} from "@/lib/notifications-store";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
@@ -85,6 +89,8 @@ function nestedTitle(pathname: string) {
       "/search": "Search",
       "/post": "Post a story",
       "/support": "Help & support",
+      "/settings": "Settings",
+      "/profile": "Your profile",
       "/about": "About Candid",
       "/guidelines": "Community guidelines",
       "/rights": "Safety & your rights",
@@ -105,8 +111,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const lastConversationId = useLastConversationId();
   const activeConversationId = selectedConversationId ?? routeConversationId;
   const unread = useUnreadCount();
+  const { open: notificationsOpen } = useNotificationsOverlay();
   const [messagesOpen, setMessagesOpen] = useState(false);
-  const onMessagesRoute = pathname === "/messages" || pathname === "/messages/" || Boolean(routeConversationId);
+  const onMessagesRoute =
+    pathname === "/messages" || pathname === "/messages/" || Boolean(routeConversationId);
   const messagesVisible = messagesOpen || Boolean(activeConversationId) || onMessagesRoute;
   const messagePanelOpen = messagesVisible;
   const returnPathRef = useRef("/");
@@ -132,7 +140,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/onboarding",
   ].includes(pathname);
   const fullscreenRoute = ["/auth", "/onboarding", "/download"].includes(pathname);
-  const headerBack = nested && (!standaloneDesktopRoute || pathname === "/support");
+  const headerBack =
+    (nested && (!standaloneDesktopRoute || pathname === "/support" || pathname === "/settings")) ||
+    pathname === "/profile" ||
+    pathname === "/post";
 
   useEffect(() => {
     if (onMessagesRoute) {
@@ -203,7 +214,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <NotificationBanners />
       <NotificationsOverlay />
       <BadgeClaimModal />
-      {fullscreenRoute ? null : <SupportChat raised={dockRoots.includes(pathname)} />}
+      {fullscreenRoute ? null : (
+        <SupportChat
+          raised={dockRoots.includes(pathname)}
+          mobileVisible={
+            !notificationsOpen &&
+            (pathname === "/" || pathname === "/profile" || pathname === "/settings")
+          }
+        />
+      )}
       <header
         className={cn(
           "sticky top-0 z-[80] border-b border-border glass-card",
@@ -571,7 +590,9 @@ function RightWorkspace({
           <X className="size-4" />
         </Button>
       </header>
-      <div data-messages-scroll className={cn("min-h-0 flex-1 overflow-y-auto p-5", bodyClassName)}>{children}</div>
+      <div data-messages-scroll className={cn("min-h-0 flex-1 overflow-y-auto p-5", bodyClassName)}>
+        {children}
+      </div>
     </aside>
   );
 }

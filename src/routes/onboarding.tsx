@@ -220,7 +220,7 @@ function OnboardingPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="glass-card rounded-2xl border border-border p-5"
+              className="rounded-none border-0 bg-transparent p-0 md:glass-card md:rounded-2xl md:border md:border-border md:p-5"
             >
               <Label htmlFor="username" className="text-xs uppercase tracking-wider">
                 Username
@@ -332,7 +332,7 @@ function OnboardingPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="glass-card rounded-2xl border border-border p-5"
+              className="rounded-none border-0 bg-transparent p-0 md:glass-card md:rounded-2xl md:border md:border-border md:p-5"
             >
               <div className="space-y-3">
                 {SOCIAL_FIELDS.map((field, index) => (

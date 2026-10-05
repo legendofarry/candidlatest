@@ -84,7 +84,7 @@ function SettingsPage() {
 
   return (
     <div className="min-h-screen bg-background md:h-dvh md:overflow-hidden">
-      <FloatingBackButton onClick={() => navigate({ to: "/" })} />
+      <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
       <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[minmax(280px,0.86fr)_1.14fr]">
         <section className="relative hidden min-h-screen overflow-hidden bg-[#132523] px-7 py-16 text-white md:flex md:h-dvh md:items-center lg:px-12 lg:py-24">
           <div className="absolute inset-0 bg-[linear-gradient(145deg,#182c28_0%,#17212c_55%,#29271d_100%)]" />

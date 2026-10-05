@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { Flame, PenLine, ShieldCheck, TrendingUp } from "lucide-react";
+import { Activity, Flame, PenLine, ShieldCheck, TrendingUp } from "lucide-react";
 import { getFilterOptions, listStories } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
 import type { PublicStory } from "@/components/site/story-card";
@@ -12,6 +12,13 @@ import { FilterBar } from "@/components/site/filter-bar";
 import { CandidPulse } from "@/components/site/candid-pulse";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 
 const feedQuery = queryOptions({
   queryKey: ["stories", "new"],
@@ -62,6 +69,7 @@ function FeedPage() {
   const [county, setCounty] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [activeDiscussion, setActiveDiscussion] = useState<PublicStory | null>(null);
+  const [pulseSheetOpen, setPulseSheetOpen] = useState(false);
 
   /**
    * The unfiltered view reuses the data the loader already fetched, so the
@@ -78,7 +86,15 @@ function FeedPage() {
   const needle = q.trim().toLowerCase();
   const stories = (data?.stories ?? []).filter((story) =>
     needle
-      ? [story.title, story.body, story.company_name ?? "", ...((story as { reasons?: string[] }).reasons ?? [])].join(" ").toLowerCase().includes(needle)
+      ? [
+          story.title,
+          story.body,
+          story.company_name ?? "",
+          ...((story as { reasons?: string[] }).reasons ?? []),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle)
       : true,
   );
 
@@ -91,48 +107,95 @@ function FeedPage() {
   const canReset = Boolean(needle) || industry !== null || county !== null || sort !== "new";
 
   return (
-    <div className="space-y-8">
-      <section className="mesh-hero animate-fade relative overflow-hidden rounded-3xl border border-border p-6 md:p-12">
-        <div className="grid items-center gap-10 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
+    <div className="space-y-5 md:space-y-8">
+      <section className="mesh-hero animate-fade relative overflow-hidden rounded-3xl border border-border p-5 sm:p-6 md:p-12">
+        <div className="grid items-center gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
           <div>
-            <p className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs font-medium text-muted-foreground">
+            <p className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground sm:text-xs">
               <ShieldCheck className="size-3.5 text-verified" /> Anonymous by design · Kenya
             </p>
-            <h1 className="mt-4 max-w-3xl text-4xl font-semibold leading-[1.05] md:text-6xl">
+            <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-[1.05] sm:mt-4 sm:text-4xl md:text-6xl">
               The <span className="text-gradient">real reasons</span> Kenyans left their jobs.
             </h1>
-            <p className="mt-4 max-w-2xl text-muted-foreground md:text-lg">
+            <p className="mt-3 line-clamp-2 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:line-clamp-none sm:text-base md:text-lg">
               Exit stories, red-flag scores and salary honesty for employers across Nairobi,
               Mombasa, Kisumu and beyond. Research a company before you sign — or tell the story
               nobody let you tell at your exit interview.
             </p>
-            <div className="mt-6 flex flex-wrap gap-3">
+            <div className="mt-4 flex flex-wrap gap-3 sm:mt-6">
               <Button asChild size="lg" className="glow-primary">
                 <Link to="/post">
                   <PenLine className="size-4" /> Share your exit story
                 </Link>
               </Button>
-              <Button asChild size="lg" variant="outline">
+              <Button asChild size="lg" variant="outline" className="hidden sm:inline-flex">
                 <Link to="/companies">Browse companies</Link>
               </Button>
             </div>
           </div>
+          <div className="hidden lg:block">
+            <CandidPulse
+              onReason={(reason) => {
+                setQ(reason);
+                scrollToFeed();
+              }}
+              onStories={() => {
+                setSort("new");
+                scrollToFeed();
+              }}
+              onThisWeek={() => {
+                setSort("trending");
+                scrollToFeed();
+              }}
+            />
+          </div>
+        </div>
+      </section>
+
+      <button
+        type="button"
+        onClick={() => setPulseSheetOpen(true)}
+        className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card/75 px-4 py-3 text-left shadow-sm transition-colors hover:bg-card lg:hidden"
+      >
+        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+          <Activity className="size-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold">Candid Pulse</span>
+          <span className="block truncate text-xs text-muted-foreground">
+            Live workplace signals from across Kenya
+          </span>
+        </span>
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <span className="size-2 animate-pulse rounded-full bg-primary" /> Live
+        </span>
+      </button>
+
+      <Drawer open={pulseSheetOpen} onOpenChange={setPulseSheetOpen}>
+        <DrawerContent className="max-h-[82dvh] overflow-y-auto rounded-t-[2rem] border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:hidden">
+          <DrawerHeader className="px-1 pb-4 text-left">
+            <DrawerTitle>Candid Pulse</DrawerTitle>
+            <DrawerDescription>Live workplace signals from across Kenya.</DrawerDescription>
+          </DrawerHeader>
           <CandidPulse
             onReason={(reason) => {
               setQ(reason);
+              setPulseSheetOpen(false);
               scrollToFeed();
             }}
             onStories={() => {
               setSort("new");
+              setPulseSheetOpen(false);
               scrollToFeed();
             }}
             onThisWeek={() => {
               setSort("trending");
+              setPulseSheetOpen(false);
               scrollToFeed();
             }}
           />
-        </div>
-      </section>
+        </DrawerContent>
+      </Drawer>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
         <div id="feed" className="min-w-0 scroll-mt-20 space-y-4">

@@ -14,7 +14,13 @@ const quickPrompts = [
   "I have a privacy question",
 ];
 
-export function SupportChat({ raised = false }: { raised?: boolean }) {
+export function SupportChat({
+  raised = false,
+  mobileVisible = true,
+}: {
+  raised?: boolean;
+  mobileVisible?: boolean;
+}) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -50,6 +56,7 @@ export function SupportChat({ raised = false }: { raised?: boolean }) {
     <div
       className={[
         "pointer-events-none fixed right-4 z-[95] sm:right-6",
+        !mobileVisible && "hidden md:block",
         raised
           ? "bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] md:bottom-6"
           : "bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] md:bottom-6",
@@ -101,7 +108,10 @@ export function SupportChat({ raised = false }: { raised?: boolean }) {
               <p className="mx-auto mt-2 max-w-xs text-sm leading-6 text-muted-foreground">
                 Sign in to start a private conversation with the Candid team.
               </p>
-              <Button asChild className="mx-auto mt-6 h-11 rounded-2xl px-6 shadow-lg shadow-primary/15">
+              <Button
+                asChild
+                className="mx-auto mt-6 h-11 rounded-2xl px-6 shadow-lg shadow-primary/15"
+              >
                 <Link to="/auth" onClick={() => setOpen(false)}>
                   Sign in
                 </Link>
@@ -156,8 +166,8 @@ export function SupportChat({ raised = false }: { raised?: boolean }) {
                     </div>
                     <p className="text-sm font-semibold">Your conversation starts here</p>
                     <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
-                      Tell us what you need. This private chat is only visible to you and the
-                      Candid team.
+                      Tell us what you need. This private chat is only visible to you and the Candid
+                      team.
                     </p>
                   </div>
                 ) : null}

@@ -71,7 +71,6 @@ function SupportPage() {
   return (
     <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.18),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
       <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
-
         <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(140deg,#182c31_0%,#20272d_55%,#29251f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
@@ -163,7 +162,7 @@ function SupportPage() {
                   <h2 className="mt-3 font-semibold">WhatsApp</h2>
                 </a>
               </section>
-              <section className="mt-8 rounded-3xl border border-border bg-card p-5 md:p-7">
+              <section className="mt-8 border-0 bg-transparent p-0 md:rounded-3xl md:border md:border-border md:bg-card md:p-7">
                 <h2 className="font-display text-2xl font-semibold">Send a support ticket</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   No account needed. We’ll use your contact details only to respond to this request.
