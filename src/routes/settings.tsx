@@ -154,7 +154,7 @@ function SettingsPage() {
           </div>
         </section>
 
-        <section className="min-h-screen overflow-y-auto px-5 pb-12 pt-24 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
+        <section className="min-h-screen overflow-y-auto px-5 pb-12 pt-5 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -499,7 +499,7 @@ function SettingsGroup({ title, children }: { title: string; children: React.Rea
   return (
     <section className="space-y-2">
       <h3 className="px-1 text-xs font-semibold uppercase text-muted-foreground">{title}</h3>
-      <div className="divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+      <div className="divide-y divide-border border-y border-border bg-transparent md:overflow-hidden md:rounded-lg md:border md:bg-card">
         {children}
       </div>
     </section>

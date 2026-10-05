@@ -175,7 +175,7 @@ function ProfilePage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.06, ease: "easeOut" }}
-              className="glass-card rounded-2xl border border-border p-5 md:p-6"
+              className="border-b border-border pb-5 md:glass-card md:rounded-2xl md:border md:border-border md:p-6"
             >
               <div className="flex items-center gap-4">
                 <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary md:size-16">
@@ -223,7 +223,7 @@ function ProfilePage() {
                 </div>
               ) : null}
               {verification.data?.canClaim ? (
-                <div className="mt-4 flex flex-wrap items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 p-3">
+                <div className="mt-4 flex flex-wrap items-center gap-3 border-l-2 border-primary/40 py-2 pl-3 md:rounded-xl md:border md:border-primary/30 md:bg-primary/5 md:p-3">
                   <BadgeCheck className="size-5 shrink-0 text-primary" />
                   <p className="min-w-0 flex-1 text-xs text-muted-foreground">
                     {verification.data.companyName
@@ -236,7 +236,7 @@ function ProfilePage() {
                   </Button>
                 </div>
               ) : null}
-              <div className="mt-5 flex items-start gap-3 rounded-xl border border-verified/15 bg-verified/5 p-4">
+              <div className="mt-4 flex items-start gap-3 border-l-2 border-verified/35 py-2 pl-3 md:mt-5 md:rounded-xl md:border md:border-verified/15 md:bg-verified/5 md:p-4">
                 <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verified" />
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   Your email is only used to sign in. Stories, votes and comments appear under an
@@ -280,12 +280,12 @@ function ProfilePage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.18, ease: "easeOut" }}
-              className="grid gap-3 sm:grid-cols-2"
+              className="grid divide-y divide-border sm:grid-cols-2 sm:gap-3 sm:divide-y-0"
             >
               <Button
                 asChild
                 variant="outline"
-                className="h-auto min-h-16 justify-between rounded-xl px-4 py-3 text-left"
+                className="h-auto min-h-14 justify-between rounded-none border-0 bg-transparent px-0 py-3 text-left shadow-none hover:bg-secondary/30 md:min-h-16 md:rounded-xl md:border md:bg-background md:px-4"
               >
                 <Link to="/settings">
                   <span className="flex min-w-0 items-center gap-3">
@@ -306,7 +306,7 @@ function ProfilePage() {
               {user ? (
                 <Button
                   variant="outline"
-                  className="h-auto min-h-16 justify-start gap-3 rounded-xl border-danger/20 px-4 py-3 text-left text-danger hover:bg-danger/5 hover:text-danger"
+                  className="h-auto min-h-14 justify-start gap-3 rounded-none border-0 bg-transparent px-0 py-3 text-left text-danger shadow-none hover:bg-danger/5 hover:text-danger md:min-h-16 md:rounded-xl md:border md:border-danger/20 md:bg-background md:px-4"
                   onClick={() => setConfirmSignOut(true)}
                 >
                   <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-danger/10">
@@ -356,7 +356,7 @@ function SettingsGroup({ title, children }: { title: string; children: React.Rea
       <h2 className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {title}
       </h2>
-      <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
+      <div className="divide-y divide-border border-y border-border bg-transparent md:overflow-hidden md:rounded-2xl md:border md:bg-card">
         {children}
       </div>
     </section>

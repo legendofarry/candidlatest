@@ -58,7 +58,7 @@ export function FollowedStories() {
   const list = stories.data ?? [];
 
   return (
-    <section className="glass-card animate-rise rounded-2xl border border-border p-5 md:p-6">
+    <section className="animate-rise border-b border-border pb-5 md:glass-card md:rounded-2xl md:border md:border-border md:p-6">
       <div className="flex items-center gap-3">
         <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Bookmark className="size-5" />
@@ -71,7 +71,7 @@ export function FollowedStories() {
         </div>
       </div>
 
-      <div className="mt-5 grid grid-cols-3 gap-2">
+      <div className="mt-5 grid grid-cols-3 divide-x divide-border md:gap-2 md:divide-x-0">
         <FollowMetric label="Followers" value={stats.data?.followers ?? 0} />
         <FollowMetric label="Following" value={stats.data?.following ?? 0} />
         <FollowMetric label="Stories" value={list.length} />
@@ -79,11 +79,11 @@ export function FollowedStories() {
 
       <ul className="mt-4 space-y-2.5">
         {stories.isPending ? (
-          <li className="rounded-xl border border-border bg-card/50 px-4 py-3 text-sm text-muted-foreground">
+          <li className="border-b border-border px-2 py-3 text-sm text-muted-foreground md:rounded-xl md:border md:bg-card/50 md:px-4">
             Loading followed stories…
           </li>
         ) : list.length === 0 ? (
-          <li className="flex flex-wrap items-center gap-3 rounded-xl border border-dashed border-border bg-secondary/30 p-4">
+          <li className="flex flex-wrap items-center gap-3 border-l-2 border-dashed border-border py-3 pl-3 md:rounded-xl md:border md:bg-secondary/30 md:p-4">
             <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background text-muted-foreground">
               <Bookmark className="size-4" />
             </div>
@@ -107,7 +107,7 @@ export function FollowedStories() {
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25, delay: index * 0.04 }}
-            className="rounded-xl border border-border bg-card/60 p-3 transition-colors hover:bg-secondary/40"
+            className="border-b border-border py-3 transition-colors md:rounded-xl md:border md:bg-card/60 md:p-3 md:hover:bg-secondary/40"
           >
             <div className="flex items-start gap-3">
               <div className="min-w-0 flex-1">
@@ -161,7 +161,7 @@ export function FollowedStories() {
 
 function FollowMetric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-xl border border-border/70 bg-secondary/35 px-3 py-2.5">
+    <div className="px-2 py-2.5 text-center md:rounded-xl md:border md:border-border/70 md:bg-secondary/35 md:px-3">
       <p className="text-xl font-semibold tabular-nums">{value}</p>
       <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{label}</p>
     </div>

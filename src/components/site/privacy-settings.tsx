@@ -48,7 +48,7 @@ export function PrivacySettings() {
       <h2 className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Privacy & messages
       </h2>
-      <div className="space-y-4 rounded-2xl border border-border bg-card p-4">
+      <div className="space-y-4 border-y border-border bg-transparent py-4 md:rounded-2xl md:border md:bg-card md:p-4">
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
             <MessageSquareLock className="size-4" />
@@ -61,7 +61,7 @@ export function PrivacySettings() {
           </div>
         </div>
 
-        <div className="grid gap-2 sm:grid-cols-3">
+        <div className="grid gap-0 md:grid-cols-3 md:gap-2">
           {OPTIONS.map((option) => {
             const active = (data?.who_can_message ?? "everyone") === option.value;
             return (
@@ -71,10 +71,10 @@ export function PrivacySettings() {
                 disabled={isLoading}
                 onClick={() => void choose(option.value)}
                 className={cn(
-                  "rounded-xl border p-3 text-left transition-all duration-300 hover:-translate-y-0.5",
+                  "rounded-none border-0 border-b border-l-2 border-l-transparent px-2 py-3 text-left transition-colors md:rounded-xl md:border md:p-3 md:transition-all md:duration-300 md:hover:-translate-y-0.5",
                   active
-                    ? "border-primary bg-primary/10 shadow-[0_0_0_1px_hsl(var(--primary)/0.35)]"
-                    : "border-border bg-background hover:bg-secondary",
+                    ? "border-l-primary bg-primary/5 md:border-primary md:bg-primary/10 md:shadow-[0_0_0_1px_hsl(var(--primary)/0.35)]"
+                    : "bg-transparent hover:bg-secondary md:border-border md:bg-background",
                 )}
               >
                 <span className="flex items-center gap-1.5 text-sm font-medium">
@@ -99,7 +99,7 @@ export function PrivacySettings() {
                     initial={{ opacity: 0, y: 6 }}
                     animate={{ opacity: 1, y: 0 }}
                     exit={{ opacity: 0, height: 0 }}
-                    className="flex items-center justify-between rounded-xl border border-border px-3 py-2"
+                    className="flex items-center justify-between border-b border-border px-2 py-2 md:rounded-xl md:border md:px-3"
                   >
                     <span className="flex items-center gap-1.5 text-sm">
                       <Ban className="size-3.5 text-muted-foreground" /> @{account.username}

@@ -1,9 +1,11 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Building2, Search } from "lucide-react";
 import { listCompanyScores } from "@/lib/public.functions";
 import { FilterBar } from "@/components/site/filter-bar";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 
 const companiesQuery = queryOptions({
   queryKey: ["company-scores"],
@@ -55,6 +57,12 @@ function CompaniesPage() {
     });
   }, [data.companies, q, industry, sort]);
 
+  function resetFilters() {
+    setQ("");
+    setIndustry(null);
+    setSort("discussed");
+  }
+
   return (
     <div className="space-y-6">
       <header>
@@ -70,11 +78,7 @@ function CompaniesPage() {
         onQueryChange={setQ}
         placeholder="Search employers…"
         canReset={Boolean(q) || industry !== null || sort !== "discussed"}
-        onReset={() => {
-          setQ("");
-          setIndustry(null);
-          setSort("discussed");
-        }}
+        onReset={resetFilters}
         filters={[
           {
             id: "sort",
@@ -96,37 +100,74 @@ function CompaniesPage() {
         ]}
       />
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-        {rows.map((company, index) => (
-          <Link
-            key={company.company_id}
-            to="/companies/$slug"
-            params={{ slug: company.slug ?? "" }}
-            className="animate-rise rounded-2xl border border-border bg-card p-5 transition-transform hover:-translate-y-0.5"
-            style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">{company.name}</h2>
-                <p className="text-xs text-muted-foreground">
-                  {company.industry} · {company.county}
-                </p>
+      {rows.length === 0 ? (
+        <section className="border-y border-border py-10 text-center sm:py-14">
+          <span className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            {data.companies.length === 0 ? (
+              <Building2 className="size-6" />
+            ) : (
+              <Search className="size-6" />
+            )}
+          </span>
+          <h2 className="mt-4 text-lg font-semibold">
+            {data.companies.length === 0
+              ? "The directory is just getting started"
+              : "No employers match"}
+          </h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+            {data.companies.length === 0
+              ? "Employers will appear here as workers share stories. Be the first to add one."
+              : "Try a different search or clear your filters to see more companies."}
+          </p>
+          {data.companies.length === 0 ? (
+            <Button asChild size="sm" className="mt-5">
+              <Link to="/post">Share the first story</Link>
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="mt-5"
+              onClick={resetFilters}
+            >
+              Clear search and filters
+            </Button>
+          )}
+        </section>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {rows.map((company, index) => (
+            <Link
+              key={company.company_id}
+              to="/companies/$slug"
+              params={{ slug: company.slug ?? "" }}
+              className="animate-rise rounded-2xl border border-border bg-card p-5 transition-transform hover:-translate-y-0.5"
+              style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-semibold">{company.name}</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {company.industry} · {company.county}
+                  </p>
+                </div>
+                <ScoreBadge value={company.overall} />
               </div>
-              <ScoreBadge value={company.overall} />
-            </div>
-            {company.descriptor ? (
-              <p className="mt-3 text-sm text-muted-foreground">{company.descriptor}</p>
-            ) : null}
-            <p className="mt-3 text-xs text-muted-foreground">
-              {Number(company.story_count ?? 0)} stories · {Number(company.rating_count ?? 0)}{" "}
-              ratings
-              {company.would_work_again_pct !== null
-                ? ` · ${Math.round(Number(company.would_work_again_pct))}% would work here again`
-                : ""}
-            </p>
-          </Link>
-        ))}
-      </div>
+              {company.descriptor ? (
+                <p className="mt-3 text-sm text-muted-foreground">{company.descriptor}</p>
+              ) : null}
+              <p className="mt-3 text-xs text-muted-foreground">
+                {Number(company.story_count ?? 0)} stories · {Number(company.rating_count ?? 0)}{" "}
+                ratings
+                {company.would_work_again_pct !== null
+                  ? ` · ${Math.round(Number(company.would_work_again_pct))}% would work here again`
+                  : ""}
+              </p>
+            </Link>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
