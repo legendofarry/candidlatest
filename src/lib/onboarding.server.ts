@@ -134,6 +134,74 @@ export async function readProfile(userId: string): Promise<OnboardingProfile | n
   return snap.data() as OnboardingProfile;
 }
 
+/** Saves only the Cloudinary delivery URL; image bytes never enter Firestore. */
+export async function saveProfilePhoto(userId: string, photoUrl: string) {
+  const url = new URL(photoUrl);
+  if (url.protocol !== "https:" || url.hostname !== "res.cloudinary.com") {
+    throw new Error("Choose a valid Cloudinary image.");
+  }
+  const db = getFirestoreDb();
+  await db
+    .collection("profiles")
+    .doc(userId)
+    .set(
+      { id: userId, photo_url: url.toString(), updated_at: new Date().toISOString() },
+      { merge: true },
+    );
+  return { photoUrl: url.toString() };
+}
+
+export async function changeUsername(userId: string, rawUsername: string) {
+  const username = normalizeUsername(rawUsername);
+  const validity = validateUsername(username);
+  if (!validity.ok) return { ok: false as const, reason: validity.reason ?? "Invalid username" };
+  const db = getFirestoreDb();
+  const profileRef = db.collection("profiles").doc(userId);
+  const usernameRef = db.collection("usernames").doc(username);
+  const now = new Date();
+  const nowIso = now.toISOString();
+  try {
+    await db.runTransaction(async (tx) => {
+      const profileSnap = await tx.get(profileRef);
+      const usernameSnap = await tx.get(usernameRef);
+      const profile = profileSnap.data() as OnboardingProfile | undefined;
+      const oldUsername = profile?.username ?? null;
+      if (!oldUsername) throw new Error("Claim a username before changing it.");
+      if (oldUsername === username) throw new Error("Choose a different username.");
+      const changedAt = profile?.username_changed_at;
+      if (changedAt) {
+        const nextChangeAt = Date.parse(changedAt) + 14 * 24 * 60 * 60 * 1000;
+        if (Number.isFinite(nextChangeAt) && now.getTime() < nextChangeAt) {
+          throw new Error(
+            `You can change your username again on ${new Date(nextChangeAt).toLocaleDateString("en-KE")}.`,
+          );
+        }
+      }
+      const ownerId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
+      if (usernameSnap.exists && ownerId !== userId) throw new Error("TAKEN");
+      tx.delete(db.collection("usernames").doc(oldUsername));
+      tx.set(usernameRef, { username, user_id: userId, created_at: nowIso });
+      tx.set(
+        profileRef,
+        { username, handle: username, username_changed_at: nowIso },
+        { merge: true },
+      );
+    });
+  } catch (error) {
+    if (error instanceof Error && error.message === "TAKEN") {
+      return { ok: false as const, reason: "Already taken — pick another." };
+    }
+    if (
+      error instanceof Error &&
+      /Claim a username|Choose a different|change your username/.test(error.message)
+    ) {
+      return { ok: false as const, reason: error.message };
+    }
+    throw error;
+  }
+  return { ok: true as const, username, changedAt: nowIso };
+}
+
 export async function claimUsername(
   userId: string,
   rawUsername: string,

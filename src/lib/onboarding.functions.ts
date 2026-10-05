@@ -21,6 +21,8 @@ export const getOnboardingState = createServerFn({ method: "POST" })
     return {
       needsOnboarding: !profile?.username,
       username: profile?.username ?? null,
+      photoUrl: profile?.photo_url ?? null,
+      usernameChangedAt: profile?.username_changed_at ?? null,
       socials: profile?.socials ?? null,
       accountType: profile?.account_type ?? "unknown",
     };
@@ -52,6 +54,24 @@ export const completeOnboarding = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { claimUsername } = await import("./onboarding.server");
     return claimUsername(context.userId, data.username, data.socials);
+  });
+
+export const saveMyProfilePhoto = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ photoUrl: z.string().url().max(2048) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { saveProfilePhoto } = await import("./onboarding.server");
+    return saveProfilePhoto(context.userId, data.photoUrl);
+  });
+
+export const updateMyUsername = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ username: z.string().max(40) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { changeUsername } = await import("./onboarding.server");
+    return changeUsername(context.userId, data.username);
   });
 
 /**

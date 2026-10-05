@@ -88,6 +88,7 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [redirectCheckComplete, setRedirectCheckComplete] = useState(false);
   const [hasBiometric, setHasBiometric] = useState(false);
   const fetchOnboardingState = useServerFn(getOnboardingState);
 
@@ -105,6 +106,9 @@ function AuthPage() {
       .catch((error) => {
         if (!active) return;
         toast.error(authErrorMessage(error));
+      })
+      .finally(() => {
+        if (active) setRedirectCheckComplete(true);
       });
     return () => {
       active = false;
@@ -112,7 +116,7 @@ function AuthPage() {
   }, []);
 
   useEffect(() => {
-    if (authLoading || !user) return;
+    if (authLoading || !redirectCheckComplete || !user) return;
     let active = true;
     void fetchOnboardingState()
       .then((state) => {
@@ -124,13 +128,13 @@ function AuthPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, user, fetchOnboardingState, navigate]);
+  }, [authLoading, redirectCheckComplete, user, fetchOnboardingState, navigate]);
 
   useEffect(() => {
     setHasBiometric(getCredentials().length > 0);
   }, []);
 
-  if (authLoading || user) {
+  if (authLoading || !redirectCheckComplete || user) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background px-6 text-sm text-muted-foreground">
         <Loader2 className="mr-2 size-4 animate-spin" />
@@ -219,7 +223,7 @@ function AuthPage() {
   return (
     <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(134,239,172,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(99,102,241,0.18),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
       <div className="relative min-h-screen w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/80 md:shadow-2xl md:backdrop-blur-xl">
-        <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-2">
+        <div className="grid min-h-dvh md:h-dvh md:min-h-0 md:grid-cols-2">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#10251d_0%,#13212b_52%,#22271f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
@@ -258,11 +262,11 @@ function AuthPage() {
             </motion.div>
           </div>
 
-          <div className="flex items-center justify-center px-5 py-8 md:h-dvh md:overflow-y-auto md:p-10">
+          <div className="flex items-start justify-center px-5 pb-8 pt-4 md:h-dvh md:items-center md:overflow-y-auto md:p-10">
             <div className="w-full max-w-md animate-rise">
               <Link
                 to="/"
-                className="mb-8 inline-flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-foreground md:hidden"
+                className="mb-5 inline-flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-foreground md:mb-8 md:hidden"
               >
                 <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/15 text-primary">
                   <Flame className="size-5" />
@@ -282,13 +286,13 @@ function AuthPage() {
                 <h1 className="mt-3 text-2xl font-semibold">
                   {mode === "signin" ? "Sign in" : "Create an account"}
                 </h1>
-                <p className="mt-2 text-sm text-muted-foreground">
+                <p className="mt-2 hidden text-sm text-muted-foreground sm:block">
                   Accounts stop spam and duplicate votes. Stories are shown under a random handle —
                   never your email or name.
                 </p>
 
-                <form onSubmit={submit} className="mt-6 space-y-4">
-                  <div className="space-y-2">
+                <form onSubmit={submit} className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
+                  <div className="space-y-1.5 sm:space-y-2">
                     <Label htmlFor="email">Email</Label>
                     <Input
                       id="email"
@@ -300,7 +304,7 @@ function AuthPage() {
                       placeholder="you@example.com"
                     />
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-1.5 sm:space-y-2">
                     <Label htmlFor="password">Password</Label>
                     <Input
                       id="password"
@@ -329,7 +333,7 @@ function AuthPage() {
                   </Button>
                 </form>
 
-                <div className="my-5 flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted-foreground">
+                <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted-foreground sm:my-5">
                   <span className="h-px flex-1 bg-border" />
                   or
                   <span className="h-px flex-1 bg-border" />
@@ -375,22 +379,22 @@ function AuthPage() {
                   </svg>
                   Continue with Google
                 </Button>
-                <p className="mt-2 text-center text-xs text-muted-foreground">
-                  Google can create an account or sign in. Connect both methods in Settings to
-                  switch between them.
+                <p className="mt-2 text-center text-[11px] text-muted-foreground">
+                  Google creates an account or signs you in. You can connect email later in
+                  Settings.
                 </p>
 
                 <button
                   type="button"
                   onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-                  className="mt-4 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
                 >
                   {mode === "signin"
                     ? "New here? Create an account"
                     : "Already have an account? Sign in"}
                 </button>
 
-                <p className="mt-6 flex items-start gap-2 border-l-2 border-primary/40 py-1 pl-3 text-xs text-muted-foreground md:rounded-xl md:border-0 md:bg-secondary/60 md:p-3">
+                <p className="mt-4 flex items-start gap-2 border-l-2 border-primary/40 py-1 pl-3 text-[11px] text-muted-foreground sm:text-xs md:mt-6 md:rounded-xl md:border-0 md:bg-secondary/60 md:p-3">
                   <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verified" />
                   Use a personal email, not your work email. We never publish emails, and employers
                   cannot see who posted.

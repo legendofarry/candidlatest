@@ -42,10 +42,12 @@ export function SupportChat({
     },
   });
 
-  useEffect(
-    () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
-    [chat.data?.messages.length, open],
-  );
+  useEffect(() => {
+    const bottom = bottomRef.current;
+    if (typeof bottom?.scrollIntoView === "function") {
+      bottom.scrollIntoView({ behavior: "smooth", block: "end" });
+    }
+  }, [chat.data?.messages.length, open]);
 
   function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -159,7 +161,26 @@ export function SupportChat({
                     Connecting to support…
                   </div>
                 ) : null}
-                {chat.data?.messages.length === 0 ? (
+                {chat.isError ? (
+                  <div
+                    role="status"
+                    className="rounded-2xl border border-destructive/25 bg-destructive/5 p-4 text-sm"
+                  >
+                    <p className="font-medium">Support chat could not load.</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Check your connection and try again.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="mt-3"
+                      onClick={() => void chat.refetch()}
+                    >
+                      Try again
+                    </Button>
+                  </div>
+                ) : null}
+                {chat.data?.messages?.length === 0 ? (
                   <div className="mx-auto mt-4 max-w-sm rounded-[24px] border border-border/70 bg-card/75 p-5 text-center shadow-sm backdrop-blur-sm">
                     <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                       <Sparkles className="size-4" />
@@ -171,7 +192,7 @@ export function SupportChat({
                     </p>
                   </div>
                 ) : null}
-                {chat.data?.messages.map((message: any) => (
+                {chat.data?.messages?.map((message: any) => (
                   <div
                     key={message.id}
                     className={

@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/site/profile-photo";
 
 export const Route = createFileRoute("/u/$username")({
   head: ({ params }) => {
@@ -114,9 +115,11 @@ function PublicProfilePage() {
       >
         <div className="pointer-events-none absolute -right-16 -top-16 size-48 rounded-full bg-primary/20 blur-3xl" />
         <div className="flex items-center gap-4">
-          <span className="flex size-16 items-center justify-center rounded-2xl bg-secondary text-2xl font-semibold uppercase">
-            {profile.username.slice(0, 2)}
-          </span>
+          <ProfileAvatar
+            photoUrl={profile.photo_url}
+            initials={profile.username.slice(0, 2)}
+            className="size-16 rounded-2xl text-2xl uppercase"
+          />
           <div className="min-w-0">
             <h1 className="flex items-center gap-1.5 font-display text-2xl font-semibold tracking-tight">
               @{profile.username}

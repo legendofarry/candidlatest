@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import { Flame } from "lucide-react";
 
+export function showSplashScreen() {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event("candid:show-splash"));
+}
+
 /**
  * Full-screen splash shown while the app boots (initial load / refresh).
  */
@@ -9,9 +13,21 @@ export function SplashScreen() {
   const [gone, setGone] = useState(false);
 
   useEffect(() => {
-    const start = window.setTimeout(() => setLeaving(true), 900);
-    const end = window.setTimeout(() => setGone(true), 1600);
+    let start = 0;
+    let end = 0;
+    const play = () => {
+      window.clearTimeout(start);
+      window.clearTimeout(end);
+      setGone(false);
+      setLeaving(false);
+      start = window.setTimeout(() => setLeaving(true), 700);
+      end = window.setTimeout(() => setGone(true), 1300);
+    };
+    const onSplashRequest = () => play();
+    window.addEventListener("candid:show-splash", onSplashRequest);
+    play();
     return () => {
+      window.removeEventListener("candid:show-splash", onSplashRequest);
       window.clearTimeout(start);
       window.clearTimeout(end);
     };

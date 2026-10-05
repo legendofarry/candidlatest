@@ -9,6 +9,7 @@ import { readInboxScroll, saveInboxScroll } from "@/lib/message-panel-state";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/site/profile-photo";
 
 function useDemoConversation() {
   return null as null | {
@@ -79,9 +80,7 @@ export function MessagesInbox({
     if (saved <= 0) return;
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const drawer = listRef.current?.closest(
-          "[data-messages-scroll]",
-        ) as HTMLElement | null;
+        const drawer = listRef.current?.closest("[data-messages-scroll]") as HTMLElement | null;
         if (drawer) drawer.scrollTop = saved;
         else window.scrollTo({ top: saved });
       });
@@ -90,9 +89,7 @@ export function MessagesInbox({
 
   // Remember the inbox scroll position so reopening messages resumes where it was.
   useEffect(() => {
-    const drawer = listRef.current?.closest(
-      "[data-messages-scroll]",
-    ) as HTMLElement | null;
+    const drawer = listRef.current?.closest("[data-messages-scroll]") as HTMLElement | null;
     const target: HTMLElement | Window = drawer ?? window;
     const handler = () => saveInboxScroll(drawer ? drawer.scrollTop : window.scrollY);
     target.addEventListener("scroll", handler, { passive: true });
@@ -170,9 +167,11 @@ export function MessagesInbox({
                   }
                   className="flex w-full items-center gap-3 rounded-2xl border border-border/70 bg-card/60 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg"
                 >
-                  <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/5 font-display text-base font-semibold uppercase">
-                    {item.with?.username?.slice(0, 2) ?? "??"}
-                  </span>
+                  <ProfileAvatar
+                    photoUrl={item.with?.photo_url}
+                    initials={item.with?.username?.slice(0, 2) ?? "??"}
+                    className="size-11 shrink-0 text-base uppercase"
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
                       <span className="truncate font-medium">@{item.with?.username}</span>

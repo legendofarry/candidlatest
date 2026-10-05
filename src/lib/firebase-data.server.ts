@@ -46,6 +46,8 @@ export type ProfileRecord = {
   created_at: string;
   role_label: string | null;
   username?: string | null;
+  photo_url?: string | null;
+  username_changed_at?: string | null;
   socials?: ProfileSocials | null;
   account_type?: "individual" | "company" | "unknown";
   onboarded_at?: string | null;

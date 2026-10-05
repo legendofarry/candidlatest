@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useServerFn } from "@tanstack/react-start";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   AtSign,
@@ -17,6 +18,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { notify as toast } from "@/lib/notifications-store";
 import { Button } from "@/components/ui/button";
+import { ProfilePhotoPicker } from "@/components/site/profile-photo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -61,13 +63,15 @@ type SocialKey = (typeof SOCIAL_FIELDS)[number]["key"];
 
 function OnboardingPage() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const { user, loading } = useAuth();
   const check = useServerFn(checkUsername);
   const suggest = useServerFn(getUsernameSuggestions);
   const complete = useServerFn(completeOnboarding);
   const state = useServerFn(getOnboardingState);
 
-  const [step, setStep] = useState<0 | 1>(0);
+  const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
@@ -89,6 +93,7 @@ function OnboardingPage() {
       return;
     }
     void state({ data: undefined }).then((result) => {
+      setPhotoUrl(result.photoUrl);
       if (!result.needsOnboarding) navigate({ to: "/" });
     });
   }, [loading, user, navigate, state]);
@@ -187,20 +192,22 @@ function OnboardingPage() {
             className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-primary"
           >
             <Sparkles className="size-3.5" />
-            Step {step + 1} of 2
+            Step {step + 1} of 3
           </motion.span>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-            {step === 0 ? "Pick your username" : "Add your links"}
+            {step === 0 ? "Pick your username" : step === 1 ? "Add a photo" : "Add your links"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {step === 0
               ? "This is the name every post, comment and reply of yours will carry."
-              : "Optional. These only show on your profile — skip if you'd rather not."}
+              : step === 1
+                ? "Optional. Add a photo to your profile, or continue without one."
+                : "Optional. These only show on your profile — skip if you'd rather not."}
           </p>
         </motion.div>
 
         <div className="mb-6 flex gap-2">
-          {[0, 1].map((index) => (
+          {[0, 1, 2].map((index) => (
             <div key={index} className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
               <motion.div
                 className="h-full rounded-full bg-primary"
@@ -325,6 +332,43 @@ function OnboardingPage() {
                 <ArrowRight className="size-4" />
               </Button>
             </motion.section>
+          ) : step === 1 ? (
+            <motion.section
+              key="photo"
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -24 }}
+              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+              className="space-y-5 rounded-none border-0 bg-transparent p-0 md:glass-card md:rounded-2xl md:border md:border-border md:p-5"
+            >
+              <ProfilePhotoPicker
+                photoUrl={photoUrl}
+                initials={(user?.email?.[0] ?? "C").toUpperCase()}
+                onSaved={(nextPhotoUrl) => {
+                  setPhotoUrl(nextPhotoUrl);
+                  if (user) {
+                    queryClient.setQueryData(["onboarding-state", user.uid], (previous: unknown) =>
+                      previous && typeof previous === "object"
+                        ? { ...previous, photoUrl: nextPhotoUrl }
+                        : previous,
+                    );
+                  }
+                }}
+              />
+              <div className="flex items-center gap-3">
+                <Button className="flex-1 glow-primary" onClick={() => setStep(2)}>
+                  {photoUrl ? "Continue with photo" : "Continue without photo"}{" "}
+                  <ArrowRight className="size-4" />
+                </Button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setStep(0)}
+                className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+              >
+                Back to username
+              </button>
+            </motion.section>
           ) : (
             <motion.section
               key="socials"
@@ -362,10 +406,10 @@ function OnboardingPage() {
               </Button>
               <button
                 type="button"
-                onClick={() => setStep(0)}
+                onClick={() => setStep(1)}
                 className="mt-3 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
               >
-                Back to username
+                Back
               </button>
             </motion.section>
           )}

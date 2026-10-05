@@ -29,7 +29,7 @@ export type BannerNotification = AppNotification & { duration: number };
  * v2 deliberately abandons the v1 blob: v1 stored every transient toast, so
  * existing users would otherwise open an inbox full of "Report sent" rows.
  */
-const STORAGE_KEY = "candid.notifications.v2";
+const STORAGE_PREFIX = "candid.notifications.v2";
 const LEGACY_STORAGE_KEYS = ["candid.notifications.v1", "candid.demo-chat.v1"];
 /** Same event pushed twice inside this window collapses into one row. */
 const DEDUPE_WINDOW_MS = 60_000;
@@ -41,7 +41,8 @@ export type OverlayView = { name: "list" } | { name: "detail"; id: string };
 
 let notifications: AppNotification[] = [];
 let banners: BannerNotification[] = [];
-let hydrated = false;
+let activeUserId = "guest";
+let hydratedScope: string | null = null;
 let overlayOpen = false;
 let overlayView: OverlayView = { name: "list" };
 
@@ -58,11 +59,14 @@ function subscribe(listener: () => void) {
 }
 
 function hydrate() {
-  if (hydrated || typeof window === "undefined") return;
-  hydrated = true;
+  if (hydratedScope === activeUserId || typeof window === "undefined") return;
+  hydratedScope = activeUserId;
   try {
     for (const legacy of LEGACY_STORAGE_KEYS) window.localStorage.removeItem(legacy);
-    const raw = window.localStorage.getItem(STORAGE_KEY);
+    // The old unscoped inbox may contain rows from another account on this device.
+    // Keep it out of every signed-in account's inbox.
+    window.localStorage.removeItem(STORAGE_PREFIX);
+    const raw = window.localStorage.getItem(`${STORAGE_PREFIX}:${activeUserId}`);
     if (raw) {
       const parsed = JSON.parse(raw) as AppNotification[];
       if (Array.isArray(parsed)) {
@@ -81,10 +85,27 @@ function hydrate() {
 function persist() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(notifications.slice(0, MAX_STORED)));
+    window.localStorage.setItem(
+      `${STORAGE_PREFIX}:${activeUserId}`,
+      JSON.stringify(notifications.slice(0, MAX_STORED)),
+    );
   } catch {
     /* storage full or unavailable */
   }
+}
+
+/** Keeps local inbox state isolated when the active Firebase account changes. */
+export function setNotificationUser(userId: string | null) {
+  const nextUserId = userId ?? "guest";
+  if (nextUserId === activeUserId) return;
+  activeUserId = nextUserId;
+  hydratedScope = null;
+  notifications = [];
+  banners = [];
+  overlayOpen = false;
+  overlayView = { name: "list" };
+  hydrate();
+  emit();
 }
 
 function newId() {

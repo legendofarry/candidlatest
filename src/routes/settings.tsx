@@ -45,6 +45,8 @@ import {
 import { cn } from "@/lib/utils";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { firebaseAuth } from "@/integrations/firebase/client";
+import { getOnboardingState } from "@/lib/onboarding.functions";
+import { ProfilePhotoPicker } from "@/components/site/profile-photo";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -64,6 +66,12 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const [bioAvailable, setBioAvailable] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
+  const fetchProfile = useServerFn(getOnboardingState);
+  const profile = useQuery({
+    queryKey: ["onboarding-state", user?.uid ?? null],
+    queryFn: () => fetchProfile(),
+    enabled: Boolean(user),
+  });
 
   useEffect(() => {
     void isPlatformAuthenticatorAvailable().then(setBioAvailable);
@@ -168,6 +176,27 @@ function SettingsPage() {
                 Manage your preferences and account controls.
               </p>
             </header>
+
+            {user ? (
+              <SettingsGroup title="Your profile">
+                <div className="p-4">
+                  <ProfilePhotoPicker
+                    compact
+                    photoUrl={profile.data?.photoUrl}
+                    initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                    onSaved={(photoUrl) => {
+                      queryClient.setQueryData(
+                        ["onboarding-state", user.uid],
+                        (previous: unknown) =>
+                          previous && typeof previous === "object"
+                            ? { ...previous, photoUrl }
+                            : previous,
+                      );
+                    }}
+                  />
+                </div>
+              </SettingsGroup>
+            ) : null}
 
             <div className="grid gap-8 lg:grid-cols-[10rem_minmax(0,1fr)]">
               <nav aria-label="Settings sections" className="hidden lg:block">

@@ -108,8 +108,8 @@ function FeedPage() {
 
   return (
     <div className="space-y-5 md:space-y-8">
-      <section className="mesh-hero animate-fade relative overflow-hidden rounded-3xl border border-border p-5 sm:p-6 md:p-12">
-        <div className="grid items-center gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
+      <section className="mesh-hero animate-fade relative overflow-hidden rounded-3xl border border-border p-4 sm:p-6 md:p-12">
+        <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground sm:text-xs">
               <ShieldCheck className="size-3.5 text-verified" /> Anonymous by design · Kenya
@@ -117,10 +117,15 @@ function FeedPage() {
             <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-[1.05] sm:mt-4 sm:text-4xl md:text-6xl">
               The <span className="text-gradient">real reasons</span> Kenyans left their jobs.
             </h1>
-            <p className="mt-3 line-clamp-2 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:line-clamp-none sm:text-base md:text-lg">
-              Exit stories, red-flag scores and salary honesty for employers across Nairobi,
-              Mombasa, Kisumu and beyond. Research a company before you sign — or tell the story
-              nobody let you tell at your exit interview.
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:text-base md:text-lg">
+              <span className="sm:hidden">
+                Anonymous exit stories, employer ratings and salary insights across Kenya.
+              </span>
+              <span className="hidden sm:inline">
+                Exit stories, red-flag scores and salary honesty for employers across Nairobi,
+                Mombasa, Kisumu and beyond. Research a company before you sign — or tell the story
+                nobody let you tell at your exit interview.
+              </span>
             </p>
             <div className="mt-4 flex flex-wrap gap-3 sm:mt-6">
               <Button asChild size="lg" className="glow-primary">
@@ -155,15 +160,16 @@ function FeedPage() {
       <button
         type="button"
         onClick={() => setPulseSheetOpen(true)}
-        className="flex w-full items-center gap-3 rounded-2xl border border-border bg-card/75 px-4 py-3 text-left shadow-sm transition-colors hover:bg-card lg:hidden"
+        className="flex w-full items-center gap-2 rounded-2xl border border-border bg-card/75 px-3 py-2 text-left shadow-sm transition-colors hover:bg-card sm:gap-3 sm:px-4 sm:py-3 lg:hidden"
       >
-        <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-          <Activity className="size-5" />
+        <span className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary sm:size-10 sm:rounded-xl">
+          <Activity className="size-4 sm:size-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold">Candid Pulse</span>
+          <span className="block text-xs font-semibold sm:text-sm">Candid Pulse</span>
           <span className="block truncate text-xs text-muted-foreground">
-            Live workplace signals from across Kenya
+            <span className="sm:hidden">Live workplace signals</span>
+            <span className="hidden sm:inline">Live workplace signals from across Kenya</span>
           </span>
         </span>
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">

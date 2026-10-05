@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/drawer";
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/site/profile-photo";
 
 type DockSheet = "you" | null;
 
@@ -35,10 +36,12 @@ const moreLinks = [
 export function MobileDock({
   signedIn,
   userInitials,
+  photoUrl,
   onLeave,
 }: {
   signedIn: boolean;
   userInitials: string;
+  photoUrl?: string | null;
   onLeave: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -116,6 +119,7 @@ export function MobileDock({
               active={youActive}
               badge={unread}
               initials={signedIn ? userInitials : undefined}
+              photoUrl={signedIn ? photoUrl : undefined}
               onClick={() => setSheet("you")}
             />
           </div>
@@ -277,12 +281,14 @@ function DockShell({
   label,
   badge,
   initials,
+  photoUrl,
   icon: Icon,
 }: {
   active: boolean;
   label: string;
   badge?: number | undefined;
   initials?: string | undefined;
+  photoUrl?: string | null;
   icon: typeof Home;
 }) {
   return (
@@ -294,14 +300,15 @@ function DockShell({
         )}
       >
         {initials ? (
-          <span
+          <ProfileAvatar
+            photoUrl={photoUrl}
+            initials={initials}
             className={cn(
-              "flex size-6 items-center justify-center rounded-full text-[10px] font-bold transition-colors",
-              active ? "bg-primary text-primary-foreground" : "bg-secondary text-foreground",
+              "size-6 text-[10px]",
+              active && !photoUrl && "bg-primary text-primary-foreground",
+              !active && !photoUrl && "bg-secondary text-foreground",
             )}
-          >
-            {initials}
-          </span>
+          />
         ) : (
           <Icon
             className={cn(
@@ -364,6 +371,7 @@ function DockButton({
   active,
   badge,
   initials,
+  photoUrl,
   onClick,
 }: {
   label: string;
@@ -371,11 +379,19 @@ function DockButton({
   active: boolean;
   badge?: number | undefined;
   initials?: string | undefined;
+  photoUrl?: string | null;
   onClick: () => void;
 }) {
   return (
     <button type="button" onClick={onClick} aria-label={label} className={tabClass}>
-      <DockShell active={active} label={label} icon={icon} badge={badge} initials={initials} />
+      <DockShell
+        active={active}
+        label={label}
+        icon={icon}
+        badge={badge}
+        initials={initials}
+        photoUrl={photoUrl}
+      />
     </button>
   );
 }

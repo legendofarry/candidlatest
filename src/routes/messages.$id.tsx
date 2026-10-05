@@ -11,6 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
+import { ProfileAvatar } from "@/components/site/profile-photo";
 
 export const Route = createFileRoute("/messages/$id")({
   head: () => ({
@@ -108,16 +109,19 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
       <button
         type="button"
         onClick={() => {
-          if (partner) void navigate({ to: "/u/$username", params: { username: partner.username } });
+          if (partner)
+            void navigate({ to: "/u/$username", params: { username: partner.username } });
         }}
         className={cn(
           "glass-card mb-4 flex items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-secondary/40",
           !inSidebar && "sticky top-[6.75rem] z-30",
         )}
       >
-        <span className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary/30 to-primary/5 font-display font-semibold uppercase">
-          {partner?.username?.slice(0, 2) ?? "··"}
-        </span>
+        <ProfileAvatar
+          photoUrl={partner?.photo_url}
+          initials={partner?.username?.slice(0, 2) ?? "··"}
+          className="size-10 font-display uppercase"
+        />
         <span>
           <span className="flex items-center gap-1.5 font-medium">
             @{partner?.username ?? "…"}

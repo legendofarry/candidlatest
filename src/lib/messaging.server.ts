@@ -36,6 +36,7 @@ export type MessageRecord = {
 export type ChatParticipant = {
   id: string;
   username: string;
+  photo_url?: string | null;
   verified: boolean;
   official: boolean;
 };
@@ -100,6 +101,7 @@ async function readParticipants(ids: string[]): Promise<Map<string, ChatParticip
       map.set(id, {
         id,
         username: profile?.username ?? profile?.handle ?? "member",
+        photo_url: profile?.photo_url ?? null,
         verified: verification?.badge_status === "claimed" || Boolean(verification?.owner_verified),
         official: id === CANDID_USER_ID,
       });
@@ -344,6 +346,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
   return {
     ...participants.get(userId)!,
     role_label: profile?.role_label ?? null,
+    photo_url: profile?.photo_url ?? null,
     county: profile?.county ?? null,
     socials: profile?.socials ?? null,
     followers: followers.size,

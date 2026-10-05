@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
@@ -31,6 +31,8 @@ import { BadgeClaimModal } from "@/components/site/badge-claim-modal";
 import { SupportChat } from "@/components/site/support-chat";
 import { MobileDock } from "@/components/site/mobile-dock";
 import { InstallBanner } from "@/components/site/install-banner";
+import { ProfileAvatar } from "@/components/site/profile-photo";
+import { MechanicEasterEgg } from "@/components/site/mechanic-easter-egg";
 
 import {
   toggleNotifications,
@@ -39,6 +41,7 @@ import {
 } from "@/lib/notifications-store";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
+import { getOnboardingState } from "@/lib/onboarding.functions";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
 import { setPreference, usePreferences } from "@/lib/preferences";
@@ -121,8 +124,16 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [rememberChoice, setRememberChoice] = useState(false);
+  const [mechanicEggOpen, setMechanicEggOpen] = useState(false);
+  const brandTapTimer = useRef<number | null>(null);
   const prefs = usePreferences();
   const canLock = Boolean(user && prefs.biometricUnlock && hasCredentialFor(user.uid));
+  const fetchProfile = useServerFn(getOnboardingState);
+  const { data: accountProfile } = useQuery({
+    queryKey: ["onboarding-state", user?.uid ?? null],
+    queryFn: () => fetchProfile(),
+    enabled: Boolean(user),
+  });
   const fetchUnreadMessages = useServerFn(getUnreadMessages);
   const { data: messageState } = useQuery({
     queryKey: ["unread-messages", user?.uid ?? null],
@@ -167,6 +178,28 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     user?.email?.slice(0, 2).toUpperCase() ||
     "U";
 
+  const closeMechanicEgg = useCallback(() => setMechanicEggOpen(false), []);
+  useEffect(
+    () => () => {
+      if (brandTapTimer.current !== null) window.clearTimeout(brandTapTimer.current);
+    },
+    [],
+  );
+
+  function handleBrandTap(event: React.MouseEvent<HTMLButtonElement>) {
+    event.preventDefault();
+    if (brandTapTimer.current !== null) {
+      window.clearTimeout(brandTapTimer.current);
+      brandTapTimer.current = null;
+      setMechanicEggOpen(true);
+      return;
+    }
+    brandTapTimer.current = window.setTimeout(() => {
+      brandTapTimer.current = null;
+      void navigate({ to: "/" });
+    }, 320);
+  }
+
   function handleLeave() {
     if (canLock && prefs.sessionMemory === "lock") return requestLock();
     if (canLock && prefs.sessionMemory === "signout") return void signOut();
@@ -210,6 +243,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-screen bg-background md:pb-6">
       <SplashScreen />
+      <MechanicEasterEgg open={mechanicEggOpen} onClose={closeMechanicEgg} />
       <RouteProgress />
       <NotificationBanners />
       <NotificationsOverlay />
@@ -239,10 +273,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               </span>
             </div>
           ) : (
-            <Link to="/" className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={handleBrandTap}
+              aria-label="Candid home"
+              className="flex items-center gap-2"
+            >
               <Flame className="size-5 text-primary" />
               <span className="font-display text-lg font-semibold tracking-tight">Candid</span>
-            </Link>
+            </button>
           )}
 
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
@@ -342,9 +381,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   aria-expanded={userMenuOpen}
                   className="flex w-full items-center gap-3 rounded-2xl border border-border bg-secondary/45 p-2.5 text-left transition-colors hover:bg-secondary"
                 >
-                  <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-sm font-semibold text-primary-foreground">
-                    {userInitials}
-                  </div>
+                  <ProfileAvatar
+                    photoUrl={accountProfile?.photoUrl}
+                    initials={userInitials}
+                    className="size-10 shrink-0 rounded-xl"
+                  />
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium text-foreground">
                       {user.displayName || user.email || "My account"}
@@ -464,7 +505,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <MessagesThread id={decodeURIComponent(activeConversationId ?? "")} inSidebar />
       </RightWorkspace>
       {showDock ? (
-        <MobileDock signedIn={Boolean(user)} userInitials={userInitials} onLeave={handleLeave} />
+        <MobileDock
+          signedIn={Boolean(user)}
+          userInitials={userInitials}
+          photoUrl={accountProfile?.photoUrl}
+          onLeave={handleLeave}
+        />
       ) : null}
       <InstallBanner />
 

@@ -2,7 +2,18 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
-import { BadgeCheck, ChevronRight, LogOut, Settings, ShieldCheck, UserRound } from "lucide-react";
+import {
+  Archive,
+  BadgeCheck,
+  ChevronRight,
+  Clock3,
+  LogOut,
+  MessageSquare,
+  PenLine,
+  Settings,
+  ShieldCheck,
+  UserRound,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   AlertDialog,
@@ -16,12 +27,19 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { declareAccountType, getOnboardingState } from "@/lib/onboarding.functions";
+import {
+  declareAccountType,
+  getOnboardingState,
+  updateMyUsername,
+} from "@/lib/onboarding.functions";
 import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
 import { useAuth } from "@/hooks/useAuth";
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
+import { ProfileAvatar, ProfilePhotoPicker } from "@/components/site/profile-photo";
+import { getMyContributions } from "@/lib/social.functions";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -44,6 +62,9 @@ function ProfilePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [editingUsername, setEditingUsername] = useState(false);
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [savingUsername, setSavingUsername] = useState(false);
 
   const fetchOnboardingState = useServerFn(getOnboardingState);
   const onboarding = useQuery({
@@ -52,6 +73,13 @@ function ProfilePage() {
     enabled: Boolean(user),
   });
   const socials = onboarding.data?.socials ?? null;
+  const updateUsername = useServerFn(updateMyUsername);
+  const fetchContributions = useServerFn(getMyContributions);
+  const contributions = useQuery({
+    queryKey: ["my-contributions", user?.uid ?? null],
+    queryFn: () => fetchContributions(),
+    enabled: Boolean(user),
+  });
 
   // Some accounts never got classified at signup. After a week we ask directly,
   // because company replies and employer tools depend on knowing.
@@ -82,6 +110,24 @@ function ProfilePage() {
       });
     } finally {
       setSavingType(false);
+    }
+  }
+  async function saveUsername() {
+    if (savingUsername) return;
+    setSavingUsername(true);
+    try {
+      const result = await updateUsername({ data: { username: usernameDraft } });
+      if (!result.ok) {
+        toast.error(result.reason);
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-state", user?.uid] });
+      setEditingUsername(false);
+      toast.success(`Username changed to @${result.username}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not change username.");
+    } finally {
+      setSavingUsername(false);
     }
   }
   const socialLinks = socials
@@ -121,6 +167,9 @@ function ProfilePage() {
     : user?.email
       ? `anon-${user.uid.slice(0, 6)}`
       : "Guest";
+  const nextUsernameChangeAt = onboarding.data?.usernameChangedAt
+    ? Date.parse(onboarding.data.usernameChangedAt) + 14 * 24 * 60 * 60 * 1000
+    : null;
 
   return (
     <div className="min-h-screen bg-background md:h-dvh md:overflow-hidden">
@@ -178,9 +227,11 @@ function ProfilePage() {
               className="border-b border-border pb-5 md:glass-card md:rounded-2xl md:border md:border-border md:p-6"
             >
               <div className="flex items-center gap-4">
-                <div className="flex size-14 shrink-0 items-center justify-center rounded-2xl bg-primary/15 text-primary md:size-16">
-                  <UserRound className="size-7 md:size-8" />
-                </div>
+                <ProfileAvatar
+                  photoUrl={onboarding.data?.photoUrl}
+                  initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
+                  className="size-14 shrink-0 md:size-16"
+                />
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Your account
@@ -210,6 +261,84 @@ function ProfilePage() {
                   </Button>
                 ) : null}
               </div>
+              {user ? (
+                <div className="mt-4 space-y-4 border-t border-border pt-4">
+                  <ProfilePhotoPicker
+                    compact
+                    photoUrl={onboarding.data?.photoUrl}
+                    initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
+                    onSaved={(photoUrl) => {
+                      queryClient.setQueryData(
+                        ["onboarding-state", user.uid],
+                        (previous: unknown) =>
+                          previous && typeof previous === "object"
+                            ? { ...previous, photoUrl }
+                            : previous,
+                      );
+                    }}
+                  />
+                  {onboarding.data?.username ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                      {editingUsername ? (
+                        <>
+                          <input
+                            value={usernameDraft}
+                            onChange={(event) =>
+                              setUsernameDraft(
+                                event.target.value.toLowerCase().replace(/\s+/g, "_"),
+                              )
+                            }
+                            maxLength={20}
+                            autoComplete="off"
+                            className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-primary"
+                            aria-label="New username"
+                          />
+                          <Button
+                            size="sm"
+                            disabled={savingUsername || !usernameDraft.trim()}
+                            onClick={() => void saveUsername()}
+                          >
+                            {savingUsername ? "Saving…" : "Save"}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => setEditingUsername(false)}
+                          >
+                            Cancel
+                          </Button>
+                        </>
+                      ) : (
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            disabled={
+                              nextUsernameChangeAt !== null && Date.now() < nextUsernameChangeAt
+                            }
+                            onClick={() => {
+                              setUsernameDraft(onboarding.data?.username ?? "");
+                              setEditingUsername(true);
+                            }}
+                          >
+                            Change username
+                          </Button>
+                          {nextUsernameChangeAt ? (
+                            <span className="text-xs text-muted-foreground">
+                              Next change after{" "}
+                              {new Date(nextUsernameChangeAt).toLocaleDateString("en-KE")}.
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              Username changes are limited to once every 2 weeks.
+                            </span>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               {socialLinks.length > 0 ? (
                 <div className="mt-4 flex flex-wrap gap-2">
                   {socialLinks.map(([key, value]) => (
@@ -246,6 +375,10 @@ function ProfilePage() {
             </motion.section>
 
             <FollowedStories />
+
+            {user ? (
+              <ContributionsPanel data={contributions.data} loading={contributions.isLoading} />
+            ) : null}
 
             {askAccountType ? (
               <SettingsGroup title="One quick question">
@@ -359,6 +492,108 @@ function SettingsGroup({ title, children }: { title: string; children: React.Rea
       <div className="divide-y divide-border border-y border-border bg-transparent md:overflow-hidden md:rounded-2xl md:border md:bg-card">
         {children}
       </div>
+    </section>
+  );
+}
+
+type ContributionItem = {
+  id: string;
+  title: string;
+  createdAt: string;
+  type: "story" | "comment";
+  storyId?: string;
+};
+type ContributionGroup = { stories: ContributionItem[]; comments: ContributionItem[] };
+
+function ContributionsPanel({
+  data,
+  loading,
+}: {
+  data?: { active: ContributionGroup; inactive: ContributionGroup; pending: ContributionGroup };
+  loading: boolean;
+}) {
+  const groups = data ?? {
+    active: { stories: [], comments: [] },
+    inactive: { stories: [], comments: [] },
+    pending: { stories: [], comments: [] },
+  };
+  const count = (group: ContributionGroup) => group.stories.length + group.comments.length;
+  return (
+    <section className="space-y-3 border-y border-border py-4 md:rounded-2xl md:border md:bg-card md:p-5">
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Your activity
+        </p>
+        <h2 className="mt-1 text-lg font-semibold">My contributions</h2>
+      </div>
+      <Tabs defaultValue="active">
+        <TabsList className="grid h-auto w-full grid-cols-3 bg-secondary/60 p-1">
+          <TabsTrigger value="active" className="gap-1.5 text-xs sm:text-sm">
+            <PenLine className="size-3.5" />
+            Active <span>{count(groups.active)}</span>
+          </TabsTrigger>
+          <TabsTrigger value="pending" className="gap-1.5 text-xs sm:text-sm">
+            <Clock3 className="size-3.5" />
+            Pending <span>{count(groups.pending)}</span>
+          </TabsTrigger>
+          <TabsTrigger value="inactive" className="gap-1.5 text-xs sm:text-sm">
+            <Archive className="size-3.5" />
+            Inactive <span>{count(groups.inactive)}</span>
+          </TabsTrigger>
+        </TabsList>
+        {(["active", "pending", "inactive"] as const).map((status) => {
+          const group = groups[status];
+          const items = [...group.stories, ...group.comments].sort(
+            (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
+          );
+          return (
+            <TabsContent key={status} value={status} className="mt-3">
+              {loading ? (
+                <p className="py-5 text-center text-sm text-muted-foreground">
+                  Loading your contributions…
+                </p>
+              ) : items.length ? (
+                <div className="divide-y divide-border">
+                  {items.map((item) => (
+                    <Link
+                      key={`${item.type}-${item.id}`}
+                      to="/stories/$id"
+                      params={{ id: item.type === "story" ? item.id : (item.storyId ?? "") }}
+                      className="flex items-start gap-3 py-3 first:pt-1 last:pb-1"
+                    >
+                      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                        {item.type === "story" ? (
+                          <PenLine className="size-4" />
+                        ) : (
+                          <MessageSquare className="size-4" />
+                        )}
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-2 block text-sm font-medium">{item.title}</span>
+                        <span className="mt-1 block text-xs capitalize text-muted-foreground">
+                          {item.type} ·{" "}
+                          {item.createdAt
+                            ? new Date(item.createdAt).toLocaleDateString("en-KE")
+                            : "Date unavailable"}
+                        </span>
+                      </span>
+                      <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  ))}
+                </div>
+              ) : (
+                <p className="py-5 text-center text-sm text-muted-foreground">
+                  {status === "active"
+                    ? "Your published stories and comments will appear here."
+                    : status === "pending"
+                      ? "Nothing is waiting for review."
+                      : "No inactive contributions."}
+                </p>
+              )}
+            </TabsContent>
+          );
+        })}
+      </Tabs>
     </section>
   );
 }
