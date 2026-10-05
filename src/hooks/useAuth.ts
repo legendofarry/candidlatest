@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { onAuthStateChanged, signOut, type User } from "firebase/auth";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { setNotificationUser } from "@/lib/notifications-store";
-import { showSplashScreen } from "@/components/site/splash-screen";
+import { showSplashScreen } from "@/lib/splash-event";
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);

@@ -166,7 +166,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       returnPathRef.current = pathname;
     }
     setUserMenuOpen(false);
-  }, [pathname, routeConversationId]);
+  }, [pathname, routeConversationId, onMessagesRoute]);
 
   const userInitials =
     user?.displayName

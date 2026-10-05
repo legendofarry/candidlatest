@@ -1,10 +1,6 @@
 import { useEffect, useState } from "react";
 import { Flame } from "lucide-react";
 
-export function showSplashScreen() {
-  if (typeof window !== "undefined") window.dispatchEvent(new Event("candid:show-splash"));
-}
-
 /**
  * Full-screen splash shown while the app boots (initial load / refresh).
  */

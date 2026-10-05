@@ -192,18 +192,20 @@ export function SupportChat({
                     </p>
                   </div>
                 ) : null}
-                {chat.data?.messages?.map((message: any) => (
-                  <div
-                    key={message.id}
-                    className={
-                      message.sender_type === "user"
-                        ? "ml-auto max-w-[88%] rounded-[22px] rounded-br-md bg-gradient-to-br from-primary to-primary/85 px-4 py-3 text-sm leading-6 text-primary-foreground shadow-[0_8px_24px_rgba(153,255,116,0.16)]"
-                        : "mr-auto max-w-[88%] rounded-[22px] rounded-bl-md border border-border/70 bg-card/85 px-4 py-3 text-sm leading-6 text-foreground shadow-sm backdrop-blur-sm"
-                    }
-                  >
-                    {message.body}
-                  </div>
-                ))}
+                {chat.data?.messages?.map(
+                  (message: { id: string; sender_type: string; body: string }) => (
+                    <div
+                      key={message.id}
+                      className={
+                        message.sender_type === "user"
+                          ? "ml-auto max-w-[88%] rounded-[22px] rounded-br-md bg-gradient-to-br from-primary to-primary/85 px-4 py-3 text-sm leading-6 text-primary-foreground shadow-[0_8px_24px_rgba(153,255,116,0.16)]"
+                          : "mr-auto max-w-[88%] rounded-[22px] rounded-bl-md border border-border/70 bg-card/85 px-4 py-3 text-sm leading-6 text-foreground shadow-sm backdrop-blur-sm"
+                      }
+                    >
+                      {message.body}
+                    </div>
+                  ),
+                )}
                 {sendMutation.isPending ? (
                   <div className="mr-auto flex items-center gap-1.5 rounded-full border border-border/70 bg-card/85 px-4 py-3 shadow-sm">
                     <span className="size-1.5 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.2s]" />

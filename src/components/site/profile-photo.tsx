@@ -3,6 +3,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { Camera, Loader2, RotateCcw, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { saveMyProfilePhoto } from "@/lib/onboarding.functions";
+import { notify } from "@/lib/notifications-store";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
@@ -121,7 +122,6 @@ export function ProfilePhotoPicker({
       const form = new FormData();
       form.append("file", image, "profile.webp");
       form.append("upload_preset", uploadPreset);
-      form.append("folder", "candid/profiles");
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`,
         {
@@ -140,6 +140,7 @@ export function ProfilePhotoPicker({
       const saved = await savePhoto({ data: { photoUrl: result.secure_url } });
       onSaved(saved.photoUrl);
       setFile(null);
+      notify.success("Profile photo updated.");
     } catch (uploadError) {
       if (controller.signal.aborted) return;
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed. Try again.");
