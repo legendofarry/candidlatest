@@ -3,6 +3,15 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
+import type { User } from "firebase/auth";
+import {
+  EmailAuthProvider,
+  getRedirectResult,
+  GoogleAuthProvider,
+  linkWithCredential,
+  linkWithPopup,
+  linkWithRedirect,
+} from "firebase/auth";
 import {
   ArrowLeft,
   Bell,
@@ -35,6 +44,7 @@ import {
 } from "@/lib/biometrics";
 import { cn } from "@/lib/utils";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
+import { firebaseAuth } from "@/integrations/firebase/client";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -217,6 +227,9 @@ function SettingsPage() {
                       </p>
                     ) : null}
                   </SettingsGroup>
+                  <div className="mt-4">
+                    <SignInMethods user={user} />
+                  </div>
                 </div>
 
                 <div id="appearance">
@@ -329,6 +342,157 @@ function SettingsPage() {
       </div>
     </div>
   );
+}
+
+function SignInMethods({ user }: { user: User | null }) {
+  const [providerIds, setProviderIds] = useState(
+    () => user?.providerData.map((provider) => provider.providerId) ?? [],
+  );
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  useEffect(() => {
+    setProviderIds(user?.providerData.map((provider) => provider.providerId) ?? []);
+  }, [user]);
+
+  useEffect(() => {
+    let active = true;
+    void getRedirectResult(firebaseAuth)
+      .then((result) => {
+        if (!active || !result || result.providerId !== GoogleAuthProvider.PROVIDER_ID) return;
+        setProviderIds(result.user.providerData.map((provider) => provider.providerId));
+        notify.success("Google is connected to this Candid account.");
+      })
+      .catch((error) => {
+        if (active) notify.error(signInMethodError(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const googleLinked = providerIds.includes(GoogleAuthProvider.PROVIDER_ID);
+  const passwordLinked = providerIds.includes(EmailAuthProvider.PROVIDER_ID);
+
+  async function connectGoogle() {
+    if (!user) return;
+    setBusy(true);
+    try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: "select_account" });
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        await linkWithRedirect(user, provider);
+        return;
+      }
+      const result = await linkWithPopup(user, provider);
+      setProviderIds(result.user.providerData.map((item) => item.providerId));
+      notify.success("Google is connected. You can use either sign-in method now.");
+    } catch (error) {
+      const code = signInMethodErrorCode(error);
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        notify.error(signInMethodError(error));
+      }
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function addPassword(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user?.email || password.length < 8) return;
+    setBusy(true);
+    try {
+      const credential = EmailAuthProvider.credential(user.email, password);
+      const result = await linkWithCredential(user, credential);
+      setProviderIds(result.user.providerData.map((item) => item.providerId));
+      setPassword("");
+      notify.success("Password added. You can use either sign-in method now.");
+    } catch (error) {
+      notify.error(signInMethodError(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <SettingsGroup title="Sign-in methods">
+      {!user ? (
+        <p className="p-4 text-sm text-muted-foreground">
+          Sign in to connect Google and email/password to one account.
+        </p>
+      ) : (
+        <div className="space-y-4 p-4">
+          <p className="text-sm text-muted-foreground">
+            Connect both methods to use either one for this same Candid account.
+          </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <p className="text-sm font-medium">Google</p>
+              <p className="text-xs text-muted-foreground">
+                {googleLinked ? "Connected to this account" : "Not connected"}
+              </p>
+            </div>
+            {!googleLinked ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={busy}
+                onClick={connectGoogle}
+              >
+                Connect Google
+              </Button>
+            ) : null}
+          </div>
+          <div className="border-t border-border pt-4">
+            <p className="text-sm font-medium">Email and password</p>
+            {passwordLinked ? (
+              <p className="mt-1 text-xs text-muted-foreground">Connected to this account</p>
+            ) : user.email ? (
+              <form onSubmit={addPassword} className="mt-2 flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Create a password (8+ characters)"
+                  aria-label="Create a password"
+                  className="h-10 min-w-0 flex-1 rounded-lg border border-input bg-background px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+                <Button type="submit" variant="outline" size="sm" disabled={busy}>
+                  Add password
+                </Button>
+              </form>
+            ) : (
+              <p className="mt-1 text-xs text-muted-foreground">
+                This account has no email address to attach a password to.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </SettingsGroup>
+  );
+}
+
+function signInMethodErrorCode(error: unknown) {
+  return error && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code ?? "")
+    : "";
+}
+
+function signInMethodError(error: unknown) {
+  const code = signInMethodErrorCode(error);
+  if (code === "auth/credential-already-in-use" || code === "auth/email-already-in-use") {
+    return "That sign-in method belongs to another Candid account. Sign in to the account you want to keep; accounts are not merged automatically.";
+  }
+  if (code === "auth/provider-already-linked") return "This sign-in method is already connected.";
+  if (code === "auth/requires-recent-login") {
+    return "For security, sign out and sign back in before changing sign-in methods.";
+  }
+  return error instanceof Error ? error.message : "Could not update sign-in methods.";
 }
 
 function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }) {

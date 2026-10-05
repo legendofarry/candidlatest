@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
   createUserWithEmailAndPassword,
-  deleteUser,
   getAdditionalUserInfo,
+  getRedirectResult,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signOut,
+  signInWithRedirect,
+  sendPasswordResetEmail,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
 import { EyeOff, Fingerprint, Flame, Loader2, ShieldCheck } from "lucide-react";
@@ -42,6 +43,44 @@ export const Route = createFileRoute("/auth")({
   component: AuthPage,
 });
 
+function authErrorCode(error: unknown) {
+  return error && typeof error === "object" && "code" in error
+    ? String((error as { code?: unknown }).code ?? "")
+    : "";
+}
+
+function authErrorMessage(error: unknown) {
+  const code = authErrorCode(error);
+  if (code === "auth/email-already-in-use") {
+    return "An account already uses this email. Sign in, or choose Google if that’s how you created it.";
+  }
+  if (code === "auth/account-exists-with-different-credential") {
+    return "This email uses another sign-in method. Sign in with that method first, then connect Google in Settings → Security & access.";
+  }
+  if (code === "auth/credential-already-in-use") {
+    return "That sign-in method is connected to another Candid account. Sign in to the account you want to keep; accounts are not merged automatically.";
+  }
+  if (
+    code === "auth/invalid-credential" ||
+    code === "auth/wrong-password" ||
+    code === "auth/user-not-found"
+  ) {
+    return "Email or password wasn’t recognized. Check your details, or try Google if you used it to create your account.";
+  }
+  if (code === "auth/weak-password") return "Choose a password with at least 8 characters.";
+  if (code === "auth/invalid-email") return "Enter a valid email address.";
+  if (code === "auth/network-request-failed") {
+    return "Could not reach the sign-in service. Check your connection and try again.";
+  }
+  if (code === "auth/popup-blocked") {
+    return "Your browser blocked the Google sign-in window. Allow popups for Candid, or choose email and password.";
+  }
+  if (code === "auth/unauthorized-domain") {
+    return "This site is not enabled for Firebase sign-in. Add its domain to Firebase Authentication’s authorized domains.";
+  }
+  return error instanceof Error ? error.message : "Sign-in failed. Please try again.";
+}
+
 function AuthPage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
@@ -51,6 +90,26 @@ function AuthPage() {
   const [busy, setBusy] = useState(false);
   const [hasBiometric, setHasBiometric] = useState(false);
   const fetchOnboardingState = useServerFn(getOnboardingState);
+
+  useEffect(() => {
+    let active = true;
+    void getRedirectResult(firebaseAuth)
+      .then((result) => {
+        if (!active || !result) return;
+        toast.success(
+          getAdditionalUserInfo(result)?.isNewUser
+            ? "Account created with Google."
+            : "Signed in with Google.",
+        );
+      })
+      .catch((error) => {
+        if (!active) return;
+        toast.error(authErrorMessage(error));
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (authLoading || !user) return;
@@ -66,16 +125,6 @@ function AuthPage() {
       active = false;
     };
   }, [authLoading, user, fetchOnboardingState, navigate]);
-
-  /** Send people who have not claimed a username to onboarding first. */
-  async function continueAfterAuth() {
-    try {
-      const state = await fetchOnboardingState();
-      navigate({ to: state.needsOnboarding ? "/onboarding" : "/" });
-    } catch {
-      navigate({ to: "/onboarding" });
-    }
-  }
 
   useEffect(() => {
     setHasBiometric(getCredentials().length > 0);
@@ -115,9 +164,27 @@ function AuthPage() {
       }
       await signInWithEmailAndPassword(firebaseAuth, email, password);
       toast.success("Signed in. You are anonymous to everyone else.");
-      await continueAfterAuth();
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Something went wrong");
+      toast.error(authErrorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function resetPassword() {
+    const address = email.trim();
+    if (!address) {
+      toast.error("Enter your email first so we can send a reset link.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await sendPasswordResetEmail(firebaseAuth, address);
+      toast.success(
+        "If this email has password sign-in, reset instructions are on the way. If you use Google, choose Continue with Google.",
+      );
+    } catch (error) {
+      toast.error(authErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -128,27 +195,21 @@ function AuthPage() {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      const result = await signInWithPopup(firebaseAuth, provider);
-      const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
-
-      if (isNewUser) {
-        // Google is sign-in only: brand new people must register with email first.
-        try {
-          await deleteUser(result.user);
-        } catch {
-          await signOut(firebaseAuth);
-        }
-        toast.error("No Candid account found. Create one with your email first, then use Google.");
-        setMode("signup");
+      if (window.matchMedia("(max-width: 767px)").matches) {
+        await signInWithRedirect(firebaseAuth, provider);
         return;
       }
-
-      toast.success("Signed in. You are anonymous to everyone else.");
-      await continueAfterAuth();
+      const result = await signInWithPopup(firebaseAuth, provider);
+      const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
+      toast.success(
+        isNewUser
+          ? "Account created with Google. Your identity stays private."
+          : "Signed in with Google.",
+      );
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Google sign-in failed";
-      if (!message.includes("popup-closed-by-user") && !message.includes("cancelled-popup")) {
-        toast.error(message);
+      const code = authErrorCode(error);
+      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
+        toast.error(authErrorMessage(error));
       }
     } finally {
       setBusy(false);
@@ -251,6 +312,16 @@ function AuthPage() {
                       onChange={(event) => setPassword(event.target.value)}
                       placeholder="At least 8 characters"
                     />
+                    {mode === "signin" ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void resetPassword()}
+                        className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
+                      >
+                        Forgot password?
+                      </button>
+                    ) : null}
                   </div>
                   <Button type="submit" disabled={busy} className="w-full glow-primary">
                     {busy ? <Loader2 className="size-4 animate-spin" /> : null}
@@ -305,7 +376,8 @@ function AuthPage() {
                   Continue with Google
                 </Button>
                 <p className="mt-2 text-center text-xs text-muted-foreground">
-                  Google works only for existing accounts. New here? Sign up with email first.
+                  Google can create an account or sign in. Connect both methods in Settings to
+                  switch between them.
                 </p>
 
                 <button
