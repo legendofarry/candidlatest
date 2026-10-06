@@ -7,6 +7,7 @@ import { ScoreBadge } from "@/routes/companies.index";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CompanyIntelPanel } from "@/components/site/company-intel";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 const companyQuery = (slug: string) =>
   queryOptions({
@@ -61,10 +62,12 @@ function CompanyPage() {
       <section className="mesh-hero animate-fade rounded-3xl border border-border p-6 md:p-10">
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-semibold md:text-4xl">{company.name}</h1>
+            <h1 className="flex flex-wrap items-center gap-2 text-3xl font-semibold md:text-4xl">
+              {company.name}
+              {company.verified ? <CompanyVerifiedBadge className="size-6" /> : null}
+            </h1>
             <p className="mt-2 text-sm text-muted-foreground">
               {company.industry} · {company.county}
-              {company.verified ? " · verified employer" : ""}
             </p>
             {profile?.descriptor ? <p className="mt-3 max-w-4xl">{profile.descriptor}</p> : null}
           </div>

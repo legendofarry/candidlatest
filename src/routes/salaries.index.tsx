@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 const salaryCompaniesQuery = queryOptions({
   queryKey: ["salary-companies"],
@@ -89,7 +90,10 @@ function SalaryDirectory() {
                   >
                     <Building2 className="size-5 text-muted-foreground" />
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{row.name}</p>
+                      <p className="flex items-center gap-1 truncate font-medium">
+                        {row.name}
+                        {row.verified ? <CompanyVerifiedBadge /> : null}
+                      </p>
                       <p className="truncate text-xs text-muted-foreground">
                         {row.industry ?? "—"} · {row.county ?? "—"} · {row.positions} position
                         {row.positions === 1 ? "" : "s"} · {row.contributions} contribution
@@ -123,7 +127,7 @@ function ContributeCard() {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [companyQuery, setCompanyQuery] = useState("");
-  const [company, setCompany] = useState<{ id: string; name: string } | null>(null);
+  const [company, setCompany] = useState<{ id: string; name: string; verified: boolean } | null>(null);
   const [form, setForm] = useState({ role_title: "", min_kes: "", max_kes: "" });
 
   const options = useQuery({
@@ -184,7 +188,10 @@ function ContributeCard() {
             <Label htmlFor="company">Employer</Label>
             {company ? (
               <div className="flex items-center gap-2 rounded-xl border border-primary/40 bg-primary/5 px-3 py-2 text-sm">
-                <span className="flex-1 truncate">{company.name}</span>
+                <span className="flex min-w-0 flex-1 items-center gap-1 truncate">
+                  {company.name}
+                  {company.verified ? <CompanyVerifiedBadge /> : null}
+                </span>
                 <Button type="button" size="sm" variant="ghost" onClick={() => setCompany(null)}>
                   Change
                 </Button>
@@ -202,12 +209,15 @@ function ContributeCard() {
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setCompany({ id: item.id, name: item.name })}
+                      onClick={() => setCompany({ id: item.id, name: item.name, verified: item.verified })}
                       className={cn(
                         "w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-secondary",
                       )}
                     >
-                      {item.name}
+                      <span className="inline-flex items-center gap-1">
+                        {item.name}
+                        {item.verified ? <CompanyVerifiedBadge /> : null}
+                      </span>
                     </button>
                   ))}
                   {matches.length === 0 ? (

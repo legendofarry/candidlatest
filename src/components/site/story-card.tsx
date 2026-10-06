@@ -2,6 +2,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { StoryActions } from "@/components/site/story-actions";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 export type PublicStory = {
   id: string | null;
@@ -9,6 +10,7 @@ export type PublicStory = {
   body: string | null;
   company_name: string | null;
   company_slug: string | null;
+  company_verified?: boolean;
   role_level: string | null;
   county: string | null;
   tenure: string | null;
@@ -67,9 +69,13 @@ export function StoryCard({
             className="relative z-10 font-semibold text-foreground hover:text-primary"
           >
             {story.company_name}
+            {story.company_verified ? <CompanyVerifiedBadge /> : null}
           </Link>
         ) : (
-          <span className="font-semibold text-foreground">{story.company_name}</span>
+          <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+            {story.company_name}
+            {story.company_verified ? <CompanyVerifiedBadge /> : null}
+          </span>
         )}
         <span>·</span>
         <span>{story.industry}</span>

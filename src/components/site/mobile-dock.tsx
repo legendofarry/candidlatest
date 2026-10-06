@@ -37,11 +37,13 @@ export function MobileDock({
   signedIn,
   userInitials,
   photoUrl,
+  messageUnread = 0,
   onLeave,
 }: {
   signedIn: boolean;
   userInitials: string;
   photoUrl?: string | null;
+  messageUnread?: number;
   onLeave: () => void;
 }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -218,8 +220,13 @@ export function MobileDock({
                 to="/messages"
                 icon={MessagesSquare}
                 label="Chats"
-                hint="Private replies and follow-ups"
+                hint={
+                  messageUnread > 0
+                    ? `${messageUnread} unread message${messageUnread === 1 ? "" : "s"}`
+                    : "Private replies and follow-ups"
+                }
                 active={pathname.startsWith("/messages")}
+                badge={messageUnread}
               />
             ) : null}
             {moreLinks.map((item) => (
@@ -245,12 +252,14 @@ function SheetRow({
   label,
   hint,
   active,
+  badge,
 }: {
   to: string;
   icon: typeof Home;
   label: string;
   hint: string;
   active: boolean;
+  badge?: number;
 }) {
   return (
     <Link
@@ -272,6 +281,11 @@ function SheetRow({
         <span className="block truncate text-sm font-medium text-foreground">{label}</span>
         <span className="block truncate text-xs text-muted-foreground">{hint}</span>
       </span>
+      {badge && badge > 0 ? (
+        <span className="rounded-full bg-danger px-1.5 py-0.5 text-[10px] font-bold text-primary-foreground">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
     </Link>
   );
 }

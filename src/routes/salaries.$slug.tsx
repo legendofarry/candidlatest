@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp } from "lucide-react";
 import { getCompanySalaries } from "@/lib/public.functions";
 import { Button } from "@/components/ui/button";
 import { kes } from "@/routes/salaries.index";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 const detailQuery = (slug: string) =>
   queryOptions({
@@ -100,7 +101,11 @@ function CompanySalaryPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-semibold md:text-4xl">{data.company.name} salaries</h1>
+        <h1 className="flex flex-wrap items-center gap-2 text-3xl font-semibold md:text-4xl">
+          {data.company.name}
+          {data.company.verified ? <CompanyVerifiedBadge className="size-5" /> : null}
+          salaries
+        </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {data.company.industry ?? "—"} · {data.company.county ?? "—"} · {data.contributions}{" "}
           contribution{data.contributions === 1 ? "" : "s"}

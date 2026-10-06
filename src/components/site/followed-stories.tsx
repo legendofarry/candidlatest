@@ -13,6 +13,7 @@ import {
 } from "@/lib/social.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 /** Followers/following counts plus followed stories with an AI catch-up. */
 export function FollowedStories() {
@@ -119,7 +120,10 @@ export function FollowedStories() {
                   {item.title ?? "Untitled story"}
                 </Link>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {item.company_name ?? "Unknown company"} ·{" "}
+                  <span className="inline-flex items-center gap-1">
+                    {item.company_name ?? "Unknown company"}
+                    {item.company_verified ? <CompanyVerifiedBadge /> : null}
+                  </span> ·{" "}
                   {item.new_comments > 0
                     ? `${item.new_comments} new since you last looked`
                     : "no new activity"}

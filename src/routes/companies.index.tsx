@@ -6,6 +6,7 @@ import { listCompanyScores } from "@/lib/public.functions";
 import { FilterBar } from "@/components/site/filter-bar";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 const companiesQuery = queryOptions({
   queryKey: ["company-scores"],
@@ -147,7 +148,10 @@ function CompaniesPage() {
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-semibold">{company.name}</h2>
+                  <h2 className="flex items-center gap-1.5 font-semibold">
+                    {company.name}
+                    {company.verified ? <CompanyVerifiedBadge /> : null}
+                  </h2>
                   <p className="text-xs text-muted-foreground">
                     {company.industry} · {company.county}
                   </p>

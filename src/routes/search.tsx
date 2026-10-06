@@ -5,6 +5,7 @@ import { Building2, FileText, Search as SearchIcon } from "lucide-react";
 import { searchAll } from "@/lib/public.functions";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 export const Route = createFileRoute("/search")({
   head: () => ({
@@ -82,7 +83,10 @@ function SearchPage() {
                     params={{ slug: company.slug ?? "" }}
                     className="block rounded-xl border border-border px-4 py-3 transition-colors hover:bg-secondary"
                   >
-                    <div className="font-medium">{company.name}</div>
+                    <div className="flex items-center gap-1.5 font-medium">
+                      {company.name}
+                      {company.verified ? <CompanyVerifiedBadge /> : null}
+                    </div>
                     <div className="text-xs text-muted-foreground">
                       {[company.industry, company.county].filter(Boolean).join(" · ") || "Kenya"}
                     </div>
@@ -109,7 +113,11 @@ function SearchPage() {
                   >
                     <div className="font-medium">{story.title}</div>
                     <div className="text-xs text-muted-foreground">
-                      {[story.company_name, story.county].filter(Boolean).join(" · ")}
+                      <span className="inline-flex items-center gap-1">
+                        {story.company_name}
+                        {story.company_verified ? <CompanyVerifiedBadge /> : null}
+                        {story.county ? ` · ${story.county}` : ""}
+                      </span>
                     </div>
                   </Link>
                 ))

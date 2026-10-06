@@ -58,6 +58,7 @@ export type StoryRecord = {
   company_id: string;
   company_name: string | null;
   company_slug: string | null;
+  company_verified?: boolean;
   title: string;
   body: string;
   reasons: string[];
@@ -158,6 +159,7 @@ export type CompanyScoreRecord = {
   company_id: string | null;
   name: string | null;
   slug: string | null;
+  verified: boolean;
   industry: string | null;
   county: string | null;
   story_count: number | null;
@@ -290,6 +292,7 @@ export async function buildCompanyScores() {
       company_id: company.id,
       name: company.name,
       slug: company.slug,
+      verified: Boolean(company.verified),
       industry: company.industry,
       county: company.county,
       story_count: companyStories.length,
@@ -347,6 +350,7 @@ export type CompanySalarySummary = {
   company_id: string;
   name: string;
   slug: string;
+  verified: boolean;
   industry: string | null;
   county: string | null;
   contributions: number;
@@ -391,6 +395,7 @@ export async function buildCompanySalaryDirectory() {
       company_id: company.id,
       name: company.name,
       slug: company.slug,
+      verified: Boolean(company.verified),
       industry: company.industry,
       county: company.county,
       contributions: items.length,
@@ -440,6 +445,7 @@ export async function buildCompanySalaryDetail(slug: string) {
       id: company.id,
       name: company.name,
       slug: company.slug,
+      verified: Boolean(company.verified),
       industry: company.industry,
       county: company.county,
     },
@@ -456,6 +462,7 @@ export type PublicStoryRecord = Omit<StoryRecord, "status" | "moderation_note"> 
   reasons: string[] | null;
   company_name: string | null;
   company_slug: string | null;
+  company_verified: boolean;
   comment_count: number | null;
   metoo: number | null;
   upvotes: number | null;
@@ -514,6 +521,7 @@ export async function getPublicStories(input: {
         id: story.id,
         company_name: story.company_name ?? company?.name ?? null,
         company_slug: story.company_slug ?? company?.slug ?? null,
+        company_verified: Boolean(company?.verified),
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
         metoo: story.metoo,
@@ -563,6 +571,7 @@ export async function getCompanyView(slug: string) {
         id: story.id,
         company_name: story.company_name ?? company.name,
         company_slug: story.company_slug ?? company.slug,
+        company_verified: Boolean(company.verified),
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
         metoo: story.metoo,
@@ -658,6 +667,7 @@ export async function getStoryView(id: string) {
       ...story,
       company_name: story.company_name ?? company?.name ?? null,
       company_slug: story.company_slug ?? company?.slug ?? null,
+      company_verified: Boolean(company?.verified),
       reasons: story.reasons ?? [],
       comment_count: story.comment_count,
       metoo: story.metoo,
@@ -711,6 +721,7 @@ export async function searchData(queryText: string) {
         story.company_slug ??
         companies.find((company) => company.id === story.company_id)?.slug ??
         null,
+      company_verified: Boolean(companies.find((company) => company.id === story.company_id)?.verified),
       reasons: story.reasons ?? [],
       comment_count: story.comment_count,
       metoo: story.metoo,

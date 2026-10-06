@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StorySocial } from "@/components/site/story-social";
 import { StoryLocationTag } from "@/components/site/company-intel";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 const storyQuery = (id: string) =>
   queryOptions({ queryKey: ["story", id], queryFn: () => getStory({ data: { id } }) });
@@ -95,6 +96,7 @@ function StoryPage() {
               className="font-semibold text-foreground hover:text-primary"
             >
               {story.company_name}
+              {story.company_verified ? <CompanyVerifiedBadge /> : null}
             </Link>
           ) : null}
           <span>· {story.industry}</span>

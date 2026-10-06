@@ -1,5 +1,10 @@
 import { getFirestoreDb } from "./firebase.server";
-import { readCollection, type CommentRecord, type StoryRecord } from "./firebase-data.server";
+import {
+  readCollection,
+  type CommentRecord,
+  type CompanyRecord,
+  type StoryRecord,
+} from "./firebase-data.server";
 
 export type FollowRecord = {
   id: string;
@@ -129,6 +134,7 @@ export type FollowedStory = {
   story_id: string;
   title: string | null;
   company_name: string | null;
+  company_verified: boolean;
   last_seen_at: string;
   new_comments: number;
   total_comments: number;
@@ -141,11 +147,13 @@ export async function listFollowedStories(userId: string): Promise<FollowedStory
   if (follows.empty) return [];
 
   const records = follows.docs.map((doc) => doc.data() as StoryFollowRecord);
-  const [stories, comments] = await Promise.all([
+  const [stories, comments, companies] = await Promise.all([
     readCollection<StoryRecord>("stories"),
     readCollection<CommentRecord>("comments"),
+    readCollection<CompanyRecord>("companies"),
   ]);
   const storyById = new Map(stories.map((story) => [story.id, story] as const));
+  const companyById = new Map(companies.map((company) => [company.id, company] as const));
 
   return records
     .map((record) => {
@@ -156,6 +164,7 @@ export async function listFollowedStories(userId: string): Promise<FollowedStory
         story_id: record.story_id,
         title: story?.title ?? null,
         company_name: story?.company_name ?? null,
+        company_verified: Boolean(story && companyById.get(story.company_id)?.verified),
         last_seen_at: record.last_seen_at,
         new_comments: storyComments.filter(
           (comment) => new Date(comment.created_at).getTime() > since,

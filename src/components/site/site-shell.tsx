@@ -509,6 +509,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           signedIn={Boolean(user)}
           userInitials={userInitials}
           photoUrl={accountProfile?.photoUrl}
+          messageUnread={messageState?.unread ?? 0}
           onLeave={handleLeave}
         />
       ) : null}

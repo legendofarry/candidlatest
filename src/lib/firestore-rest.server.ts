@@ -20,7 +20,8 @@ function encode(value: unknown): FsValue {
   if (typeof value === "string") return { stringValue: value };
   if (value instanceof Date) return { timestampValue: value.toISOString() };
   if (Array.isArray(value)) return { arrayValue: { values: value.map(encode) } };
-  if (typeof value === "object") return { mapValue: { fields: encodeFields(value as DocumentData) } };
+  if (typeof value === "object")
+    return { mapValue: { fields: encodeFields(value as DocumentData) } };
   return { stringValue: String(value) };
 }
 function encodeFields(data: DocumentData) {
@@ -57,7 +58,7 @@ function leafPaths(data: DocumentData, prefix: string[] = []): string[] {
       typeof v === "object" &&
       !Array.isArray(v) &&
       !(v instanceof Date) &&
-      !(v instanceof IncrementTransform) &&
+      !(v instanceof FieldTransform) &&
       Object.keys(v).length
     )
       paths.push(...leafPaths(v, path));
@@ -93,7 +94,9 @@ export class DocumentSnapshot {
     return this.fields ? { ...this.fields } : undefined;
   }
   get(field: string) {
-    return field.split(".").reduce<any>((acc, k) => (acc == null ? undefined : acc[k]), this.fields);
+    return field
+      .split(".")
+      .reduce<any>((acc, k) => (acc == null ? undefined : acc[k]), this.fields);
   }
 }
 export type QueryDocumentSnapshot<_T = DocumentData> = DocumentSnapshot & { data(): DocumentData };
@@ -114,14 +117,46 @@ export class QuerySnapshot {
 type Write = Record<string, unknown>;
 type SetOptions = { merge?: boolean };
 
-class IncrementTransform {
+abstract class FieldTransform {}
+
+class IncrementTransform extends FieldTransform {
   constructor(readonly operand: number) {}
+}
+class ArrayUnionTransform extends FieldTransform {
+  constructor(readonly operands: unknown[]) {
+    super();
+  }
+}
+class ArrayRemoveTransform extends FieldTransform {
+  constructor(readonly operands: unknown[]) {
+    super();
+  }
+}
+
+function stripTransforms(data: DocumentData): DocumentData {
+  const result: DocumentData = {};
+  for (const [key, value] of Object.entries(data)) {
+    if (value instanceof FieldTransform) continue;
+    if (value && typeof value === "object" && !Array.isArray(value) && !(value instanceof Date)) {
+      const stripped = stripTransforms(value as DocumentData);
+      if (Object.keys(stripped).length > 0 || Object.keys(value).length === 0) {
+        result[key] = stripped;
+      }
+    } else result[key] = value;
+  }
+  return result;
 }
 
 /** Firestore field transforms supported by the REST client. */
 export const FieldValue = {
   increment(operand: number) {
     return new IncrementTransform(operand);
+  },
+  arrayUnion(...operands: unknown[]) {
+    return new ArrayUnionTransform(operands);
+  },
+  arrayRemove(...operands: unknown[]) {
+    return new ArrayRemoveTransform(operands);
   },
 };
 
@@ -159,6 +194,18 @@ export class DocumentReference {
       if (value instanceof IncrementTransform) {
         fieldTransforms.push({ fieldPath, increment: encode(value.operand) });
         transformedPaths.add(fieldPath);
+      } else if (value instanceof ArrayUnionTransform) {
+        fieldTransforms.push({
+          fieldPath,
+          appendMissingElements: { values: value.operands.map(encode) },
+        });
+        transformedPaths.add(fieldPath);
+      } else if (value instanceof ArrayRemoveTransform) {
+        fieldTransforms.push({
+          fieldPath,
+          removeAllFromArray: { values: value.operands.map(encode) },
+        });
+        transformedPaths.add(fieldPath);
       }
     }
     const updatePaths = paths.filter((path) => !transformedPaths.has(path));
@@ -171,7 +218,7 @@ export class DocumentReference {
     }
 
     return {
-      update: { name: this.name, fields: encodeFields(nested) },
+      update: { name: this.name, fields: encodeFields(stripTransforms(nested)) },
       updateMask: { fieldPaths: updatePaths },
       ...(fieldTransforms.length > 0 ? { updateTransforms: fieldTransforms } : {}),
       currentDocument: { exists: true },
@@ -214,7 +261,13 @@ export class Query {
     protected max?: number,
   ) {}
   where(field: string, op: string, value: unknown) {
-    return new Query(this.db, this.path, [...this.filters, { field, op, value }], this.orders, this.max);
+    return new Query(
+      this.db,
+      this.path,
+      [...this.filters, { field, op, value }],
+      this.orders,
+      this.max,
+    );
   }
   orderBy(field: string, dir: "asc" | "desc" = "asc") {
     return new Query(this.db, this.path, this.filters, [...this.orders, { field, dir }], this.max);
@@ -252,7 +305,11 @@ export class Query {
       .map((r) => {
         const rel = r.document!.name.slice(this.db.root.length + 1);
         const ref = new DocumentReference(this.db, rel);
-        return new DocumentSnapshot(ref.id, ref, decodeFields(r.document!.fields ?? {})) as QueryDocumentSnapshot;
+        return new DocumentSnapshot(
+          ref.id,
+          ref,
+          decodeFields(r.document!.fields ?? {}),
+        ) as QueryDocumentSnapshot;
       });
     return new QuerySnapshot(docs);
   }
@@ -263,7 +320,10 @@ export class CollectionReference extends Query {
     return this.path.split("/").pop()!;
   }
   doc(id?: string) {
-    return new DocumentReference(this.db, `${this.path}/${id ?? crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`);
+    return new DocumentReference(
+      this.db,
+      `${this.path}/${id ?? crypto.randomUUID().replace(/-/g, "").slice(0, 20)}`,
+    );
   }
   async add(data: DocumentData) {
     const ref = this.doc();
@@ -323,17 +383,27 @@ export class Firestore {
     const res = await fetch("https://oauth2.googleapis.com/token", {
       method: "POST",
       headers: { "content-type": "application/x-www-form-urlencoded" },
-      body: new URLSearchParams({ grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer", assertion }),
+      body: new URLSearchParams({
+        grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+        assertion,
+      }),
     });
     if (!res.ok) throw new Error(`Firestore auth failed [${res.status}]: ${await res.text()}`);
     const json = (await res.json()) as { access_token: string; expires_in: number };
-    cachedToken = { token: json.access_token, exp: now + json.expires_in, email: this.creds.clientEmail };
+    cachedToken = {
+      token: json.access_token,
+      exp: now + json.expires_in,
+      email: this.creds.clientEmail,
+    };
     return json.access_token;
   }
   async request(path: string, init: RequestInit, allow404 = false): Promise<any> {
     const res = await fetch(`${this.base}${path}`, {
       ...init,
-      headers: { authorization: `Bearer ${await this.token()}`, "content-type": "application/json" },
+      headers: {
+        authorization: `Bearer ${await this.token()}`,
+        "content-type": "application/json",
+      },
     });
     if (allow404 && res.status === 404) return null;
     if (!res.ok) throw new Error(`Firestore request failed [${res.status}]: ${await res.text()}`);

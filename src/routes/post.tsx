@@ -25,6 +25,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { cn } from "@/lib/utils";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 const filtersQuery = queryOptions({ queryKey: ["filters"], queryFn: () => getFilterOptions() });
 
@@ -297,6 +298,7 @@ function PostPage() {
                                 >
                                   <Building2 className="size-3.5 text-primary" />
                                   {match.name}
+                                  {match.verified ? <CompanyVerifiedBadge /> : null}
                                 </button>
                               ))}
                             </div>

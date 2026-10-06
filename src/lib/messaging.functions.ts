@@ -56,7 +56,12 @@ export const postMessage = createServerFn({ method: "POST" })
 export const reactToMessage = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ message_id: z.string().min(1), emoji: z.string().min(1).max(8) }).parse(input),
+    z
+      .object({
+        message_id: z.string().min(1),
+        emoji: z.enum(["❤️", "😂", "😮", "😢", "🔥", "👏", "👍", "🙏"]),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { toggleReaction } = await import("./messaging.server");

@@ -12,6 +12,7 @@ import { FilterBar } from "@/components/site/filter-bar";
 import { CandidPulse } from "@/components/site/candid-pulse";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import {
   Drawer,
   DrawerContent,
@@ -291,6 +292,7 @@ function FeedPage() {
                         className="text-muted-foreground hover:text-primary"
                       >
                         {company.name}
+                        {company.verified ? <CompanyVerifiedBadge className="ml-1 align-middle" /> : null}
                       </Link>
                     </li>
                   ))}

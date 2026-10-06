@@ -120,6 +120,35 @@ export type SocialLinks = {
   website: string | null;
 };
 
+/** Stores only canonical HTTPS links so profile links are safe to open in the app. */
+export function normalizeSocialLinks(input: SocialLinks): SocialLinks {
+  const handleUrl = (value: string | null, host: string, prefix = "") => {
+    const trimmed = value?.trim() ?? "";
+    if (!trimmed) return null;
+    if (/^https:\/\//i.test(trimmed)) return safeHttpsUrl(trimmed);
+    const handle = trimmed.replace(/^@/, "").replace(/^\/+/, "");
+    return handle ? `https://${host}/${prefix}${encodeURIComponent(handle)}` : null;
+  };
+  return {
+    x: handleUrl(input.x, "x.com"),
+    instagram: handleUrl(input.instagram, "instagram.com"),
+    tiktok: handleUrl(input.tiktok, "tiktok.com", "@"),
+    linkedin: handleUrl(input.linkedin, "linkedin.com"),
+    website: safeHttpsUrl(input.website),
+  };
+}
+
+export function safeHttpsUrl(value: string | null | undefined) {
+  const trimmed = value?.trim() ?? "";
+  if (!trimmed) return null;
+  try {
+    const url = new URL(trimmed.startsWith("www.") ? `https://${trimmed}` : trimmed);
+    return url.protocol === "https:" ? url.toString() : null;
+  } catch {
+    return null;
+  }
+}
+
 export type OnboardingProfile = ProfileRecord & {
   username: string | null;
   socials: SocialLinks | null;
@@ -215,6 +244,7 @@ export async function claimUsername(
   const usernameRef = db.collection("usernames").doc(username);
   const profileRef = db.collection("profiles").doc(userId);
   const now = new Date().toISOString();
+  const safeSocials = normalizeSocialLinks(socials);
 
   try {
     await db.runTransaction(async (tx) => {
@@ -239,7 +269,7 @@ export async function claimUsername(
           id: userId,
           username,
           handle: username,
-          socials,
+          socials: safeSocials,
           county: previous?.county ?? null,
           role_label: previous?.role_label ?? null,
           banned: previous?.banned ?? false,

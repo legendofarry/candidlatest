@@ -12,6 +12,7 @@ import {
 import type { PublicStory } from "@/components/site/story-card";
 import { getStory } from "@/lib/public.functions";
 import { cn } from "@/lib/utils";
+import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
 const sortOptions: { value: CommentSortMode; label: string; icon: typeof TrendingUp }[] = [
   { value: "top", label: "Top", icon: TrendingUp },
@@ -55,7 +56,10 @@ export function FeedDiscussionPanel({
               {story.title || "Post discussion"}
             </h2>
             <p className="mt-1 truncate text-xs text-muted-foreground">
-              {story.company_name || "Anonymous employer"} · Anonymous
+              <span className="inline-flex items-center gap-1">
+                {story.company_name || "Anonymous employer"}
+                {story.company_verified ? <CompanyVerifiedBadge /> : null}
+              </span> · Anonymous
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close discussion">

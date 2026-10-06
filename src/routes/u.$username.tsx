@@ -141,6 +141,10 @@ function PublicProfilePage() {
           <Stat label="Following" value={profile.following} />
         </div>
 
+        {profile.followsYou && !profile.isSelf ? (
+          <p className="mt-3 text-xs font-medium text-primary">Follows you</p>
+        ) : null}
+
         {profile.isSelf ? null : (
           <div className="mt-5 flex flex-wrap gap-2">
             <Button
@@ -166,7 +170,7 @@ function PublicProfilePage() {
             </Button>
             <Button
               variant="outline"
-              disabled={busy || profile.isBlocked}
+              disabled={busy || profile.isBlocked || !profile.messaging.allowed}
               onClick={() =>
                 void (async () => {
                   setBusy(true);
@@ -186,7 +190,8 @@ function PublicProfilePage() {
                 })()
               }
             >
-              <MessageSquare className="size-4" /> Message
+              <MessageSquare className="size-4" />{" "}
+              {profile.messaging.allowed ? "Message" : "Message unavailable"}
             </Button>
             {profile.official ? null : (
               <Button
@@ -205,7 +210,32 @@ function PublicProfilePage() {
             )}
           </div>
         )}
+        {!profile.isSelf && !profile.messaging.allowed && !profile.isBlocked ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            {profile.messaging.reason ?? "This account is not accepting messages right now."}
+          </p>
+        ) : null}
       </motion.section>
+
+      <section className="rounded-2xl border border-border bg-card p-5">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Activity
+        </h2>
+        <div className="mt-4 grid grid-cols-3 gap-3">
+          <ActivityStat label="Published stories" value={profile.contributions.stories} />
+          <ActivityStat label="Comments" value={profile.contributions.comments} />
+          <ActivityStat
+            label="Member since"
+            value={
+              profile.contributions.joined_at
+                ? new Intl.DateTimeFormat("en", { month: "short", year: "numeric" }).format(
+                    new Date(profile.contributions.joined_at),
+                  )
+                : "—"
+            }
+          />
+        </div>
+      </section>
 
       {profile.socials ? (
         <section className="rounded-2xl border border-border bg-card p-5">
@@ -214,11 +244,12 @@ function PublicProfilePage() {
           </h2>
           <ul className="mt-3 space-y-2">
             {(Object.entries(profile.socials) as [string, string | null][])
-              .filter(([, value]) => Boolean(value))
+              .map(([key, value]) => [key, profileLink(key, value)] as const)
+              .filter((entry): entry is readonly [string, string] => Boolean(entry[1]))
               .map(([key, value]) => (
                 <li key={key}>
                   <a
-                    href={value as string}
+                    href={value}
                     target="_blank"
                     rel="noreferrer noopener"
                     className="flex items-center gap-2 text-sm text-primary hover:underline"
@@ -241,6 +272,34 @@ function Stat({ label, value }: { label: string; value: number }) {
       <p className="text-xs text-muted-foreground">{label}</p>
     </div>
   );
+}
+
+function ActivityStat({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div className="rounded-xl bg-secondary/50 p-3">
+      <p className="truncate font-display text-base font-semibold">{value}</p>
+      <p className="mt-1 text-[11px] text-muted-foreground">{label}</p>
+    </div>
+  );
+}
+
+function profileLink(key: string, raw: string | null) {
+  const value = raw?.trim();
+  if (!value) return null;
+  if (/^https:\/\//i.test(value)) {
+    try {
+      return new URL(value).protocol === "https:" ? value : null;
+    } catch {
+      return null;
+    }
+  }
+  const handle = value.replace(/^@/, "").replace(/^\/+/, "");
+  if (!handle || /[\s/]/.test(handle)) return null;
+  if (key === "x") return `https://x.com/${encodeURIComponent(handle)}`;
+  if (key === "instagram") return `https://instagram.com/${encodeURIComponent(handle)}`;
+  if (key === "tiktok") return `https://tiktok.com/@${encodeURIComponent(handle)}`;
+  if (key === "linkedin") return `https://linkedin.com/${encodeURIComponent(handle)}`;
+  return null;
 }
 
 function EmptyState({

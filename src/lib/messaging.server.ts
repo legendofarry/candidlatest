@@ -1,5 +1,6 @@
 import { getFirestoreDb } from "./firebase.server";
-import type { ProfileRecord } from "./firebase-data.server";
+import { FieldValue } from "./firestore-rest.server";
+import type { CommentRecord, ProfileRecord, StoryRecord } from "./firebase-data.server";
 
 /** The seeded owner account. Candid can always reach every user. */
 export const CANDID_USER_ID = "candid-official";
@@ -135,8 +136,13 @@ export async function isBlocked(blockerId: string, blockedId: string) {
 }
 
 export async function toggleBlock(blockerId: string, blockedId: string) {
+  if (blockerId === blockedId) throw new Error("You cannot block yourself.");
   if (blockedId === CANDID_USER_ID) throw new Error("Candid cannot be blocked.");
   const db = getFirestoreDb();
+  const profile = await db.collection("profiles").doc(blockedId).get();
+  if (!profile.exists || (profile.data() as ProfileRecord).banned) {
+    throw new Error("Account unavailable.");
+  }
   const ref = db.collection("blocks").doc(`${blockerId}:${blockedId}`);
   const snap = await ref.get();
   if (snap.exists) {
@@ -162,16 +168,21 @@ export async function listBlocked(userId: string) {
 
 /** Decides whether `senderId` is allowed to open a chat with `recipientId`. */
 export async function canMessage(senderId: string, recipientId: string) {
-  if (senderId === CANDID_USER_ID) return { allowed: true as const };
   if (senderId === recipientId) return { allowed: false as const, reason: "That is you." };
 
   const db = getFirestoreDb();
-  const [blockedByThem, blockedByYou, settings, followSnap] = await Promise.all([
+  const [recipientSnap, blockedByThem, blockedByYou, settings, followSnap] = await Promise.all([
+    db.collection("profiles").doc(recipientId).get(),
     isBlocked(recipientId, senderId),
     isBlocked(senderId, recipientId),
     readPrivacySettings(recipientId),
     db.collection("follows").doc(`${recipientId}:${senderId}`).get(),
   ]);
+
+  const recipient = recipientSnap.data() as ProfileRecord | undefined;
+  if (!recipientSnap.exists || recipient?.banned)
+    return { allowed: false as const, reason: "This account is unavailable." };
+  if (senderId === CANDID_USER_ID) return { allowed: true as const };
 
   if (blockedByYou) return { allowed: false as const, reason: "You blocked this account." };
   if (blockedByThem)
@@ -301,13 +312,30 @@ export async function sendMessage(input: { userId: string; conversationId: strin
     read_at: null,
     reactions: {},
   };
-  await messageRef.set(message);
-  await ref.update({
+  const batch = db.batch();
+  batch.set(messageRef, message);
+  batch.update(ref, {
     last_message: input.body,
     last_message_at: message.created_at,
     last_sender_id: input.userId,
-    [`unread.${otherId}`]: (record.unread?.[otherId] ?? 0) + 1,
+    [`unread.${otherId}`]: FieldValue.increment(1),
   });
+  await batch.commit();
+
+  // Chat delivery must never fail because a secondary notification cannot be saved.
+  try {
+    const sender = (await readParticipants([input.userId])).get(input.userId);
+    const { pushServerNotification } = await import("./notifications.server");
+    await pushServerNotification({
+      userId: otherId,
+      kind: "info",
+      title: `New message from @${sender?.username ?? "member"}`,
+      description: input.body.replace(/\s+/g, " ").slice(0, 140),
+      link: `/messages/${encodeURIComponent(input.conversationId)}`,
+    });
+  } catch (error) {
+    console.error("Could not create message notification", error);
+  }
 
   return message;
 }
@@ -318,14 +346,18 @@ export async function toggleReaction(userId: string, messageId: string, emoji: s
   const snap = await ref.get();
   if (!snap.exists) throw new Error("Message not found");
   const message = snap.data() as MessageRecord;
+  const conversationSnap = await db.collection("conversations").doc(message.conversation_id).get();
+  const conversation = conversationSnap.data() as ConversationRecord | undefined;
+  if (!conversationSnap.exists || !conversation?.participant_ids.includes(userId)) {
+    throw new Error("Not your conversation");
+  }
   const current = message.reactions?.[emoji] ?? [];
-  const next = current.includes(userId)
-    ? current.filter((id) => id !== userId)
-    : [...current, userId];
-  const reactions = { ...(message.reactions ?? {}), [emoji]: next };
-  if (next.length === 0) delete reactions[emoji];
-  await ref.update({ reactions });
-  return { reactions };
+  await ref.update({
+    [`reactions.${emoji}`]: current.includes(userId)
+      ? FieldValue.arrayRemove(userId)
+      : FieldValue.arrayUnion(userId),
+  });
+  return { ok: true };
 }
 
 /** Public-facing profile used by the chat header and profile detail screen. */
@@ -335,13 +367,24 @@ export async function readPublicProfile(username: string, viewerId: string | nul
   const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
   if (!userId) return null;
 
-  const [participants, profileSnap, followers, following] = await Promise.all([
-    readParticipants([userId]),
-    db.collection("profiles").doc(userId).get(),
-    db.collection("follows").where("following_id", "==", userId).get(),
-    db.collection("follows").where("follower_id", "==", userId).get(),
-  ]);
+  const [participants, profileSnap, followers, following, stories, comments, profileFollowsViewer] =
+    await Promise.all([
+      readParticipants([userId]),
+      db.collection("profiles").doc(userId).get(),
+      db.collection("follows").where("following_id", "==", userId).get(),
+      db.collection("follows").where("follower_id", "==", userId).get(),
+      db.collection("stories").where("author_id", "==", userId).get(),
+      db.collection("comments").where("author_id", "==", userId).get(),
+      viewerId
+        ? db.collection("follows").doc(`${userId}:${viewerId}`).get()
+        : Promise.resolve(null),
+    ]);
   const profile = profileSnap.data() as ProfileRecord | undefined;
+  if (!profileSnap.exists || profile?.banned) return null;
+  const messaging =
+    viewerId && viewerId !== userId
+      ? await canMessage(viewerId, userId)
+      : { allowed: false as const, reason: null };
 
   return {
     ...participants.get(userId)!,
@@ -351,12 +394,21 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     socials: profile?.socials ?? null,
     followers: followers.size,
     following: following.size,
+    contributions: {
+      stories: stories.docs.filter((doc) => (doc.data() as StoryRecord).status === "published")
+        .length,
+      comments: comments.docs.filter((doc) => (doc.data() as CommentRecord).status === "published")
+        .length,
+      joined_at: profile.onboarded_at ?? profile.created_at ?? null,
+    },
     isFollowing: viewerId
       ? followers.docs.some(
           (doc) => (doc.data() as { follower_id: string }).follower_id === viewerId,
         )
       : false,
     isBlocked: viewerId ? await isBlocked(viewerId, userId) : false,
+    followsYou: Boolean(profileFollowsViewer?.exists),
+    messaging: { allowed: messaging.allowed, reason: messaging.allowed ? null : messaging.reason },
     isSelf: viewerId === userId,
   };
 }
