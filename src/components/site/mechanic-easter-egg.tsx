@@ -6,6 +6,9 @@ import { X } from "lucide-react";
 type Phase = "vortex" | "void" | "chat" | "rebuild";
 type Msg = { from: "a" | "b"; text: string };
 
+const COLLAPSE_MS = 9000;
+const REBUILD_MS = 8500;
+
 const SCRIPT: { from: "a" | "b"; text: string; typing: number; pause: number }[] = [
   { from: "a", text: "Hey… you there? 👀", typing: 0, pause: 1800 },
   { from: "b", text: "I'm literally on leave. What happened?", typing: 1900, pause: 1400 },
@@ -50,7 +53,7 @@ function collectParticles(w: number, h: number): P[] {
     }
   }
   const maxR = Math.hypot(cx, cy);
-  for (const p of out) p.delay = (1 - p.r / maxR) * 0.15 + (p.r / maxR) * 0.55 * Math.random() + Math.random() * 0.25;
+  for (const p of out) p.delay = 0.8 + (p.r / maxR) * 1.2 + Math.random() * 0.7;
   return out;
 }
 
@@ -69,6 +72,9 @@ export function MechanicEasterEgg({ open, onClose }: { open: boolean; onClose: (
 
   useEffect(() => {
     if (!open) return;
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext("2d");
+    if (!canvas || !ctx) return;
     const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const timers: number[] = [];
     const at = (ms: number, fn: () => void) => timers.push(window.setTimeout(fn, ms));
@@ -95,14 +101,15 @@ export function MechanicEasterEgg({ open, onClose }: { open: boolean; onClose: (
     const w = window.innerWidth, h = window.innerHeight;
     const dpr = Math.min(window.devicePixelRatio || 1, 2);
     particles.current = reduce ? [] : collectParticles(w, h);
-    const canvas = canvasRef.current!;
     canvas.width = w * dpr; canvas.height = h * dpr;
-    const ctx = canvas.getContext("2d")!;
     ctx.scale(dpr, dpr);
     const cx = w / 2, cy = h / 2;
 
-    // page itself dissolves & twists away while dust peels off
-    requestAnimationFrame(() => setPage({ transform: "rotate(220deg) scale(0.02)", filter: "blur(14px) brightness(1.6)", opacity: "0" }, reduce ? 50 : 2600));
+    // A barely perceptible disturbance comes before the full collapse.
+    let introRaf = requestAnimationFrame(() => {
+      setPage({ transform: "rotate(2deg) scale(0.985)", filter: "blur(0.5px) brightness(1.05)" }, reduce ? 50 : 1400);
+    });
+    at(reduce ? 50 : 1400, () => setPage({ transform: "rotate(220deg) scale(0.02)", filter: "blur(14px) brightness(1.6)", opacity: "0" }, reduce ? 50 : 7200, "cubic-bezier(.65,0,.65,1)"));
 
     let start = performance.now();
     let raf = 0;
@@ -112,28 +119,35 @@ export function MechanicEasterEgg({ open, onClose }: { open: boolean; onClose: (
       const t = (now - start) / 1000;
       const ph = phaseRef.current;
       ctx.clearRect(0, 0, w, h);
-      if (ph === "vortex") darkness = Math.min(1, t / 2.4);
-      if (ph === "rebuild") darkness = Math.max(0, 1 - (now - rebuildStart) / 1600);
+      if (ph === "vortex") darkness = Math.pow(Math.min(1, Math.max(0, (t - 1.4) / 7.2)), 1.6);
+      if (ph === "rebuild") {
+        const reveal = Math.min(1, Math.max(0, ((now - rebuildStart) / 1000 - 2) / 6));
+        darkness = 1 - reveal * reveal * (3 - 2 * reveal);
+      }
       ctx.fillStyle = `rgba(0,0,0,${darkness})`;
       ctx.fillRect(0, 0, w, h);
 
       if (ph === "vortex") {
         // accretion glow
-        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 90 + t * 30);
-        g.addColorStop(0, "rgba(0,0,0,1)");
-        g.addColorStop(0.35, "rgba(0,0,0,1)");
-        g.addColorStop(0.5, `rgba(180,140,255,${0.35 * Math.min(1, t)})`);
+        const glow = Math.min(1, Math.max(0, (t - 0.8) / 3));
+        const glowRadius = 45 + Math.min(t, 9) * 12;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, glowRadius);
+        g.addColorStop(0, `rgba(0,0,0,${glow})`);
+        g.addColorStop(0.35, `rgba(0,0,0,${glow})`);
+        g.addColorStop(0.5, `rgba(180,140,255,${0.35 * glow})`);
         g.addColorStop(1, "rgba(0,0,0,0)");
         ctx.fillStyle = g;
-        ctx.beginPath(); ctx.arc(cx, cy, 90 + t * 30, 0, Math.PI * 2); ctx.fill();
+        ctx.beginPath(); ctx.arc(cx, cy, glowRadius, 0, Math.PI * 2); ctx.fill();
         for (const p of particles.current) {
           if (p.done) continue;
           const lt = t - p.delay;
           if (lt < 0) { ctx.fillStyle = p.color; ctx.fillRect(p.x, p.y, p.size, p.size); continue; }
-          const pull = 0.012 + lt * lt * 0.05;
-          p.r = Math.max(0, p.r - (p.r * pull + lt * 2.2));
-          p.a += 0.02 + 2.4 / (p.r + 25) + lt * 0.015;
-          const px = cx + Math.cos(p.a) * p.r, py = cy + Math.sin(p.a) * p.r * 0.92;
+          // Time-based motion stays equally slow on fast and slow displays.
+          const progress = Math.min(1, lt / (8.6 - p.delay));
+          const pull = Math.pow(progress, 2.4);
+          p.r = p.r0 * (1 - pull);
+          p.a = p.a0 + Math.pow(progress, 2) * 10;
+          const px = cx + Math.cos(p.a) * p.r, py = cy + Math.sin(p.a) * p.r;
           const s = p.size * Math.min(1, p.r / 120 + 0.25);
           ctx.strokeStyle = p.color;
           ctx.globalAlpha = Math.min(1, p.r / 40);
@@ -146,18 +160,18 @@ export function MechanicEasterEgg({ open, onClose }: { open: boolean; onClose: (
       } else if (ph === "rebuild") {
         const lt = (now - rebuildStart) / 1000;
         for (const p of particles.current) {
-          const k = Math.min(1, Math.max(0, (lt - p.delay * 0.4) / 1.1));
-          const e = 1 - Math.pow(1 - k, 3);
-          const r = p.r0 * e, a = p.a0 - (1 - e) * 6;
+          const k = Math.min(1, Math.max(0, (lt - p.delay * 0.5) / 6));
+          const e = k * k * (3 - 2 * k);
+          const r = p.r0 * e, a = p.a0 - (1 - e) * 8;
           const px = cx + Math.cos(a) * r, py = cy + Math.sin(a) * r;
-          ctx.globalAlpha = k < 1 ? 1 : Math.max(0, 1 - (lt - 1.4) * 2);
+          ctx.globalAlpha = Math.min(1, k * 5) * Math.max(0, 1 - Math.max(0, lt - 7.4) / 0.8);
           ctx.fillStyle = p.color;
           ctx.fillRect(px, py, p.size, p.size);
         }
         ctx.globalAlpha = 1;
         // shockwave ring
-        const ring = lt * 900;
-        ctx.strokeStyle = `rgba(200,170,255,${Math.max(0, 0.6 - lt * 0.5)})`;
+        const ring = lt * 150;
+        ctx.strokeStyle = `rgba(200,170,255,${Math.max(0, 0.35 - lt * 0.05)})`;
         ctx.lineWidth = 3;
         ctx.beginPath(); ctx.arc(cx, cy, ring, 0, Math.PI * 2); ctx.stroke();
       }
@@ -166,9 +180,9 @@ export function MechanicEasterEgg({ open, onClose }: { open: boolean; onClose: (
     raf = requestAnimationFrame(frame);
 
     // timeline
-    const vortexEnd = reduce ? 200 : 3000;
+    const vortexEnd = reduce ? 200 : COLLAPSE_MS;
     at(vortexEnd, () => go("void"));
-    let tl = vortexEnd + (reduce ? 200 : 1900); // dramatic silence
+    let tl = vortexEnd + (reduce ? 200 : 2600); // dramatic silence
     at(tl, () => go("chat"));
     SCRIPT.forEach((s) => {
       if (s.typing) { at(tl, () => setTyping(s.from)); tl += reduce ? 100 : s.typing; }
@@ -178,15 +192,16 @@ export function MechanicEasterEgg({ open, onClose }: { open: boolean; onClose: (
     at(tl, () => {
       go("rebuild");
       rebuildStart = performance.now();
-      setPage({ transform: "rotate(0deg) scale(1)", filter: "blur(0px) brightness(1)", opacity: "1" }, reduce ? 50 : 1500, "cubic-bezier(.2,.8,.2,1)");
+      setPage({ transform: "rotate(0deg) scale(1)", filter: "blur(0px) brightness(1)", opacity: "1" }, reduce ? 50 : 8000, "cubic-bezier(.55,0,.35,1)");
     });
-    at(tl + (reduce ? 300 : 2300), () => closeRef.current());
+    at(tl + (reduce ? 300 : REBUILD_MS), () => closeRef.current());
 
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && closeRef.current();
     window.addEventListener("keydown", onKey);
     return () => {
       timers.forEach(clearTimeout);
       cancelAnimationFrame(raf);
+      cancelAnimationFrame(introRaf);
       window.removeEventListener("keydown", onKey);
       resetPage();
       document.body.style.overflow = prevOverflow;
