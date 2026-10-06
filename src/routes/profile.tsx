@@ -237,7 +237,15 @@ function ProfilePage() {
                     Your account
                   </p>
                   <h1 className="mt-1 flex items-center gap-1.5 truncate text-xl font-semibold md:text-2xl">
-                    {handle}
+                    {onboarding.data?.username ? (
+                      <Link
+                        to="/u/$username"
+                        params={{ username: onboarding.data.username }}
+                        className="hover:text-primary"
+                      >
+                        {handle}
+                      </Link>
+                    ) : handle}
                     {verification.data?.badgeStatus === "claimed" ? (
                       <BadgeCheck className="size-5 shrink-0 text-verified" aria-label="Verified" />
                     ) : null}

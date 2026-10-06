@@ -1,5 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { Ban, BadgeCheck, MessageSquareLock } from "lucide-react";
 import {
@@ -102,7 +103,14 @@ export function PrivacySettings() {
                     className="flex items-center justify-between border-b border-border px-2 py-2 md:rounded-xl md:border md:px-3"
                   >
                     <span className="flex items-center gap-1.5 text-sm">
-                      <Ban className="size-3.5 text-muted-foreground" /> @{account.username}
+                      <Ban className="size-3.5 text-muted-foreground" />
+                      <Link
+                        to="/u/$username"
+                        params={{ username: account.username }}
+                        className="hover:text-primary"
+                      >
+                        @{account.username}
+                      </Link>
                     </span>
                     <Button
                       size="sm"

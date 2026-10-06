@@ -176,7 +176,16 @@ export function StoryActions({
               {(thread.data?.comments ?? []).slice(0, 4).map((item) => (
                 <li key={item.id} className="rounded-lg bg-background/80 p-2.5">
                   <p className="text-[11px] font-medium text-muted-foreground">
-                    {item.author_handle} · {formatDate(item.created_at)}
+                    {item.author_username ? (
+                      <Link
+                        to="/u/$username"
+                        params={{ username: item.author_username }}
+                        onClick={(event) => event.stopPropagation()}
+                        className="hover:text-primary"
+                      >
+                        @{item.author_username}
+                      </Link>
+                    ) : item.author_handle} · {formatDate(item.created_at)}
                   </p>
                   <p className="mt-1 text-sm">{item.body}</p>
                 </li>

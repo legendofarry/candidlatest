@@ -183,7 +183,15 @@ export function CommentThread({
             {replyTo ? (
               <div className="mb-2 flex items-center gap-2 rounded-lg bg-secondary/60 px-3 py-1.5 text-xs">
                 <CornerDownRight className="size-3.5" />
-                Replying to {replyTo.author_username ? `@${replyTo.author_username}` : "comment"}
+                Replying to {replyTo.author_username ? (
+                  <Link
+                    to="/u/$username"
+                    params={{ username: replyTo.author_username }}
+                    className="font-medium hover:text-primary"
+                  >
+                    @{replyTo.author_username}
+                  </Link>
+                ) : "comment"}
                 <button
                   type="button"
                   className="ml-auto text-muted-foreground hover:text-foreground"
@@ -309,9 +317,17 @@ function CommentRow({
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
-            <span className="font-semibold text-foreground">
-              {comment.author_username ? `@${comment.author_username}` : comment.author_handle}
-            </span>
+            {comment.author_username ? (
+              <Link
+                to="/u/$username"
+                params={{ username: comment.author_username }}
+                className="font-semibold text-foreground hover:text-primary"
+              >
+                @{comment.author_username}
+              </Link>
+            ) : (
+              <span className="font-semibold text-foreground">{comment.author_handle}</span>
+            )}
             {comment.author_verified ? <BadgeCheck className="size-3.5 text-primary" /> : null}
             {comment.is_official ? (
               <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">

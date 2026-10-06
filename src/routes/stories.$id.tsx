@@ -112,7 +112,15 @@ function StoryPage() {
         </div>
         <h1 className="mt-3 text-3xl font-semibold leading-tight md:text-4xl">{story.title}</h1>
         <p className="mt-2 text-xs text-muted-foreground">
-          {story.author_username ? `@${story.author_username}` : "Anonymous contributor"} ·{" "}
+          {story.author_username ? (
+            <Link
+              to="/u/$username"
+              params={{ username: story.author_username }}
+              className="hover:text-primary"
+            >
+              @{story.author_username}
+            </Link>
+          ) : "Anonymous contributor"} ·{" "}
           {formatDate(story.created_at)}
         </p>
       </div>

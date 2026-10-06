@@ -109,7 +109,16 @@ export function StoryCard({
 
       <div className="mt-4 flex items-center gap-5 text-xs text-muted-foreground">
         <span className="ml-auto">
-          {story.author_username ? `@${story.author_username}` : "Anonymous"} ·{" "}
+          {story.author_username ? (
+            <Link
+              to="/u/$username"
+              params={{ username: story.author_username }}
+              onClick={(event) => event.stopPropagation()}
+              className="relative z-10 hover:text-primary"
+            >
+              @{story.author_username}
+            </Link>
+          ) : "Anonymous"} ·{" "}
           {formatDate(story.created_at)}
         </span>
       </div>
