@@ -517,7 +517,7 @@ function ContributionsPanel({
   data,
   loading,
 }: {
-  data?: { active: ContributionGroup; inactive: ContributionGroup; pending: ContributionGroup };
+  data?: undefined | { active: ContributionGroup; inactive: ContributionGroup; pending: ContributionGroup };
   loading: boolean;
 }) {
   const groups = data ?? {

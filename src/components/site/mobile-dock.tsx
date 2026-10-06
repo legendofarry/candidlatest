@@ -42,7 +42,7 @@ export function MobileDock({
 }: {
   signedIn: boolean;
   userInitials: string;
-  photoUrl?: string | null;
+  photoUrl?: string | null | undefined;
   messageUnread?: number;
   onLeave: () => void;
 }) {
@@ -302,7 +302,7 @@ function DockShell({
   label: string;
   badge?: number | undefined;
   initials?: string | undefined;
-  photoUrl?: string | null;
+  photoUrl?: string | null | undefined;
   icon: typeof Home;
 }) {
   return (
@@ -393,7 +393,7 @@ function DockButton({
   active: boolean;
   badge?: number | undefined;
   initials?: string | undefined;
-  photoUrl?: string | null;
+  photoUrl?: string | null | undefined;
   onClick: () => void;
 }) {
   return (
