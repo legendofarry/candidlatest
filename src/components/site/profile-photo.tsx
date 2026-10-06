@@ -17,7 +17,7 @@ export function ProfileAvatar({
   initials,
   className = "",
 }: {
-  photoUrl?: string | null;
+  photoUrl?: string | null | undefined;
   initials: string;
   className?: string;
 }) {
@@ -46,7 +46,7 @@ export function ProfilePhotoPicker({
   onSaved,
   compact = false,
 }: {
-  photoUrl?: string | null;
+  photoUrl?: string | null | undefined;
   initials: string;
   onSaved: (photoUrl: string) => void;
   compact?: boolean;

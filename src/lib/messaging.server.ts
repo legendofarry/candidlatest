@@ -399,7 +399,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
         .length,
       comments: comments.docs.filter((doc) => (doc.data() as CommentRecord).status === "published")
         .length,
-      joined_at: profile.onboarded_at ?? profile.created_at ?? null,
+      joined_at: profile?.onboarded_at ?? profile?.created_at ?? null,
     },
     isFollowing: viewerId
       ? followers.docs.some(

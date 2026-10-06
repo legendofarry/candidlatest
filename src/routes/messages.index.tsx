@@ -14,7 +14,7 @@ import { ProfileAvatar } from "@/components/site/profile-photo";
 function useDemoConversation() {
   return null as null | {
     id: string;
-    with: { username: string; verified?: boolean };
+    with: { username: string; verified?: boolean; photo_url?: string | null };
     last_message: string;
     last_message_at: string;
     unread: number;

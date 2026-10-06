@@ -120,7 +120,7 @@ type SetOptions = { merge?: boolean };
 abstract class FieldTransform {}
 
 class IncrementTransform extends FieldTransform {
-  constructor(readonly operand: number) {}
+  constructor(readonly operand: number) { super(); }
 }
 class ArrayUnionTransform extends FieldTransform {
   constructor(readonly operands: unknown[]) {
