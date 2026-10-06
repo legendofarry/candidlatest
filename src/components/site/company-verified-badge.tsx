@@ -6,7 +6,6 @@ export function CompanyVerifiedBadge({ className = "" }: { className?: string })
     <BadgeCheck
       aria-label="Verified company"
       role="img"
-      title="Verified company"
       className={`inline-block size-4 shrink-0 text-verified ${className}`}
     />
   );
