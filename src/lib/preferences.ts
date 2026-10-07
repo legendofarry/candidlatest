@@ -66,6 +66,9 @@ function applySideEffects(next: Preferences) {
   if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("dark", next.theme === "dark");
   document.documentElement.classList.toggle("reduce-motion", next.reduceMotion);
+  document
+    .querySelector('meta[name="theme-color"]')
+    ?.setAttribute("content", next.theme === "dark" ? "#08070e" : "#fbfafc");
 }
 
 export function setPreference<K extends keyof Preferences>(key: K, value: Preferences[K]) {

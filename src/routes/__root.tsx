@@ -120,9 +120,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var saved=JSON.parse(localStorage.getItem("candid_preferences")||"{}");var theme=localStorage.getItem("lo-theme")||saved.theme;var dark=theme!=="light";document.documentElement.classList.toggle("dark",dark);var color=document.querySelector('meta[name="theme-color"]');if(color)color.setAttribute("content",dark?"#08070e":"#fbfafc")}catch{document.documentElement.classList.add("dark")}`,
+          }}
+        />
       </head>
       <body>
         {children}
