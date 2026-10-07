@@ -10,8 +10,7 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
-import { Eye, EyeOff, Fingerprint, Flame, Loader2, ShieldCheck } from "lucide-react";
-import { authenticateWithBiometric, getCredentials, markUnlocked } from "@/lib/biometrics";
+import { Eye, EyeOff, Flame, Loader2, ShieldCheck } from "lucide-react";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -96,7 +95,6 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [hasBiometric, setHasBiometric] = useState(false);
   const fetchOnboardingState = useServerFn(getOnboardingState);
 
   useEffect(() => {
@@ -114,10 +112,6 @@ function AuthPage() {
     };
   }, [authLoading, user, fetchOnboardingState, navigate]);
 
-  useEffect(() => {
-    setHasBiometric(getCredentials().length > 0);
-  }, []);
-
   if (authLoading || user) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background px-6 text-sm text-muted-foreground">
@@ -125,19 +119,6 @@ function AuthPage() {
         {user ? "Opening your account…" : "Checking your session…"}
       </div>
     );
-  }
-
-  async function biometricUnlock() {
-    setBusy(true);
-    const ok = await authenticateWithBiometric();
-    setBusy(false);
-    if (ok) {
-      markUnlocked();
-      toast.success("Welcome back.");
-      navigate({ to: "/" });
-    } else {
-      toast.error("Scan not recognised. Use your email and password.");
-    }
   }
 
   async function submit(event: React.FormEvent) {
@@ -295,21 +276,6 @@ function AuthPage() {
                     </button>
                   ))}
                 </div>
-
-                {hasBiometric && mode === "signin" ? (
-                  <button
-                    type="button"
-                    disabled={busy}
-                    onClick={() => void biometricUnlock()}
-                    className="mb-5 flex min-h-12 w-full items-center gap-3 rounded-2xl border border-primary/20 bg-primary/[0.055] px-4 text-left transition-colors hover:bg-primary/[0.09] active:scale-[0.99] disabled:opacity-50"
-                  >
-                    <span className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                      {busy ? <Loader2 className="size-4 animate-spin" /> : <Fingerprint className="size-4" />}
-                    </span>
-                    <span className="flex-1 text-sm font-medium">Unlock with biometrics</span>
-                    <span className="text-xs text-muted-foreground">This device</span>
-                  </button>
-                ) : null}
 
                 <div id="auth-panel" role="tabpanel" aria-labelledby={`auth-tab-${mode}`}>
                   <Button

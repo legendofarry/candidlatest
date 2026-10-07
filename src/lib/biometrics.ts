@@ -115,9 +115,9 @@ export async function registerBiometric(
   return record;
 }
 
-export async function authenticateWithBiometric(userId?: string): Promise<boolean> {
+export async function authenticateWithBiometric(userId: string): Promise<boolean> {
   if (!isWebAuthnSupported()) return false;
-  const stored = getCredentials().filter((c) => !userId || c.userId === userId);
+  const stored = getCredentials().filter((c) => c.userId === userId);
   if (stored.length === 0) return false;
 
   try {
