@@ -170,13 +170,6 @@ export const createStory = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
-    const { screenStory } = await import("./ai.server");
-    const screen = await screenStory({ title: data.title, body: data.body });
-
-    if (screen.verdict === "block") {
-      return { ok: false as const, status: "blocked", message: screen.reason };
-    }
-
     const company = await queryFirst<CompanyRecord>("companies", "id", data.company_id);
     if (!company) throw new Error("Company not found");
 
@@ -222,7 +215,22 @@ export const createStory = createServerFn({ method: "POST" })
       storyId = String(evidenceTicket["story_id"]);
     }
 
+    const { screenStory } = await import("./ai.server");
+    const screen = await screenStory({
+      title: data.title.trim(),
+      body: data.body.trim(),
+      evidence: uploadedEvidence
+        ? {
+            publicId: uploadedEvidence.public_id,
+            format: uploadedEvidence.format,
+            bytes: uploadedEvidence.bytes,
+          }
+        : null,
+      evidenceNote: data.evidence?.note?.trim() || null,
+    });
+
     const hasEvidence = Boolean(evidenceNote || uploadedEvidence);
+    const autoApproved = screen.decision === "auto_approved";
     const created: StoryRecord = {
       id: storyId,
       company_id: company.id,
@@ -238,9 +246,13 @@ export const createStory = createServerFn({ method: "POST" })
       industry: data.industry ?? company.industry,
       would_work_again: data.would_work_again,
       author_id: context.userId,
-      status: screen.verdict === "publish" ? "published" : "pending",
-      moderation_note: screen.verdict === "publish" ? null : screen.reason,
-      evidence_status: hasEvidence ? "pending_review" : null,
+      status: autoApproved ? "published" : "pending",
+      moderation_note: autoApproved ? null : screen.summary,
+      evidence_status: hasEvidence
+        ? screen.evidence_assessment === "unavailable"
+          ? "pending_review"
+          : "reviewed"
+        : null,
       upvotes: 0,
       metoo: 0,
       comment_count: 0,
@@ -251,6 +263,24 @@ export const createStory = createServerFn({ method: "POST" })
     const storyRef = db.collection("stories").doc(storyId);
     if ((await storyRef.get()).exists) throw new Error("This story has already been submitted.");
     batch.set(storyRef, created);
+    batch.set(db.collection("story_ai_reviews").doc(storyId), {
+      id: storyId,
+      story_id: storyId,
+      decision: screen.decision,
+      verdict: screen.verdict,
+      confidence: screen.confidence,
+      risk_level: screen.risk_level,
+      risk_flags: screen.risk_flags,
+      summary: screen.summary,
+      concerns: screen.concerns,
+      evidence_assessment: screen.evidence_assessment,
+      evidence_summary: screen.evidence_summary,
+      model: screen.model,
+      automated: screen.decision === "auto_approved",
+      owner_reviewed: false,
+      reviewed_at: null,
+      created_at: new Date().toISOString(),
+    });
 
     if (hasEvidence && data.evidence) {
       batch.set(db.collection("employment_evidence").doc(storyId), {

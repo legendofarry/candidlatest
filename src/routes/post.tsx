@@ -334,10 +334,6 @@ function PostPage() {
         },
       });
 
-      if (!result.ok) {
-        toast.error(`We could not publish this: ${result.message}`);
-        return;
-      }
       if (result.status === "published") {
         toast.success("Your story is live");
         navigate({ to: "/stories/$id", params: { id: result.id } });
@@ -676,7 +672,10 @@ function PostPage() {
                         </li>
                         <li>· Do not name individual colleagues, managers or clients.</li>
                         <li>· Stick to what you experienced or can describe factually.</li>
-                        <li>· An automated screen checks every story before it goes live.</li>
+                          <li>
+                            · Automated AI reads each full story. Clear, low-risk stories may go
+                            live right away; uncertain or sensitive cases wait for moderator review.
+                          </li>
                       </ul>
 
                       <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
@@ -688,7 +687,8 @@ function PostPage() {
                           Add a document or image that can help moderators review your story. Proof
                           is uploaded to restricted Cloudinary storage, is{" "}
                           <span className="font-medium text-foreground">never published</span>, and
-                          is never shown to the employer.
+                          is never shown to the employer. If attached, AI checks it for relevance and
+                          exposed sensitive details; this does not verify that the story is true.
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Paid via M-Pesa from your boss's personal number? That's normal for small

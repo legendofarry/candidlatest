@@ -39,6 +39,12 @@ function PrivacyPage() {
             Your stories, votes, comments, reports and salary submissions, linked internally to your
             account ID.
           </li>
+          <li>
+            Optional employment proof is stored as a private Cloudinary file. When you attach proof,
+            our automated moderation service receives it to check for relevance and exposed
+            sensitive details; it does not authenticate documents or determine whether a story is
+            true.
+          </li>
         </ul>
       </section>
       <section>
@@ -48,6 +54,10 @@ function PrivacyPage() {
             Your email, legal name, or account ID — not on public pages or in public API responses.
           </li>
           <li>Who voted on what. Votes are only ever published as totals.</li>
+          <li>
+            Attached proof is not published and is not shown to employers. It is accessible to the
+            moderation system and authorized Candid moderators for review.
+          </li>
           <li>
             Individual salary entries. Bands appear only once several people have reported the same
             role.
@@ -65,7 +75,11 @@ function PrivacyPage() {
             Database access rules restrict every write to the signed-in account and every read to
             published content.
           </li>
-          <li>Moderation happens in a separate internal tool, not in this app.</li>
+          <li>
+            Automated screening may publish clear, low-risk stories or hold uncertain cases for
+            moderator review. Automated assessments can be wrong, so moderators can review and
+            change the result.
+          </li>
         </ul>
       </section>
       <section>
@@ -81,6 +95,10 @@ function PrivacyPage() {
           <li>
             Stories are the personal opinions and recollections shared by members. They are
             not findings of fact and we do not independently verify them.
+          </li>
+          <li>
+            Automated screening reviews submissions for safety and privacy. It does not verify the
+            truth of a story or prove that an attached document is authentic.
           </li>
           <li>Scores are averages of user-submitted ratings, not audits.</li>
           <li>

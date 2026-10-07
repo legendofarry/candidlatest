@@ -1,33 +1,147 @@
 import { generateText, Output, NoObjectGeneratedError } from "ai";
+import { v2 as cloudinary } from "cloudinary";
 import { z } from "zod";
 import { AI_MODEL, createOpenRouterProvider } from "./ai-gateway.server";
+import { getCloudinaryEvidenceConfig } from "./cloudinary-evidence.server";
 
 const ScreenSchema = z.object({
-  verdict: z.enum(["publish", "review", "block"]),
-  reason: z.string(),
+  verdict: z.enum(["approve", "hold", "reject"]),
+  confidence: z.number().min(0).max(1),
+  risk_level: z.enum(["low", "medium", "high", "critical"]),
+  risk_flags: z.array(z.string().max(80)).max(8),
+  summary: z.string().max(500),
+  concerns: z
+    .array(z.object({ excerpt: z.string().max(240), reason: z.string().max(240) }))
+    .max(8),
+  evidence_assessment: z.enum([
+    "not_provided",
+    "consistent",
+    "unclear",
+    "mismatch",
+    "sensitive_information",
+    "unavailable",
+  ]),
+  evidence_summary: z.string().max(500),
 });
 
-/** Automated screen for named individuals, slurs and obvious libel. */
-export async function screenStory(input: { title: string; body: string }) {
+export type StoryScreen = z.infer<typeof ScreenSchema> & {
+  model: string;
+  decision: "auto_approved" | "important_review";
+};
+
+async function fetchEvidenceForReview(input: {
+  publicId: string;
+  format: string;
+  bytes: number;
+}) {
+  const config = getCloudinaryEvidenceConfig();
+  cloudinary.config({
+    cloud_name: config.cloudName,
+    api_key: config.apiKey,
+    api_secret: config.apiSecret,
+    secure: true,
+  });
+  const downloadUrl = cloudinary.utils.private_download_url(
+    input.publicId,
+    input.format,
+    {
+      resource_type: "image",
+      type: "authenticated",
+      expires_at: Math.floor(Date.now() / 1000) + 120,
+      attachment: false,
+    },
+  );
+  const response = await fetch(downloadUrl, { signal: AbortSignal.timeout(15_000) });
+  if (!response.ok) throw new Error(`Cloudinary proof download failed (${response.status}).`);
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  if (!bytes.byteLength || bytes.byteLength > 5 * 1024 * 1024 || bytes.byteLength !== input.bytes) {
+    throw new Error("The proof file is empty or exceeds the supported size.");
+  }
+  const format = input.format.toLowerCase();
+  const mediaType = format === "jpg" || format === "jpeg"
+    ? "image/jpeg"
+    : format === "png"
+      ? "image/png"
+      : format === "webp"
+        ? "image/webp"
+        : format === "pdf"
+          ? "application/pdf"
+          : null;
+  if (!mediaType) throw new Error("This proof format cannot be analyzed.");
+  return { bytes, mediaType };
+}
+
+function fallbackScreen(reason: string, evidenceProvided: boolean): StoryScreen {
+  return {
+    verdict: "hold",
+    confidence: 0,
+    risk_level: "high",
+    risk_flags: ["AI screening unavailable"],
+    summary: reason,
+    concerns: [],
+    evidence_assessment: evidenceProvided ? "unavailable" : "not_provided",
+    evidence_summary: evidenceProvided ? "Proof could not be analyzed." : "No proof attached.",
+    model: AI_MODEL,
+    decision: "important_review",
+  };
+}
+
+/** Screens the complete story and any attached private proof before deciding whether it can publish. */
+export async function screenStory(input: {
+  title: string;
+  body: string;
+  evidence?: { publicId: string; format: string; bytes: number } | null;
+  evidenceNote?: string | null;
+}): Promise<StoryScreen> {
   const key = process.env["OPENROUTER_API_KEY"];
-  if (!key) return { verdict: "review" as const, reason: "Screening unavailable" };
+  if (!key) return fallbackScreen("AI screening is not configured.", Boolean(input.evidence));
 
   const gateway = createOpenRouterProvider(key);
   try {
+    const evidenceFile = input.evidence
+      ? await fetchEvidenceForReview(input.evidence)
+      : null;
+    const content = [
+      {
+        type: "text" as const,
+        text: `Review the complete submission, not a sample.\n\nTitle: ${input.title}\n\nFull story: ${input.body}\n\nPrivate evidence note: ${input.evidenceNote?.trim() || "None"}\n\nEvidence file: ${input.evidence ? "A proof document/image is attached. Analyze only whether it appears relevant, contains exposed personal/sensitive information, or is too unclear to assess. It does not prove the story is true." : "No file attached."}`,
+      },
+      ...(evidenceFile
+        ? [{
+            type: "file" as const,
+            data: evidenceFile.bytes,
+            mediaType: evidenceFile.mediaType,
+            filename: evidenceFile.mediaType === "application/pdf" ? "proof.pdf" : `proof.${input.evidence!.format}`,
+          }]
+        : []),
+    ];
     const { output } = await generateText({
       model: gateway(AI_MODEL),
       output: Output.object({ schema: ScreenSchema }),
       system:
-        "You moderate Kenyan workplace exit stories. Return publish for ordinary workplace complaints. Return review when an individual person is named, when claims look like unverifiable accusations of crime, or when identifying details appear. Return block for slurs, threats, doxxing, or clear defamation of a named individual. Keep reason under 20 words.",
-      prompt: `Title: ${input.title}\n\nStory: ${input.body}`,
+        "You are a cautious moderator for Kenyan workplace exit stories. Read every word of the complete story and inspect the attached image/PDF if present. Ordinary first-person workplace criticism is allowed. Do not treat an employer name as an individual. Set approve only when there is no clear policy violation, no exposed personal identifying or financial information, no credible threat, and no obvious unsupported serious accusation against a named individual. Set hold for uncertainty, named private individuals, serious allegations, identifying details, unclear or mismatched proof, or any personal data in proof. Set reject only for unmistakable doxxing, direct threats, slurs, or clear targeted abuse. Never decide whether a claim is true. Proof can be relevant but cannot establish truth or employment by itself. Include short exact excerpts for material concerns. confidence must reflect certainty; any uncertainty lowers it. Evidence assessment should only describe visible relevance/readability and sensitive-data exposure, not authenticate the document.",
+      messages: [{ role: "user", content }],
     });
-    return output;
+    const autoApproved = output.verdict === "approve"
+      && output.confidence >= 0.92
+      && output.risk_level === "low"
+      && !output.risk_flags.length
+      && (!input.evidence || output.evidence_assessment === "consistent")
+      && output.evidence_assessment !== "unclear"
+      && output.evidence_assessment !== "mismatch"
+      && output.evidence_assessment !== "sensitive_information"
+      && output.evidence_assessment !== "unavailable";
+    return {
+      ...output,
+      model: AI_MODEL,
+      decision: autoApproved ? "auto_approved" : "important_review",
+    };
   } catch (error) {
     if (NoObjectGeneratedError.isInstance(error)) {
-      return { verdict: "review" as const, reason: "Screening inconclusive" };
+      return fallbackScreen("AI screening was inconclusive.", Boolean(input.evidence));
     }
     console.error("[screenStory]", error);
-    return { verdict: "review" as const, reason: "Screening failed" };
+    return fallbackScreen("AI screening failed; owner review is required.", Boolean(input.evidence));
   }
 }
 

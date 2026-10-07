@@ -56,8 +56,13 @@ function GuidelinesPage() {
         <h2>What happens after you post</h2>
         <ul>
           <li>
-            Every story passes an automated screen. Borderline posts are held for review rather than
-            published.
+            Every story is read by automated screening. Clear, low-risk stories may publish
+            automatically; uncertain or sensitive cases are held for a moderator.
+          </li>
+          <li>
+            Optional proof is checked for relevance and exposed sensitive information, not to
+            authenticate the document or prove the story. Do not upload confidential or personal
+            documents.
           </li>
           <li>
             Anyone can report a story or comment. Reported content is re-reviewed by moderators.
