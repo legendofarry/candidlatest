@@ -10,6 +10,11 @@ import {
   type StoryRecord,
 } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
+import {
+  getCloudinaryEvidenceConfig,
+  isAllowedEvidenceFormat,
+  verifyCloudinaryUploadResponse,
+} from "./cloudinary-evidence.server";
 
 function slugify(name: string) {
   return name
@@ -140,6 +145,23 @@ export const createStory = createServerFn({ method: "POST" })
         evidence: z
           .object({
             note: z.string().max(1000).nullable().default(null),
+            upload: z
+              .object({
+                ticket_id: z.string().uuid(),
+                public_id: z.string().min(1).max(220),
+                version: z.number().int().positive(),
+                signature: z.string().regex(/^[a-f0-9]{40,64}$/i),
+                resource_type: z.literal("image"),
+                type: z.literal("authenticated"),
+                format: z.string().min(1).max(10),
+                bytes: z
+                  .number()
+                  .int()
+                  .positive()
+                  .max(5 * 1024 * 1024),
+              })
+              .nullable()
+              .default(null),
           })
           .nullable()
           .default(null),
@@ -158,9 +180,49 @@ export const createStory = createServerFn({ method: "POST" })
     const company = await queryFirst<CompanyRecord>("companies", "id", data.company_id);
     if (!company) throw new Error("Company not found");
 
-    const hasEvidence = Boolean(data.evidence?.note?.trim());
+    const evidenceNote = data.evidence?.note?.trim() || null;
+    const uploadedEvidence = data.evidence?.upload ?? null;
+    let evidenceTicket: Record<string, any> | null = null;
+    let storyId: string = generateId();
 
-    const storyId = generateId();
+    if (uploadedEvidence) {
+      const { apiSecret } = getCloudinaryEvidenceConfig();
+      const ticketRef = db
+        .collection("employment_evidence_uploads")
+        .doc(uploadedEvidence.ticket_id);
+      const ticketSnapshot = await ticketRef.get();
+      evidenceTicket = ticketSnapshot.data() ?? null;
+
+      if (
+        !ticketSnapshot.exists ||
+        evidenceTicket?.["user_id"] !== context.userId ||
+        evidenceTicket?.["status"] !== "issued" ||
+        evidenceTicket?.["expires_at"] <= new Date().toISOString() ||
+        evidenceTicket?.["cloudinary_public_id"] !== uploadedEvidence.public_id ||
+        evidenceTicket?.["expected_bytes"] !== uploadedEvidence.bytes ||
+        evidenceTicket?.["expected_format"] !== uploadedEvidence.format ||
+        uploadedEvidence.type !== "authenticated" ||
+        uploadedEvidence.resource_type !== "image" ||
+        !isAllowedEvidenceFormat(uploadedEvidence.format)
+      ) {
+        throw new Error(
+          "That proof upload has expired or could not be verified. Please attach it again.",
+        );
+      }
+
+      const validUploadResponse = await verifyCloudinaryUploadResponse({
+        publicId: uploadedEvidence.public_id,
+        version: uploadedEvidence.version,
+        signature: uploadedEvidence.signature,
+        apiSecret,
+      });
+      if (!validUploadResponse) {
+        throw new Error("Cloudinary could not verify the proof file. Please upload it again.");
+      }
+      storyId = String(evidenceTicket["story_id"]);
+    }
+
+    const hasEvidence = Boolean(evidenceNote || uploadedEvidence);
     const created: StoryRecord = {
       id: storyId,
       company_id: company.id,
@@ -185,22 +247,35 @@ export const createStory = createServerFn({ method: "POST" })
       created_at: new Date().toISOString(),
     };
 
-    await db.collection("stories").doc(storyId).set(created);
+    const batch = db.batch();
+    const storyRef = db.collection("stories").doc(storyId);
+    if ((await storyRef.get()).exists) throw new Error("This story has already been submitted.");
+    batch.set(storyRef, created);
 
     if (hasEvidence && data.evidence) {
-      await db
-        .collection("employment_evidence")
-        .doc(storyId)
-        .set({
-          id: storyId,
-          story_id: storyId,
-          company_id: company.id,
-          user_id: context.userId,
-          note: data.evidence.note?.trim() || null,
-          status: "pending_review",
-          created_at: new Date().toISOString(),
-        });
+      batch.set(db.collection("employment_evidence").doc(storyId), {
+        id: storyId,
+        story_id: storyId,
+        company_id: company.id,
+        user_id: context.userId,
+        note: evidenceNote,
+        cloudinary_public_id: uploadedEvidence?.public_id ?? null,
+        cloudinary_resource_type: uploadedEvidence?.resource_type ?? null,
+        cloudinary_delivery_type: uploadedEvidence?.type ?? null,
+        file_format: uploadedEvidence?.format ?? null,
+        file_bytes: uploadedEvidence?.bytes ?? null,
+        status: "pending_review",
+        created_at: new Date().toISOString(),
+      });
     }
+
+    if (uploadedEvidence && evidenceTicket) {
+      batch.update(db.collection("employment_evidence_uploads").doc(uploadedEvidence.ticket_id), {
+        status: "linked",
+        linked_at: new Date().toISOString(),
+      });
+    }
+    await batch.commit();
 
     // Tell the company's claimed account it was tagged in a new live story.
     if (created.status === "published") {
