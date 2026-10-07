@@ -118,7 +118,7 @@ export function StoryCard({
             >
               @{story.author_username}
             </Link>
-          ) : "Anonymous"} ·{" "}
+          ) : "Candid member"} ·{" "}
           {formatDate(story.created_at)}
         </span>
       </div>

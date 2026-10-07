@@ -8,13 +8,13 @@ export const Route = createFileRoute("/privacy")({
       {
         name: "description",
         content:
-          "What Candid stores, what it never shows, how anonymity is protected, and the legal disclaimer covering user-submitted stories.",
+          "What Candid stores, what appears publicly, and the limits of user-submitted stories.",
       },
       { property: "og:title", content: "Privacy & disclaimer — Candid" },
       {
         property: "og:description",
         content:
-          "How we protect anonymity, what we store, and the limits of what stories on this site represent.",
+          "What account information we store, what appears publicly, and how to read stories on this site.",
       },
     ],
   }),
@@ -25,7 +25,7 @@ function PrivacyPage() {
   return (
     <ProsePage
       title="Privacy & disclaimer"
-      intro="Anonymity is the product. This page explains exactly what we keep, what we never publish, and how to read the stories on this site."
+      intro="This page explains what information we store, what appears publicly, and how to read the stories on this site."
     >
       <section>
         <h2>What we store</h2>
@@ -34,7 +34,7 @@ function PrivacyPage() {
             Your email address and password hash, handled by our authentication provider — used only
             to stop spam and duplicate voting.
           </li>
-          <li>An anonymous handle generated for you at signup, e.g. "Anon Analyst, Nairobi".</li>
+          <li>Your Candid handle, chosen during signup.</li>
           <li>
             Your stories, votes, comments, reports and salary submissions, linked internally to your
             account ID.
@@ -42,10 +42,10 @@ function PrivacyPage() {
         </ul>
       </section>
       <section>
-        <h2>What we never show</h2>
+        <h2>What stays private</h2>
         <ul>
           <li>
-            Your email, name, or account ID — not on any page and not in any public API response.
+            Your email, legal name, or account ID — not on public pages or in public API responses.
           </li>
           <li>Who voted on what. Votes are only ever published as totals.</li>
           <li>
@@ -55,11 +55,11 @@ function PrivacyPage() {
         </ul>
       </section>
       <section>
-        <h2>How anonymity is enforced</h2>
+        <h2>How your account information is protected</h2>
         <ul>
           <li>
-            Public pages read from database views that simply do not contain author identity
-            columns.
+            Public story pages do not display your email, legal name, or account ID. Your Candid
+            handle may appear with your contributions.
           </li>
           <li>
             Database access rules restrict every write to the signed-in account and every read to
@@ -71,15 +71,15 @@ function PrivacyPage() {
       <section>
         <h2>Deleting your data</h2>
         <p>
-          You can ask us to delete your account. Stories can be removed with it, or kept anonymously
-          detached — tell us which you prefer when you write in.
+          You can ask us to delete your account. Stories can be removed with it or retained without
+          your account details — tell us which you prefer when you write in.
         </p>
       </section>
       <section>
         <h2>Disclaimer</h2>
         <ul>
           <li>
-            Stories are the personal opinions and recollections of anonymous individuals. They are
+            Stories are the personal opinions and recollections shared by members. They are
             not findings of fact and we do not independently verify them.
           </li>
           <li>Scores are averages of user-submitted ratings, not audits.</li>

@@ -13,16 +13,16 @@ export const Route = createFileRoute("/about")({
   loader: ({ context }) => context.queryClient.ensureQueryData(contactQuery),
   head: () => ({
     meta: [
-      { title: "About Candid — why we publish exit stories" },
+      { title: "About Candid — workplace stories from Kenya" },
       {
         name: "description",
         content:
-          "Candid lets employees say why they really left, anonymously. Learn how stories are screened, how company scores work, how employers can reply, and how to reach the team.",
+          "Candid gives employees a place to share why they left. Learn how stories are screened, how company scores work, how employers can reply, and how to reach the team.",
       },
       { property: "og:title", content: "About Candid" },
       {
         property: "og:description",
-        content: "A Kenyan-built platform for honest, anonymous accounts of workplace culture.",
+        content: "A Kenyan-built platform for honest accounts of workplace culture.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -65,11 +65,11 @@ function AboutPage() {
         </ul>
       </section>
       <section>
-        <h2>How anonymity works</h2>
+        <h2>Your account and privacy</h2>
         <ul className="mt-2">
           <li>You need an account so votes and stories cannot be spammed.</li>
-          <li>Your email and name are never published. You appear as a random handle.</li>
-          <li>Employers cannot see who wrote a story, and neither can other readers.</li>
+          <li>Your email and legal name are not published. Your Candid handle may appear with posts.</li>
+          <li>Employers cannot see your account email or legal name.</li>
           <li>
             Never include your own full name, ID number, or a colleague&apos;s name in a story.
           </li>
@@ -94,7 +94,7 @@ function AboutPage() {
       <section>
         <h2>How company scores work</h2>
         <p className="mt-2">
-          Culture scores average anonymous ratings across five things Kenyan workers repeatedly
+          Culture scores average member ratings across five things Kenyan workers repeatedly
           raise: pay punctuality, statutory compliance, respect, workload, and growth. Company
           background summaries are AI-researched and clearly labelled — treat them as context, not
           verified fact.

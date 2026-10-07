@@ -50,7 +50,7 @@ const faqs = [
   {
     question: "Can an employer respond to a story?",
     answer:
-      "Yes. Employers can claim their company profile and request a right of reply. They cannot see who submitted an anonymous story.",
+      "Yes. Employers can claim their company profile and request a right of reply. They cannot see a contributor's account email or legal name.",
   },
   {
     question: "Can I correct or delete my data?",

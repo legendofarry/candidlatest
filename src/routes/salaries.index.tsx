@@ -25,7 +25,7 @@ export const Route = createFileRoute("/salaries/")({
       {
         name: "description",
         content:
-          "Browse Kenyan employers and see anonymous pay ranges broken down by position, with contributor counts for every role.",
+          "Browse Kenyan employers and see worker-reported pay ranges broken down by position, with contributor counts for every role.",
       },
       { property: "og:title", content: "Salary honesty by employer — Candid" },
       {
@@ -265,7 +265,7 @@ function ContributeCard() {
           </div>
           <Button type="submit" disabled={busy} className="w-full glow-primary">
             {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-            Submit anonymously
+            Submit salary range
           </Button>
         </form>
       ) : (

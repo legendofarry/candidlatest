@@ -18,7 +18,7 @@ export async function screenStory(input: { title: string; body: string }) {
       model: gateway(AI_MODEL),
       output: Output.object({ schema: ScreenSchema }),
       system:
-        "You moderate anonymous Kenyan workplace exit stories. Return publish for ordinary workplace complaints. Return review when an individual person is named, when claims look like unverifiable accusations of crime, or when identifying details appear. Return block for slurs, threats, doxxing, or clear defamation of a named individual. Keep reason under 20 words.",
+        "You moderate Kenyan workplace exit stories. Return publish for ordinary workplace complaints. Return review when an individual person is named, when claims look like unverifiable accusations of crime, or when identifying details appear. Return block for slurs, threats, doxxing, or clear defamation of a named individual. Keep reason under 20 words.",
       prompt: `Title: ${input.title}\n\nStory: ${input.body}`,
     });
     return output;
@@ -86,7 +86,7 @@ export async function summarizeStoryActivity(input: {
     const { text } = await generateText({
       model: gateway(AI_MODEL),
       system:
-        "You summarise new activity on an anonymous Kenyan workplace story thread for someone who already read the story. Write 2-3 short sentences starting from what has changed since they last looked. Neutral, factual, no names of individuals, no advice, under 60 words.",
+        "You summarise new activity on a Kenyan workplace story thread for someone who already read the story. Write 2-3 short sentences starting from what has changed since they last looked. Neutral, factual, no names of individuals, no advice, under 60 words.",
       prompt: `Story title: ${input.title}\n\nStory: ${input.body.slice(0, 1200)}\n\nNew comments since the reader last looked:\n${input.comments
         .map((comment, index) => `${index + 1}. ${comment}`)
         .join("\n")}`,

@@ -47,7 +47,7 @@ export const Route = createFileRoute("/profile")({
       { title: "Your profile | Candid" },
       {
         name: "description",
-        content: "View your anonymous Candid account and followed stories.",
+        content: "View your Candid profile, contributions and followed stories.",
       },
       { property: "og:title", content: "Your profile | Candid" },
       { property: "og:type", content: "profile" },
@@ -376,8 +376,8 @@ function ProfilePage() {
               <div className="mt-4 flex items-start gap-3 border-l-2 border-verified/35 py-2 pl-3 md:mt-5 md:rounded-xl md:border md:border-verified/15 md:bg-verified/5 md:p-4">
                 <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verified" />
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Your email is only used to sign in. Stories, votes and comments appear under an
-                  anonymous handle.
+                  Your email is only used to sign in. Your Candid handle appears on stories and
+                  comments; individual votes are never shown.
                 </p>
               </div>
             </motion.section>
@@ -394,7 +394,7 @@ function ProfilePage() {
                   <p className="text-sm font-medium">Are you here as a worker or an employer?</p>
                   <p className="mt-0.5 text-xs text-muted-foreground">
                     We never worked this out for your account. Employers get a reply tool and a
-                    company page; workers keep posting anonymously as usual.
+                    company page; workers can share workplace stories under their Candid handle.
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     <Button

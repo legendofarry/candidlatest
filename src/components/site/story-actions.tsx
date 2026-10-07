@@ -75,7 +75,7 @@ export function StoryActions({
     onSuccess: () => {
       setBody("");
       setOptimistic((prev) => ({ ...prev, comments: prev.comments + 1 }));
-      toast.success("Comment posted anonymously");
+      toast.success("Comment posted.");
       void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
       void queryClient.invalidateQueries({ queryKey: ["stories"] });
     },
@@ -157,7 +157,7 @@ export function StoryActions({
                 ) : (
                   <Send className="size-4" />
                 )}
-                Post anonymously
+                Post comment
               </Button>
             </div>
           ) : (

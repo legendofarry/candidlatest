@@ -80,7 +80,7 @@ export function ReportDialog({
             Report this {targetType}
           </DialogTitle>
           <DialogDescription>
-            Pick everything that applies. Reports are anonymous and reviewed by moderators.
+            Pick everything that applies. Reports go privately to moderators and are not displayed publicly.
           </DialogDescription>
         </DialogHeader>
 

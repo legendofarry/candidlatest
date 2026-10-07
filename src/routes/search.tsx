@@ -19,7 +19,7 @@ export const Route = createFileRoute("/search")({
       { property: "og:title", content: "Search Kenyan employers and exit stories" },
       {
         property: "og:description",
-        content: "One search box across every company profile and anonymous exit story on Candid.",
+        content: "One search box across every company profile and workplace story on Candid.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

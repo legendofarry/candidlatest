@@ -30,7 +30,7 @@ export const Route = createFileRoute("/companies/$slug")({
     const title = `${loaderData.name} — employee exit stories & culture score | Candid`;
     const description =
       loaderData.descriptor ??
-      `Anonymous exit stories, red-flag scores and salary ranges reported for ${loaderData.name} in Kenya.`;
+      `Workplace stories, red-flag scores and salary ranges reported for ${loaderData.name} in Kenya.`;
     return {
       meta: [
         { title },

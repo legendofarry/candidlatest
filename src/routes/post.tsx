@@ -48,16 +48,16 @@ export const Route = createFileRoute("/post")({
   loader: ({ context }) => context.queryClient.ensureQueryData(filtersQuery),
   head: () => ({
     meta: [
-      { title: "Share your exit story anonymously | Candid" },
+      { title: "Share your exit story | Candid" },
       {
         name: "description",
         content:
-          "Tell Kenyan job seekers why you really left. Four quick steps, fully anonymous, screened before publishing.",
+          "Tell Kenyan job seekers why you really left. Four quick steps, screened before publishing.",
       },
-      { property: "og:title", content: "Share your exit story anonymously" },
+      { property: "og:title", content: "Share your exit story" },
       {
         property: "og:description",
-        content: "Anonymous, screened, and attached to the employer — help the next person decide.",
+        content: "Screened and attached to the employer — help the next person decide.",
       },
     ],
   }),
@@ -110,10 +110,10 @@ function PostPage() {
     return (
       <div className="mx-auto max-w-lg rounded-3xl border border-border bg-card p-8 text-center">
         <ShieldCheck className="mx-auto size-8 text-primary" />
-        <h1 className="mt-4 text-2xl font-semibold">Sign in to post anonymously</h1>
+        <h1 className="mt-4 text-2xl font-semibold">Sign in to share a story</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          We ask for an account only to stop spam and abuse. Your story always shows as an anonymous
-          handle — your email and name are never displayed or shared.
+          An account helps prevent spam and abuse. Your story shows your Candid handle; your email
+          and legal name are never displayed.
         </p>
         <Button asChild className="mt-5">
           <Link to="/auth">Sign in or create an account</Link>
@@ -122,7 +122,7 @@ function PostPage() {
     );
   }
 
-  const steps = ["Employer", "What happened", "Your role", "Your story", "Anonymity"];
+  const steps = ["Employer", "What happened", "Your role", "Your story", "Review"];
 
   const matches = findCompanyMatches(companyName, filters.companies, 5);
   const exactMatch = matches.some((m) => m.name.toLowerCase() === companyName.trim().toLowerCase());
@@ -211,7 +211,7 @@ function PostPage() {
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.2em] text-emerald-200">
                 <ShieldCheck className="size-3.5" />
-                Share anonymously
+                Share your story
               </div>
               <div className="space-y-4">
                 <h2 className="max-w-md text-4xl font-semibold tracking-tight text-white">
@@ -496,8 +496,8 @@ function PostPage() {
                       <h2 className="text-lg font-semibold">Before you publish</h2>
                       <ul className="space-y-2 text-muted-foreground">
                         <li>
-                          · Your story publishes under an anonymous handle. Your email is never
-                          shown.
+                          · Your Candid handle appears with the story. Your email and legal name
+                          are never shown.
                         </li>
                         <li>· Do not name individual colleagues, managers or clients.</li>
                         <li>· Stick to what you experienced or can describe factually.</li>
@@ -533,7 +533,7 @@ function PostPage() {
                         disabled={submitting}
                         onClick={submit}
                       >
-                        {submitting ? "Screening and publishing…" : "Publish anonymously"}
+                        {submitting ? "Screening and publishing…" : "Publish story"}
                       </Button>
                     </div>
                   ) : null}

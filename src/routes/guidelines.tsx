@@ -13,7 +13,7 @@ export const Route = createFileRoute("/guidelines")({
       { property: "og:title", content: "Community guidelines — Candid" },
       {
         property: "og:description",
-        content: "The rules for posting anonymous exit stories about Kenyan employers.",
+        content: "Rules for safely sharing workplace stories about Kenyan employers.",
       },
     ],
   }),

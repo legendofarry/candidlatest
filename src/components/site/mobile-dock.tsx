@@ -143,7 +143,7 @@ export function MobileDock({
             <DrawerTitle>{signedIn ? "Your account" : "Join Candid"}</DrawerTitle>
             <DrawerDescription>
               {signedIn
-                ? "Your profile stays anonymous unless you choose otherwise."
+                ? "Your Candid handle appears on your posts."
                 : "Sign in to post stories, comment and follow employers."}
             </DrawerDescription>
           </DrawerHeader>
@@ -210,7 +210,7 @@ export function MobileDock({
                 to="/auth"
                 icon={UserRound}
                 label="Sign in"
-                hint="Anonymous by default"
+                hint="Your handle appears on posts"
                 active={pathname.startsWith("/auth")}
               />
             )}

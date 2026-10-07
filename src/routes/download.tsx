@@ -23,7 +23,7 @@ export const Route = createFileRoute("/download")({
       {
         name: "description",
         content:
-          "Install Candid on your Android phone with the official APK, or add Candid to your desktop home screen. Anonymous workplace exit stories for Kenya.",
+          "Install Candid on your Android phone with the official APK, or add Candid to your desktop home screen. Workplace stories from Kenya.",
       },
       { property: "og:title", content: "Download Candid — Android app & desktop install" },
       {
@@ -75,7 +75,7 @@ function DownloadPage() {
           </h1>
           <p className="mt-3 max-w-lg text-muted-foreground">
             The Candid app opens full-screen, feels faster, and sits on your home screen like any
-            other app — same anonymous account, nothing extra to learn.
+            other app — same Candid account, nothing extra to learn.
           </p>
         </motion.section>
 
@@ -176,7 +176,7 @@ function DownloadPage() {
         </motion.section>
 
         <p className="mt-8 pb-6 text-center text-xs text-muted-foreground">
-          Stories are personal opinions of anonymous contributors. Employers have a right of reply.
+          Stories are personal opinions shared by members. Employers have a right of reply.
         </p>
       </div>
     </div>

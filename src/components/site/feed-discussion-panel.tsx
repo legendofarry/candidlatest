@@ -57,9 +57,9 @@ export function FeedDiscussionPanel({
             </h2>
             <p className="mt-1 truncate text-xs text-muted-foreground">
               <span className="inline-flex items-center gap-1">
-                {story.company_name || "Anonymous employer"}
+                {story.company_name || "Employer not listed"}
                 {story.company_verified ? <CompanyVerifiedBadge /> : null}
-              </span> · Anonymous
+              </span> · Member story
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close discussion">

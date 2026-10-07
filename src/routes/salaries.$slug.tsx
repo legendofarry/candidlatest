@@ -26,7 +26,7 @@ export const Route = createFileRoute("/salaries/$slug")({
       };
     }
     const title = `${loaderData.name} salaries by position | Candid`;
-    const description = `Anonymous pay ranges reported at ${loaderData.name}, broken down by position with contributor counts.`;
+    const description = `Worker-reported pay ranges at ${loaderData.name}, broken down by position with contributor counts.`;
     return {
       meta: [
         { title },

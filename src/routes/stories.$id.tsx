@@ -120,7 +120,7 @@ function StoryPage() {
             >
               @{story.author_username}
             </Link>
-          ) : "Anonymous contributor"} ·{" "}
+          ) : "Candid member"} ·{" "}
           {formatDate(story.created_at)}
         </p>
       </div>

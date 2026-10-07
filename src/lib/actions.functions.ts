@@ -27,7 +27,7 @@ function randomHandle() {
   }`;
 }
 
-/** Ensures the signed-in user has an anonymous profile handle. */
+/** Ensures the signed-in user has a public-facing profile handle. */
 export const ensureProfile = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>
@@ -305,7 +305,7 @@ export const addComment = createServerFn({ method: "POST" })
         id: commentId,
         ...data,
         author_id: context.userId,
-        author_handle: profile?.handle ?? "Anonymous",
+        author_handle: profile?.handle ?? "Candid member",
         author_username: profile?.username ?? null,
         author_verified: verification?.badge_status === "claimed",
         is_official: isOfficial,

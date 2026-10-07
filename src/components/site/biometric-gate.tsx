@@ -126,7 +126,7 @@ export function BiometricGate({ children }: { children: React.ReactNode }) {
       <div>
         <h1 className="text-xl font-semibold">Unlock Candid</h1>
         <p className="mt-1 max-w-xs text-sm text-muted-foreground">
-          Use your fingerprint or face to get back to your anonymous account.
+          Use your fingerprint or face to get back to your Candid account.
         </p>
         {failed ? (
           <p className="mt-2 text-sm text-danger">Scan not recognised. Try again.</p>

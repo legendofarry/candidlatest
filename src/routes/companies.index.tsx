@@ -69,7 +69,7 @@ function CompaniesPage() {
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Company directory</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Every employer Kenyans have tagged here, with culture scores from anonymous ratings and
+          Every employer Kenyans have tagged here, with culture scores from member ratings and
           AI-researched background.
         </p>
       </header>

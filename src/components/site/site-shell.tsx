@@ -466,8 +466,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 Help &amp; support
               </Link>
               <span className="w-full pt-2 text-xs">
-                Stories are personal opinions of anonymous contributors. Employers have a right of
-                reply.
+                Stories are personal opinions shared by members. Employers have a right of reply.
               </span>
             </div>
           </footer>

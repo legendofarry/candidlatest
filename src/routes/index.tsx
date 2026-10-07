@@ -40,16 +40,16 @@ export const Route = createFileRoute("/")({
   },
   head: () => ({
     meta: [
-      { title: "Candid — anonymous exit stories from Kenyan workplaces" },
+      { title: "Candid — workplace stories from Kenya" },
       {
         name: "description",
         content:
-          "Read anonymous exit stories from Kenyan employees and research employers before you accept an offer. Pay, contracts, respect and workload — told by the people who left.",
+          "Read workplace stories from Kenyan employees and research employers before you accept an offer. Pay, contracts, respect and workload — told by the people who left.",
       },
-      { property: "og:title", content: "Candid — anonymous workplace exit stories" },
+      { property: "og:title", content: "Candid — Kenyan workplace stories" },
       {
         property: "og:description",
-        content: "Why Kenyans really left their jobs. Anonymous, searchable, employer by employer.",
+        content: "Why Kenyans really left their jobs. Search workplace stories employer by employer.",
       },
     ],
   }),
@@ -113,14 +113,14 @@ function FeedPage() {
         <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground sm:text-xs">
-              <ShieldCheck className="size-3.5 text-verified" /> Anonymous by design · Kenya
+              <ShieldCheck className="size-3.5 text-verified" /> Worker-led · Kenya
             </p>
             <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-[1.05] sm:mt-4 sm:text-4xl md:text-6xl">
               The <span className="text-gradient">real reasons</span> Kenyans left their jobs.
             </h1>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:text-base md:text-lg">
               <span className="sm:hidden">
-                Anonymous exit stories, employer ratings and salary insights across Kenya.
+                Workplace stories, employer ratings and salary insights across Kenya.
               </span>
               <span className="hidden sm:inline">
                 Exit stories, red-flag scores and salary honesty for employers across Nairobi,

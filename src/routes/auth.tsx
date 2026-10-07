@@ -23,16 +23,16 @@ import { useAuth } from "@/hooks/useAuth";
 export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
-      { title: "Sign in anonymously | Candid" },
+      { title: "Sign in | Candid" },
       {
         name: "description",
         content:
-          "Create a free Candid account to post exit stories, vote and comment. Your name and email are never shown — you appear only as an anonymous handle.",
+          "Create a Candid account to share workplace stories, vote and comment. Your Candid handle appears publicly; your email and legal name do not.",
       },
-      { property: "og:title", content: "Sign in anonymously | Candid" },
+      { property: "og:title", content: "Sign in | Candid" },
       {
         property: "og:description",
-        content: "Accounts keep the platform honest. Your identity stays hidden from everyone.",
+        content: "Accounts help keep the platform reliable. Your email and legal name stay private.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -150,7 +150,7 @@ function AuthPage() {
         return;
       }
       await signInWithEmailAndPassword(firebaseAuth, email, password);
-      toast.success("Signed in. You are anonymous to everyone else.");
+      toast.success("Signed in successfully.");
     } catch (error) {
       toast.error(authErrorMessage(error));
     } finally {
@@ -203,8 +203,8 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(134,239,172,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(99,102,241,0.18),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
-      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/80 md:shadow-2xl md:backdrop-blur-xl">
+    <div className="min-h-dvh w-full bg-[radial-gradient(circle_at_top_left,_rgba(134,239,172,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(99,102,241,0.18),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
+      <div className="relative min-h-dvh w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/80 md:shadow-2xl md:backdrop-blur-xl">
         <div className="grid min-h-dvh md:h-dvh md:min-h-0 md:grid-cols-2">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#10251d_0%,#13212b_52%,#22271f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
@@ -215,14 +215,14 @@ function AuthPage() {
             >
               <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-emerald-200">
                 <EyeOff className="size-3.5" />
-                Anonymous by design
+                Built for honest work
               </div>
               <div className="space-y-4">
                 <h2 className="max-w-md text-4xl font-semibold tracking-tight text-white">
-                  Your story is honest. Your identity stays private.
+                  Share your experience with confidence.
                 </h2>
                 <p className="max-w-md text-base text-slate-200/80">
-                  Keep the platform honest without exposing your workplace, name or email.
+                  Give workers useful context without publishing your name or email.
                 </p>
               </div>
               <motion.div
@@ -231,7 +231,7 @@ function AuthPage() {
                 transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
               >
                 <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
-                  100% anonymous
+                  Your voice matters
                 </div>
                 <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
                   Verified by design
@@ -244,8 +244,8 @@ function AuthPage() {
             </motion.div>
           </div>
 
-          <div className="flex items-start justify-center px-5 pb-8 pt-4 md:h-dvh md:items-center md:overflow-y-auto md:p-10">
-            <div className="w-full max-w-md animate-rise">
+          <div className="flex min-h-dvh flex-col justify-center px-5 py-8 md:h-dvh md:min-h-0 md:overflow-y-auto md:p-10">
+            <div className="my-auto w-full max-w-md animate-rise md:my-0">
               <Link
                 to="/"
                 className="mb-5 inline-flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-foreground md:mb-8 md:hidden"
@@ -254,9 +254,6 @@ function AuthPage() {
                   <Flame className="size-5" />
                 </span>
                 Candid
-                <span className="ml-1 text-xs font-normal text-muted-foreground">
-                  · anonymous by design
-                </span>
               </Link>
               <div className="rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-3xl md:border md:border-border md:bg-background/80 md:p-8 md:shadow-xl">
                 <div className="flex items-center gap-2 text-primary">
@@ -269,8 +266,8 @@ function AuthPage() {
                   {mode === "signin" ? "Sign in" : "Create an account"}
                 </h1>
                 <p className="mt-2 hidden text-sm text-muted-foreground sm:block">
-                  Accounts stop spam and duplicate votes. Stories are shown under a random handle —
-                  never your email or name.
+                  Accounts help prevent spam and duplicate votes. Your Candid handle appears on
+                  stories; your email and legal name stay private.
                 </p>
 
                 <form onSubmit={submit} className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">

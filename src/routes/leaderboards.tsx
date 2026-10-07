@@ -22,7 +22,7 @@ export const Route = createFileRoute("/leaderboards")({
       {
         property: "og:description",
         content:
-          "Most reported, best rated, and would-work-again rankings from anonymous Kenyan workers.",
+          "Most reported, best rated, and would-work-again rankings from Kenyan workers.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -92,7 +92,7 @@ function LeaderboardsPage() {
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Leaderboards</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Rankings built from anonymous exit stories and culture ratings by Kenyan workers. Scores
+          Rankings built from workplace stories and culture ratings by Kenyan workers. Scores
           move as new reports come in.
         </p>
       </header>

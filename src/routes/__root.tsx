@@ -80,17 +80,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Candid — anonymous workplace exit stories" },
+      { title: "Candid — Kenyan workplace stories" },
       {
         name: "description",
         content:
-          "Kenyans share the real reasons they left toxic employers. Anonymous exit stories, company culture scores and honest KES salary ranges.",
+          "Read workplace stories, company culture scores and salary ranges shared by workers across Kenya.",
       },
-      { property: "og:title", content: "Candid — anonymous workplace exit stories" },
+      { property: "og:title", content: "Candid — Kenyan workplace stories" },
       {
         property: "og:description",
         content:
-          "Research Kenyan employers before you accept the offer. Anonymous stories, scores and salary ranges.",
+          "Research Kenyan employers with workplace stories, company scores and salary ranges.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
