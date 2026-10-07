@@ -113,7 +113,7 @@ export function FilterBar({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex w-full flex-wrap items-center justify-center gap-2">
         {filters.map((filter) => (
           <FilterDropdown key={filter.id} filter={filter} />
         ))}
