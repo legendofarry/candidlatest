@@ -6,15 +6,23 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
   AtSign,
+  BriefcaseBusiness,
   Check,
+  Clock3,
+  Coins,
+  Flame,
   Globe,
   Instagram,
   Linkedin,
   Loader2,
+  Megaphone,
   Music2,
+  ShieldCheck,
   Sparkles,
+  UsersRound,
   X as XIcon,
 } from "lucide-react";
+import { useReducedMotion } from "motion/react";
 import { useAuth } from "@/hooks/useAuth";
 import { requiresEmailVerification } from "@/lib/email-verification";
 import { notify as toast } from "@/lib/notifications-store";
@@ -62,15 +70,145 @@ const SOCIAL_FIELDS = [
 
 type SocialKey = (typeof SOCIAL_FIELDS)[number]["key"];
 
+type LensAnswer = {
+  scenario1?: "contract" | "accept";
+  scenario2?: "breakdown" | "wait";
+  scenario3?: "pushback" | "doit";
+  scenario4?: "clarity" | "continue";
+  scenario5?: "ask" | "findout";
+};
+
+type LensInterests = {
+  payBenefits: number;
+  contracts: number;
+  management: number;
+  culture: number;
+  career: number;
+};
+
+type CandidLensData = {
+  completed: boolean;
+  skipped: boolean;
+  answers: LensAnswer;
+  interests: LensInterests;
+};
+
+type LensScreen = "intro" | "scenario" | "transition" | "result" | "onboarding";
+
+type LensDraft = {
+  screen: LensScreen;
+  scenarioIndex: number;
+  answers: LensAnswer;
+  skipped: boolean;
+};
+
+const LENS_SCENARIOS = [
+  {
+    label: "THE OFFER",
+    icon: BriefcaseBusiness,
+    text: "You just got the job. HR says: ‘We’ll sort out the contract once you start.’",
+    choices: [
+      { value: "accept", label: "Accept — finally, a job" },
+      { value: "contract", label: "Ask for the contract first" },
+    ],
+  },
+  {
+    label: "PAYDAY",
+    icon: Coins,
+    text: "Your first payday arrives. Your payslip says KSh 45,000. Your M-Pesa receives KSh 32,000.",
+    choices: [
+      { value: "breakdown", label: "Ask HR for the breakdown" },
+      { value: "wait", label: "Wait and see what happens" },
+    ],
+  },
+  {
+    label: "THE MANAGER",
+    icon: Clock3,
+    text: "It’s Friday, 5:47 PM. Your manager says: ‘Need this before Monday morning.’",
+    choices: [
+      { value: "pushback", label: "Push back" },
+      { value: "doit", label: "Do it and move on" },
+    ],
+  },
+  {
+    label: "THE JOB AD",
+    icon: Megaphone,
+    text: "The advert says KSh 40k–60k. In the interview: ‘We’ll discuss salary after probation.’",
+    choices: [
+      { value: "clarity", label: "Ask for clarity" },
+      { value: "continue", label: "Keep the interview going" },
+    ],
+  },
+  {
+    label: "THE CULTURE",
+    icon: UsersRound,
+    text: "Someone quietly tells you: ‘People don’t usually stay here very long.’",
+    choices: [
+      { value: "ask", label: "Ask why" },
+      { value: "findout", label: "Take the job and find out" },
+    ],
+  },
+] as const;
+
+const LENS_INTEREST_LABELS: { key: keyof LensInterests; label: string }[] = [
+  { key: "payBenefits", label: "Pay & benefits" },
+  { key: "contracts", label: "Contracts & policies" },
+  { key: "management", label: "Management" },
+  { key: "culture", label: "Workplace culture" },
+  { key: "career", label: "Career decisions" },
+];
+
+function getLensInterests(answers: LensAnswer): LensInterests {
+  const interests: LensInterests = {
+    payBenefits: 0,
+    contracts: 0,
+    management: 0,
+    culture: 0,
+    career: 0,
+  };
+  if (answers.scenario1 === "contract") interests.contracts += 2;
+  if (answers.scenario1 === "accept") interests.career += 1;
+  if (answers.scenario2 === "breakdown") interests.payBenefits += 2;
+  if (answers.scenario3 === "pushback") interests.management += 2;
+  if (answers.scenario3 === "doit") interests.management += 1;
+  if (answers.scenario4 === "clarity") {
+    interests.payBenefits += 1;
+    interests.contracts += 1;
+  }
+  if (answers.scenario4 === "continue") interests.career += 1;
+  if (answers.scenario5 === "ask") interests.culture += 2;
+  if (answers.scenario5 === "findout") {
+    interests.culture += 1;
+    interests.career += 1;
+  }
+  return interests;
+}
+
+function emptyLensData(skipped: boolean): CandidLensData {
+  return {
+    completed: false,
+    skipped,
+    answers: {},
+    interests: { payBenefits: 0, contracts: 0, management: 0, culture: 0, career: 0 },
+  };
+}
+
 function OnboardingPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, loading } = useAuth();
+  const prefersReducedMotion = useReducedMotion();
   const check = useServerFn(checkUsername);
   const suggest = useServerFn(getUsernameSuggestions);
   const complete = useServerFn(completeOnboarding);
   const state = useServerFn(getOnboardingState);
 
+  const [lensScreen, setLensScreen] = useState<LensScreen>("intro");
+  const [scenarioIndex, setScenarioIndex] = useState(0);
+  const [lensAnswers, setLensAnswers] = useState<LensAnswer>({});
+  const [lensSkipped, setLensSkipped] = useState(false);
+  const [lensHydrated, setLensHydrated] = useState(false);
+  const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [username, setUsername] = useState("");
@@ -89,19 +227,93 @@ function OnboardingPage() {
 
   useEffect(() => {
     if (loading) return;
+    let active = true;
     if (!user) {
       navigate({ to: "/auth" });
-      return;
+      return () => {
+        active = false;
+      };
     }
     if (requiresEmailVerification(user)) {
       navigate({ to: "/verify-email" });
-      return;
+      return () => {
+        active = false;
+      };
     }
-    void state({ data: undefined }).then((result) => {
-      setPhotoUrl(result.photoUrl);
-      if (!result.needsOnboarding) navigate({ to: "/" });
-    });
+    const storageKey = `candid-onboarding-lens:${user.uid}`;
+    void state({ data: undefined })
+      .then((result) => {
+        if (!active) return;
+        setPhotoUrl(result.photoUrl);
+        if (!result.needsOnboarding) {
+          navigate({ to: "/" });
+          return;
+        }
+        try {
+          const rawDraft = window.localStorage.getItem(storageKey);
+          if (rawDraft) {
+            const draft = JSON.parse(rawDraft) as Partial<LensDraft>;
+            const validScreen = [
+              "intro",
+              "scenario",
+              "transition",
+              "result",
+              "onboarding",
+            ].includes(String(draft.screen));
+            if (validScreen) {
+              setLensScreen(draft.screen as LensScreen);
+              setScenarioIndex(Math.max(0, Math.min(4, Number(draft.scenarioIndex) || 0)));
+              setLensAnswers(
+                draft.answers && typeof draft.answers === "object" ? draft.answers : {},
+              );
+              setLensSkipped(Boolean(draft.skipped));
+            }
+          }
+        } catch {
+          window.localStorage.removeItem(storageKey);
+        }
+        setLensHydrated(true);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        toast.error(error instanceof Error ? error.message : "Could not load onboarding.");
+        setLensHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
   }, [loading, user, navigate, state]);
+
+  useEffect(() => {
+    if (!user || !lensHydrated) return;
+    const draft: LensDraft = {
+      screen: lensScreen,
+      scenarioIndex,
+      answers: lensAnswers,
+      skipped: lensSkipped,
+    };
+    try {
+      window.localStorage.setItem(`candid-onboarding-lens:${user.uid}`, JSON.stringify(draft));
+    } catch {
+      // The in-memory experience still works if browser storage is unavailable.
+    }
+  }, [user, lensHydrated, lensScreen, scenarioIndex, lensAnswers, lensSkipped]);
+
+  useEffect(() => {
+    if (lensScreen !== "transition") return;
+    const timer = window.setTimeout(
+      () => {
+        setSelectedChoice(null);
+        if (scenarioIndex >= LENS_SCENARIOS.length - 1) setLensScreen("result");
+        else {
+          setScenarioIndex((current) => current + 1);
+          setLensScreen("scenario");
+        }
+      },
+      prefersReducedMotion ? 0 : 420,
+    );
+    return () => window.clearTimeout(timer);
+  }, [lensScreen, scenarioIndex, prefersReducedMotion]);
 
   const seed = useMemo(() => {
     const raw = user?.email?.split("@")[0] ?? "candid";
@@ -155,6 +367,14 @@ function OnboardingPage() {
       const result = await complete({
         data: {
           username: username.trim().toLowerCase(),
+          candidLens: lensSkipped
+            ? emptyLensData(true)
+            : {
+                completed: true,
+                skipped: false,
+                answers: lensAnswers,
+                interests: getLensInterests(lensAnswers),
+              },
           socials: {
             x: socials.x.trim() || null,
             instagram: socials.instagram.trim() || null,
@@ -170,6 +390,13 @@ function OnboardingPage() {
         setStep(0);
         return;
       }
+      if (user) {
+        try {
+          window.localStorage.removeItem(`candid-onboarding-lens:${user.uid}`);
+        } catch {
+          // A stored draft is harmless if browser storage cannot be cleared.
+        }
+      }
       toast.success(`Welcome, @${username.trim().toLowerCase()}`);
       navigate({ to: "/" });
     } catch (error) {
@@ -177,6 +404,45 @@ function OnboardingPage() {
     } finally {
       setSaving(false);
     }
+  }
+
+  function answerScenario(value: string) {
+    if (selectedChoice) return;
+    setSelectedChoice(value);
+    const key = `scenario${scenarioIndex + 1}` as keyof LensAnswer;
+    setLensAnswers((current) => ({ ...current, [key]: value }));
+    setLensScreen("transition");
+  }
+
+  function skipLens() {
+    setLensAnswers({});
+    setLensSkipped(true);
+    setLensScreen("onboarding");
+  }
+
+  if (loading || !user || !lensHydrated) {
+    return (
+      <div className="flex min-h-[75dvh] items-center justify-center text-sm text-muted-foreground">
+        <Loader2 className="mr-2 size-4 animate-spin" />
+        Getting your onboarding ready…
+      </div>
+    );
+  }
+
+  if (lensScreen !== "onboarding") {
+    return (
+      <CandidLensExperience
+        screen={lensScreen}
+        scenarioIndex={scenarioIndex}
+        selectedChoice={selectedChoice}
+        answers={lensAnswers}
+        onStart={() => setLensScreen("scenario")}
+        onAnswer={answerScenario}
+        onSkip={skipLens}
+        onContinue={() => setLensScreen("onboarding")}
+        reducedMotion={Boolean(prefersReducedMotion)}
+      />
+    );
   }
 
   return (
@@ -424,18 +690,248 @@ function OnboardingPage() {
   );
 }
 
-function AuroraBackdrop() {
+type CandidLensExperienceProps = {
+  screen: Exclude<LensScreen, "onboarding">;
+  scenarioIndex: number;
+  selectedChoice: string | null;
+  answers: LensAnswer;
+  onStart: () => void;
+  onAnswer: (value: string) => void;
+  onSkip: () => void;
+  onContinue: () => void;
+  reducedMotion: boolean;
+};
+
+function CandidLensExperience({
+  screen,
+  scenarioIndex,
+  selectedChoice,
+  answers,
+  onStart,
+  onAnswer,
+  onSkip,
+  onContinue,
+  reducedMotion,
+}: CandidLensExperienceProps) {
+  const scenario = LENS_SCENARIOS[scenarioIndex];
+  const scenarioKey = `scenario${scenarioIndex + 1}` as keyof LensAnswer;
+  const interests = getLensInterests(answers);
+  const highlightedInterests = LENS_INTEREST_LABELS.filter((item) => interests[item.key] > 0)
+    .sort((first, second) => interests[second.key] - interests[first.key])
+    .slice(0, 3);
+  const transition = reducedMotion
+    ? { duration: 0 }
+    : { duration: 0.36, ease: [0.22, 1, 0.36, 1] as const };
+
+  return (
+    <main className="relative -mx-4 -my-6 flex min-h-[100dvh] w-auto items-center justify-center overflow-hidden px-5 py-8 sm:px-8">
+      <AuroraBackdrop reducedMotion={reducedMotion} />
+      <div className="relative mx-auto flex w-full max-w-xl flex-col">
+        <header className="mb-10 flex items-center justify-between">
+          <div className="flex items-center gap-3 font-display text-lg font-semibold tracking-tight">
+            <span className="flex size-10 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary">
+              <Flame className="size-5" />
+            </span>
+            Candid
+          </div>
+          {screen !== "intro" ? (
+            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              Your Candid Lens
+            </span>
+          ) : null}
+        </header>
+
+        <AnimatePresence mode="wait" initial={false}>
+          {screen === "intro" ? (
+            <motion.section
+              key="lens-intro"
+              initial={reducedMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={transition}
+              {...(reducedMotion ? {} : { exit: { opacity: 0, y: -10 } })}
+              className="w-full"
+            >
+              <div className="mb-7 flex size-14 items-center justify-center rounded-[1.25rem] border border-primary/20 bg-primary/10 text-primary">
+                <Sparkles className="size-6" />
+              </div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                A quick gut check
+              </p>
+              <h1 className="max-w-lg font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
+                Before you start<span className="text-primary">…</span>
+              </h1>
+              <p className="mt-4 text-lg text-foreground">5 situations. Trust your gut.</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                No right answers. Just your instincts.
+              </p>
+              <Button
+                onClick={onStart}
+                className="mt-9 h-12 w-full rounded-xl text-base sm:w-auto sm:min-w-52"
+              >
+                Let’s go <ArrowRight className="size-4" />
+              </Button>
+              <button
+                type="button"
+                onClick={onSkip}
+                className="mt-5 block min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:w-auto sm:text-left"
+              >
+                Skip for now
+              </button>
+            </motion.section>
+          ) : screen === "scenario" && scenario ? (
+            <motion.section
+              key={`lens-scenario-${scenarioIndex}`}
+              initial={reducedMotion ? false : { opacity: 0, x: 18 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={transition}
+              {...(reducedMotion ? {} : { exit: { opacity: 0, x: -18 } })}
+              aria-live="polite"
+              className="w-full"
+            >
+              <div className="mb-5 flex items-center justify-between text-xs font-medium text-muted-foreground">
+                <span>{String(scenarioIndex + 1).padStart(2, "0")} / 05</span>
+                <span>Trust your gut</span>
+              </div>
+              <div className="mb-7 h-1 overflow-hidden rounded-full bg-secondary">
+                <motion.div
+                  className="h-full rounded-full bg-primary"
+                  initial={false}
+                  animate={{ width: `${((scenarioIndex + 1) / LENS_SCENARIOS.length) * 100}%` }}
+                  transition={reducedMotion ? { duration: 0 } : { duration: 0.45, ease: "easeOut" }}
+                />
+              </div>
+
+              <div className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-border bg-card/70 text-primary">
+                <scenario.icon className="size-5" />
+              </div>
+              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                {scenario.label}
+              </p>
+              <h1 className="mt-3 font-display text-[1.65rem] font-semibold leading-snug tracking-tight sm:text-3xl">
+                {scenario.text}
+              </h1>
+
+              <div className="mt-8 grid gap-3">
+                {scenario.choices.map((choice, index) => {
+                  const selected = selectedChoice === choice.value;
+                  return (
+                    <motion.button
+                      key={choice.value}
+                      type="button"
+                      disabled={Boolean(selectedChoice)}
+                      aria-pressed={answers[scenarioKey] === choice.value}
+                      onClick={() => onAnswer(choice.value)}
+                      animate={selected ? { scale: 1.015 } : { scale: 1 }}
+                      transition={reducedMotion ? { duration: 0 } : { duration: 0.18 }}
+                      {...(reducedMotion ? {} : { whileTap: { scale: 0.985 } })}
+                      className={`flex min-h-[4.5rem] w-full items-center justify-between gap-4 rounded-2xl border px-5 py-4 text-left text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default ${
+                        selected
+                          ? "border-primary bg-primary/10 text-foreground"
+                          : "border-border bg-card/65 text-foreground hover:border-primary/55 hover:bg-card"
+                      }`}
+                    >
+                      <span>{choice.label}</span>
+                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted-foreground">
+                        {index === 0 ? "A" : "B"}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              <button
+                type="button"
+                disabled={Boolean(selectedChoice)}
+                onClick={onSkip}
+                className="mt-6 min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+              >
+                Skip for now
+              </button>
+            </motion.section>
+          ) : screen === "transition" ? (
+            <motion.section
+              key="lens-transition"
+              initial={reducedMotion ? false : { opacity: 0, scale: 0.98 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={transition}
+              {...(reducedMotion ? {} : { exit: { opacity: 0, scale: 1.02 } })}
+              aria-live="polite"
+              className="flex min-h-72 flex-col items-center justify-center text-center"
+            >
+              <span className="mb-5 flex size-14 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
+                <Check className="size-6" />
+              </span>
+              <h1 className="font-display text-3xl font-semibold tracking-tight">Got it.</h1>
+              <p className="mt-2 text-sm text-muted-foreground">No wrong answers here.</p>
+            </motion.section>
+          ) : screen === "result" ? (
+            <motion.section
+              key="lens-result"
+              initial={reducedMotion ? false : { opacity: 0, y: 14 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={transition}
+              className="w-full"
+            >
+              <div className="mb-7 flex size-14 items-center justify-center rounded-[1.25rem] border border-primary/20 bg-primary/10 text-primary">
+                <ShieldCheck className="size-6" />
+              </div>
+              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
+                Your Candid Lens
+              </p>
+              <h1 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
+                Okay, we get you.
+              </h1>
+              <p className="mt-4 text-base text-muted-foreground">
+                Your Candid Lens is taking shape.
+              </p>
+              <div className="mt-8">
+                <p className="text-sm font-medium text-foreground">Your choices leaned toward:</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {highlightedInterests.map((item) => (
+                    <span
+                      key={item.key}
+                      className="rounded-full border border-primary/20 bg-primary/10 px-3.5 py-2 text-sm font-medium text-foreground"
+                    >
+                      {item.label}
+                    </span>
+                  ))}
+                </div>
+              </div>
+              <p className="mt-8 text-sm font-medium text-foreground">That’s useful.</p>
+              <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">
+                Your answers aren’t a score or a personality test. They help Candid bring the
+                details behind job adverts into view.
+              </p>
+              <Button
+                onClick={onContinue}
+                className="mt-8 h-12 w-full rounded-xl text-base sm:w-auto sm:min-w-52"
+              >
+                Continue <ArrowRight className="size-4" />
+              </Button>
+            </motion.section>
+          ) : null}
+        </AnimatePresence>
+      </div>
+    </main>
+  );
+}
+
+function AuroraBackdrop({ reducedMotion = false }: { reducedMotion?: boolean } = {}) {
   return (
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
       <motion.div
         className="absolute -left-24 top-0 size-72 rounded-full bg-primary/25 blur-3xl"
-        animate={{ x: [0, 40, -10, 0], y: [0, 30, 60, 0] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
+        animate={reducedMotion ? { x: 0, y: 0 } : { x: [0, 40, -10, 0], y: [0, 30, 60, 0] }}
+        transition={
+          reducedMotion ? { duration: 0 } : { duration: 18, repeat: Infinity, ease: "easeInOut" }
+        }
       />
       <motion.div
         className="absolute -right-20 top-40 size-80 rounded-full bg-verified/20 blur-3xl"
-        animate={{ x: [0, -30, 20, 0], y: [0, 40, -20, 0] }}
-        transition={{ duration: 22, repeat: Infinity, ease: "easeInOut" }}
+        animate={reducedMotion ? { x: 0, y: 0 } : { x: [0, -30, 20, 0], y: [0, 40, -20, 0] }}
+        transition={
+          reducedMotion ? { duration: 0 } : { duration: 22, repeat: Infinity, ease: "easeInOut" }
+        }
       />
     </div>
   );

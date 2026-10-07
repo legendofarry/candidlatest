@@ -49,8 +49,28 @@ export type ProfileRecord = {
   photo_url?: string | null;
   username_changed_at?: string | null;
   socials?: ProfileSocials | null;
+  candid_lens?: CandidLensRecord | null;
   account_type?: "individual" | "company" | "unknown";
   onboarded_at?: string | null;
+};
+
+export type CandidLensRecord = {
+  completed: boolean;
+  skipped: boolean;
+  answers: {
+    scenario1?: string | undefined;
+    scenario2?: string | undefined;
+    scenario3?: string | undefined;
+    scenario4?: string | undefined;
+    scenario5?: string | undefined;
+  };
+  interests: {
+    payBenefits: number;
+    contracts: number;
+    management: number;
+    culture: number;
+    career: number;
+  };
 };
 
 export type StoryRecord = {
@@ -721,7 +741,9 @@ export async function searchData(queryText: string) {
         story.company_slug ??
         companies.find((company) => company.id === story.company_id)?.slug ??
         null,
-      company_verified: Boolean(companies.find((company) => company.id === story.company_id)?.verified),
+      company_verified: Boolean(
+        companies.find((company) => company.id === story.company_id)?.verified,
+      ),
       reasons: story.reasons ?? [],
       comment_count: story.comment_count,
       metoo: story.metoo,
