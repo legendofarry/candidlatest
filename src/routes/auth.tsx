@@ -242,14 +242,14 @@ function AuthPage() {
             </motion.div>
           </div>
 
-          <div className="flex min-h-dvh flex-col justify-center px-5 py-7 sm:px-8 md:h-dvh md:min-h-0 md:overflow-y-auto md:px-10 md:py-10">
-            <div className="my-auto w-full max-w-[25rem] animate-rise md:my-0 md:mx-auto">
+          <div className="flex min-h-dvh flex-col justify-start px-5 pb-8 pt-6 sm:px-8 md:h-dvh md:min-h-0 md:justify-center md:overflow-y-auto md:px-10 md:py-10">
+            <div className="mx-auto w-full animate-rise md:max-w-[25rem]">
               <Link
                 to="/"
-                className="mb-8 inline-flex items-center gap-3 font-display text-lg font-semibold tracking-tight text-foreground md:hidden"
+                className="mb-7 inline-flex items-center gap-3 font-display text-xl font-semibold tracking-tight text-foreground md:hidden"
               >
-                <span className="flex size-10 items-center justify-center rounded-[0.95rem] border border-primary/20 bg-primary/10 text-primary shadow-[0_0_28px_-13px_rgba(190,242,100,0.7)]">
-                  <Flame className="size-5" />
+                <span className="flex size-12 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary shadow-[0_0_32px_-12px_rgba(190,242,100,0.7)]">
+                  <Flame className="size-6" />
                 </span>
                 Candid
               </Link>
