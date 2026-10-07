@@ -163,6 +163,8 @@ function AuthPage() {
     setBusy(true);
     try {
       const provider = new GoogleAuthProvider();
+      provider.addScope("email");
+      provider.addScope("profile");
       provider.setCustomParameters({ prompt: "select_account" });
       // This app is hosted on Netlify, not Firebase Hosting. Firebase redirect
       // auth can lose its cross-domain state in modern mobile browsers unless

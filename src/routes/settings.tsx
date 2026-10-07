@@ -384,12 +384,18 @@ function SignInMethods({ user }: { user: User | null }) {
 
   const googleLinked = providerIds.includes(GoogleAuthProvider.PROVIDER_ID);
   const passwordLinked = providerIds.includes(EmailAuthProvider.PROVIDER_ID);
+  const googleEmail = user?.providerData.find(
+    (provider) => provider.providerId === GoogleAuthProvider.PROVIDER_ID,
+  )?.email;
+  const accountEmail = user?.email ?? googleEmail ?? null;
 
   async function connectGoogle() {
     if (!user) return;
     setBusy(true);
     try {
       const provider = new GoogleAuthProvider();
+      provider.addScope("email");
+      provider.addScope("profile");
       provider.setCustomParameters({ prompt: "select_account" });
       const result = await linkWithPopup(user, provider);
       setProviderIds(result.user.providerData.map((item) => item.providerId));
@@ -406,10 +412,10 @@ function SignInMethods({ user }: { user: User | null }) {
 
   async function addPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!user?.email || password.length < 8) return;
+    if (!user || !accountEmail || password.length < 8) return;
     setBusy(true);
     try {
-      const credential = EmailAuthProvider.credential(user.email, password);
+      const credential = EmailAuthProvider.credential(accountEmail, password);
       const result = await linkWithCredential(user, credential);
       setProviderIds(result.user.providerData.map((item) => item.providerId));
       setPassword("");
@@ -436,7 +442,11 @@ function SignInMethods({ user }: { user: User | null }) {
             <div>
               <p className="text-sm font-medium">Google</p>
               <p className="text-xs text-muted-foreground">
-                {googleLinked ? "Connected to this account" : "Not connected"}
+                {googleLinked
+                  ? accountEmail
+                    ? `Connected as ${accountEmail}`
+                    : "Connected, but Google did not share an email"
+                  : "Not connected"}
               </p>
             </div>
             {!googleLinked ? (
@@ -455,7 +465,7 @@ function SignInMethods({ user }: { user: User | null }) {
             <p className="text-sm font-medium">Email and password</p>
             {passwordLinked ? (
               <p className="mt-1 text-xs text-muted-foreground">Connected to this account</p>
-            ) : user.email ? (
+            ) : accountEmail ? (
               <form onSubmit={addPassword} className="mt-2 flex flex-col gap-2 sm:flex-row">
                 <input
                   type="password"
@@ -474,7 +484,8 @@ function SignInMethods({ user }: { user: User | null }) {
               </form>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">
-                This account has no email address to attach a password to.
+                Google did not provide an email for this account, so a password cannot be added.
+                Continue signing in with Google.
               </p>
             )}
           </div>
