@@ -23,8 +23,12 @@ export function SupportChat({
 }) {
   const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [launcherRevealed, setLauncherRevealed] = useState(false);
   const [body, setBody] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
+  const launcherSwipeStart = useRef<number | null>(null);
+  const suppressLauncherClick = useRef(false);
+  const launcherHideTimer = useRef<number | null>(null);
   const queryClient = useQueryClient();
   const fetchConversation = useServerFn(getSupportConversation);
   const send = useServerFn(sendSupportMessage);
@@ -49,15 +53,71 @@ export function SupportChat({
     }
   }, [chat.data?.messages.length, open]);
 
+  useEffect(
+    () => () => {
+      if (launcherHideTimer.current !== null) window.clearTimeout(launcherHideTimer.current);
+    },
+    [],
+  );
+
   function submit(event: React.FormEvent) {
     event.preventDefault();
     if (body.trim() && !sendMutation.isPending) sendMutation.mutate();
   }
 
+  function revealMobileLauncher() {
+    setLauncherRevealed(true);
+    if (launcherHideTimer.current !== null) window.clearTimeout(launcherHideTimer.current);
+    launcherHideTimer.current = window.setTimeout(() => {
+      setLauncherRevealed(false);
+      launcherHideTimer.current = null;
+    }, 3000);
+  }
+
+  function hideMobileLauncher() {
+    setLauncherRevealed(false);
+    if (launcherHideTimer.current !== null) {
+      window.clearTimeout(launcherHideTimer.current);
+      launcherHideTimer.current = null;
+    }
+  }
+
+  function onLauncherPointerDown(event: React.PointerEvent<HTMLButtonElement>) {
+    if (event.pointerType === "mouse") return;
+    launcherSwipeStart.current = event.clientX;
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function onLauncherPointerUp(event: React.PointerEvent<HTMLButtonElement>) {
+    const start = launcherSwipeStart.current;
+    launcherSwipeStart.current = null;
+    if (start === null) return;
+
+    const deltaX = event.clientX - start;
+    if (!launcherRevealed && deltaX <= -16) revealMobileLauncher();
+    else if (launcherRevealed && deltaX >= 16) hideMobileLauncher();
+    else return;
+
+    suppressLauncherClick.current = true;
+    window.setTimeout(() => {
+      suppressLauncherClick.current = false;
+    }, 250);
+  }
+
+  function activateMobileLauncher() {
+    if (suppressLauncherClick.current) return;
+    if (!launcherRevealed) {
+      revealMobileLauncher();
+      return;
+    }
+    hideMobileLauncher();
+    setOpen(true);
+  }
+
   return (
     <div
       className={[
-        "pointer-events-none fixed right-4 z-[95] sm:right-6",
+        "pointer-events-none fixed right-0 z-[95] md:right-6",
         !mobileVisible && "hidden md:block",
         raised
           ? "bottom-[calc(env(safe-area-inset-bottom)+6.25rem)] md:bottom-6"
@@ -245,22 +305,48 @@ export function SupportChat({
           )}
         </section>
       ) : null}
+      {!open ? (
+        <button
+          type="button"
+          aria-label={launcherRevealed ? "Open Candid support chat" : "Reveal support chat button"}
+          aria-expanded={launcherRevealed}
+          aria-controls="support-chat-panel"
+          onPointerDown={onLauncherPointerDown}
+          onPointerUp={onLauncherPointerUp}
+          onPointerCancel={() => {
+            launcherSwipeStart.current = null;
+          }}
+          onClick={activateMobileLauncher}
+          className={[
+            "pointer-events-auto absolute bottom-0 right-0 flex h-14 touch-pan-y items-center justify-end overflow-hidden transition-[width,transform,box-shadow] duration-200 md:hidden",
+            launcherRevealed
+              ? "w-14 rounded-l-2xl border border-r-0 border-primary-foreground/15 bg-gradient-to-br from-primary via-primary to-primary/80 text-primary-foreground shadow-[0_12px_32px_rgba(153,255,116,0.25)] active:scale-[0.98]"
+              : "w-6 rounded-l-full",
+          ].join(" ")}
+        >
+          {launcherRevealed ? (
+            <span className="relative flex size-14 shrink-0 items-center justify-center">
+              <MessageCircle className="size-[21px]" />
+              <span className="absolute right-3 top-3 size-2 rounded-full border-2 border-primary bg-emerald-300" />
+            </span>
+          ) : (
+            <span className="h-10 w-1 rounded-l-full bg-primary shadow-[0_0_12px_rgba(190,242,100,0.55)]" />
+          )}
+        </button>
+      ) : null}
       <Button
         onClick={() => setOpen((value) => !value)}
         size="default"
         aria-expanded={open}
         aria-controls="support-chat-panel"
-        className={[
-          "group pointer-events-auto relative h-14 rounded-[20px] border border-primary-foreground/15 bg-gradient-to-br from-primary via-primary to-primary/80 px-0 text-primary-foreground shadow-[0_16px_42px_rgba(153,255,116,0.28)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_52px_rgba(153,255,116,0.38)] active:translate-y-0 active:scale-[0.98] sm:h-[3.75rem] sm:rounded-[22px]",
-          open ? "hidden md:inline-flex md:px-5" : "inline-flex md:px-5",
-        ].join(" ")}
+        className="group pointer-events-auto relative hidden h-14 rounded-[20px] border border-primary-foreground/15 bg-gradient-to-br from-primary via-primary to-primary/80 px-0 text-primary-foreground shadow-[0_16px_42px_rgba(153,255,116,0.28)] transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_52px_rgba(153,255,116,0.38)] active:translate-y-0 active:scale-[0.98] md:inline-flex md:px-5"
         aria-label={open ? "Close support chat" : "Open support chat"}
       >
-        <span className="relative flex size-14 shrink-0 items-center justify-center sm:size-11">
+        <span className="relative flex size-11 shrink-0 items-center justify-center">
           <MessageCircle className="size-[21px] transition-transform duration-300 group-hover:scale-110" />
-          <span className="absolute right-[13px] top-[13px] size-2 rounded-full border-2 border-primary bg-emerald-300 sm:right-1 sm:top-1" />
+          <span className="absolute right-1 top-1 size-2 rounded-full border-2 border-primary bg-emerald-300" />
         </span>
-        <span className="hidden pr-1 text-left sm:block">
+        <span className="hidden pr-1 text-left md:block">
           <span className="block text-sm font-semibold leading-4">
             {open ? "Close chat" : "Chat with us"}
           </span>
