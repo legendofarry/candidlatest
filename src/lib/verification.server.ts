@@ -14,6 +14,8 @@ export type VerificationRecord = {
   /** Set by the owner app; when present it wins over automatic detection. */
   owner_override: AccountType | null;
   owner_verified: boolean;
+  approval_status?: "none" | "pending_review" | "approved" | "declined";
+  requested_at?: string | null;
   snoozed_until: string | null;
   claimed_at: string | null;
   checked_at: string;
@@ -76,6 +78,8 @@ const defaults = (userId: string): VerificationRecord => ({
   company_slug: null,
   owner_override: null,
   owner_verified: false,
+  approval_status: "none",
+  requested_at: null,
   snoozed_until: null,
   claimed_at: null,
   checked_at: new Date().toISOString(),
@@ -115,8 +119,9 @@ export async function resolveVerification(
   const detected: AccountType = company ? "company" : corporate ? "unknown" : "individual";
   const accountType: AccountType = existing.owner_override ?? detected;
 
-  const eligible =
-    existing.owner_verified || (accountType === "company" && emailVerified && Boolean(company));
+  const eligible = existing.owner_verified || (
+    accountType === "company" && emailVerified && Boolean(company?.verified)
+  );
 
   const badgeStatus: BadgeStatus =
     existing.badge_status === "claimed" ? "claimed" : eligible ? "eligible" : "none";
@@ -140,22 +145,82 @@ export async function resolveVerification(
   return next;
 }
 
-export async function claimBadge(userId: string) {
+export async function claimBadge(userId: string, email: string | null, emailVerified: boolean) {
   const db = getFirestoreDb();
   const current = await readVerification(userId);
   if (!current || current.badge_status === "none") {
     return { ok: false as const, reason: "This account is not eligible for a badge yet." };
   }
-  const now = new Date().toISOString();
-  await db
-    .collection("account_verifications")
-    .doc(userId)
-    .set({ badge_status: "claimed", claimed_at: now, snoozed_until: null }, { merge: true });
-  await db
-    .collection("profiles")
-    .doc(userId)
-    .set({ verified: true, account_type: current.account_type }, { merge: true });
-  return { ok: true as const };
+  if (current.badge_status === "claimed") return { ok: true as const, approved: true as const };
+
+  const reviewRef = db.collection("account_verification_reviews").doc(userId);
+  const reviewSnapshot = await reviewRef.get();
+  const reviewData = reviewSnapshot.data() as { status?: string } | undefined;
+  if (reviewData?.status === "pending_review") {
+    return { ok: true as const, pending: true as const };
+  }
+
+  const profileSnapshot = await db.collection("profiles").doc(userId).get();
+  const profile = profileSnapshot.data() as { username?: string | null } | undefined;
+  const companySnapshot = current.company_id
+    ? await db.collection("companies").doc(current.company_id).get()
+    : null;
+  const company = companySnapshot?.data() as { verified?: boolean } | undefined;
+  const { reviewAccountVerification } = await import("./ai.server");
+  const screen = await reviewAccountVerification({
+    email,
+    emailVerified,
+    username: profile?.username ?? null,
+    accountType: current.account_type,
+    companyName: current.company_name,
+    companyVerified: company?.verified === true,
+  });
+  const timestamp = new Date().toISOString();
+  const autoApproved = screen.decision === "auto_approved";
+  await reviewRef.set({
+    id: userId,
+    user_id: userId,
+    status: autoApproved ? "approved" : "pending_review",
+    decision: screen.decision,
+    recommendation: screen.recommendation,
+    confidence: screen.confidence,
+    risk_level: screen.risk_level,
+    flags: screen.flags,
+    summary: screen.summary,
+    model: screen.model,
+    requested_at: timestamp,
+    reviewed_at: autoApproved ? timestamp : null,
+    reviewed_by: autoApproved ? "ai" : null,
+  });
+  await db.collection("account_verifications").doc(userId).set({
+    badge_status: autoApproved ? "claimed" : "eligible",
+    approval_status: autoApproved ? "approved" : "pending_review",
+    claimed_at: autoApproved ? timestamp : null,
+    requested_at: timestamp,
+    snoozed_until: null,
+  }, { merge: true });
+  await db.collection("profiles").doc(userId).set({
+    verified: autoApproved,
+    account_type: current.account_type,
+  }, { merge: true });
+  const auditRef = db.collection("owner_audit_log").doc();
+  await auditRef.set({
+    id: auditRef.id,
+    action: autoApproved ? "account_verification.ai_approved" : "account_verification.ai_queued",
+    target_type: "user",
+    target_id: userId,
+    payload: {
+      recommendation: screen.recommendation,
+      decision: screen.decision,
+      confidence: screen.confidence,
+      risk_level: screen.risk_level,
+      model: screen.model,
+    },
+    created_at: timestamp,
+  });
+  return autoApproved
+    ? { ok: true as const, approved: true as const }
+    : { ok: true as const, pending: true as const };
 }
 
 export async function snoozeBadgePrompt(userId: string, hours = 24) {

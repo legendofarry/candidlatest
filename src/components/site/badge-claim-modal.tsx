@@ -46,13 +46,18 @@ export function BadgeClaimModal() {
     setBusy(true);
     try {
       const result = await claim({ data: undefined });
-      if (result.ok) {
+      if (result.ok && "approved" in result && result.approved) {
         inbox.success("Badge claimed — your account is now verified on Candid", {
           dedupeKey: "badge-claimed",
         });
         setOpen(false);
+      } else if (result.ok && "pending" in result && result.pending) {
+        inbox.success("Request received — we’ll notify you after the review", {
+          dedupeKey: "badge-review-pending",
+        });
+        setOpen(false);
       } else {
-        toast.error(result.reason);
+        toast.error("reason" in result ? result.reason : "Could not submit the request.");
       }
     } finally {
       setBusy(false);
@@ -104,7 +109,7 @@ export function BadgeClaimModal() {
             </motion.div>
 
             <h2 className="font-display text-2xl font-semibold tracking-tight">
-              Claim your verified badge
+              Request the verified badge
             </h2>
             <p className="mt-3 text-sm text-muted-foreground">
               {companyName
@@ -125,7 +130,7 @@ export function BadgeClaimModal() {
                 ) : (
                   <BadgeCheck className="size-4" />
                 )}
-                Claim badge
+                Request review
               </Button>
               <Button size="lg" variant="ghost" onClick={() => void onSnooze()}>
                 Remind me later

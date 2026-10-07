@@ -21,9 +21,10 @@ export const getVerificationState = createServerFn({ method: "POST" })
       companyName: record.company_name,
       companySlug: record.company_slug,
       ownerVerified: record.owner_verified,
+      approvalStatus: record.approval_status ?? "none",
       snoozed,
-      canClaim: record.badge_status === "eligible",
-      showPrompt: record.badge_status === "eligible" && !snoozed,
+      canClaim: record.badge_status === "eligible" && record.approval_status !== "pending_review",
+      showPrompt: record.badge_status === "eligible" && record.approval_status !== "pending_review" && !snoozed,
     };
   });
 
@@ -31,7 +32,8 @@ export const claimVerificationBadge = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .handler(async ({ context }) => {
     const { claimBadge } = await import("./verification.server");
-    return claimBadge(context.userId);
+    const claims = context.claims as { email?: string; email_verified?: boolean };
+    return claimBadge(context.userId, claims.email ?? null, Boolean(claims.email_verified));
   });
 
 export const snoozeVerificationPrompt = createServerFn({ method: "POST" })

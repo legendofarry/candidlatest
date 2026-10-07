@@ -147,13 +147,16 @@ function ProfilePage() {
     setClaiming(true);
     try {
       const result = await claimBadgeFn();
-      if (result.ok) {
+      if (result.ok && "approved" in result && result.approved) {
         inbox.success("Badge claimed — your account is now verified", {
           dedupeKey: "badge-claimed",
         });
         await verification.refetch();
+      } else if (result.ok && "pending" in result && result.pending) {
+        inbox.success("Verification request sent for review", { dedupeKey: "badge-review-pending" });
+        await verification.refetch();
       } else {
-        toast.error(result.reason);
+        toast.error("reason" in result ? result.reason : "Could not submit the request");
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not claim the badge");
@@ -366,11 +369,17 @@ function ProfilePage() {
                     {verification.data.companyName
                       ? `Your account is recognised as ${verification.data.companyName}.`
                       : "Your account is recognised as official."}{" "}
-                    Claim your verified badge — it's free.
+                    Request the verified badge. AI checks routine requests; uncertain ones go to Candid review.
                   </p>
                   <Button size="sm" disabled={claiming} onClick={() => void handleClaimBadge()}>
-                    Claim badge
+                    Request review
                   </Button>
+                </div>
+              ) : null}
+              {verification.data?.approvalStatus === "pending_review" ? (
+                <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3">
+                  <BadgeCheck className="size-5 shrink-0 text-primary" />
+                  <p className="text-sm text-muted-foreground">Your verification request is being reviewed. We’ll update this profile when there’s a decision.</p>
                 </div>
               ) : null}
               <div className="mt-4 flex items-start gap-3 border-l-2 border-verified/35 py-2 pl-3 md:mt-5 md:rounded-xl md:border md:border-verified/15 md:bg-verified/5 md:p-4">

@@ -24,6 +24,55 @@ const ScreenSchema = z.object({
   evidence_summary: z.string().max(500),
 });
 
+const AccountReviewSchema = z.object({
+  recommendation: z.enum(["approve", "review", "decline"]),
+  confidence: z.number().min(0).max(1),
+  risk_level: z.enum(["low", "medium", "high"]),
+  flags: z.array(z.string().max(100)).max(8),
+  summary: z.string().max(500),
+});
+
+export type AccountReview = z.infer<typeof AccountReviewSchema> & {
+  model: string;
+  decision: "auto_approved" | "important_review";
+};
+
+/** Reviews a member's explicit request for an official company badge. */
+export async function reviewAccountVerification(input: {
+  email: string | null;
+  emailVerified: boolean;
+  username: string | null;
+  accountType: string;
+  companyName: string | null;
+  companyVerified: boolean;
+}) : Promise<AccountReview> {
+  const key = process.env["OPENROUTER_API_KEY"];
+  const fallback = (summary: string): AccountReview => ({
+    recommendation: "review", confidence: 0, risk_level: "medium",
+    flags: ["AI screening unavailable"], summary, model: AI_MODEL,
+    decision: "important_review",
+  });
+  if (!key) return fallback("AI screening is not configured; owner review is required.");
+
+  try {
+    const gateway = createOpenRouterProvider(key);
+    const { output } = await generateText({
+      model: gateway(AI_MODEL),
+      output: Output.object({ schema: AccountReviewSchema }),
+      system: "You review requests for an official company identity badge on Candid. Decide whether the account signals are internally consistent; you cannot establish a person's identity or employment from an email domain. Never infer truth from a username. Recommend approve only if the email is verified, its domain matches a company already verified by Candid, and the record is consistent. Any missing or uncertain signal means review. Decline only clear impersonation or abuse evidence; otherwise request owner review. Explain briefly and identify concrete flags.",
+      prompt: `Verified email: ${input.emailVerified ? "yes" : "no"}\nEmail address: ${input.email || "unavailable"}\nAccount type: ${input.accountType}\nUsername: ${input.username || "not set"}\nMatched company: ${input.companyName || "none"}\nCompany already verified by Candid: ${input.companyVerified ? "yes" : "no"}`,
+    });
+    const canAutoApprove = output.recommendation === "approve"
+      && output.confidence >= 0.97
+      && output.risk_level === "low"
+      && input.emailVerified && input.companyVerified && Boolean(input.companyName);
+    return { ...output, model: AI_MODEL, decision: canAutoApprove ? "auto_approved" : "important_review" };
+  } catch (error) {
+    console.error("[reviewAccountVerification]", error);
+    return fallback("AI screening was inconclusive; owner review is required.");
+  }
+}
+
 export type StoryScreen = z.infer<typeof ScreenSchema> & {
   model: string;
   decision: "auto_approved" | "important_review";
