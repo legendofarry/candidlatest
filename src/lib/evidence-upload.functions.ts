@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
+import {
+  requireFirebaseAuth,
+  requireVerifiedFirebaseAuth,
+} from "@/integrations/firebase/auth-middleware";
 import { getCloudinaryEvidenceConfig, signCloudinaryParams } from "./cloudinary-evidence.server";
 import { generateId } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
@@ -8,7 +11,7 @@ import { getFirestoreDb } from "./firebase.server";
 const MAX_EVIDENCE_BYTES = 5 * 1024 * 1024;
 
 export const issueEmploymentEvidenceUpload = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({

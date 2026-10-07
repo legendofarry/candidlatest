@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
+import {
+  requireFirebaseAuth,
+  requireVerifiedFirebaseAuth,
+} from "@/integrations/firebase/auth-middleware";
 
 const socialSchema = z
   .object({
@@ -47,7 +50,7 @@ export const getUsernameSuggestions = createServerFn({ method: "POST" })
   });
 
 export const completeOnboarding = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ username: z.string().max(40), socials: socialSchema }).parse(input),
   )

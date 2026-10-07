@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
+import {
+  requireFirebaseAuth,
+  requireVerifiedFirebaseAuth,
+} from "@/integrations/firebase/auth-middleware";
 import {
   buildCompanyIntel,
   readMyCompanyRating,
@@ -50,7 +53,7 @@ export const getMyCompanyRating = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => readMyCompanyRating(data.company_id, context.userId));
 
 export const rateCompanyFromQuestionnaire = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({

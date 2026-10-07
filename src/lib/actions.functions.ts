@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
+import {
+  requireFirebaseAuth,
+  requireVerifiedFirebaseAuth,
+} from "@/integrations/firebase/auth-middleware";
 import {
   generateId,
   queryFirst,
@@ -128,7 +131,7 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
   });
 
 export const createStory = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -337,7 +340,7 @@ export const createStory = createServerFn({ method: "POST" })
   });
 
 export const castVote = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ story_id: z.string().uuid(), kind: z.enum(["up", "metoo"]) }).parse(input),
   )
@@ -371,7 +374,7 @@ export const castVote = createServerFn({ method: "POST" })
   });
 
 export const addComment = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -448,7 +451,7 @@ export const addComment = createServerFn({ method: "POST" })
 
 /** Toggles a like on a comment or reply. */
 export const likeComment = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) => z.object({ comment_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
@@ -536,7 +539,7 @@ export const submitReport = createServerFn({ method: "POST" })
   });
 
 export const rateCompany = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -566,7 +569,7 @@ export const rateCompany = createServerFn({ method: "POST" })
   });
 
 export const submitSalary = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({

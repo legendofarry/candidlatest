@@ -1,6 +1,9 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
+import {
+  requireFirebaseAuth,
+  requireVerifiedFirebaseAuth,
+} from "@/integrations/firebase/auth-middleware";
 import { getFirestoreDb } from "./firebase.server";
 
 const storyInput = (input: unknown) => z.object({ story_id: z.string().min(1) }).parse(input);
@@ -30,7 +33,7 @@ export const getFollowStats = createServerFn({ method: "POST" })
   });
 
 export const likeStory = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([requireVerifiedFirebaseAuth])
   .inputValidator(storyInput)
   .handler(async ({ data, context }) => {
     const { toggleStoryLike } = await import("./social.server");

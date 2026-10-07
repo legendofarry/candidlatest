@@ -8,6 +8,7 @@ import {
   signInWithEmailAndPassword,
   signInWithPopup,
   sendPasswordResetEmail,
+  sendEmailVerification,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
 import { Eye, EyeOff, Flame, Loader2, ShieldCheck } from "lucide-react";
@@ -18,6 +19,7 @@ import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { useAuth } from "@/hooks/useAuth";
+import { requiresEmailVerification, verificationActionSettings } from "@/lib/email-verification";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -99,6 +101,13 @@ function AuthPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
+    // Let the signup handler finish requesting the verification email before
+    // auth-state redirects replace this screen.
+    if (mode === "signup" && busy) return;
+    if (requiresEmailVerification(user)) {
+      void navigate({ to: "/verify-email" });
+      return;
+    }
     let active = true;
     void fetchOnboardingState()
       .then((state) => {
@@ -110,7 +119,7 @@ function AuthPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, user, fetchOnboardingState, navigate]);
+  }, [authLoading, user, fetchOnboardingState, navigate, mode, busy]);
 
   if (authLoading || user) {
     return (
@@ -126,9 +135,17 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
-        await createUserWithEmailAndPassword(firebaseAuth, email, password);
-        toast.success("Account created.");
-        navigate({ to: "/onboarding" });
+        const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+        try {
+          await sendEmailVerification(credential.user, verificationActionSettings());
+          window.sessionStorage.setItem("candid:verification-email", "sent");
+          toast.success("Check your inbox for a verification link.");
+        } catch (error) {
+          window.sessionStorage.setItem("candid:verification-email", "failed");
+          console.error("Could not send email verification", error);
+          toast.error("Your account is ready, but we couldn’t send the email yet. You can retry on the verification screen.");
+        }
+        navigate({ to: "/verify-email" });
         return;
       }
       await signInWithEmailAndPassword(firebaseAuth, email, password);
@@ -194,31 +211,31 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-dvh w-full bg-[radial-gradient(ellipse_at_50%_0%,_rgba(190,242,100,0.11),_transparent_34%),linear-gradient(155deg,#121411_0%,#0b0c0b_52%,#11120f_100%)] md:h-dvh md:overflow-hidden">
-      <div className="relative min-h-dvh w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-[#111310]/90 md:shadow-2xl md:backdrop-blur-xl">
+    <div className="min-h-dvh w-full bg-background bg-[radial-gradient(ellipse_at_50%_0%,_rgba(132,204,22,0.09),_transparent_42%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,_rgba(190,242,100,0.11),_transparent_34%),linear-gradient(155deg,#121411_0%,#0b0c0b_52%,#11120f_100%)] md:h-dvh md:overflow-hidden">
+      <div className="relative min-h-dvh w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/70 md:shadow-2xl md:backdrop-blur-xl">
         <div className="grid min-h-dvh md:h-dvh md:min-h-0 md:grid-cols-2">
-          <div className="relative hidden overflow-hidden border-r border-white/[0.07] bg-[radial-gradient(ellipse_at_30%_28%,_rgba(190,242,100,0.14),_transparent_34%),linear-gradient(145deg,#171b14_0%,#111512_48%,#171713_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
+          <div className="relative hidden overflow-hidden border-r border-border bg-secondary/40 dark:bg-[radial-gradient(ellipse_at_30%_28%,_rgba(190,242,100,0.14),_transparent_34%),linear-gradient(145deg,#171b14_0%,#111512_48%,#171713_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.55, ease: "easeOut" }}
               className="relative w-full max-w-xl space-y-7"
             >
-              <div className="flex items-center gap-3 text-white">
-                <span className="flex size-11 items-center justify-center rounded-2xl border border-lime-200/20 bg-lime-200/10 text-primary shadow-[0_0_35px_-12px_rgba(190,242,100,0.55)]">
+              <div className="flex items-center gap-3 text-foreground">
+                <span className="flex size-11 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary shadow-[0_0_35px_-12px_rgba(190,242,100,0.35)]">
                   <Flame className="size-5" />
                 </span>
                 <span className="font-display text-xl font-semibold tracking-tight">Candid</span>
               </div>
               <div className="space-y-4">
-                <h2 className="max-w-lg font-display text-5xl font-semibold leading-[1.08] tracking-tight text-white">
+                <h2 className="max-w-lg font-display text-5xl font-semibold leading-[1.08] tracking-tight text-foreground">
                   Know what you&apos;re walking into.
                 </h2>
-                <p className="max-w-md text-base leading-7 text-stone-300/75">
+                <p className="max-w-md text-base leading-7 text-muted-foreground">
                   Straight stories about pay, respect and what a job is really like.
                 </p>
               </div>
-              <div className="flex items-center gap-3 pt-2 text-sm text-stone-300/75">
+              <div className="flex items-center gap-3 pt-2 text-sm text-muted-foreground">
                 <ShieldCheck className="size-4 shrink-0 text-primary" />
                 <span>Stories from people who have done the work.</span>
               </div>
@@ -236,7 +253,7 @@ function AuthPage() {
                 </span>
                 Candid
               </Link>
-              <div className="rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-[1.75rem] md:border md:border-white/[0.08] md:bg-white/[0.025] md:p-8 md:shadow-[0_28px_90px_-54px_rgba(0,0,0,0.9)]">
+              <div className="rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-[1.75rem] md:border md:border-border md:bg-card/75 md:p-8 md:shadow-xl">
                 <div className="mb-6">
                   <h1 className="font-display text-[2rem] font-semibold tracking-tight text-foreground">
                     {mode === "signin" ? "Welcome back" : "Join Candid"}
@@ -251,7 +268,7 @@ function AuthPage() {
                 <div
                   role="tablist"
                   aria-label="Choose sign in or account creation"
-                  className="mb-5 grid grid-cols-2 rounded-2xl border border-white/[0.07] bg-black/20 p-1"
+                  className="mb-5 grid grid-cols-2 rounded-2xl border border-border bg-secondary/60 p-1"
                 >
                   {([
                     ["signin", "Sign in"],
@@ -271,7 +288,7 @@ function AuthPage() {
                         <motion.span
                           layoutId="auth-mode-pill"
                           transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                          className="absolute inset-0 -z-10 rounded-[0.8rem] border border-white/[0.09] bg-[#282b24] shadow-sm"
+                          className="absolute inset-0 -z-10 rounded-[0.8rem] border border-border bg-background shadow-sm"
                         />
                       ) : null}
                       {label}
@@ -285,7 +302,7 @@ function AuthPage() {
                     variant="outline"
                     disabled={busy}
                     onClick={googleSignIn}
-                    className="h-12 w-full rounded-xl border-white/[0.12] bg-white/[0.035] font-medium shadow-none transition-all hover:border-white/[0.2] hover:bg-white/[0.07] active:scale-[0.99]"
+                    className="h-12 w-full rounded-xl border-border bg-card font-medium text-foreground shadow-none transition-all hover:border-primary/40 hover:bg-secondary active:scale-[0.99]"
                   >
                     {busy ? (
                       <Loader2 className="size-4 animate-spin" />
@@ -313,14 +330,14 @@ function AuthPage() {
                   </Button>
 
                   <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground/75">
-                    <span className="h-px flex-1 bg-white/[0.09]" />
+                    <span className="h-px flex-1 bg-border" />
                     or use email
-                    <span className="h-px flex-1 bg-white/[0.09]" />
+                    <span className="h-px flex-1 bg-border" />
                   </div>
 
                   <form onSubmit={submit} className="space-y-4">
                     <div className="space-y-2">
-                      <Label htmlFor="email" className="text-[13px] font-medium text-stone-200">
+                      <Label htmlFor="email" className="text-[13px] font-medium text-foreground">
                         Email address
                       </Label>
                       <Input
@@ -331,12 +348,12 @@ function AuthPage() {
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         placeholder="you@example.com"
-                        className="h-12 rounded-xl border-white/[0.1] bg-white/[0.035] px-4 text-[15px] shadow-inner shadow-black/10 placeholder:text-muted-foreground/60 focus-visible:border-primary/45 focus-visible:ring-primary/20"
+                        className="h-12 rounded-xl border-input bg-background px-4 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus-visible:border-primary/45 focus-visible:ring-primary/20 dark:bg-white/[0.035] dark:shadow-inner dark:shadow-black/10"
                       />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-[13px] font-medium text-stone-200">
+                        <Label htmlFor="password" className="text-[13px] font-medium text-foreground">
                           Password
                         </Label>
                         {mode === "signin" ? (
@@ -360,7 +377,7 @@ function AuthPage() {
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
                           placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-                          className="h-12 rounded-xl border-white/[0.1] bg-white/[0.035] px-4 pr-12 text-[15px] shadow-inner shadow-black/10 placeholder:text-muted-foreground/60 focus-visible:border-primary/45 focus-visible:ring-primary/20"
+                          className="h-12 rounded-xl border-input bg-background px-4 pr-12 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus-visible:border-primary/45 focus-visible:ring-primary/20 dark:bg-white/[0.035] dark:shadow-inner dark:shadow-black/10"
                         />
                       <button
                         type="button"

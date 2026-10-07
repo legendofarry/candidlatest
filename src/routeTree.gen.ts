@@ -25,6 +25,7 @@ import { Route as SalariesRouteImport } from './routes/salaries'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SupportRouteImport } from './routes/support'
+import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as CompaniesIndexRouteImport } from './routes/companies.index'
 import { Route as CompaniesSlugRouteImport } from './routes/companies.$slug'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
@@ -121,6 +122,11 @@ const SettingsRoute = SettingsRouteImport.update({
 const SupportRoute = SupportRouteImport.update({
   id: '/support',
   path: '/support',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const VerifyEmailRoute = VerifyEmailRouteImport.update({
+  id: '/verify-email',
+  path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CompaniesIndexRoute = CompaniesIndexRouteImport.update({
@@ -226,6 +232,7 @@ export interface FileRoutesByFullPath {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
@@ -260,6 +267,7 @@ export interface FileRoutesByTo {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
@@ -296,6 +304,7 @@ export interface FileRoutesById {
   '/search': typeof SearchRoute
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
+  '/verify-email': typeof VerifyEmailRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
@@ -333,6 +342,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/support'
+    | '/verify-email'
     | '/companies/$slug'
     | '/messages/$id'
     | '/salaries/$slug'
@@ -367,6 +377,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/support'
+    | '/verify-email'
     | '/companies/$slug'
     | '/messages/$id'
     | '/salaries/$slug'
@@ -402,6 +413,7 @@ export interface FileRouteTypes {
     | '/search'
     | '/settings'
     | '/support'
+    | '/verify-email'
     | '/companies/$slug'
     | '/messages/$id'
     | '/salaries/$slug'
@@ -438,6 +450,7 @@ export interface RootRouteChildren {
   SearchRoute: typeof SearchRoute
   SettingsRoute: typeof SettingsRoute
   SupportRoute: typeof SupportRoute
+  VerifyEmailRoute: typeof VerifyEmailRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   MessagesIdRoute: typeof MessagesIdRoute
   StoriesIdRoute: typeof StoriesIdRoute
@@ -567,6 +580,13 @@ declare module '@tanstack/react-router' {
       path: '/support'
       fullPath: '/support'
       preLoaderRoute: typeof SupportRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/verify-email': {
+      id: '/verify-email'
+      path: '/verify-email'
+      fullPath: '/verify-email'
+      preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/companies/': {
@@ -722,6 +742,7 @@ const rootRouteChildren: RootRouteChildren = {
   SearchRoute: SearchRoute,
   SettingsRoute: SettingsRoute,
   SupportRoute: SupportRoute,
+  VerifyEmailRoute: VerifyEmailRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   MessagesIdRoute: MessagesIdRoute,
   StoriesIdRoute: StoriesIdRoute,

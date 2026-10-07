@@ -16,6 +16,7 @@ import {
   X as XIcon,
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
+import { requiresEmailVerification } from "@/lib/email-verification";
 import { notify as toast } from "@/lib/notifications-store";
 import { Button } from "@/components/ui/button";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
@@ -90,6 +91,10 @@ function OnboardingPage() {
     if (loading) return;
     if (!user) {
       navigate({ to: "/auth" });
+      return;
+    }
+    if (requiresEmailVerification(user)) {
+      navigate({ to: "/verify-email" });
       return;
     }
     void state({ data: undefined }).then((result) => {
