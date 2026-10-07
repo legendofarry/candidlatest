@@ -10,7 +10,7 @@ import {
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
-import { EyeOff, Fingerprint, Flame, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Fingerprint, Flame, Loader2, ShieldCheck } from "lucide-react";
 import { authenticateWithBiometric, getCredentials, markUnlocked } from "@/lib/biometrics";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { Button } from "@/components/ui/button";
@@ -94,6 +94,7 @@ function AuthPage() {
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hasBiometric, setHasBiometric] = useState(false);
   const fetchOnboardingState = useServerFn(getOnboardingState);
@@ -202,181 +203,226 @@ function AuthPage() {
     }
   }
 
+  function switchMode(nextMode: "signin" | "signup") {
+    if (nextMode === mode) return;
+    setMode(nextMode);
+    setPassword("");
+    setShowPassword(false);
+  }
+
   return (
-    <div className="min-h-dvh w-full bg-[radial-gradient(circle_at_top_left,_rgba(134,239,172,0.18),_transparent_30%),radial-gradient(circle_at_bottom_right,_rgba(99,102,241,0.18),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
-      <div className="relative min-h-dvh w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/80 md:shadow-2xl md:backdrop-blur-xl">
+    <div className="min-h-dvh w-full bg-[radial-gradient(ellipse_at_50%_0%,_rgba(190,242,100,0.11),_transparent_34%),linear-gradient(155deg,#121411_0%,#0b0c0b_52%,#11120f_100%)] md:h-dvh md:overflow-hidden">
+      <div className="relative min-h-dvh w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-[#111310]/90 md:shadow-2xl md:backdrop-blur-xl">
         <div className="grid min-h-dvh md:h-dvh md:min-h-0 md:grid-cols-2">
-          <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#10251d_0%,#13212b_52%,#22271f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
+          <div className="relative hidden overflow-hidden border-r border-white/[0.07] bg-[radial-gradient(ellipse_at_30%_28%,_rgba(190,242,100,0.14),_transparent_34%),linear-gradient(145deg,#171b14_0%,#111512_48%,#171713_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, x: -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ duration: 0.55, ease: "easeOut" }}
-              className="relative w-full max-w-xl space-y-6"
+              className="relative w-full max-w-xl space-y-7"
             >
-              <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-500/10 px-3 py-1 text-[11px] uppercase tracking-[0.24em] text-emerald-200">
-                <EyeOff className="size-3.5" />
-                Built for honest work
+              <div className="flex items-center gap-3 text-white">
+                <span className="flex size-11 items-center justify-center rounded-2xl border border-lime-200/20 bg-lime-200/10 text-primary shadow-[0_0_35px_-12px_rgba(190,242,100,0.55)]">
+                  <Flame className="size-5" />
+                </span>
+                <span className="font-display text-xl font-semibold tracking-tight">Candid</span>
               </div>
               <div className="space-y-4">
-                <h2 className="max-w-md text-4xl font-semibold tracking-tight text-white">
-                  Share your experience with confidence.
+                <h2 className="max-w-lg font-display text-5xl font-semibold leading-[1.08] tracking-tight text-white">
+                  Know what you&apos;re walking into.
                 </h2>
-                <p className="max-w-md text-base text-slate-200/80">
-                  Give workers useful context without publishing your name or email.
+                <p className="max-w-md text-base leading-7 text-stone-300/75">
+                  Straight stories about pay, respect and what a job is really like.
                 </p>
               </div>
-              <motion.div
-                className="flex gap-3 text-sm text-slate-100/80"
-                animate={{ y: [0, -5, 0] }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
-                  Your voice matters
-                </div>
-                <div className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
-                  Verified by design
-                </div>
-              </motion.div>
-              <div className="mt-7 flex items-center gap-3 rounded-xl border border-white/10 bg-black/10 p-4 text-emerald-100/90">
-                <ShieldCheck className="size-5 shrink-0" />
-                <span className="text-sm">Your email stays private. Your voice stays heard.</span>
+              <div className="flex items-center gap-3 pt-2 text-sm text-stone-300/75">
+                <ShieldCheck className="size-4 shrink-0 text-primary" />
+                <span>Stories from people who have done the work.</span>
               </div>
             </motion.div>
           </div>
 
-          <div className="flex min-h-dvh flex-col justify-center px-5 py-8 md:h-dvh md:min-h-0 md:overflow-y-auto md:p-10">
-            <div className="my-auto w-full max-w-md animate-rise md:my-0">
+          <div className="flex min-h-dvh flex-col justify-center px-5 py-7 sm:px-8 md:h-dvh md:min-h-0 md:overflow-y-auto md:px-10 md:py-10">
+            <div className="my-auto w-full max-w-[25rem] animate-rise md:my-0 md:mx-auto">
               <Link
                 to="/"
-                className="mb-5 inline-flex items-center gap-2 font-display text-lg font-semibold tracking-tight text-foreground md:mb-8 md:hidden"
+                className="mb-8 inline-flex items-center gap-3 font-display text-lg font-semibold tracking-tight text-foreground md:hidden"
               >
-                <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+                <span className="flex size-10 items-center justify-center rounded-[0.95rem] border border-primary/20 bg-primary/10 text-primary shadow-[0_0_28px_-13px_rgba(190,242,100,0.7)]">
                   <Flame className="size-5" />
                 </span>
                 Candid
               </Link>
-              <div className="rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-3xl md:border md:border-border md:bg-background/80 md:p-8 md:shadow-xl">
-                <div className="flex items-center gap-2 text-primary">
-                  <EyeOff className="size-5" />
-                  <span className="text-xs font-semibold uppercase tracking-wider">
-                    {mode === "signin" ? "Welcome back" : "Create your account"}
-                  </span>
-                </div>
-                <h1 className="mt-3 text-2xl font-semibold">
-                  {mode === "signin" ? "Sign in" : "Create an account"}
-                </h1>
-                <p className="mt-2 hidden text-sm text-muted-foreground sm:block">
-                  Accounts help prevent spam and duplicate votes. Your Candid handle appears on
-                  stories; your email and legal name stay private.
-                </p>
-
-                <form onSubmit={submit} className="mt-4 space-y-3 sm:mt-6 sm:space-y-4">
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="email">Email</Label>
-                    <Input
-                      id="email"
-                      type="email"
-                      required
-                      autoComplete="email"
-                      value={email}
-                      onChange={(event) => setEmail(event.target.value)}
-                      placeholder="you@example.com"
-                    />
-                  </div>
-                  <div className="space-y-1.5 sm:space-y-2">
-                    <Label htmlFor="password">Password</Label>
-                    <Input
-                      id="password"
-                      type="password"
-                      required
-                      minLength={8}
-                      autoComplete={mode === "signup" ? "new-password" : "current-password"}
-                      value={password}
-                      onChange={(event) => setPassword(event.target.value)}
-                      placeholder="At least 8 characters"
-                    />
-                    {mode === "signin" ? (
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void resetPassword()}
-                        className="text-xs font-medium text-primary hover:underline disabled:opacity-50"
-                      >
-                        Forgot password?
-                      </button>
-                    ) : null}
-                  </div>
-                  <Button type="submit" disabled={busy} className="w-full glow-primary">
-                    {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                    {mode === "signin" ? "Sign in" : "Create account"}
-                  </Button>
-                </form>
-
-                <div className="my-4 flex items-center gap-3 text-[11px] uppercase tracking-widest text-muted-foreground sm:my-5">
-                  <span className="h-px flex-1 bg-border" />
-                  or
-                  <span className="h-px flex-1 bg-border" />
+              <div className="rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-[1.75rem] md:border md:border-white/[0.08] md:bg-white/[0.025] md:p-8 md:shadow-[0_28px_90px_-54px_rgba(0,0,0,0.9)]">
+                <div className="mb-6">
+                  <h1 className="font-display text-[2rem] font-semibold tracking-tight text-foreground">
+                    {mode === "signin" ? "Welcome back" : "Join Candid"}
+                  </h1>
+                  <p className="mt-1.5 text-sm text-muted-foreground">
+                    {mode === "signin"
+                      ? "Pick up where you left off."
+                      : "A better read on work starts here."}
+                  </p>
                 </div>
 
-                {hasBiometric ? (
+                <div
+                  role="tablist"
+                  aria-label="Choose sign in or account creation"
+                  className="mb-5 grid grid-cols-2 rounded-2xl border border-white/[0.07] bg-black/20 p-1"
+                >
+                  {([
+                    ["signin", "Sign in"],
+                    ["signup", "Create account"],
+                  ] as const).map(([tabMode, label]) => (
+                    <button
+                      key={tabMode}
+                      id={`auth-tab-${tabMode}`}
+                      type="button"
+                      role="tab"
+                      aria-selected={mode === tabMode}
+                      aria-controls="auth-panel"
+                      onClick={() => switchMode(tabMode)}
+                      className={`relative isolate min-h-11 rounded-[0.8rem] px-3 text-sm font-medium transition-colors duration-200 ${mode === tabMode ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      {mode === tabMode ? (
+                        <motion.span
+                          layoutId="auth-mode-pill"
+                          transition={{ type: "spring", stiffness: 420, damping: 34 }}
+                          className="absolute inset-0 -z-10 rounded-[0.8rem] border border-white/[0.09] bg-[#282b24] shadow-sm"
+                        />
+                      ) : null}
+                      {label}
+                    </button>
+                  ))}
+                </div>
+
+                {hasBiometric && mode === "signin" ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void biometricUnlock()}
+                    className="mb-5 flex min-h-12 w-full items-center gap-3 rounded-2xl border border-primary/20 bg-primary/[0.055] px-4 text-left transition-colors hover:bg-primary/[0.09] active:scale-[0.99] disabled:opacity-50"
+                  >
+                    <span className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      {busy ? <Loader2 className="size-4 animate-spin" /> : <Fingerprint className="size-4" />}
+                    </span>
+                    <span className="flex-1 text-sm font-medium">Unlock with biometrics</span>
+                    <span className="text-xs text-muted-foreground">This device</span>
+                  </button>
+                ) : null}
+
+                <div id="auth-panel" role="tabpanel" aria-labelledby={`auth-tab-${mode}`}>
                   <Button
                     type="button"
                     variant="outline"
                     disabled={busy}
-                    onClick={biometricUnlock}
-                    className="mb-3 w-full"
+                    onClick={googleSignIn}
+                    className="h-12 w-full rounded-xl border-white/[0.12] bg-white/[0.035] font-medium shadow-none transition-all hover:border-white/[0.2] hover:bg-white/[0.07] active:scale-[0.99]"
                   >
-                    <Fingerprint className="size-4" />
-                    Use fingerprint or face
+                    {busy ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <svg className="size-[18px]" viewBox="0 0 24 24" aria-hidden>
+                        <path
+                          fill="#4285F4"
+                          d="M21.6 12.23c0-.75-.07-1.47-.2-2.16H12v4.09h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.23c1.89-1.74 2.99-4.3 2.99-7.45Z"
+                        />
+                        <path
+                          fill="#34A853"
+                          d="M12 22c2.7 0 4.96-.9 6.61-2.42l-3.23-2.5c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z"
+                        />
+                        <path
+                          fill="#FBBC05"
+                          d="M6.41 13.92a6 6 0 0 1 0-3.83V7.5H3.07a10 10 0 0 0 0 9l3.34-2.58Z"
+                        />
+                        <path
+                          fill="#EA4335"
+                          d="M12 5.98c1.47 0 2.79.5 3.83 1.5l2.87-2.87C16.95 2.99 14.7 2 12 2a10 10 0 0 0-8.93 5.5l3.34 2.59C7.2 7.73 9.4 5.98 12 5.98Z"
+                        />
+                      </svg>
+                    )}
+                    Continue with Google
                   </Button>
-                ) : null}
 
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={busy}
-                  onClick={googleSignIn}
-                  className="w-full"
-                >
-                  <svg className="size-4" viewBox="0 0 24 24" aria-hidden>
-                    <path
-                      fill="#4285F4"
-                      d="M21.6 12.23c0-.75-.07-1.47-.2-2.16H12v4.09h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.23c1.89-1.74 2.99-4.3 2.99-7.45Z"
-                    />
-                    <path
-                      fill="#34A853"
-                      d="M12 22c2.7 0 4.96-.9 6.61-2.42l-3.23-2.5c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z"
-                    />
-                    <path
-                      fill="#FBBC05"
-                      d="M6.41 13.92a6 6 0 0 1 0-3.83V7.5H3.07a10 10 0 0 0 0 9l3.34-2.58Z"
-                    />
-                    <path
-                      fill="#EA4335"
-                      d="M12 5.98c1.47 0 2.79.5 3.83 1.5l2.87-2.87C16.95 2.99 14.7 2 12 2a10 10 0 0 0-8.93 5.5l3.34 2.59C7.2 7.73 9.4 5.98 12 5.98Z"
-                    />
-                  </svg>
-                  Continue with Google
-                </Button>
-                <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                  Google creates an account or signs you in. You can connect email later in
-                  Settings.
-                </p>
+                  <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground/75">
+                    <span className="h-px flex-1 bg-white/[0.09]" />
+                    or use email
+                    <span className="h-px flex-1 bg-white/[0.09]" />
+                  </div>
 
-                <button
-                  type="button"
-                  onClick={() => setMode(mode === "signin" ? "signup" : "signin")}
-                  className="mt-3 text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  {mode === "signin"
-                    ? "New here? Create an account"
-                    : "Already have an account? Sign in"}
-                </button>
+                  <form onSubmit={submit} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-[13px] font-medium text-stone-200">
+                        Email address
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        required
+                        autoComplete="email"
+                        value={email}
+                        onChange={(event) => setEmail(event.target.value)}
+                        placeholder="you@example.com"
+                        className="h-12 rounded-xl border-white/[0.1] bg-white/[0.035] px-4 text-[15px] shadow-inner shadow-black/10 placeholder:text-muted-foreground/60 focus-visible:border-primary/45 focus-visible:ring-primary/20"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label htmlFor="password" className="text-[13px] font-medium text-stone-200">
+                          Password
+                        </Label>
+                        {mode === "signin" ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void resetPassword()}
+                            className="text-xs font-medium text-primary/90 transition-colors hover:text-primary disabled:opacity-50"
+                          >
+                            Forgot password?
+                          </button>
+                        ) : null}
+                      </div>
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? "text" : "password"}
+                          required
+                          minLength={8}
+                          autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
+                          className="h-12 rounded-xl border-white/[0.1] bg-white/[0.035] px-4 pr-12 text-[15px] shadow-inner shadow-black/10 placeholder:text-muted-foreground/60 focus-visible:border-primary/45 focus-visible:ring-primary/20"
+                        />
+                      <button
+                        type="button"
+                        aria-label={showPassword ? "Hide password" : "Show password"}
+                        aria-pressed={showPassword}
+                        onClick={() => setShowPassword((visible) => !visible)}
+                        className="absolute inset-y-0 right-1 flex w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                      >
+                        {showPassword ? (
+                          <EyeOff className="size-[18px]" />
+                        ) : (
+                          <Eye className="size-[18px]" />
+                        )}
+                      </button>
+                      </div>
+                    </div>
+                    <Button
+                      type="submit"
+                      disabled={busy}
+                      className="mt-1 h-12 w-full rounded-xl font-semibold shadow-[0_10px_30px_-15px_rgba(190,242,100,0.7)] transition-all hover:brightness-105 active:scale-[0.99]"
+                    >
+                      {busy ? <Loader2 className="size-4 animate-spin" /> : null}
+                      {mode === "signin" ? "Sign in" : "Create account"}
+                    </Button>
+                  </form>
+                </div>
 
-                <p className="mt-4 flex items-start gap-2 border-l-2 border-primary/40 py-1 pl-3 text-[11px] text-muted-foreground sm:text-xs md:mt-6 md:rounded-xl md:border-0 md:bg-secondary/60 md:p-3">
-                  <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verified" />
-                  Use a personal email, not your work email. We never publish emails, and employers
-                  cannot see who posted.
+                <p className="mt-6 text-center text-xs leading-5 text-muted-foreground/80">
+                  <ShieldCheck className="mr-1.5 inline size-3.5 -translate-y-px text-primary/80" />
+                  Your email stays private and is never shown to employers.
                 </p>
               </div>
             </div>
