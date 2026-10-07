@@ -138,14 +138,14 @@ export function SupportChat({
             </div>
             <div className="relative min-w-0 flex-1">
               <span className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.2em] text-primary">
-                Here to help
+                Candid help
               </span>
               <strong className="block truncate font-display text-base font-semibold tracking-tight">
-                Candid support
+                Support assistant
               </strong>
               <small className="mt-1 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="size-1.5 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.75)]" />
-                Usually replies within a day
+                Team follows up when needed
               </small>
             </div>
             <Button
@@ -192,6 +192,11 @@ export function SupportChat({
           ) : (
             <>
               <div className="shrink-0 border-b border-border/70 bg-secondary/20 px-4 py-3.5 md:px-5">
+                {chat.data?.escalation?.needsOwner ? (
+                  <p className="mb-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs leading-5 text-muted-foreground">
+                    A Candid team member has been asked to follow up here.
+                  </p>
+                ) : null}
                 <div className="mb-2.5 flex items-center justify-between gap-3">
                   <span className="text-[11px] font-medium text-muted-foreground">
                     Start with a topic
@@ -247,8 +252,7 @@ export function SupportChat({
                     </div>
                     <p className="text-sm font-semibold">Your conversation starts here</p>
                     <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
-                      Tell us what you need. This private chat is only visible to you and the Candid
-                      team.
+                      Tell us what you need. Candid’s assistant handles common questions; messages needing a closer look are sent to the team in this private chat.
                     </p>
                   </div>
                 ) : null}

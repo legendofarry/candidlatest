@@ -32,6 +32,38 @@ const AccountReviewSchema = z.object({
   summary: z.string().max(500),
 });
 
+const SupportReplySchema = z.object({
+  disposition: z.enum(["answer", "escalate"]),
+  reply: z.string().min(1).max(900),
+  escalation_reason: z.string().max(240),
+});
+
+/** Answers supported product questions; account-specific or uncertain cases enter the owner inbox. */
+export async function answerSupportMessage(input: {
+  messages: { sender: "user" | "candid"; body: string }[];
+}) {
+  const key = process.env["OPENROUTER_API_KEY"];
+  const fallback = {
+    disposition: "escalate" as const,
+    reply: "I can’t answer that confidently, so I’ve sent this conversation to the Candid team. They’ll follow up here.",
+    escalation_reason: "AI support is unavailable or could not answer confidently.",
+  };
+  if (!key) return fallback;
+  try {
+    const { output } = await generateText({
+      model: createOpenRouterProvider(key)(AI_MODEL),
+      output: Output.object({ schema: SupportReplySchema }),
+      abortSignal: AbortSignal.timeout(15_000),
+      system: "You are Candid's support assistant. Be warm, direct and concise. Answer only from the verified product facts below. Never claim you changed a user account, moderation decision, payment, verification status, or data. Escalate anything account-specific, disputed moderation, privacy/data deletion, safety threats, legal/medical/financial advice, reports needing action, requests for a human, or any question whose answer is not clearly supported. When escalating, say a Candid team member will follow up in this same chat; do not promise timing. Do not ask for passwords, verification codes, or sensitive documents.\n\nProduct facts: Candid is a community platform for workplace stories in Kenya. Stories are screened for policy and privacy risks; unclear submissions can wait for moderator review. Employment evidence is private and visible only to moderators, never published or shared with an employer. Stories display Candid handles, not email or legal names; users should still avoid identifying details in story text. Employers can claim company profiles and request a right of reply. Users can contact the team through this support chat or the support form. Email verification is required where prompted. A verified company badge is not proof that any story is true. For account access, deletion/correction, a specific story/report, badge requests, or anything else requiring database access, escalate. If answering is safe, give steps based only on these facts; otherwise ask one concise clarifying question or escalate.",
+      prompt: input.messages.map((message) => `${message.sender === "user" ? "Member" : "Candid"}: ${message.body}`).join("\n"),
+    });
+    return output;
+  } catch (error) {
+    console.error("[answerSupportMessage]", error);
+    return fallback;
+  }
+}
+
 export type AccountReview = z.infer<typeof AccountReviewSchema> & {
   model: string;
   decision: "auto_approved" | "important_review";

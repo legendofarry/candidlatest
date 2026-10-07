@@ -80,6 +80,11 @@ function PrivacyPage() {
             moderator review. Automated assessments can be wrong, so moderators can review and
             change the result.
           </li>
+          <li>
+            Support chat messages may be processed by Candid’s AI support assistant to answer
+            common product questions. Questions it cannot confidently answer are flagged for the
+            Candid team, who can read and reply in the same chat.
+          </li>
         </ul>
       </section>
       <section>

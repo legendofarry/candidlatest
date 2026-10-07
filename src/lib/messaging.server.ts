@@ -53,36 +53,41 @@ export async function ensureCandidAccount() {
   const db = getFirestoreDb();
   const ref = db.collection("profiles").doc(CANDID_USER_ID);
   const snap = await ref.get();
-  if (!snap.exists) {
-    const profile: ProfileRecord = {
-      id: CANDID_USER_ID,
-      handle: CANDID_USERNAME,
-      county: null,
-      banned: false,
-      created_at: now(),
-      role_label: "Candid team",
-      username: CANDID_USERNAME,
-      account_type: "company",
-      onboarded_at: now(),
-    };
-    await ref.set(profile);
-    await db.collection("usernames").doc(CANDID_USERNAME).set({
+  const timestamp = now();
+  const existingProfile = snap.data() as Partial<ProfileRecord> | undefined;
+  await ref.set({
+    id: CANDID_USER_ID,
+    handle: CANDID_USERNAME,
+    county: null,
+    banned: false,
+    created_at: existingProfile?.created_at ?? timestamp,
+    role_label: "Candid team",
+    username: CANDID_USERNAME,
+    account_type: "company",
+    verified: true,
+    onboarded_at: existingProfile?.onboarded_at ?? timestamp,
+  }, { merge: true });
+  const usernameRef = db.collection("usernames").doc(CANDID_USERNAME);
+  if (!(await usernameRef.get()).exists) {
+    await usernameRef.set({
       username: CANDID_USERNAME,
       user_id: CANDID_USER_ID,
-      created_at: now(),
+      created_at: timestamp,
     });
-    await db.collection("verifications").doc(CANDID_USER_ID).set(
-      {
-        user_id: CANDID_USER_ID,
-        account_type: "company",
-        badge_status: "claimed",
-        owner_verified: true,
-        claimed_at: now(),
-        checked_at: now(),
-      },
-      { merge: true },
-    );
   }
+  const verificationRef = db.collection("account_verifications").doc(CANDID_USER_ID);
+  const verificationSnapshot = await verificationRef.get();
+  const existingVerification = verificationSnapshot.data() as { claimed_at?: string } | undefined;
+  await verificationRef.set({
+    user_id: CANDID_USER_ID,
+    account_type: "company",
+    badge_status: "claimed",
+    owner_override: "company",
+    owner_verified: true,
+    approval_status: "approved",
+    claimed_at: existingVerification?.claimed_at ?? timestamp,
+    checked_at: timestamp,
+  }, { merge: true });
   return CANDID_USER_ID;
 }
 
@@ -92,18 +97,19 @@ async function readParticipants(ids: string[]): Promise<Map<string, ChatParticip
   const map = new Map<string, ChatParticipant>();
   await Promise.all(
     unique.map(async (id) => {
-      const [profileSnap, verificationSnap] = await Promise.all([
+      const [profileSnap, verificationSnap, legacyVerificationSnap] = await Promise.all([
         db.collection("profiles").doc(id).get(),
+        db.collection("account_verifications").doc(id).get(),
         db.collection("verifications").doc(id).get(),
       ]);
       const profile = profileSnap.data() as ProfileRecord | undefined;
-      const verification = verificationSnap.data() as
+      const verification = (verificationSnap.data() ?? legacyVerificationSnap.data()) as
         { badge_status?: string; owner_verified?: boolean } | undefined;
       map.set(id, {
         id,
         username: profile?.username ?? profile?.handle ?? "member",
         photo_url: profile?.photo_url ?? null,
-        verified: verification?.badge_status === "claimed" || Boolean(verification?.owner_verified),
+        verified: id === CANDID_USER_ID || profile?.verified === true || verification?.badge_status === "claimed" || Boolean(verification?.owner_verified),
         official: id === CANDID_USER_ID,
       });
     }),
@@ -363,6 +369,7 @@ export async function toggleReaction(userId: string, messageId: string, emoji: s
 /** Public-facing profile used by the chat header and profile detail screen. */
 export async function readPublicProfile(username: string, viewerId: string | null) {
   const db = getFirestoreDb();
+  if (username.trim().toLowerCase() === CANDID_USERNAME) await ensureCandidAccount();
   const usernameSnap = await db.collection("usernames").doc(username.toLowerCase()).get();
   const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
   if (!userId) return null;

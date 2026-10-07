@@ -717,200 +717,112 @@ function CandidLensExperience({
   const scenarioKey = `scenario${scenarioIndex + 1}` as keyof LensAnswer;
   const interests = getLensInterests(answers);
   const highlightedInterests = LENS_INTEREST_LABELS.filter((item) => interests[item.key] > 0)
-    .sort((first, second) => interests[second.key] - interests[first.key])
-    .slice(0, 3);
+    .sort((first, second) => interests[second.key] - interests[first.key]);
   const transition = reducedMotion
     ? { duration: 0 }
     : { duration: 0.36, ease: [0.22, 1, 0.36, 1] as const };
+  const answersMade = Object.keys(answers).length;
+  const isQuestion = screen === "scenario" && Boolean(scenario);
 
   return (
-    <main className="relative -mx-4 -my-6 flex min-h-[100dvh] w-auto items-center justify-center overflow-hidden px-5 py-8 sm:px-8">
-      <AuroraBackdrop reducedMotion={reducedMotion} />
-      <div className="relative mx-auto flex w-full max-w-xl flex-col">
-        <header className="mb-10 flex items-center justify-between">
-          <div className="flex items-center gap-3 font-display text-lg font-semibold tracking-tight">
-            <span className="flex size-10 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary">
-              <Flame className="size-5" />
-            </span>
-            Candid
+    <main className="min-h-[100dvh] w-full bg-background px-4 py-4 text-foreground sm:px-8 sm:py-7 lg:px-12">
+      <div className="mx-auto flex min-h-[calc(100dvh-2rem)] w-full max-w-6xl flex-col sm:min-h-[calc(100dvh-3.5rem)]">
+        <header className="flex items-center justify-between border-b border-border/70 pb-4 sm:pb-5">
+          <div className="flex items-center gap-3">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Flame className="size-5" /></span>
+            <span className="font-display text-base font-bold tracking-tight">Candid</span>
+            <span className="hidden h-5 w-px bg-border sm:block" />
+            <span className="hidden text-sm text-muted-foreground sm:block">Your Lens</span>
           </div>
-          {screen !== "intro" ? (
-            <span className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              Your Candid Lens
-            </span>
-          ) : null}
+          <div className="flex items-center gap-3">
+            {isQuestion ? <span className="text-xs font-medium tabular-nums text-muted-foreground">{scenarioIndex + 1} <span className="text-muted-foreground/50">/ 5</span></span> : null}
+            {screen === "intro" || screen === "scenario" ? <button type="button" onClick={onSkip} className="min-h-10 rounded-full px-3 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground">Skip</button> : null}
+          </div>
         </header>
 
-        <AnimatePresence mode="wait" initial={false}>
-          {screen === "intro" ? (
-            <motion.section
-              key="lens-intro"
-              initial={reducedMotion ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={transition}
-              {...(reducedMotion ? {} : { exit: { opacity: 0, y: -10 } })}
-              className="w-full"
-            >
-              <div className="mb-7 flex size-14 items-center justify-center rounded-[1.25rem] border border-primary/20 bg-primary/10 text-primary">
-                <Sparkles className="size-6" />
-              </div>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                A quick gut check
-              </p>
-              <h1 className="max-w-lg font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
-                Before you start<span className="text-primary">…</span>
-              </h1>
-              <p className="mt-4 text-lg text-foreground">5 situations. Trust your gut.</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                No right answers. Just your instincts.
-              </p>
-              <Button
-                onClick={onStart}
-                className="mt-9 h-12 w-full rounded-xl text-base sm:w-auto sm:min-w-52"
-              >
-                Let’s go <ArrowRight className="size-4" />
-              </Button>
-              <button
-                type="button"
-                onClick={onSkip}
-                className="mt-5 block min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:w-auto sm:text-left"
-              >
-                Skip for now
-              </button>
-            </motion.section>
-          ) : screen === "scenario" && scenario ? (
-            <motion.section
-              key={`lens-scenario-${scenarioIndex}`}
-              initial={reducedMotion ? false : { opacity: 0, x: 18 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={transition}
-              {...(reducedMotion ? {} : { exit: { opacity: 0, x: -18 } })}
-              aria-live="polite"
-              className="w-full"
-            >
-              <div className="mb-5 flex items-center justify-between text-xs font-medium text-muted-foreground">
-                <span>{String(scenarioIndex + 1).padStart(2, "0")} / 05</span>
-                <span>Trust your gut</span>
-              </div>
-              <div className="mb-7 h-1 overflow-hidden rounded-full bg-secondary">
-                <motion.div
-                  className="h-full rounded-full bg-primary"
-                  initial={false}
-                  animate={{ width: `${((scenarioIndex + 1) / LENS_SCENARIOS.length) * 100}%` }}
-                  transition={reducedMotion ? { duration: 0 } : { duration: 0.45, ease: "easeOut" }}
-                />
-              </div>
+        {isQuestion ? <div className="mt-5 flex gap-1.5 sm:mt-7" aria-label={`Question ${scenarioIndex + 1} of 5`}>
+          {LENS_SCENARIOS.map((item, index) => <span key={item.label} className={`h-1 flex-1 rounded-full transition-colors ${index <= scenarioIndex ? "bg-primary" : "bg-secondary"}`} />)}
+        </div> : null}
 
-              <div className="mb-5 flex size-12 items-center justify-center rounded-2xl border border-border bg-card/70 text-primary">
-                <scenario.icon className="size-5" />
-              </div>
-              <p className="text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                {scenario.label}
-              </p>
-              <h1 className="mt-3 font-display text-[1.65rem] font-semibold leading-snug tracking-tight sm:text-3xl">
-                {scenario.text}
-              </h1>
-
-              <div className="mt-8 grid gap-3">
-                {scenario.choices.map((choice, index) => {
-                  const selected = selectedChoice === choice.value;
-                  return (
-                    <motion.button
-                      key={choice.value}
-                      type="button"
-                      disabled={Boolean(selectedChoice)}
-                      aria-pressed={answers[scenarioKey] === choice.value}
-                      onClick={() => onAnswer(choice.value)}
-                      animate={selected ? { scale: 1.015 } : { scale: 1 }}
-                      transition={reducedMotion ? { duration: 0 } : { duration: 0.18 }}
-                      {...(reducedMotion ? {} : { whileTap: { scale: 0.985 } })}
-                      className={`flex min-h-[4.5rem] w-full items-center justify-between gap-4 rounded-2xl border px-5 py-4 text-left text-base font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/70 disabled:cursor-default ${
-                        selected
-                          ? "border-primary bg-primary/10 text-foreground"
-                          : "border-border bg-card/65 text-foreground hover:border-primary/55 hover:bg-card"
-                      }`}
-                    >
-                      <span>{choice.label}</span>
-                      <span className="flex size-7 shrink-0 items-center justify-center rounded-full border border-border text-xs text-muted-foreground">
-                        {index === 0 ? "A" : "B"}
-                      </span>
-                    </motion.button>
-                  );
-                })}
-              </div>
-
-              <button
-                type="button"
-                disabled={Boolean(selectedChoice)}
-                onClick={onSkip}
-                className="mt-6 min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
-              >
-                Skip for now
-              </button>
-            </motion.section>
-          ) : screen === "transition" ? (
-            <motion.section
-              key="lens-transition"
-              initial={reducedMotion ? false : { opacity: 0, scale: 0.98 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={transition}
-              {...(reducedMotion ? {} : { exit: { opacity: 0, scale: 1.02 } })}
-              aria-live="polite"
-              className="flex min-h-72 flex-col items-center justify-center text-center"
-            >
-              <span className="mb-5 flex size-14 items-center justify-center rounded-full border border-primary/30 bg-primary/10 text-primary">
-                <Check className="size-6" />
-              </span>
-              <h1 className="font-display text-3xl font-semibold tracking-tight">Got it.</h1>
-              <p className="mt-2 text-sm text-muted-foreground">No wrong answers here.</p>
-            </motion.section>
-          ) : screen === "result" ? (
-            <motion.section
-              key="lens-result"
-              initial={reducedMotion ? false : { opacity: 0, y: 14 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={transition}
-              className="w-full"
-            >
-              <div className="mb-7 flex size-14 items-center justify-center rounded-[1.25rem] border border-primary/20 bg-primary/10 text-primary">
-                <ShieldCheck className="size-6" />
-              </div>
-              <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">
-                Your Candid Lens
-              </p>
-              <h1 className="font-display text-4xl font-semibold leading-[1.08] tracking-tight sm:text-5xl">
-                Okay, we get you.
-              </h1>
-              <p className="mt-4 text-base text-muted-foreground">
-                Your Candid Lens is taking shape.
-              </p>
-              <div className="mt-8">
-                <p className="text-sm font-medium text-foreground">Your choices leaned toward:</p>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {highlightedInterests.map((item) => (
-                    <span
-                      key={item.key}
-                      className="rounded-full border border-primary/20 bg-primary/10 px-3.5 py-2 text-sm font-medium text-foreground"
-                    >
-                      {item.label}
-                    </span>
-                  ))}
+        <div className="grid flex-1 items-center gap-8 py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)] lg:gap-16 lg:py-10">
+          <AnimatePresence mode="wait" initial={false}>
+            {screen === "intro" ? (
+              <motion.section key="lens-intro" initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { opacity: 0, y: -8 }} transition={transition} className="w-full max-w-2xl">
+                <p className="mb-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><Sparkles className="size-4" /> A quick check-in</p>
+                <h1 className="max-w-2xl font-display text-4xl font-semibold leading-[1.06] tracking-[-0.04em] sm:text-6xl">What do you look for at work?</h1>
+                <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">Five everyday situations. Pick the response that feels right to you. It helps shape the work stories and details Candid brings into view.</p>
+                <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-5">
+                  {LENS_SCENARIOS.map((item, index) => <div key={item.label} className="flex min-h-20 flex-col justify-between rounded-xl border border-border/70 bg-card/50 p-3"><span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground">0{index + 1}</span><span className="text-xs font-medium">{item.label.toLowerCase()}</span></div>)}
                 </div>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Button onClick={onStart} className="h-12 w-full rounded-xl px-6 text-sm sm:w-auto">Start the check-in <ArrowRight className="size-4" /></Button>
+                  <span className="text-center text-xs text-muted-foreground sm:text-left">About 1 minute · no wrong answers</span>
+                </div>
+              </motion.section>
+            ) : screen === "scenario" && scenario ? (
+              <motion.section key={`lens-scenario-${scenarioIndex}`} initial={reducedMotion ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={reducedMotion ? undefined : { opacity: 0, x: -12 }} transition={transition} aria-live="polite" className="w-full max-w-2xl">
+                <p className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><scenario.icon className="size-4" /> {scenario.label}</p>
+                <h1 className="font-display text-[1.75rem] font-semibold leading-[1.18] tracking-[-0.03em] sm:text-4xl">{scenario.text}</h1>
+                <p className="mt-4 text-sm text-muted-foreground">What would you do first?</p>
+                <div className="mt-7 grid gap-3 sm:grid-cols-2">
+                  {scenario.choices.map((choice, index) => {
+                    const selected = selectedChoice === choice.value;
+                    return <motion.button key={choice.value} type="button" disabled={Boolean(selectedChoice)} aria-pressed={answers[scenarioKey] === choice.value} onClick={() => onAnswer(choice.value)} whileTap={reducedMotion ? undefined : { scale: 0.985 }} className={`group flex min-h-28 w-full flex-col items-start justify-between rounded-2xl border p-4 text-left transition-all sm:min-h-36 sm:p-5 ${selected ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-border bg-card/60 hover:border-primary/50 hover:bg-card"}`}>
+                      <span className={`flex size-7 items-center justify-center rounded-full border text-xs ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground group-hover:border-primary/50"}`}>{selected ? <Check className="size-4" /> : index + 1}</span>
+                      <span className="mt-4 text-sm font-semibold leading-6 sm:text-base">{choice.label}</span>
+                    </motion.button>;
+                  })}
+                </div>
+                <p className="mt-5 text-xs leading-5 text-muted-foreground">Choose what you’d actually do. Your answer isn’t a test score.</p>
+              </motion.section>
+            ) : screen === "transition" ? (
+              <motion.section key="lens-transition" initial={reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={transition} aria-live="polite" className="flex min-h-64 flex-col justify-center">
+                <span className="mb-5 flex size-11 items-center justify-center rounded-full bg-primary/15 text-primary"><Check className="size-5" /></span>
+                <h1 className="font-display text-3xl font-semibold tracking-tight">Got it.</h1>
+                <p className="mt-2 text-sm text-muted-foreground">One more everyday situation.</p>
+              </motion.section>
+            ) : screen === "result" ? (
+              <motion.section key="lens-result" initial={reducedMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={transition} className="w-full max-w-2xl">
+                <p className="mb-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><ShieldCheck className="size-4" /> Your Lens</p>
+                <h1 className="font-display text-4xl font-semibold leading-[1.06] tracking-[-0.04em] sm:text-6xl">We’ll keep an eye on what matters to you.</h1>
+                <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">Your choices suggest the parts of work you pay attention to. They help Candid surface relevant stories and practical details.</p>
+                <div className="mt-7 grid gap-2 sm:grid-cols-2">
+                  {highlightedInterests.map((item) => <div key={item.key} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/50 px-4 py-3"><span className="size-2 rounded-full bg-primary" /><span className="text-sm font-medium">{item.label}</span></div>)}
+                </div>
+                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <Button onClick={onContinue} className="h-12 w-full rounded-xl px-6 text-sm sm:w-auto">Continue to your profile <ArrowRight className="size-4" /></Button>
+                  <span className="text-center text-xs text-muted-foreground sm:text-left">This isn’t a score or personality test.</span>
+                </div>
+              </motion.section>
+            ) : null}
+          </AnimatePresence>
+
+          <aside className="hidden lg:block">
+            {screen === "result" ? (
+              <div className="rounded-3xl border border-border bg-card/65 p-7">
+                <span className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">What you noticed</span>
+                <div className="mt-7 space-y-5">{LENS_INTEREST_LABELS.map((item) => <div key={item.key}><div className="mb-2 flex justify-between text-sm"><span>{item.label}</span><span className="tabular-nums text-muted-foreground">{interests[item.key]}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-secondary"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, interests[item.key] * 25)}%` }} transition={{ duration: reducedMotion ? 0 : 0.6 }} className="h-full rounded-full bg-primary" /></div></div>)}</div>
+                <p className="mt-7 border-t border-border pt-5 text-xs leading-5 text-muted-foreground">Your answers are saved with your account and used to shape your Candid experience.</p>
               </div>
-              <p className="mt-8 text-sm font-medium text-foreground">That’s useful.</p>
-              <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">
-                Your answers aren’t a score or a personality test. They help Candid bring the
-                details behind job adverts into view.
-              </p>
-              <Button
-                onClick={onContinue}
-                className="mt-8 h-12 w-full rounded-xl text-base sm:w-auto sm:min-w-52"
-              >
-                Continue <ArrowRight className="size-4" />
-              </Button>
-            </motion.section>
-          ) : null}
-        </AnimatePresence>
+            ) : screen === "intro" ? (
+              <div className="relative overflow-hidden rounded-3xl border border-border bg-card/65 p-7">
+                <div className="absolute -right-12 -top-16 size-48 rounded-full bg-primary/10 blur-3xl" />
+                <span className="relative text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">A little context</span>
+                <p className="relative mt-10 font-display text-3xl font-medium leading-tight">“The small details often tell you the most.”</p>
+                <p className="relative mt-4 text-sm leading-6 text-muted-foreground">This helps tune your Candid experience around the questions you care about.</p>
+                <div className="relative mt-10 flex items-center gap-2 border-t border-border pt-5 text-xs text-muted-foreground"><ShieldCheck className="size-4 text-primary" /> Your answers stay on your account</div>
+              </div>
+            ) : (
+              <div className="rounded-3xl border border-border bg-card/65 p-7">
+                <span className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Your check-in</span>
+                <p className="mt-2 text-sm text-muted-foreground">{answersMade} of 5 answered</p>
+                <div className="mt-6 space-y-3">{LENS_SCENARIOS.map((item, index) => { const answer = answers[`scenario${index + 1}` as keyof LensAnswer]; return <div key={item.label} className="flex items-start gap-3 border-t border-border/70 pt-3"><span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] ${answer ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>{answer ? <Check className="size-3" /> : String(index + 1)}</span><span className="text-xs leading-5 text-muted-foreground">{item.label.toLowerCase()}{index === scenarioIndex ? <span className="ml-2 text-primary">Current</span> : ""}</span></div>; })}</div>
+                <p className="mt-6 border-t border-border pt-5 text-xs leading-5 text-muted-foreground">There are no right answers. Pick the response you’d choose in real life.</p>
+              </div>
+            )}
+          </aside>
+        </div>
+        <footer className="flex items-center justify-between border-t border-border/70 py-3 text-[11px] text-muted-foreground"><span>Candid · Kenya</span><span>{screen === "result" ? "Your answers are private" : "No right or wrong answers"}</span></footer>
       </div>
     </main>
   );
