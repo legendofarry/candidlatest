@@ -4,11 +4,9 @@ import { motion } from "motion/react";
 import {
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
-  getRedirectResult,
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
-  signInWithRedirect,
   sendPasswordResetEmail,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
@@ -78,6 +76,15 @@ function authErrorMessage(error: unknown) {
   if (code === "auth/unauthorized-domain") {
     return "This site is not enabled for Firebase sign-in. Add its domain to Firebase Authentication’s authorized domains.";
   }
+  if (code === "auth/operation-not-allowed") {
+    return "Google sign-in is disabled for this Firebase project. Enable Google in Firebase Authentication sign-in providers.";
+  }
+  if (code === "auth/invalid-api-key" || code === "auth/app-not-authorized") {
+    return "This app’s Firebase sign-in configuration is invalid. Check the Firebase web app and API key settings.";
+  }
+  if (code === "auth/web-storage-unsupported") {
+    return "This browser is blocking the storage needed for sign-in. Enable site storage or try another browser.";
+  }
   return error instanceof Error ? error.message : "Sign-in failed. Please try again.";
 }
 
@@ -88,35 +95,11 @@ function AuthPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [redirectCheckComplete, setRedirectCheckComplete] = useState(false);
   const [hasBiometric, setHasBiometric] = useState(false);
   const fetchOnboardingState = useServerFn(getOnboardingState);
 
   useEffect(() => {
-    let active = true;
-    void getRedirectResult(firebaseAuth)
-      .then((result) => {
-        if (!active || !result) return;
-        toast.success(
-          getAdditionalUserInfo(result)?.isNewUser
-            ? "Account created with Google."
-            : "Signed in with Google.",
-        );
-      })
-      .catch((error) => {
-        if (!active) return;
-        toast.error(authErrorMessage(error));
-      })
-      .finally(() => {
-        if (active) setRedirectCheckComplete(true);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (authLoading || !redirectCheckComplete || !user) return;
+    if (authLoading || !user) return;
     let active = true;
     void fetchOnboardingState()
       .then((state) => {
@@ -128,13 +111,13 @@ function AuthPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, redirectCheckComplete, user, fetchOnboardingState, navigate]);
+  }, [authLoading, user, fetchOnboardingState, navigate]);
 
   useEffect(() => {
     setHasBiometric(getCredentials().length > 0);
   }, []);
 
-  if (authLoading || !redirectCheckComplete || user) {
+  if (authLoading || user) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background px-6 text-sm text-muted-foreground">
         <Loader2 className="mr-2 size-4 animate-spin" />
@@ -199,10 +182,9 @@ function AuthPage() {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      if (window.matchMedia("(max-width: 767px)").matches) {
-        await signInWithRedirect(firebaseAuth, provider);
-        return;
-      }
+      // This app is hosted on Netlify, not Firebase Hosting. Firebase redirect
+      // auth can lose its cross-domain state in modern mobile browsers unless
+      // the auth helper is proxied onto this domain. Popup auth avoids that flow.
       const result = await signInWithPopup(firebaseAuth, provider);
       const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
       toast.success(

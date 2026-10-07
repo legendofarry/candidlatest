@@ -6,11 +6,9 @@ import { motion } from "motion/react";
 import type { User } from "firebase/auth";
 import {
   EmailAuthProvider,
-  getRedirectResult,
   GoogleAuthProvider,
   linkWithCredential,
   linkWithPopup,
-  linkWithRedirect,
 } from "firebase/auth";
 import {
   ArrowLeft,
@@ -384,22 +382,6 @@ function SignInMethods({ user }: { user: User | null }) {
     setProviderIds(user?.providerData.map((provider) => provider.providerId) ?? []);
   }, [user]);
 
-  useEffect(() => {
-    let active = true;
-    void getRedirectResult(firebaseAuth)
-      .then((result) => {
-        if (!active || !result || result.providerId !== GoogleAuthProvider.PROVIDER_ID) return;
-        setProviderIds(result.user.providerData.map((provider) => provider.providerId));
-        notify.success("Google is connected to this Candid account.");
-      })
-      .catch((error) => {
-        if (active) notify.error(signInMethodError(error));
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
-
   const googleLinked = providerIds.includes(GoogleAuthProvider.PROVIDER_ID);
   const passwordLinked = providerIds.includes(EmailAuthProvider.PROVIDER_ID);
 
@@ -409,10 +391,6 @@ function SignInMethods({ user }: { user: User | null }) {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: "select_account" });
-      if (window.matchMedia("(max-width: 767px)").matches) {
-        await linkWithRedirect(user, provider);
-        return;
-      }
       const result = await linkWithPopup(user, provider);
       setProviderIds(result.user.providerData.map((item) => item.providerId));
       notify.success("Google is connected. You can use either sign-in method now.");
