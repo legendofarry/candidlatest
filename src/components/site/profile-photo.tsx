@@ -187,8 +187,9 @@ export function ProfilePhotoPicker({
           type="button"
           aria-label="View or update profile photo"
           aria-haspopup="dialog"
+          onPointerUp={() => setActionsOpen(true)}
           onClick={() => setActionsOpen(true)}
-          className="group relative shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="group relative z-10 shrink-0 cursor-pointer pointer-events-auto rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           <ProfileAvatar
             photoUrl={previewUrl ?? photoUrl}
