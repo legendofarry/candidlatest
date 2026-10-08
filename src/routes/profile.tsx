@@ -230,11 +230,29 @@ function ProfilePage() {
               className="border-b border-border pb-5 md:glass-card md:rounded-2xl md:border md:border-border md:p-6"
             >
               <div className="flex items-center gap-4">
-                <ProfileAvatar
-                  photoUrl={onboarding.data?.photoUrl}
-                  initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
-                  className="size-14 shrink-0 md:size-16"
-                />
+                {user ? (
+                  <ProfilePhotoPicker
+                    compact
+                    avatarOnly
+                    photoUrl={onboarding.data?.photoUrl}
+                    initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
+                    onSaved={(photoUrl) => {
+                      queryClient.setQueryData(
+                        ["onboarding-state", user.uid],
+                        (previous: unknown) =>
+                          previous && typeof previous === "object"
+                            ? { ...previous, photoUrl }
+                            : previous,
+                      );
+                    }}
+                  />
+                ) : (
+                  <ProfileAvatar
+                    photoUrl={onboarding.data?.photoUrl}
+                    initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
+                    className="size-14 shrink-0 md:size-16"
+                  />
+                )}
                 <div className="min-w-0">
                   <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     Your account
@@ -274,20 +292,6 @@ function ProfilePage() {
               </div>
               {user ? (
                 <div className="mt-4 space-y-4 border-t border-border pt-4">
-                  <ProfilePhotoPicker
-                    compact
-                    photoUrl={onboarding.data?.photoUrl}
-                    initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
-                    onSaved={(photoUrl) => {
-                      queryClient.setQueryData(
-                        ["onboarding-state", user.uid],
-                        (previous: unknown) =>
-                          previous && typeof previous === "object"
-                            ? { ...previous, photoUrl }
-                            : previous,
-                      );
-                    }}
-                  />
                   {onboarding.data?.username ? (
                     <div className="flex flex-wrap items-center gap-2">
                       {editingUsername ? (

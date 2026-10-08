@@ -1,7 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Loader2, RotateCcw, Upload, X } from "lucide-react";
+import { Camera, Eye, Loader2, RotateCcw, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { saveMyProfilePhoto } from "@/lib/onboarding.functions";
 import { notify } from "@/lib/notifications-store";
 
@@ -45,11 +53,13 @@ export function ProfilePhotoPicker({
   initials,
   onSaved,
   compact = false,
+  avatarOnly = false,
 }: {
   photoUrl?: string | null | undefined;
   initials: string;
   onSaved: (photoUrl: string) => void;
   compact?: boolean;
+  avatarOnly?: boolean;
 }) {
   const savePhoto = useServerFn(saveMyProfilePhoto);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -58,6 +68,8 @@ export function ProfilePhotoPicker({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   useEffect(() => {
     if (!file) {
@@ -76,13 +88,16 @@ export function ProfilePhotoPicker({
     if (!next) return;
     if (!ACCEPTED_TYPES.has(next.type)) {
       setError("Choose a JPG, PNG, or WebP image.");
+      setActionsOpen(true);
       return;
     }
     if (next.size > MAX_FILE_SIZE) {
       setError("That image is over 5 MB. Choose a smaller file.");
+      setActionsOpen(true);
       return;
     }
     setFile(next);
+    setActionsOpen(true);
   }
 
   async function compressImage(input: File) {
@@ -140,6 +155,7 @@ export function ProfilePhotoPicker({
       const saved = await savePhoto({ data: { photoUrl: result.secure_url } });
       onSaved(saved.photoUrl);
       setFile(null);
+      setActionsOpen(false);
       notify.success("Profile photo updated.");
     } catch (uploadError) {
       if (controller.signal.aborted) return;
@@ -157,18 +173,40 @@ export function ProfilePhotoPicker({
     setError("Upload cancelled. You can try again or continue without a photo.");
   }
 
+  function openFilePicker() {
+    setError(null);
+    setActionsOpen(false);
+    // Wait for the action dialog to close before opening the native file picker.
+    window.setTimeout(() => inputRef.current?.click(), 0);
+  }
+
   return (
-    <div className={compact ? "flex flex-col gap-3 sm:flex-row sm:items-center" : "space-y-4"}>
+    <div className={avatarOnly ? "inline-flex" : compact ? "flex flex-col gap-3 sm:flex-row sm:items-center" : "space-y-4"}>
       <div className="flex items-center gap-4">
-        <ProfileAvatar
-          photoUrl={previewUrl ?? photoUrl}
-          initials={initials}
-          className={compact ? "size-14 border border-border" : "size-20 border-2 border-border"}
-        />
-        <div className="min-w-0">
-          <p className="font-medium">{photoUrl ? "Profile photo" : "Add a profile photo"}</p>
-          <p className="text-xs text-muted-foreground">Optional · JPG, PNG or WebP · up to 5 MB</p>
-        </div>
+        <button
+          type="button"
+          aria-label="View or update profile photo"
+          aria-haspopup="dialog"
+          onClick={() => setActionsOpen(true)}
+          className="group relative shrink-0 rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <ProfileAvatar
+            photoUrl={previewUrl ?? photoUrl}
+            initials={initials}
+            className={`${compact ? "size-14 border border-border" : "size-20 border-2 border-border"} transition-opacity group-hover:opacity-80`}
+          />
+          <span className="absolute bottom-0 right-0 grid size-6 place-items-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-sm">
+            <Camera className="size-3" />
+          </span>
+        </button>
+        {!avatarOnly ? (
+          <div className="min-w-0">
+            <p className="font-medium">{photoUrl ? "Profile photo" : "Add a profile photo"}</p>
+            <p className="text-xs text-muted-foreground">
+              {compact ? "Tap photo to view or update" : "Optional · tap photo to view or update · JPG, PNG or WebP · up to 5 MB"}
+            </p>
+          </div>
+        ) : null}
       </div>
       <input
         ref={inputRef}
@@ -180,42 +218,76 @@ export function ProfilePhotoPicker({
           event.currentTarget.value = "";
         }}
       />
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={uploading}
-          onClick={() => inputRef.current?.click()}
-        >
-          <Camera className="size-4" />{" "}
-          {file ? "Choose another" : photoUrl ? "Change photo" : "Choose photo"}
-        </Button>
-        {file ? (
-          <Button type="button" onClick={() => void upload()} disabled={uploading}>
-            {uploading ? (
-              <Loader2 className="size-4 animate-spin" />
+      <Dialog open={actionsOpen} onOpenChange={setActionsOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>{file ? "Update profile photo" : "Profile photo"}</DialogTitle>
+            <DialogDescription>
+              {file ? "Check the preview, then upload it to your profile." : "View your current photo or choose a new one."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col items-center gap-4 py-2">
+            <ProfileAvatar
+              photoUrl={previewUrl ?? photoUrl}
+              initials={initials}
+              className="size-36 border-2 border-border shadow-sm"
+            />
+            {file ? <p className="max-w-full truncate text-sm text-muted-foreground">{file.name}</p> : null}
+          </div>
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          <DialogFooter className="gap-2 sm:flex-row sm:justify-center sm:space-x-0">
+            {file ? (
+              <>
+                {!uploading ? (
+                  <Button type="button" variant="outline" onClick={openFilePicker}>
+                    <Camera className="size-4" /> Choose another
+                  </Button>
+                ) : null}
+                <Button type="button" onClick={() => void upload()} disabled={uploading}>
+                  {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
+                  {uploading ? "Uploading…" : "Upload photo"}
+                </Button>
+                {uploading ? (
+                  <Button type="button" variant="ghost" onClick={cancelUpload}>
+                    <X className="size-4" /> Cancel
+                  </Button>
+                ) : (
+                  <Button type="button" variant="ghost" onClick={() => { setFile(null); setError(null); }}>
+                    <RotateCcw className="size-4" /> Clear
+                  </Button>
+                )}
+              </>
             ) : (
-              <Upload className="size-4" />
+              <>
+                {photoUrl ? (
+                  <Button type="button" variant="outline" onClick={() => { setActionsOpen(false); setViewerOpen(true); }}>
+                    <Eye className="size-4" /> View photo
+                  </Button>
+                ) : null}
+                <Button type="button" onClick={openFilePicker}>
+                  <Camera className="size-4" /> {photoUrl ? "Update photo" : "Add photo"}
+                </Button>
+              </>
             )}
-            {uploading ? "Uploading…" : "Upload photo"}
-          </Button>
-        ) : null}
-        {uploading ? (
-          <Button type="button" variant="ghost" onClick={cancelUpload}>
-            <X className="size-4" /> Cancel
-          </Button>
-        ) : null}
-        {file && !uploading ? (
-          <Button type="button" variant="ghost" onClick={() => setFile(null)}>
-            <RotateCcw className="size-4" /> Clear
-          </Button>
-        ) : null}
-      </div>
-      {error ? (
-        <p role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      ) : null}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Profile photo</DialogTitle>
+            <DialogDescription>This is the photo shown on your Candid profile.</DialogDescription>
+          </DialogHeader>
+          {photoUrl ? (
+            <img src={photoUrl} alt="Your profile photo" className="mx-auto max-h-[65dvh] max-w-full rounded-xl object-contain" />
+          ) : null}
+          <DialogFooter>
+            <Button type="button" onClick={() => { setViewerOpen(false); openFilePicker(); }}>
+              <Camera className="size-4" /> Update photo
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
