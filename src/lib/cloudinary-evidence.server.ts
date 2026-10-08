@@ -1,10 +1,13 @@
+import { v2 as cloudinary } from "cloudinary";
+
 const EVIDENCE_FORMATS = new Set(["jpg", "png", "webp", "pdf"]);
 
 export function getCloudinaryEvidenceConfig() {
-  const cloudName =
-    process.env["CLOUDINARY_CLOUD_NAME"] ?? process.env["VITE_CLOUDINARY_CLOUD_NAME"];
-  const apiKey = process.env["CLOUDINARY_API_KEY"];
-  const apiSecret = process.env["CLOUDINARY_API_SECRET"];
+  const cloudName = (
+    process.env["CLOUDINARY_CLOUD_NAME"] ?? process.env["VITE_CLOUDINARY_CLOUD_NAME"]
+  )?.trim();
+  const apiKey = process.env["CLOUDINARY_API_KEY"]?.trim();
+  const apiSecret = process.env["CLOUDINARY_API_SECRET"]?.trim();
 
   if (!cloudName || !apiKey || !apiSecret) {
     throw new Error(
@@ -15,21 +18,16 @@ export function getCloudinaryEvidenceConfig() {
   return { cloudName, apiKey, apiSecret };
 }
 
-function toHex(bytes: ArrayBuffer) {
-  return [...new Uint8Array(bytes)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-}
-
 export async function signCloudinaryParams(
   params: Record<string, string>,
   apiSecret: string,
   algorithm: "SHA-1" | "SHA-256" = "SHA-1",
 ) {
-  const serialized = Object.entries(params)
-    .sort(([a], [b]) => a.localeCompare(b))
-    .map(([key, value]) => `${key}=${value}`)
-    .join("&");
-  const bytes = new TextEncoder().encode(`${serialized}${apiSecret}`);
-  return toHex(await crypto.subtle.digest(algorithm, bytes));
+  return cloudinary.utils.api_sign_request(
+    params,
+    apiSecret.trim(),
+    algorithm === "SHA-256" ? "sha256" : "sha1",
+  );
 }
 
 export async function verifyCloudinaryUploadResponse(input: {

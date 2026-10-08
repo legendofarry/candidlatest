@@ -88,14 +88,14 @@ function FeedPage() {
   const stories = (data?.stories ?? []).filter((story) =>
     needle
       ? [
-          story.title,
-          story.body,
-          story.company_name ?? "",
-          ...((story as { reasons?: string[] }).reasons ?? []),
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(needle)
+        story.title,
+        story.body,
+        story.company_name ?? "",
+        ...((story as { reasons?: string[] }).reasons ?? []),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle)
       : true,
   );
 
@@ -113,7 +113,7 @@ function FeedPage() {
         <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
           <div>
             <p className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-[11px] font-medium text-muted-foreground sm:text-xs">
-              <ShieldCheck className="size-3.5 text-verified" /> Worker-led · Kenya
+              <ShieldCheck className="size-3.5 text-verified" />
             </p>
             <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-[1.05] sm:mt-4 sm:text-4xl md:text-6xl">
               The <span className="text-gradient">real reasons</span> Kenyans left their jobs.

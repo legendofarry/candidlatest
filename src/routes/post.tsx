@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -13,6 +13,7 @@ import {
   Lock,
   LoaderCircle,
   Paperclip,
+  Save,
   ShieldCheck,
   Trash2,
   X,
@@ -20,6 +21,7 @@ import {
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { getFilterOptions } from "@/lib/public.functions";
 import { createStory, ensureProfile, findOrCreateCompany } from "@/lib/actions.functions";
+import { buildStoryDraft } from "@/lib/story-draft";
 import {
   discardEmploymentEvidenceUpload,
   issueEmploymentEvidenceUpload,
@@ -76,6 +78,23 @@ type CloudinaryUploadResult = {
   error?: { message?: string };
 };
 
+type StoryDraft = {
+  version: 1;
+  step: number;
+  companyName: string;
+  industry: string;
+  county: string;
+  reasons: string[];
+  customReason: string;
+  tenure: string;
+  roleLevel: string;
+  position: string;
+  title: string;
+  body: string;
+  wouldReturn: boolean | null;
+  evidenceNote: string;
+};
+
 export const Route = createFileRoute("/post")({
   loader: ({ context }) => context.queryClient.ensureQueryData(filtersQuery),
   head: () => ({
@@ -118,6 +137,7 @@ function PostPage() {
   const [position, setPosition] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [storyDraftedFromAnswers, setStoryDraftedFromAnswers] = useState(false);
   const [wouldReturn, setWouldReturn] = useState<boolean | null>(null);
   const [evidenceNote, setEvidenceNote] = useState("");
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
@@ -125,11 +145,33 @@ function PostPage() {
   const [evidenceUpload, setEvidenceUpload] = useState<EvidenceUploadReceipt | null>(null);
   const [evidenceTicketId, setEvidenceTicketId] = useState<string | null>(null);
   const [evidenceError, setEvidenceError] = useState("");
+  const [publishError, setPublishError] = useState("");
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const uploadLock = useRef(false);
   const uploadAbortController = useRef<AbortController | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [savedDraftKey, setSavedDraftKey] = useState<string | null>(null);
+  const [draftReadyForUser, setDraftReadyForUser] = useState<string | null>(null);
+  const storageFailureNotified = useRef(false);
+  const writingAttemptKey = useRef<string | null>(null);
+  const storyDraftUserId = user?.uid;
+
+  const generateFromEarlierAnswers = useCallback(() => {
+    const draft = buildStoryDraft({
+      company: companyName,
+      industry,
+      county,
+      reasons,
+      position,
+      tenure,
+      roleLevel,
+      wouldReturn,
+    });
+    setTitle(draft.title);
+    setBody(draft.body);
+    setStoryDraftedFromAnswers(true);
+  }, [companyName, county, industry, position, reasons, roleLevel, tenure, wouldReturn]);
 
   useEffect(() => {
     if (!evidenceFile) {
@@ -143,18 +185,141 @@ function PostPage() {
 
   const dirty =
     companyName.trim().length > 0 ||
+    industry.trim().length > 0 ||
+    county.trim().length > 0 ||
     reasons.length > 0 ||
+    customReason.trim().length > 0 ||
+    tenure.length > 0 ||
+    roleLevel.length > 0 ||
+    position.trim().length > 0 ||
     title.trim().length > 0 ||
-    body.trim().length > 0;
+    body.trim().length > 0 ||
+    wouldReturn !== null ||
+    evidenceNote.trim().length > 0 ||
+    Boolean(evidenceFile || evidenceUpload);
+
+  const storyDraft: StoryDraft = {
+    version: 1,
+    step,
+    companyName,
+    industry,
+    county,
+    reasons,
+    customReason,
+    tenure,
+    roleLevel,
+    position,
+    title,
+    body,
+    wouldReturn,
+    evidenceNote,
+  };
+  const storyDraftKey = JSON.stringify(storyDraft);
+  const hasUnsavedDraftChanges = dirty && savedDraftKey !== storyDraftKey;
 
   useEffect(() => {
-    if (!dirty) return;
-    const handler = (event: BeforeUnloadEvent) => {
-      event.preventDefault();
-    };
-    window.addEventListener("beforeunload", handler);
-    return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+    if (step !== 3 || title.trim() || body.trim()) return;
+    const attemptKey = JSON.stringify({
+      companyName,
+      industry,
+      county,
+      reasons,
+      position,
+      tenure,
+      roleLevel,
+      wouldReturn,
+    });
+    if (writingAttemptKey.current === attemptKey) return;
+    writingAttemptKey.current = attemptKey;
+    generateFromEarlierAnswers();
+  }, [
+    body,
+    companyName,
+    county,
+    generateFromEarlierAnswers,
+    industry,
+    position,
+    reasons,
+    roleLevel,
+    step,
+    tenure,
+    title,
+    wouldReturn,
+  ]);
+
+  useEffect(() => {
+    if (!storyDraftUserId) {
+      setDraftReadyForUser(null);
+      return;
+    }
+    const storageKey = `candid:story-draft:${storyDraftUserId}`;
+    try {
+      const rawDraft = window.localStorage.getItem(storageKey);
+      if (rawDraft) {
+        const parsed = JSON.parse(rawDraft) as Partial<StoryDraft>;
+        if (parsed.version !== 1) throw new Error("Unsupported draft version");
+        const restored: StoryDraft = {
+          version: 1,
+          step: Number.isInteger(parsed.step) ? Math.min(4, Math.max(0, parsed.step!)) : 0,
+          companyName: typeof parsed.companyName === "string" ? parsed.companyName : "",
+          industry: typeof parsed.industry === "string" ? parsed.industry : "",
+          county: typeof parsed.county === "string" ? parsed.county : "",
+          reasons: Array.isArray(parsed.reasons)
+            ? parsed.reasons.filter((reason): reason is string => typeof reason === "string").slice(0, 10)
+            : [],
+          customReason: typeof parsed.customReason === "string" ? parsed.customReason : "",
+          tenure: typeof parsed.tenure === "string" ? parsed.tenure : "",
+          roleLevel: typeof parsed.roleLevel === "string" ? parsed.roleLevel : "",
+          position: typeof parsed.position === "string" ? parsed.position : "",
+          title: typeof parsed.title === "string" ? parsed.title : "",
+          body: typeof parsed.body === "string" ? parsed.body : "",
+          wouldReturn: typeof parsed.wouldReturn === "boolean" ? parsed.wouldReturn : null,
+          evidenceNote: typeof parsed.evidenceNote === "string" ? parsed.evidenceNote : "",
+        };
+        setStep(restored.step);
+        setCompanyName(restored.companyName);
+        setIndustry(restored.industry);
+        setCounty(restored.county);
+        setReasons(restored.reasons);
+        setCustomReason(restored.customReason);
+        setTenure(restored.tenure);
+        setRoleLevel(restored.roleLevel);
+        setPosition(restored.position);
+        setTitle(restored.title);
+        setBody(restored.body);
+        setWouldReturn(restored.wouldReturn);
+        setEvidenceNote(restored.evidenceNote);
+        setSavedDraftKey(JSON.stringify(restored));
+        toast.info("Draft restored", {
+          description: "Your saved story draft is ready on this device. Reattach proof if needed.",
+        });
+      }
+    } catch {
+      try {
+        window.localStorage.removeItem(storageKey);
+      } catch {
+        // Ignore unavailable browser storage.
+      }
+    } finally {
+      setDraftReadyForUser(storyDraftUserId);
+    }
+  }, [storyDraftUserId]);
+
+  useEffect(() => {
+    if (!storyDraftUserId || draftReadyForUser !== storyDraftUserId || !dirty) return;
+    try {
+      window.localStorage.setItem(`candid:story-draft:${storyDraftUserId}`, storyDraftKey);
+      setSavedDraftKey(storyDraftKey);
+      storageFailureNotified.current = false;
+    } catch {
+      if (!storageFailureNotified.current) {
+        toast.error("Could not save on this device", {
+          description: "Your browser storage may be full or disabled. Use Save draft to retry.",
+        });
+        storageFailureNotified.current = true;
+      }
+    }
+  }, [draftReadyForUser, dirty, storyDraftKey, storyDraftUserId]);
 
   if (loading) return null;
 
@@ -178,6 +343,30 @@ function PostPage() {
 
   const matches = findCompanyMatches(companyName, filters.companies, 5);
   const exactMatch = matches.some((m) => m.name.toLowerCase() === companyName.trim().toLowerCase());
+
+  function saveDraft() {
+    if (!user || !dirty) return;
+    try {
+      window.localStorage.setItem(`candid:story-draft:${user.uid}`, storyDraftKey);
+      setSavedDraftKey(storyDraftKey);
+      toast.success("Draft saved", {
+        description: evidenceFile || evidenceUpload
+          ? "Saved on this device. Reattach your proof file before publishing."
+          : "Saved on this device. Come back anytime to continue.",
+      });
+    } catch {
+      toast.error("Could not save draft", { description: "Check your device storage and try again." });
+    }
+  }
+
+  function clearSavedDraft() {
+    try {
+      if (user) window.localStorage.removeItem(`candid:story-draft:${user.uid}`);
+    } catch {
+      // Clearing a local draft must not block leaving or publishing the form.
+    }
+    setSavedDraftKey(null);
+  }
 
   function addCustomReason(raw: string) {
     const value = raw.replace(/,+$/, "").trim();
@@ -303,6 +492,8 @@ function PostPage() {
   }
 
   async function submit() {
+    setPublishError("");
+    setEvidenceError("");
     setSubmitting(true);
     try {
       let uploadedProof = evidenceUpload;
@@ -334,6 +525,7 @@ function PostPage() {
         },
       });
 
+      clearSavedDraft();
       if (result.status === "published") {
         toast.success("Your story is live");
         navigate({ to: "/stories/$id", params: { id: result.id } });
@@ -344,13 +536,14 @@ function PostPage() {
         navigate({ to: "/" });
       }
     } catch (error) {
-      toast.error(
-        error instanceof Error
-          ? error.name === "AbortError"
-            ? "Proof upload canceled. Your story was not submitted."
-            : error.message
-          : "Something went wrong",
-      );
+      const message = error instanceof Error
+        ? error.name === "AbortError"
+          ? "Proof upload canceled. Your story was not submitted."
+          : error.message
+        : "Something went wrong while publishing your story.";
+      setPublishError(message);
+      if (message.includes("Proof uploads are not configured")) setEvidenceError(message);
+      toast.error("Could not publish story", { description: message });
     } finally {
       setSubmitting(false);
     }
@@ -365,14 +558,14 @@ function PostPage() {
   ][step];
 
   return (
-    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(163,230,53,0.18),_transparent_25%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
-      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
+    <div className="min-h-[calc(100dvh-4rem)] w-full bg-background md:h-dvh md:overflow-hidden">
+      <div className="relative min-h-[calc(100dvh-4rem)] w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/85 md:shadow-2xl md:backdrop-blur-xl">
         <FloatingBackButton
           onClick={() => navigate({ to: "/" })}
           className="hidden md:inline-flex"
         />
 
-        <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
+        <div className="grid min-h-[calc(100dvh-4rem)] md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#0f172a_0%,#111827_30%,#0f172a_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, y: 18 }}
@@ -414,9 +607,9 @@ function PostPage() {
             </motion.div>
           </div>
 
-          <div className="flex items-center p-4 md:h-dvh md:overflow-y-auto md:p-8">
+          <div className="flex items-start p-4 pt-3 md:h-dvh md:items-center md:overflow-y-auto md:p-8">
             <div className="w-full space-y-6">
-              <header className="pt-12 md:pt-0">
+              <header>
                 <h1 className="text-3xl font-semibold md:text-4xl">Share your exit story</h1>
                 <div className="mt-4 flex gap-1.5">
                   {steps.map((label, index) => (
@@ -637,6 +830,31 @@ function PostPage() {
 
                   {step === 3 ? (
                     <>
+                      <div className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <h2 className="flex items-center gap-2 text-sm font-semibold">
+                              <FileText className="size-4 text-primary" /> Smart draft from your answers
+                            </h2>
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              This draft uses a local writing helper, so no AI service is called to create it. Add details only you know, then edit it below.
+                            </p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={generateFromEarlierAnswers}
+                          >
+                            <FileText className="size-4" /> Rebuild from answers
+                          </Button>
+                        </div>
+                        {storyDraftedFromAnswers ? (
+                          <p className="mt-3 text-xs text-muted-foreground">
+                            Draft created from your answers. Check it for accuracy before continuing.
+                          </p>
+                        ) : null}
+                      </div>
                       <div className="space-y-2">
                         <Label htmlFor="title">Headline</Label>
                         <Input
@@ -836,10 +1054,15 @@ function PostPage() {
                           "Publish story"
                         )}
                       </Button>
+                      {publishError ? (
+                        <p role="alert" className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+                          {publishError}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
 
-                  <div className="flex justify-between pt-2">
+                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
                     <Button
                       variant="ghost"
                       disabled={step === 0}
@@ -847,30 +1070,45 @@ function PostPage() {
                     >
                       <ArrowLeft className="size-4" /> Back
                     </Button>
-                    {dirty && !submitting ? (
-                      <Button
-                        variant="ghost"
-                        className="text-danger"
-                        onClick={() => setDiscardOpen(true)}
-                      >
-                        <Trash2 className="size-4" /> Discard
-                      </Button>
-                    ) : null}
-                    {step < 4 ? (
-                      <Button disabled={!canContinue} onClick={() => setStep((s) => s + 1)}>
-                        Continue <ArrowRight className="size-4" />
-                      </Button>
-                    ) : null}
+                    <div className="flex flex-wrap items-center justify-end gap-1.5 sm:gap-2">
+                      {dirty && !submitting ? (
+                        <Button
+                          variant="outline"
+                          disabled={!hasUnsavedDraftChanges}
+                          onClick={saveDraft}
+                        >
+                          <Save className="size-4" />
+                          {hasUnsavedDraftChanges ? "Save draft" : "Draft saved"}
+                        </Button>
+                      ) : null}
+                      {dirty && !submitting ? (
+                        <Button
+                          variant="ghost"
+                          className="text-danger"
+                          onClick={() => setDiscardOpen(true)}
+                        >
+                          <Trash2 className="size-4" /> Discard
+                        </Button>
+                      ) : null}
+                      {step < 4 ? (
+                        <Button disabled={!canContinue} onClick={() => setStep((s) => s + 1)}>
+                          Continue <ArrowRight className="size-4" />
+                        </Button>
+                      ) : null}
+                    </div>
                   </div>
 
                   <ConfirmDialog
                     open={discardOpen}
                     onOpenChange={setDiscardOpen}
                     title="Discard this story?"
-                    description="Everything you've written here will be lost. This cannot be undone."
+                    description="This deletes the saved draft from this device and clears the story form. This cannot be undone."
                     confirmLabel="Discard draft"
                     destructive
-                    onConfirm={() => navigate({ to: "/" })}
+                    onConfirm={() => {
+                      clearSavedDraft();
+                      void navigate({ to: "/" });
+                    }}
                   />
                 </div>
 
