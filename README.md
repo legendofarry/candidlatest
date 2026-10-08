@@ -1,28 +1,38 @@
-# Candid Clone Project
+# Candid Project
 
-Clone this app, https://github.com/legendofarry/candid.git
+About Candid
 
-Fully clone this project here and make sure it runs
+Job adverts tell you what an employer wants you to hear. Candid tells you what the people who left would say if it were safe to say it.
+Why it exists
 
-This project was built with [Lovable](https://lovable.dev).
+In Kenya, leaving a job quietly is often the safest option. Delayed salaries, missing NSSF and SHA deductions, contracts that never arrive, and management that treats staff as disposable rarely make it into public view. Candid collects those accounts in one place so the next candidate can walk into an interview informed.
+What you can do here
 
-**Live app**: https://candidlatest.lovable.app
+    Read exit stories by employer, industry or county.
+    Check a company's red flags, ratings and whether people would work there again.
+    See what roles actually pay, contributed by people who held them.
+    Follow a company or a story and get told when something new lands.
+    Message other members privately, on your own privacy terms.
 
-## Build with Lovable
+Your account and privacy
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/a7aebd6e-67f0-4d85-bc20-b12ad6bfc492).
+    You need an account so votes and stories cannot be spammed.
+    Your email and legal name are not published. Your Candid handle may appear with posts.
+    Employers cannot see your account email or legal name.
+    Never include your own full name, ID number, or a colleague's name in a story.
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+Staying signed in safely
 
-## Development
+So you are not typing a password every time, Candid keeps you signed in on your own device and instead hides the app behind your fingerprint or face after a period of inactivity. You choose how long that is in your profile settings.
+How stories are screened
 
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+Every submission passes an automated screening step that looks for personal identifying details, defamatory accusations of crime stated as fact, and abuse. Borderline stories are held for review rather than published. Anything can also be reported by readers.
+How company scores work
 
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
-```
+Culture scores average member ratings across five things Kenyan workers repeatedly raise: pay punctuality, statutory compliance, respect, workload, and growth. Company background summaries are AI-researched and clearly labelled — treat them as context, not verified fact.
+Right of reply
+
+Employers who believe a story is false can request a reply or a review. Stories are the personal opinions of contributors, and we correct or remove content that breaks the guidelines.
+How to reach us
+
+Contact details have not been published yet. In the meantime, report anything urgent straight from the story it concerns — reports reach the team immediately.
