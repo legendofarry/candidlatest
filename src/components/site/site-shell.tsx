@@ -55,7 +55,6 @@ import {
   closeMessagePanel,
   openMessagePanel,
   rememberConversation,
-  useLastConversationId,
   useSelectedConversationId,
 } from "@/lib/message-panel-state";
 import {
@@ -116,7 +115,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const needsEmailVerification = requiresEmailVerification(user);
   const routeConversationId = pathname.match(/^\/messages\/([^/]+)\/?$/)?.[1];
   const selectedConversationId = useSelectedConversationId();
-  const lastConversationId = useLastConversationId();
   const activeConversationId = selectedConversationId ?? routeConversationId;
   const unread = useUnreadCount();
   const { open: notificationsOpen } = useNotificationsOverlay();
@@ -169,6 +167,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/verify-email",
   ].includes(pathname);
   const fullscreenRoute = ["/auth", "/onboarding", "/download", "/verify-email"].includes(pathname);
+  const directConversationRoute = /^\/messages\/[^/]+$/.test(pathname);
   const headerBack =
     (nested && (!standaloneDesktopRoute || pathname === "/support" || pathname === "/settings")) ||
     pathname === "/profile" ||
@@ -249,18 +248,23 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     if (selectedConversationId) closeMessagePanel();
     else void navigate({ to: "/messages" });
   }
+
   function openMessages() {
-    const resumeId = activeConversationId ?? lastConversationId;
-    if (!onMessagesRoute && !window.matchMedia("(min-width: 768px)").matches) {
-      if (resumeId) void navigate({ to: "/messages/$id", params: { id: resumeId } });
-      else void navigate({ to: "/messages" });
+    // Messages always begins with the inbox. A thread only opens after a user
+    // chooses it from that list, so the button never unexpectedly resumes a chat.
+    closeMessagePanel();
+    if (routeConversationId || !window.matchMedia("(min-width: 768px)").matches) {
+      void navigate({ to: "/messages" });
       return;
     }
     setMessagesOpen(true);
-    if (resumeId && !onMessagesRoute) openMessagePanel(resumeId);
   }
 
   function toggleMessages() {
+    if (routeConversationId || selectedConversationId) {
+      openMessages();
+      return;
+    }
     if (messagesVisible) closeMessages();
     else openMessages();
   }
@@ -529,7 +533,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <main
           className={cn(
             "min-w-0 md:pb-10 md:pl-80",
-            fullscreenRoute || pathname === "/post" ? "p-0 md:pb-0" : "pt-6",
+            fullscreenRoute || pathname === "/post" || directConversationRoute
+              ? "p-0 md:pb-0"
+              : "pt-6",
             !fullscreenRoute && (showDock ? "pb-32" : "pb-10"),
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",

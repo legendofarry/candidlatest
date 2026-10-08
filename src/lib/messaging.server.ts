@@ -331,21 +331,6 @@ export async function sendMessage(input: { userId: string; conversationId: strin
   });
   await batch.commit();
 
-  // Chat delivery must never fail because a secondary notification cannot be saved.
-  try {
-    const sender = (await readParticipants([input.userId])).get(input.userId);
-    const { pushServerNotification } = await import("./notifications.server");
-    await pushServerNotification({
-      userId: otherId,
-      kind: "info",
-      title: `New message from @${sender?.username ?? "member"}`,
-      description: input.body.replace(/\s+/g, " ").slice(0, 140),
-      link: `/messages/${encodeURIComponent(input.conversationId)}`,
-    });
-  } catch (error) {
-    console.error("Could not create message notification", error);
-  }
-
   return message;
 }
 

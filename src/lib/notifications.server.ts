@@ -38,6 +38,9 @@ export async function listServerNotifications(userId: string, limit = 30) {
   const snap = await db.collection("notifications").where("user_id", "==", userId).get();
   return snap.docs
     .map((doc) => doc.data() as ServerNotificationRecord)
+    // Messages own their unread state and badge in the Messages workspace.
+    // This also keeps already-created legacy message alerts out of the main inbox.
+    .filter((item) => !item.link?.startsWith("/messages/"))
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, limit);
 }

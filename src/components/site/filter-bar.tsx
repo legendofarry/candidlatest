@@ -78,6 +78,7 @@ export function FilterBar({
   onReset,
   canReset,
   className,
+  centerFiltersOnMobile = false,
 }: {
   query: string;
   onQueryChange: (next: string) => void;
@@ -86,6 +87,8 @@ export function FilterBar({
   onReset: () => void;
   canReset: boolean;
   className?: string;
+  /** Keeps the controls balanced beneath a full-width search field on phones. */
+  centerFiltersOnMobile?: boolean;
 }) {
   return (
     <div
@@ -113,7 +116,12 @@ export function FilterBar({
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2",
+          centerFiltersOnMobile && "w-full justify-center sm:w-auto sm:justify-start",
+        )}
+      >
         {filters.map((filter) => (
           <FilterDropdown key={filter.id} filter={filter} />
         ))}

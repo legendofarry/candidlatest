@@ -217,6 +217,7 @@ function FeedPage() {
               setCounty(null);
               setSort("new");
             }}
+            centerFiltersOnMobile
             filters={[
               {
                 id: "sort",

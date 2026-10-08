@@ -72,6 +72,7 @@ function hydrate() {
       if (Array.isArray(parsed)) {
         notifications = parsed
           .filter((item) => !("demo" in item && Boolean((item as Record<string, unknown>)["demo"])))
+          .filter((item) => !item.link?.href.startsWith("/messages/"))
           .slice(0, MAX_STORED);
         pruneExpired();
         emit();
@@ -349,6 +350,7 @@ export function ingestServerNotifications(
     notifications.map((n) => n.dedupeKey).filter((key): key is string => Boolean(key)),
   );
   const fresh = items
+    .filter((item) => !item.link?.startsWith("/messages/"))
     .filter((item) => !known.has(`srv:${item.id}`))
     .map<AppNotification>((item) => ({
       id: `srv-${item.id}`,

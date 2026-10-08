@@ -41,7 +41,7 @@ function clock(iso: string) {
 function ChatScreen() {
   const { id } = useParams({ from: "/messages/$id" });
   return (
-    <div className="xl:hidden">
+    <div className="h-[calc(100dvh-4rem)] min-h-[30rem] xl:hidden">
       <MessagesThread id={id} />
     </div>
   );
@@ -103,8 +103,8 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   return (
     <div
       className={cn(
-        "mx-auto flex w-full max-w-2xl flex-col md:mx-0 md:max-w-none",
-        inSidebar ? "h-full min-h-0" : "min-h-[70vh]",
+        "flex h-full min-h-0 w-full flex-col",
+        inSidebar ? "mx-auto max-w-2xl md:mx-0 md:max-w-none" : "bg-background",
       )}
     >
       <button
@@ -114,16 +114,18 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
             void navigate({ to: "/u/$username", params: { username: partner.username } });
         }}
         className={cn(
-          "glass-card mb-4 flex items-center gap-3 rounded-2xl p-3 text-left transition-colors hover:bg-secondary/40",
-          !inSidebar && "sticky top-[6.75rem] z-30",
+          "flex shrink-0 items-center gap-3 text-left transition-colors hover:bg-secondary/40",
+          inSidebar
+            ? "glass-card mb-4 rounded-2xl p-3"
+            : "border-b border-border bg-background px-5 py-3.5",
         )}
       >
         <ProfileAvatar
           photoUrl={partner?.photo_url}
           initials={partner?.username?.slice(0, 2) ?? "··"}
-          className="size-10 font-display uppercase"
+          className="size-10 shrink-0 font-display uppercase"
         />
-        <span>
+        <span className="min-w-0">
           <span className="flex items-center gap-1.5 font-medium">
             @{partner?.username ?? "…"}
             {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
@@ -135,15 +137,26 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
         </span>
       </button>
 
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto pb-4">
+      <div
+        className={cn(
+          "min-h-0 flex-1 overflow-y-auto",
+          inSidebar ? "space-y-3 pb-4" : "px-4 py-5 sm:px-6",
+        )}
+      >
+        <div
+          className={cn(
+            "flex flex-col gap-3",
+            !inSidebar && "mx-auto max-w-2xl",
+          )}
+        >
         {isLoading ? (
           <div className="flex justify-center py-10">
             <Loader2 className="size-5 animate-spin text-muted-foreground" />
           </div>
         ) : messages.length === 0 ? (
-          <p className="py-10 text-center text-sm text-muted-foreground">
-            No messages yet — say hello.
-          </p>
+          <div className="flex min-h-40 flex-1 items-center justify-center py-10 text-center">
+            <p className="text-sm text-muted-foreground">No messages yet — say hello.</p>
+          </div>
         ) : null}
 
         <AnimatePresence initial={false}>
@@ -160,10 +173,10 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 className={cn("flex", mine ? "justify-end" : "justify-start")}
               >
-                <div className={cn("max-w-[80%]", mine ? "items-end" : "items-start")}>
+                <div className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start")}>
                   <div
                     className={cn(
-                      "rounded-3xl px-4 py-2.5 text-sm shadow-sm",
+                      "rounded-3xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
                       mine
                         ? "rounded-br-md bg-primary text-primary-foreground"
                         : "rounded-bl-md border border-border bg-card",
@@ -174,10 +187,11 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
 
                   <div
                     className={cn(
-                      "mt-1 flex items-center gap-2 text-[11px] text-muted-foreground",
+                      "mt-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground",
                       mine ? "justify-end" : "justify-start",
                     )}
                   >
+                    <span>{clock(message.created_at)}</span>
                     <Popover>
                       <PopoverTrigger asChild>
                         <button
@@ -205,7 +219,6 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                         </div>
                       </PopoverContent>
                     </Popover>
-                    <span>{clock(message.created_at)}</span>
                     {mine ? (
                       <CheckCheck className={cn("size-3.5", message.read_at && "text-primary")} />
                     ) : null}
@@ -231,15 +244,31 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           })}
         </AnimatePresence>
         <div ref={bottomRef} />
+        </div>
       </div>
 
       {conversation && !conversation.can_send ? (
-        <p className="rounded-2xl border border-border bg-secondary/40 p-4 text-center text-sm text-muted-foreground">
-          {conversation.blocked_reason}
-        </p>
+        <div className={cn("shrink-0", !inSidebar && "border-t border-border bg-background p-4")}>
+          <p className="rounded-2xl border border-border bg-secondary/40 p-4 text-center text-sm text-muted-foreground">
+            {conversation.blocked_reason}
+          </p>
+        </div>
       ) : (
-        <div className="glass-card sticky bottom-4 rounded-3xl p-2">
-          <div className="flex items-end gap-2">
+        <div
+          className={cn(
+            "shrink-0",
+            inSidebar
+              ? "glass-card rounded-3xl p-2"
+              : "border-t border-border bg-background/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-6",
+          )}
+        >
+          <div
+            className={cn(
+              "flex items-end gap-2",
+              !inSidebar &&
+                "mx-auto max-w-2xl rounded-2xl border border-border bg-card p-1.5 shadow-sm",
+            )}
+          >
             <Textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -251,7 +280,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               }}
               rows={1}
               placeholder="Write a message"
-              className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent focus-visible:ring-0"
+              className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 focus-visible:ring-0"
             />
             <Button
               type="button"
