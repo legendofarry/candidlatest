@@ -13,6 +13,7 @@ import {
   PenLine,
   Search,
   Settings,
+  ShieldAlert,
   Trophy,
   UserRound,
   Wallet,
@@ -44,6 +45,7 @@ import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { requiresEmailVerification } from "@/lib/email-verification";
 import { getOnboardingState } from "@/lib/onboarding.functions";
+import { getInvestigationHoldState } from "@/lib/account-access.functions";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
 import { setPreference, usePreferences } from "@/lib/preferences";
@@ -136,6 +138,18 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
     enabled: Boolean(user) && !needsEmailVerification,
+  });
+  const fetchInvestigationHold = useServerFn(getInvestigationHoldState);
+  const {
+    data: investigationState,
+    isLoading: checkingInvestigation,
+    isError: investigationCheckFailed,
+  } = useQuery({
+    queryKey: ["investigation-hold", user?.uid ?? null],
+    queryFn: () => fetchInvestigationHold(),
+    enabled: Boolean(user),
+    refetchInterval: 15000,
+    retry: 1,
   });
   const fetchUnreadMessages = useServerFn(getUnreadMessages);
   const { data: messageState } = useQuery({
@@ -252,6 +266,57 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }
 
   const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
+
+  if (user && !investigationState && (checkingInvestigation || investigationCheckFailed)) {
+    return (
+      <main className="fixed inset-0 z-[100] flex min-h-dvh items-center justify-center bg-background px-6 text-foreground">
+        <div className="text-center">
+          <Flame className="mx-auto size-8 animate-pulse text-primary" />
+          <p className="mt-5 font-display text-xl font-semibold">Checking account access</p>
+          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+            {investigationCheckFailed ? "We couldn’t confirm access right now. Sign out and try again later." : "One moment while Candid checks your account."}
+          </p>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="mt-7 inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border px-6 font-medium transition hover:bg-muted"
+          >
+            <LogOut className="size-4" /> Sign out
+          </button>
+        </div>
+      </main>
+    );
+  }
+
+  if (user && investigationState?.active) {
+    return (
+      <main className="fixed inset-0 z-[100] flex min-h-dvh items-center justify-center overflow-hidden bg-background px-5 py-8 text-foreground">
+        <div className="pointer-events-none absolute -top-64 left-1/2 size-[34rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-72 -right-48 size-[32rem] rounded-full bg-verified/10 blur-3xl" />
+        <section className="relative w-full max-w-xl text-center">
+          <div className="mx-auto mb-8 flex size-16 items-center justify-center rounded-[1.4rem] border border-primary/25 bg-primary/10 text-primary shadow-lg shadow-primary/10">
+            <ShieldAlert className="size-8" strokeWidth={1.7} />
+          </div>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">Candid account review</p>
+          <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Access is paused for now.</h1>
+          <p className="mx-auto mt-4 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
+            Your account is under investigation. You can’t use Candid while the review is in progress.
+          </p>
+          <button
+            type="button"
+            onClick={() => void signOut()}
+            className="mt-9 inline-flex min-h-12 items-center justify-center gap-2 rounded-full bg-primary px-7 font-semibold text-primary-foreground shadow-[0_12px_34px_hsl(var(--primary)/0.22)] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <LogOut className="size-4" />
+            Sign out
+          </button>
+          <div className="mt-12 flex items-center justify-center gap-2 text-sm font-semibold text-foreground/80">
+            <Flame className="size-4 text-primary" /> Candid
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (
     needsEmailVerification &&

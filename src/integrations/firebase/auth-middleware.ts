@@ -27,9 +27,18 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
 
     const db = getFirestoreDb();
     const profile = await db.collection("profiles").doc(decoded.uid).get();
-    const profileData = profile.data() as { banned?: boolean; subscription_tier?: string; subscription_status?: string } | undefined;
+    const profileData = profile.data() as {
+      banned?: boolean;
+      investigation_hold?: boolean | { active?: boolean } | null;
+      subscription_tier?: string;
+      subscription_status?: string;
+    } | undefined;
     if (profileData?.banned) {
       throw new Error("This account has been restricted.");
+    }
+    const investigationHold = profileData?.investigation_hold;
+    if (investigationHold === true || (typeof investigationHold === "object" && investigationHold?.active)) {
+      throw new Error("ACCOUNT_INVESTIGATION_HOLD");
     }
     if (!profileData?.subscription_tier || !profileData.subscription_status) {
       await db.collection("profiles").doc(decoded.uid).set({

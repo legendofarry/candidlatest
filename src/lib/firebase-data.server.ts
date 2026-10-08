@@ -58,6 +58,7 @@ export type ProfileRecord = {
   subscription_provider?: string | null;
   subscription_started_at?: string | null;
   subscription_period_ends_at?: string | null;
+  investigation_hold?: boolean | { active?: boolean; started_at?: string | null; updated_at?: string | null } | null;
 };
 
 function membershipBadgeTier(profile: ProfileRecord | undefined): "basic" | "premium" | "gold" {
