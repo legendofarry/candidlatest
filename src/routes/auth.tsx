@@ -7,6 +7,7 @@ import {
   GoogleAuthProvider,
   signInWithEmailAndPassword,
   signInWithPopup,
+  signOut,
   sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
@@ -101,6 +102,14 @@ function AuthPage() {
 
   useEffect(() => {
     if (authLoading || !user) return;
+    if (!user.email) {
+      // Firebase can technically create a Google-linked user without an email
+      // when the provider response is incomplete. Candid cannot safely use it.
+      void signOut(firebaseAuth).then(() => {
+        toast.error("This account has no email address attached. Choose a Google account with an email and try again.");
+      });
+      return;
+    }
     // Let the signup handler finish requesting the verification email before
     // auth-state redirects replace this screen.
     if (mode === "signup" && busy) return;
@@ -187,6 +196,18 @@ function AuthPage() {
       // auth can lose its cross-domain state in modern mobile browsers unless
       // the auth helper is proxied onto this domain. Popup auth avoids that flow.
       const result = await signInWithPopup(firebaseAuth, provider);
+      await result.user.reload();
+      const currentUser = firebaseAuth.currentUser;
+      const token = currentUser ? await currentUser.getIdTokenResult(true) : null;
+      const hasVerifiedGoogleEmail = Boolean(
+        currentUser?.email && token?.claims.email_verified === true,
+      );
+      if (!hasVerifiedGoogleEmail) {
+        await signOut(firebaseAuth);
+        throw new Error(
+          "Google did not provide a verified email address. Choose a different Google account and try again.",
+        );
+      }
       const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
       toast.success(
         isNewUser
