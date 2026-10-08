@@ -52,6 +52,11 @@ export type ProfileRecord = {
   candid_lens?: CandidLensRecord | null;
   account_type?: "individual" | "company" | "unknown";
   onboarded_at?: string | null;
+  subscription_tier?: "basic" | "premium" | "gold";
+  subscription_status?: "active" | "cancelled" | "expired" | "past_due";
+  subscription_provider?: string | null;
+  subscription_started_at?: string | null;
+  subscription_period_ends_at?: string | null;
 };
 
 export type CandidLensRecord = {

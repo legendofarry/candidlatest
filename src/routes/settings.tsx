@@ -45,6 +45,7 @@ import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
+import { MEMBERSHIP_PLANS } from "@/lib/membership";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -192,6 +193,42 @@ function SettingsPage() {
                       );
                     }}
                   />
+                </div>
+              </SettingsGroup>
+            ) : null}
+
+            {user ? (
+              <SettingsGroup title="Membership">
+                <div className="space-y-4 p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="font-medium">{MEMBERSHIP_PLANS[profile.data?.membership?.tier ?? "basic"].name} plan</p>
+                      <p className="text-xs text-muted-foreground">
+                        {profile.data?.membership?.tier === "basic"
+                          ? "Your account is on Basic. Candid is free while we prepare paid plans."
+                          : "Your current membership package."}
+                      </p>
+                    </div>
+                    <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
+                      {profile.data?.membership?.status === "active" ? "Active" : profile.data?.membership?.status ?? "Active"}
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {(Object.entries(MEMBERSHIP_PLANS) as [keyof typeof MEMBERSHIP_PLANS, (typeof MEMBERSHIP_PLANS)[keyof typeof MEMBERSHIP_PLANS]][]).map(([tier, plan]) => {
+                      const current = (profile.data?.membership?.tier ?? "basic") === tier;
+                      return (
+                        <div key={tier} className={`rounded-xl border p-3 ${current ? "border-primary bg-primary/5" : "border-border"}`}>
+                          <p className="text-sm font-semibold">{plan.name}</p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {plan.priceKes === 0 ? "Free" : `KSh ${plan.priceKes.toLocaleString("en-KE")} ${plan.interval}`}
+                          </p>
+                          <p className="mt-2 text-[11px] text-muted-foreground">
+                            {current ? "Your current plan" : "Available later"}
+                          </p>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               </SettingsGroup>
             ) : null}

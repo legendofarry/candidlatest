@@ -1,6 +1,7 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase.server";
+import { DEFAULT_MEMBERSHIP } from "@/lib/membership";
 
 export const requireFirebaseAuth = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
@@ -26,8 +27,19 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
 
     const db = getFirestoreDb();
     const profile = await db.collection("profiles").doc(decoded.uid).get();
-    if (profile.exists && (profile.data() as { banned?: boolean }).banned) {
+    const profileData = profile.data() as { banned?: boolean; subscription_tier?: string; subscription_status?: string } | undefined;
+    if (profileData?.banned) {
       throw new Error("This account has been restricted.");
+    }
+    if (!profileData?.subscription_tier || !profileData.subscription_status) {
+      await db.collection("profiles").doc(decoded.uid).set({
+        id: decoded.uid,
+        subscription_tier: profileData?.subscription_tier || DEFAULT_MEMBERSHIP.subscription_tier,
+        subscription_status: profileData?.subscription_status || DEFAULT_MEMBERSHIP.subscription_status,
+        subscription_provider: DEFAULT_MEMBERSHIP.subscription_provider,
+        subscription_started_at: DEFAULT_MEMBERSHIP.subscription_started_at,
+        subscription_period_ends_at: DEFAULT_MEMBERSHIP.subscription_period_ends_at,
+      }, { merge: true });
     }
 
     return next({

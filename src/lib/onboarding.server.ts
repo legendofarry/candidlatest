@@ -1,5 +1,6 @@
 import { getFirestoreDb } from "./firebase.server";
 import type { CandidLensRecord, ProfileRecord } from "./firebase-data.server";
+import { DEFAULT_MEMBERSHIP } from "./membership";
 
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;
@@ -276,6 +277,11 @@ export async function claimUsername(
           role_label: previous?.role_label ?? null,
           banned: previous?.banned ?? false,
           account_type: previous?.account_type ?? "unknown",
+          subscription_tier: previous?.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
+          subscription_status: previous?.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
+          subscription_provider: previous?.subscription_provider ?? DEFAULT_MEMBERSHIP.subscription_provider,
+          subscription_started_at: previous?.subscription_started_at ?? DEFAULT_MEMBERSHIP.subscription_started_at,
+          subscription_period_ends_at: previous?.subscription_period_ends_at ?? DEFAULT_MEMBERSHIP.subscription_period_ends_at,
           created_at: previous?.created_at ?? now,
           onboarded_at: previous?.onboarded_at ?? now,
         },

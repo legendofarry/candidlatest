@@ -1,5 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { DEFAULT_MEMBERSHIP } from "./membership";
 import {
   requireFirebaseAuth,
   requireVerifiedFirebaseAuth,
@@ -54,6 +55,13 @@ export const getOnboardingState = createServerFn({ method: "POST" })
       usernameChangedAt: profile?.username_changed_at ?? null,
       socials: profile?.socials ?? null,
       accountType: profile?.account_type ?? "unknown",
+      membership: {
+        tier: profile?.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
+        status: profile?.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
+        provider: profile?.subscription_provider ?? null,
+        startedAt: profile?.subscription_started_at ?? null,
+        periodEndsAt: profile?.subscription_period_ends_at ?? null,
+      },
     };
   });
 
