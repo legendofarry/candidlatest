@@ -1,6 +1,7 @@
 import { getFirestoreDb } from "./firebase.server";
 import { FieldValue } from "./firestore-rest.server";
 import type { CommentRecord, ProfileRecord, StoryRecord } from "./firebase-data.server";
+import { getMembershipBadgeTier } from "./membership";
 
 /** The seeded owner account. Candid can always reach every user. */
 export const CANDID_USER_ID = "candid-official";
@@ -40,6 +41,7 @@ export type ChatParticipant = {
   photo_url?: string | null;
   verified: boolean;
   official: boolean;
+  membership_tier: "basic" | "premium" | "gold";
 };
 
 const now = () => new Date().toISOString();
@@ -111,6 +113,7 @@ async function readParticipants(ids: string[]): Promise<Map<string, ChatParticip
         photo_url: profile?.photo_url ?? null,
         verified: id === CANDID_USER_ID || profile?.verified === true || verification?.badge_status === "claimed" || Boolean(verification?.owner_verified),
         official: id === CANDID_USER_ID,
+        membership_tier: getMembershipBadgeTier(profile?.subscription_tier, profile?.subscription_status, profile?.subscription_period_ends_at),
       });
     }),
   );

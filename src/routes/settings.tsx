@@ -206,7 +206,9 @@ function SettingsPage() {
                       <p className="text-xs text-muted-foreground">
                         {profile.data?.membership?.tier === "basic"
                           ? "Your account is on Basic. Candid is free while we prepare paid plans."
-                          : "Your current membership package."}
+                          : profile.data?.membership?.tier === "gold"
+                            ? "Your Gold member badge is included and appears beside your username."
+                            : "Your Premium member badge is included and appears beside your username."}
                       </p>
                     </div>
                     <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
@@ -223,7 +225,9 @@ function SettingsPage() {
                             {plan.priceKes === 0 ? "Free" : `KSh ${plan.priceKes.toLocaleString("en-KE")} ${plan.interval}`}
                           </p>
                           <p className="mt-2 text-[11px] text-muted-foreground">
-                            {current ? "Your current plan" : "Available later"}
+                            {current
+                              ? tier === "gold" ? "Includes Gold member badge" : tier === "premium" ? "Includes Premium member badge" : "Your current plan"
+                              : "Available later"}
                           </p>
                         </div>
                       );

@@ -12,6 +12,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
+import { MembershipBadge } from "@/components/site/membership-badge";
 
 export const Route = createFileRoute("/messages/$id")({
   head: () => ({
@@ -126,6 +127,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           <span className="flex items-center gap-1.5 font-medium">
             @{partner?.username ?? "…"}
             {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
+            <MembershipBadge tier={partner?.membership_tier} />
           </span>
           <span className="block text-xs text-muted-foreground">
             {partner?.official ? "Official Candid account" : "Tap to view profile"}

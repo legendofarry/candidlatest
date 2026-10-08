@@ -16,6 +16,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { formatDate } from "@/components/site/story-card";
 import { StorySocial } from "@/components/site/story-social";
 import { cn } from "@/lib/utils";
+import { MembershipBadge } from "@/components/site/membership-badge";
 
 /** Inline vote + comment bar so people can act without leaving the feed. */
 export function StoryActions({
@@ -177,14 +178,17 @@ export function StoryActions({
                 <li key={item.id} className="rounded-lg bg-background/80 p-2.5">
                   <p className="text-[11px] font-medium text-muted-foreground">
                     {item.author_username ? (
-                      <Link
-                        to="/u/$username"
-                        params={{ username: item.author_username }}
-                        onClick={(event) => event.stopPropagation()}
-                        className="hover:text-primary"
-                      >
-                        @{item.author_username}
-                      </Link>
+                      <>
+                        <Link
+                          to="/u/$username"
+                          params={{ username: item.author_username }}
+                          onClick={(event) => event.stopPropagation()}
+                          className="hover:text-primary"
+                        >
+                          @{item.author_username}
+                        </Link>
+                        <MembershipBadge tier={item.author_membership_tier} />
+                      </>
                     ) : item.author_handle} · {formatDate(item.created_at)}
                   </p>
                   <p className="mt-1 text-sm">{item.body}</p>

@@ -14,6 +14,7 @@ import { getStory } from "@/lib/public.functions";
 import { castVote, getMyEngagement } from "@/lib/actions.functions";
 import { formatDate, reasonTone } from "@/components/site/story-card";
 import { CommentThread, type ThreadComment } from "@/components/site/comment-thread";
+import { MembershipBadge } from "@/components/site/membership-badge";
 import { ReportDialog } from "@/components/site/report-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -113,13 +114,16 @@ function StoryPage() {
         <h1 className="mt-3 text-3xl font-semibold leading-tight md:text-4xl">{story.title}</h1>
         <p className="mt-2 text-xs text-muted-foreground">
           {story.author_username ? (
-            <Link
-              to="/u/$username"
-              params={{ username: story.author_username }}
-              className="hover:text-primary"
-            >
-              @{story.author_username}
-            </Link>
+            <>
+              <Link
+                to="/u/$username"
+                params={{ username: story.author_username }}
+                className="hover:text-primary"
+              >
+                @{story.author_username}
+              </Link>
+              <MembershipBadge tier={story.author_membership_tier} />
+            </>
           ) : "Candid member"} ·{" "}
           {formatDate(story.created_at)}
         </p>

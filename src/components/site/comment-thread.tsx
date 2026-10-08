@@ -25,6 +25,8 @@ import { addComment, getMyEngagement, likeComment } from "@/lib/actions.function
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { MembershipBadge } from "@/components/site/membership-badge";
+import type { MembershipTier } from "@/lib/membership";
 
 export type ThreadComment = {
   id: string;
@@ -33,6 +35,7 @@ export type ThreadComment = {
   author_handle: string;
   author_username: string | null;
   author_verified: boolean;
+  author_membership_tier?: MembershipTier;
   is_official: boolean;
   likes: number;
   replies: ThreadComment[];
@@ -184,13 +187,16 @@ export function CommentThread({
               <div className="mb-2 flex items-center gap-2 rounded-lg bg-secondary/60 px-3 py-1.5 text-xs">
                 <CornerDownRight className="size-3.5" />
                 Replying to {replyTo.author_username ? (
-                  <Link
-                    to="/u/$username"
-                    params={{ username: replyTo.author_username }}
-                    className="font-medium hover:text-primary"
-                  >
-                    @{replyTo.author_username}
-                  </Link>
+                  <>
+                    <Link
+                      to="/u/$username"
+                      params={{ username: replyTo.author_username }}
+                      className="font-medium hover:text-primary"
+                    >
+                      @{replyTo.author_username}
+                    </Link>
+                    <MembershipBadge tier={replyTo.author_membership_tier} />
+                  </>
                 ) : "comment"}
                 <button
                   type="button"
@@ -329,6 +335,7 @@ function CommentRow({
               <span className="font-semibold text-foreground">{comment.author_handle}</span>
             )}
             {comment.author_verified ? <BadgeCheck className="size-3.5 text-primary" /> : null}
+            <MembershipBadge tier={comment.author_membership_tier} />
             {comment.is_official ? (
               <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                 Official reply

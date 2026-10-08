@@ -3,6 +3,8 @@ import { MapPin } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { StoryActions } from "@/components/site/story-actions";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { MembershipBadge } from "@/components/site/membership-badge";
+import type { MembershipTier } from "@/lib/membership";
 
 export type PublicStory = {
   id: string | null;
@@ -22,6 +24,7 @@ export type PublicStory = {
   reasons: string[] | null;
   would_work_again?: boolean | null;
   author_username?: string | null;
+  author_membership_tier?: MembershipTier;
 };
 
 export function reasonTone(reason: string) {
@@ -110,14 +113,17 @@ export function StoryCard({
       <div className="mt-4 flex items-center gap-5 text-xs text-muted-foreground">
         <span className="ml-auto">
           {story.author_username ? (
-            <Link
-              to="/u/$username"
-              params={{ username: story.author_username }}
-              onClick={(event) => event.stopPropagation()}
-              className="relative z-10 hover:text-primary"
-            >
-              @{story.author_username}
-            </Link>
+            <>
+              <Link
+                to="/u/$username"
+                params={{ username: story.author_username }}
+                onClick={(event) => event.stopPropagation()}
+                className="relative z-10 hover:text-primary"
+              >
+                @{story.author_username}
+              </Link>
+              <MembershipBadge tier={story.author_membership_tier} />
+            </>
           ) : "Candid member"} ·{" "}
           {formatDate(story.created_at)}
         </span>

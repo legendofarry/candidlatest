@@ -20,6 +20,7 @@ import { notify } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
+import { MembershipBadge } from "@/components/site/membership-badge";
 
 export const Route = createFileRoute("/u/$username")({
   head: ({ params }) => {
@@ -124,6 +125,7 @@ function PublicProfilePage() {
             <h1 className="flex items-center gap-1.5 font-display text-2xl font-semibold tracking-tight">
               @{profile.username}
               {profile.verified ? <BadgeCheck className="size-5 text-primary" /> : null}
+              <MembershipBadge tier={profile.membership_tier} />
             </h1>
             {profile.role_label ? (
               <p className="text-sm text-muted-foreground">{profile.role_label}</p>

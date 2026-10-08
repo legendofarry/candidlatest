@@ -38,6 +38,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { ProfileAvatar, ProfilePhotoPicker } from "@/components/site/profile-photo";
+import { MembershipBadge } from "@/components/site/membership-badge";
 import { getMyContributions } from "@/lib/social.functions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -270,6 +271,7 @@ function ProfilePage() {
                     {verification.data?.badgeStatus === "claimed" ? (
                       <BadgeCheck className="size-5 shrink-0 text-verified" aria-label="Verified" />
                     ) : null}
+                    <MembershipBadge tier={onboarding.data?.membership?.tier} />
                   </h1>
                   <p className="truncate text-sm text-muted-foreground">
                     {loading

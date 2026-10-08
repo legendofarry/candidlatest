@@ -1,6 +1,7 @@
 const randomUUID = () => crypto.randomUUID();
 import type { DocumentData, QueryDocumentSnapshot } from "./firestore-rest.server";
 import { getFirestoreDb } from "./firebase.server";
+import { getMembershipBadgeTier } from "./membership";
 
 export type CompanyRecord = {
   id: string;
@@ -59,6 +60,10 @@ export type ProfileRecord = {
   subscription_period_ends_at?: string | null;
 };
 
+function membershipBadgeTier(profile: ProfileRecord | undefined): "basic" | "premium" | "gold" {
+  return getMembershipBadgeTier(profile?.subscription_tier, profile?.subscription_status, profile?.subscription_period_ends_at);
+}
+
 export type CandidLensRecord = {
   completed: boolean;
   skipped: boolean;
@@ -95,6 +100,7 @@ export type StoryRecord = {
   would_work_again: boolean | null;
   author_id: string | null;
   author_username?: string | null;
+  author_membership_tier?: "basic" | "premium" | "gold";
   status: "published" | "pending" | "hidden";
   moderation_note: string | null;
   evidence_status?: "pending_review" | "reviewed" | null;
@@ -114,6 +120,7 @@ export type CommentRecord = {
   author_handle: string;
   author_username?: string | null;
   author_verified?: boolean;
+  author_membership_tier?: "basic" | "premium" | "gold";
   is_official?: boolean;
   likes?: number;
   created_at: string;
@@ -121,6 +128,7 @@ export type CommentRecord = {
 
 export type PublicComment = CommentRecord & {
   author_username: string | null;
+  author_membership_tier: "basic" | "premium" | "gold";
   author_verified: boolean;
   is_official: boolean;
   likes: number;
@@ -493,6 +501,7 @@ export type PublicStoryRecord = Omit<StoryRecord, "status" | "moderation_note"> 
   upvotes: number | null;
   would_work_again: boolean | null;
   author_username: string | null;
+  author_membership_tier: "basic" | "premium" | "gold";
 };
 
 /** Map of user id -> claimed username, for showing authors on public stories. */
@@ -503,6 +512,11 @@ export async function readAuthorUsernames(): Promise<Map<string, string>> {
       .filter((profile) => Boolean(profile.username))
       .map((profile) => [profile.id, profile.username as string] as const),
   );
+}
+
+async function readAuthorMembershipTiers(): Promise<Map<string, "basic" | "premium" | "gold">> {
+  const profiles = await readCollection<ProfileRecord>("profiles");
+  return new Map(profiles.map((profile) => [profile.id, membershipBadgeTier(profile)] as const));
 }
 
 export async function getFilterOptionsData() {
@@ -524,10 +538,11 @@ export async function getPublicStories(input: {
   companySlug?: string | null;
   limit?: number;
 }) {
-  const [companies, stories, authorUsernames] = await Promise.all([
+  const [companies, stories, authorUsernames, authorMembershipTiers] = await Promise.all([
     readCollection<CompanyRecord>("companies"),
     readCollection<StoryRecord>("stories"),
     readAuthorUsernames(),
+    readAuthorMembershipTiers(),
   ]);
 
   const companiesById = new Map(companies.map((company) => [company.id, company] as const));
@@ -555,6 +570,7 @@ export async function getPublicStories(input: {
         author_username:
           story.author_username ??
           (story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null),
+        author_membership_tier: story.author_id ? (authorMembershipTiers.get(story.author_id) ?? "basic") : "basic",
       };
     });
 
@@ -575,11 +591,12 @@ export async function getCompanyView(slug: string) {
   const company = companies.find((entry) => entry.slug === slug) ?? null;
   if (!company) return null;
 
-  const [scores, profile, stories, authorUsernames] = await Promise.all([
+  const [scores, profile, stories, authorUsernames, authorMembershipTiers] = await Promise.all([
     buildCompanyScores(),
     readDocument<CompanyAIProfileRecord>("company_ai_profiles", company.id),
     readCollection<StoryRecord>("stories"),
     readAuthorUsernames(),
+    readAuthorMembershipTiers(),
   ]);
 
   return {
@@ -603,6 +620,7 @@ export async function getCompanyView(slug: string) {
         upvotes: story.upvotes,
         would_work_again: story.would_work_again,
         author_username: story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null,
+        author_membership_tier: story.author_id ? (authorMembershipTiers.get(story.author_id) ?? "basic") : "basic",
       })),
   };
 }
@@ -648,6 +666,7 @@ export async function getStoryView(id: string) {
     return {
       ...comment,
       author_username: comment.author_username ?? profile?.username ?? null,
+      author_membership_tier: membershipBadgeTier(profile),
       author_verified: comment.author_verified ?? verification?.badge_status === "claimed",
       is_official: official,
       likes: Number(comment.likes ?? 0),
@@ -699,6 +718,7 @@ export async function getStoryView(id: string) {
       upvotes: story.upvotes,
       would_work_again: story.would_work_again,
       author_username: authorProfile?.username ?? null,
+      author_membership_tier: membershipBadgeTier(authorProfile),
     } as PublicStoryRecord,
     comments: roots,
     commentTotal: enriched.length,
@@ -709,10 +729,11 @@ export async function searchData(queryText: string) {
   const q = queryText.trim().toLowerCase();
   if (q.length < 2) return { companies: [], stories: [] };
 
-  const [companies, stories, authorUsernames] = await Promise.all([
+  const [companies, stories, authorUsernames, authorMembershipTiers] = await Promise.all([
     readCollection<CompanyRecord>("companies"),
     readCollection<StoryRecord>("stories"),
     readAuthorUsernames(),
+    readAuthorMembershipTiers(),
   ]);
 
   const companyMatches = companies
@@ -755,6 +776,7 @@ export async function searchData(queryText: string) {
       upvotes: story.upvotes,
       would_work_again: story.would_work_again,
       author_username: story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null,
+      author_membership_tier: story.author_id ? (authorMembershipTiers.get(story.author_id) ?? "basic") : "basic",
     }));
 
   return { companies: companyMatches, stories: storyMatches };
