@@ -1,8 +1,8 @@
 import type { User } from "firebase/auth";
 
-/** Require verification when the signed-in Firebase account has an unverified email. */
+/** Require a verified email before a signed-in Firebase account can use Candid. */
 export function requiresEmailVerification(user: User | null | undefined): boolean {
-  return Boolean(user?.email && !user.emailVerified);
+  return Boolean(user && (!user.email || !user.emailVerified));
 }
 
 export function verificationActionSettings() {

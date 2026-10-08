@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { onAuthStateChanged, signOut, type User } from "firebase/auth";
+import { onIdTokenChanged, signOut, type User } from "firebase/auth";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { setNotificationUser } from "@/lib/notifications-store";
 import { showSplashScreen } from "@/lib/splash-event";
@@ -9,7 +9,7 @@ export function useAuth() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(firebaseAuth, async (nextUser) => {
+    const unsubscribe = onIdTokenChanged(firebaseAuth, async (nextUser) => {
       setNotificationUser(nextUser?.uid ?? null);
       setUser(nextUser);
       setLoading(false);

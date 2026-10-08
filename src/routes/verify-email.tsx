@@ -47,7 +47,10 @@ function VerifyEmailPage() {
     }
   }, [navigate, readOnboarding]);
 
-  const checkVerification = useCallback(async () => {
+  const checkVerification = useCallback(async (manual = false) => {
+    if (manual) {
+      setNotice("");
+    }
     const current = firebaseAuth.currentUser;
     if (!current) {
       void navigate({ to: "/auth" });
@@ -60,6 +63,12 @@ function VerifyEmailPage() {
         return;
       }
       setChecking(false);
+      if (manual) {
+        toast.info("Nice try 😄", {
+          description: "Your inbox hasn’t given us the green light yet. Tap the link in your email, then try again.",
+          duration: 4500,
+        });
+      }
     } catch {
       setChecking(false);
       setNotice("We couldn’t check your email status. Check your connection and try again.");
@@ -105,6 +114,10 @@ function VerifyEmailPage() {
   async function resendEmail() {
     const current = firebaseAuth.currentUser;
     if (!current || sending || cooldown > 0) return;
+    if (!current.email) {
+      setNotice("This account has no email address. Sign out and use an email or Google account to continue.");
+      return;
+    }
     setSending(true);
     setNotice("");
     try {
@@ -153,22 +166,28 @@ function VerifyEmailPage() {
         </div>
 
         <p className="mb-3 text-xs font-semibold uppercase tracking-[0.2em] text-primary">One quick check</p>
-        <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">Check your inbox</h1>
+        <h1 className="font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+          {user.email ? "Check your inbox" : "Use an email account"}
+        </h1>
         <p className="mt-4 max-w-md text-base leading-7 text-muted-foreground">
-          Use the verification link in your inbox. Open it on this device or another one; this screen will notice when you’re verified.
+          {user.email
+            ? "Use the verification link in your inbox. Open it on this device or another one; this screen will notice when you’re verified."
+            : "Candid requires a verified email before you can continue. Sign out, then use Google or an email-and-password account."}
         </p>
 
         <div className="mt-8 rounded-2xl border border-border bg-card/70 p-4 sm:p-5">
-          <p className="break-all font-medium">{user.email}</p>
-          <p className="mt-1 text-sm text-muted-foreground">Check your spam folder if it doesn’t arrive soon.</p>
+          <p className="break-all font-medium">{user.email || "No email address linked"}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {user.email ? "Check your spam folder if it doesn’t arrive soon." : "Use another account to continue."}
+          </p>
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <Button onClick={() => void checkVerification()} disabled={checking} className="h-12 flex-1 rounded-xl">
+          <Button onClick={() => void checkVerification(true)} disabled={checking} className="h-12 flex-1 rounded-xl">
             {checking ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
             I’ve verified my email
           </Button>
-          <Button onClick={() => void resendEmail()} disabled={sending || cooldown > 0} variant="outline" className="h-12 rounded-xl">
+          <Button onClick={() => void resendEmail()} disabled={sending || cooldown > 0 || !user.email} variant="outline" className="h-12 rounded-xl">
             {sending ? <Loader2 className="size-4 animate-spin" /> : null}
             {cooldown > 0 ? `Resend in ${cooldown}s` : "Resend email"}
           </Button>

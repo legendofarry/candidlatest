@@ -20,6 +20,9 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
     if (!decoded.uid) {
       throw new Error("Unauthorized: Firebase token missing uid");
     }
+    if (!decoded.email || decoded.email_verified !== true) {
+      throw new Error("Email verification required. Open /verify-email to continue.");
+    }
 
     const db = getFirestoreDb();
     const profile = await db.collection("profiles").doc(decoded.uid).get();
@@ -37,13 +40,11 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
   },
 );
 
-/** Require a verified email for actions that publish or endorse community content. */
+/** Explicit marker for actions that publish or endorse community content. */
 export const requireVerifiedFirebaseAuth = createMiddleware({ type: "function" })
   .middleware([requireFirebaseAuth])
   .server(async ({ next, context }) => {
-    // Firebase marks verified Google addresses as verified in the ID token.
-    // Accounts with no email cannot receive a verification link, so they pass.
-    if (context.claims.email && context.claims["email_verified"] !== true) {
+    if (!context.claims.email || context.claims["email_verified"] !== true) {
       throw new Error("Verify your email before contributing. Open /verify-email to continue.");
     }
 

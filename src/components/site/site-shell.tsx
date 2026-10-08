@@ -8,6 +8,7 @@ import {
   Headset,
   Home,
   LogOut,
+  Loader2,
   MessagesSquare,
   PenLine,
   Search,
@@ -41,6 +42,7 @@ import {
 } from "@/lib/notifications-store";
 import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
+import { requiresEmailVerification } from "@/lib/email-verification";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
@@ -109,6 +111,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   useServerNotificationsSync();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const needsEmailVerification = requiresEmailVerification(user);
   const routeConversationId = pathname.match(/^\/messages\/([^/]+)\/?$/)?.[1];
   const selectedConversationId = useSelectedConversationId();
   const lastConversationId = useLastConversationId();
@@ -132,13 +135,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const { data: accountProfile } = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !needsEmailVerification,
   });
   const fetchUnreadMessages = useServerFn(getUnreadMessages);
   const { data: messageState } = useQuery({
     queryKey: ["unread-messages", user?.uid ?? null],
     queryFn: () => fetchUnreadMessages(),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !needsEmailVerification,
     refetchInterval: 20000,
   });
   const nested = isNestedRoute(pathname);
@@ -149,12 +152,22 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/profile",
     "/settings",
     "/onboarding",
+    "/verify-email",
   ].includes(pathname);
-  const fullscreenRoute = ["/auth", "/onboarding", "/download"].includes(pathname);
+  const fullscreenRoute = ["/auth", "/onboarding", "/download", "/verify-email"].includes(pathname);
   const headerBack =
     (nested && (!standaloneDesktopRoute || pathname === "/support" || pathname === "/settings")) ||
     pathname === "/profile" ||
     pathname === "/post";
+
+  useEffect(() => {
+    if (
+      !needsEmailVerification ||
+      pathname === "/verify-email" ||
+      pathname === "/auth"
+    ) return;
+    void navigate({ to: "/verify-email", replace: true });
+  }, [needsEmailVerification, pathname, navigate]);
 
   useEffect(() => {
     if (onMessagesRoute) {
@@ -239,6 +252,19 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }
 
   const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
+
+  if (
+    needsEmailVerification &&
+    pathname !== "/verify-email" &&
+    pathname !== "/auth"
+  ) {
+    return (
+      <main className="flex min-h-dvh w-full items-center justify-center bg-background px-6 text-foreground">
+        <Loader2 className="mr-3 size-5 animate-spin text-primary" />
+        <span className="text-sm text-muted-foreground">Taking you to email verification…</span>
+      </main>
+    );
+  }
 
   return (
     <div className="min-h-dvh bg-background md:pb-6">

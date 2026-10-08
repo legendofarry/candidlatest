@@ -4,6 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useAuth } from "./useAuth";
 import { syncMyNotifications } from "@/lib/notification-sync.functions";
 import { ingestServerNotifications } from "@/lib/notifications-store";
+import { requiresEmailVerification } from "@/lib/email-verification";
 
 /** Polls durable server notifications (mentions, company tags) into the local inbox. */
 export function useServerNotificationsSync() {
@@ -12,7 +13,7 @@ export function useServerNotificationsSync() {
   const query = useQuery({
     queryKey: ["server-notifications", user?.uid ?? "anon"],
     queryFn: () => sync(),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && !requiresEmailVerification(user),
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   });
