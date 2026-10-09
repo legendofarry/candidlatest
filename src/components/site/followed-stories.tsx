@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { motion, AnimatePresence } from "motion/react";
+import { motion } from "motion/react";
 import {
   ArrowRight,
   Bookmark,
@@ -12,9 +12,15 @@ import {
   Loader2,
   MessageCircle,
   Sparkles,
-  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   getFollowStats,
   getFollowedStories,
@@ -47,6 +53,7 @@ export function FollowedStories() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [storyTimeline, setStoryTimeline] = useState<StoryTimeline | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [catchUpError, setCatchUpError] = useState<string | null>(null);
 
   const stats = useQuery({
     queryKey: ["follow-stats", user?.uid ?? null],
@@ -66,12 +73,14 @@ export function FollowedStories() {
     setLoadingId(storyId);
     setOpenId(storyId);
     setStoryTimeline(null);
+    setCatchUpError(null);
     try {
       const result = await catchUpFn({ data: { story_id: storyId } });
       setStoryTimeline({ id: storyId, data: result });
       await seenFn({ data: { story_id: storyId } });
       void stories.refetch();
     } catch (error) {
+      setCatchUpError(error instanceof Error ? error.message : "Could not build the catch-up");
       toast.error(error instanceof Error ? error.message : "Could not build the catch-up");
     } finally {
       setLoadingId(null);
@@ -79,6 +88,7 @@ export function FollowedStories() {
   }
 
   const list = stories.data ?? [];
+  const selectedStory = list.find((item) => item.story_id === openId) ?? null;
 
   return (
     <section className="animate-rise border-b border-border pb-5 md:glass-card md:rounded-2xl md:border md:border-border md:p-6">
@@ -90,14 +100,14 @@ export function FollowedStories() {
           <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             Your activity
           </p>
-            <h2 className="mt-0.5 font-display text-lg font-semibold">Your story follow-up</h2>
+          <h2 className="mt-0.5 font-display text-lg font-semibold">Your story follow-up</h2>
         </div>
       </div>
 
       <div className="mt-5 grid grid-cols-3 divide-x divide-border md:gap-2 md:divide-x-0">
         <FollowMetric label="Followers" value={stats.data?.followers ?? 0} />
         <FollowMetric label="Following" value={stats.data?.following ?? 0} />
-          <FollowMetric label="Stories" value={list.length} />
+        <FollowMetric label="Stories" value={list.length} />
       </div>
 
       <ul className="mt-4 space-y-2.5">
@@ -168,35 +178,65 @@ export function FollowedStories() {
               </Button>
             </div>
 
-            <AnimatePresence initial={false}>
-              {openId === item.story_id && storyTimeline?.id === item.story_id ? (
-                <motion.div
-                  initial={{ opacity: 0, height: 0 }}
-                  animate={{ opacity: 1, height: "auto" }}
-                  exit={{ opacity: 0, height: 0 }}
-                  className="mt-4 overflow-hidden"
-                >
-                  <div className="rounded-2xl border border-border/80 bg-gradient-to-br from-primary/[0.07] via-card to-secondary/30 p-4 sm:p-5">
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
-                          <Sparkles className="size-3.5" /> Story so far
-                        </p>
-                        <p className="mt-2 text-sm leading-relaxed text-foreground/85">
-                          {storyTimeline.data.summary}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        aria-label="Close story timeline"
-                        onClick={() => setOpenId(null)}
-                        className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-background hover:text-foreground"
-                      >
-                        <X className="size-4" />
-                      </button>
-                    </div>
+          </motion.li>
+        ))}
+      </ul>
 
-                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-y border-border/70 py-3 text-xs text-muted-foreground">
+      <Dialog
+        open={openId !== null}
+        onOpenChange={(open) => {
+          if (!open) {
+            setOpenId(null);
+            setStoryTimeline(null);
+            setCatchUpError(null);
+          }
+        }}
+      >
+        <DialogContent className="!fixed !inset-0 !left-0 !top-0 !grid !h-[100dvh] !w-screen !max-w-none !translate-x-0 !translate-y-0 !grid-rows-[auto_minmax(0,1fr)_auto] !gap-0 !overflow-hidden !rounded-none !border-0 !p-0">
+          <DialogHeader className="border-b border-border bg-background/95 px-5 py-4 pr-14 text-left shadow-sm backdrop-blur sm:px-8 sm:py-5 sm:pr-16">
+            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+              Story follow-up
+            </p>
+            <DialogTitle className="mt-1 line-clamp-2 text-base sm:text-xl">
+              {storyTimeline?.data.story.title ?? selectedStory?.title ?? "Loading story…"}
+            </DialogTitle>
+            <DialogDescription className="text-xs">
+              {storyTimeline?.data.story.company_name ?? selectedStory?.company_name ?? "Your followed story"}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="overflow-y-auto overscroll-contain">
+            <div className="mx-auto w-full max-w-3xl space-y-5 px-5 py-6 sm:px-8 sm:py-9">
+              {loadingId === openId ? (
+                <div className="flex min-h-[45dvh] flex-col items-center justify-center gap-4 text-center">
+                  <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <Loader2 className="size-6 animate-spin" />
+                  </span>
+                  <div>
+                    <p className="font-medium">Putting the story in order</p>
+                    <p className="mt-1 text-sm text-muted-foreground">Gathering the original post and published replies.</p>
+                  </div>
+                </div>
+              ) : catchUpError ? (
+                <div className="flex min-h-[45dvh] flex-col items-center justify-center gap-3 text-center">
+                  <p className="font-medium">Couldn’t load this story</p>
+                  <p className="max-w-sm text-sm text-muted-foreground">{catchUpError}</p>
+                  {openId ? (
+                    <Button onClick={() => void handleCatchUp(openId)} className="mt-2 rounded-full">
+                      Try again
+                    </Button>
+                  ) : null}
+                </div>
+              ) : storyTimeline ? (
+                <>
+                  <section className="rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/[0.11] via-card to-secondary/40 p-5 sm:p-7">
+                    <p className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-primary">
+                      <Sparkles className="size-3.5" /> The story so far
+                    </p>
+                    <p className="mt-3 max-w-2xl text-base leading-relaxed sm:text-lg">
+                      {storyTimeline.data.summary}
+                    </p>
+                    <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-border/70 pt-4 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
                         <CalendarDays className="size-3.5" />
                         Started {formatTimelineDate(storyTimeline.data.story.created_at)}
@@ -210,8 +250,14 @@ export function FollowedStories() {
                         Latest {formatTimelineDate(storyTimeline.data.latestUpdateAt)}
                       </span>
                     </div>
+                  </section>
 
-                    <div className="relative mt-4 space-y-0 before:absolute before:bottom-4 before:left-[11px] before:top-3 before:w-px before:bg-border">
+                  <section>
+                    <div className="mb-4">
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">From the beginning</p>
+                      <h3 className="mt-1 text-lg font-semibold">What happened, in order</h3>
+                    </div>
+                    <div className="relative space-y-0 before:absolute before:bottom-4 before:left-[11px] before:top-3 before:w-px before:bg-border">
                       <TimelineEntry
                         label="Story shared"
                         date={storyTimeline.data.story.created_at}
@@ -228,25 +274,30 @@ export function FollowedStories() {
                         />
                       ))}
                       {storyTimeline.data.timeline.length === 0 ? (
-                        <p className="ml-8 py-2 text-xs text-muted-foreground">
-                          No replies have been posted yet. This is the latest update.
+                        <p className="ml-8 py-2 text-sm text-muted-foreground">
+                          No replies have been posted yet. The original story is the latest update.
                         </p>
                       ) : null}
                     </div>
-                    <div className="mt-3 flex justify-end">
-                      <Button asChild size="sm" variant="ghost" className="rounded-full">
-                        <Link to="/stories/$id" params={{ id: item.story_id }}>
-                          Open full conversation <ArrowRight className="size-4" />
-                        </Link>
-                      </Button>
-                    </div>
-                  </div>
-                </motion.div>
+                  </section>
+                </>
               ) : null}
-            </AnimatePresence>
-          </motion.li>
-        ))}
-      </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-border bg-background/95 px-5 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur sm:px-8">
+            <div className="mx-auto flex w-full max-w-3xl justify-end">
+              {openId ? (
+                <Button asChild className="w-full rounded-full sm:w-auto">
+                  <Link to="/stories/$id" params={{ id: openId }}>
+                    Open full conversation <ArrowRight className="size-4" />
+                  </Link>
+                </Button>
+              ) : null}
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }
