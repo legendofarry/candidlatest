@@ -3,8 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeCheck, CheckCheck, Loader2, Send, Smile } from "lucide-react";
-import { getConversation, postMessage, reactToMessage } from "@/lib/messaging.functions";
+import { BadgeCheck, CheckCheck, ImagePlus, Loader2, Send, Smile, X } from "lucide-react";
+import {
+  discardChatImageUpload,
+  getConversation,
+  issueChatImageUpload,
+  postMessage,
+  reactToMessage,
+} from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -33,6 +39,27 @@ export const Route = createFileRoute("/messages/$id")({
 });
 
 const EMOJI = ["❤️", "😂", "😮", "😢", "🔥", "👏", "👍", "🙏"];
+const CHAT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+
+type ChatImageReceipt = {
+  ticket_id: string;
+  public_id: string;
+  version: number;
+  signature: string;
+  format: "jpg" | "png" | "webp";
+  bytes: number;
+};
+
+type CloudinaryChatUpload = {
+  public_id?: string;
+  resource_type?: string;
+  type?: string;
+  version?: number;
+  signature?: string;
+  format?: string;
+  bytes?: number;
+  error?: { message?: string };
+};
 
 function clock(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -54,9 +81,36 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const fetchConversation = useServerFn(getConversation);
   const sendMessage = useServerFn(postMessage);
   const react = useServerFn(reactToMessage);
+  const issueImageUpload = useServerFn(issueChatImageUpload);
+  const discardImageUpload = useServerFn(discardChatImageUpload);
 
   const [draft, setDraft] = useState("");
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageReceipt, setImageReceipt] = useState<ChatImageReceipt | null>(null);
+  const [imageTicketId, setImageTicketId] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const imageTicketRef = useRef<string | null>(null);
+  const discardUploadRef = useRef(discardImageUpload);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    discardUploadRef.current = discardImageUpload;
+  }, [discardImageUpload]);
+
+  useEffect(
+    () => () => {
+      const ticketId = imageTicketRef.current;
+      if (ticketId) {
+        void discardUploadRef.current({ data: { ticket_id: ticketId } }).catch(() => undefined);
+      }
+    },
+    [],
+  );
+
+  useEffect(() => () => {
+    if (imagePreview) URL.revokeObjectURL(imagePreview);
+  }, [imagePreview]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["conversation", id],
@@ -68,14 +122,113 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const conversation = data;
   const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
 
+  async function clearImageAttachment() {
+    if (imageTicketId) {
+      try {
+        await discardImageUpload({ data: { ticket_id: imageTicketId } });
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : "Could not remove this image.");
+        return false;
+      }
+      imageTicketRef.current = null;
+    }
+    setImageReceipt(null);
+    setImageTicketId(null);
+    setImagePreview(null);
+    if (imageInputRef.current) imageInputRef.current.value = "";
+    return true;
+  }
+
+  async function chooseImage(file?: File) {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Choose a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > CHAT_IMAGE_MAX_BYTES) {
+      toast.error("Images must be 8 MB or smaller.");
+      return;
+    }
+    if (imageTicketId && !(await clearImageAttachment())) return;
+    setImagePreview(URL.createObjectURL(file));
+    setImageReceipt(null);
+    setUploadingImage(true);
+    let ticketId: string | null = null;
+    try {
+      const ticket = await issueImageUpload({
+        data: { conversation_id: id, size: file.size, mimeType: file.type as "image/jpeg" | "image/png" | "image/webp" },
+      });
+      ticketId = ticket.ticketId;
+      imageTicketRef.current = ticket.ticketId;
+      setImageTicketId(ticket.ticketId);
+      const form = new FormData();
+      form.append("file", file);
+      form.append("api_key", ticket.apiKey);
+      form.append("timestamp", String(ticket.timestamp));
+      form.append("public_id", ticket.publicId);
+      form.append("type", ticket.type);
+      form.append("overwrite", String(ticket.overwrite));
+      form.append("signature", ticket.signature);
+
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(ticket.cloudName)}/image/upload`,
+        { method: "POST", body: form },
+      );
+      const result = (await response.json().catch(() => ({}))) as CloudinaryChatUpload;
+      if (!response.ok) throw new Error(result.error?.message || "Image upload failed.");
+      if (
+        result.public_id !== ticket.publicId ||
+        result.resource_type !== "image" ||
+        result.type !== "authenticated" ||
+        !Number.isInteger(result.version) ||
+        typeof result.signature !== "string" ||
+        !["jpg", "png", "webp"].includes(result.format ?? "") ||
+        result.bytes !== file.size
+      ) {
+        throw new Error("The uploaded image could not be verified. Please try again.");
+      }
+      setImageReceipt({
+        ticket_id: ticket.ticketId,
+        public_id: result.public_id,
+        version: result.version!,
+        signature: result.signature!,
+        format: result.format as ChatImageReceipt["format"],
+        bytes: result.bytes!,
+      });
+    } catch (error) {
+      if (ticketId) {
+        try {
+          await discardImageUpload({ data: { ticket_id: ticketId } });
+        } catch {
+          // The original upload error is the one the user needs to see.
+        }
+      }
+      imageTicketRef.current = null;
+      setImageReceipt(null);
+      setImageTicketId(null);
+      setImagePreview(null);
+      toast.error("Image not attached", {
+        description: error instanceof Error ? error.message : "Please try again.",
+      });
+    } finally {
+      setUploadingImage(false);
+    }
+  }
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
   const send = useMutation({
-    mutationFn: async () => sendMessage({ data: { conversation_id: id, body: draft } }),
+    mutationFn: async () =>
+      sendMessage({ data: { conversation_id: id, body: draft, image: imageReceipt } }),
     onSuccess: () => {
       setDraft("");
+      imageTicketRef.current = null;
+      setImageReceipt(null);
+      setImageTicketId(null);
+      setImagePreview(null);
+      if (imageInputRef.current) imageInputRef.current.value = "";
       void queryClient.invalidateQueries({ queryKey: ["conversation", id] });
       void queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
@@ -182,6 +335,14 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                         : "rounded-bl-md border border-border bg-card",
                     )}
                   >
+                    {message.image?.delivery_url ? (
+                      <img
+                        src={message.image.delivery_url}
+                        alt="Image shared in chat"
+                        loading="lazy"
+                        className="mb-2 max-h-80 max-w-full rounded-xl object-contain"
+                      />
+                    ) : null}
                     {message.body ? <p className="whitespace-pre-wrap">{message.body}</p> : null}
                   </div>
 
@@ -264,18 +425,62 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
         >
           <div
             className={cn(
-              "flex items-end gap-2",
+              "flex flex-col gap-2",
               !inSidebar &&
                 "mx-auto max-w-2xl rounded-2xl border border-border bg-card p-1.5 shadow-sm",
             )}
           >
+            {imagePreview ? (
+              <div className="relative mx-1 mt-1 w-fit rounded-xl border border-border bg-background p-1.5">
+                <img src={imagePreview} alt="Image ready to send" className="h-20 max-w-32 rounded-lg object-cover" />
+                <span className="absolute -right-2 -top-2 rounded-full bg-background shadow">
+                  <button
+                    type="button"
+                    aria-label="Remove attached image"
+                    disabled={uploadingImage || send.isPending}
+                    onClick={() => void clearImageAttachment()}
+                    className="flex size-7 items-center justify-center rounded-full border border-border text-muted-foreground hover:text-foreground disabled:opacity-50"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </span>
+                {uploadingImage ? (
+                  <span className="absolute inset-1 flex items-center justify-center rounded-lg bg-background/75">
+                    <Loader2 className="size-5 animate-spin text-primary" />
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
+            <div className="flex items-end gap-2">
+              <input
+                ref={imageInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="sr-only"
+                onChange={(event) => {
+                  void chooseImage(event.currentTarget.files?.[0]);
+                  event.currentTarget.value = "";
+                }}
+              />
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                aria-label="Attach image"
+                title="Attach image"
+                disabled={uploadingImage || send.isPending || !conversation?.can_send}
+                onClick={() => imageInputRef.current?.click()}
+                className="shrink-0 rounded-full"
+              >
+                <ImagePlus className="size-5" />
+              </Button>
             <Textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Enter" && !event.shiftKey) {
                   event.preventDefault();
-                  if (draft.trim()) send.mutate();
+                  if (draft.trim() || imageReceipt) send.mutate();
                 }
               }}
               rows={1}
@@ -287,7 +492,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               size="icon"
               className="glow-primary rounded-full"
               aria-label="Send message"
-              disabled={send.isPending || !draft.trim()}
+              disabled={send.isPending || uploadingImage || (!draft.trim() && !imageReceipt)}
               onClick={() => send.mutate()}
             >
               {send.isPending ? (
@@ -296,6 +501,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 <Send className="size-4" />
               )}
             </Button>
+            </div>
           </div>
         </div>
       )}

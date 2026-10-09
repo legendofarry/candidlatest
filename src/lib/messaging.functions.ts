@@ -40,17 +40,58 @@ export const postMessage = createServerFn({ method: "POST" })
       .object({
         conversation_id: z.string().min(1),
         body: z.string().max(4000).default(""),
+        image: z
+          .object({
+            ticket_id: z.string().uuid(),
+            public_id: z.string().min(1).max(255),
+            version: z.number().int().positive(),
+            signature: z.string().regex(/^[a-f0-9]{40,64}$/i),
+            format: z.enum(["jpg", "png", "webp"]),
+            bytes: z.number().int().positive().max(8 * 1024 * 1024),
+          })
+          .nullable()
+          .optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { sendMessage } = await import("./messaging.server");
-    if (!data.body.trim()) throw new Error("Write something first.");
+    if (!data.body.trim() && !data.image) throw new Error("Write a message or attach an image.");
     return sendMessage({
       userId: context.userId,
       conversationId: data.conversation_id,
       body: data.body.trim(),
+      image: data.image ?? null,
     });
+  });
+
+export const issueChatImageUpload = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        conversation_id: z.string().min(1),
+        size: z.number().int().positive().max(8 * 1024 * 1024),
+        mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { issueChatImageUpload: issue } = await import("./messaging.server");
+    return issue({
+      userId: context.userId,
+      conversationId: data.conversation_id,
+      size: data.size,
+      mimeType: data.mimeType,
+    });
+  });
+
+export const discardChatImageUpload = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ ticket_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { discardChatImageUpload: discard } = await import("./messaging.server");
+    return discard(context.userId, data.ticket_id);
   });
 
 export const reactToMessage = createServerFn({ method: "POST" })

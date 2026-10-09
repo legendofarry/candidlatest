@@ -30,6 +30,23 @@ export async function signCloudinaryParams(
   );
 }
 
+/** Short-lived, signed delivery URL for an authenticated Cloudinary image. */
+export function createAuthenticatedImageUrl(publicId: string, format: string, expiresAt: number) {
+  const config = getCloudinaryEvidenceConfig();
+  cloudinary.config({
+    cloud_name: config.cloudName,
+    api_key: config.apiKey,
+    api_secret: config.apiSecret,
+    secure: true,
+  });
+  return cloudinary.utils.private_download_url(publicId, format, {
+    resource_type: "image",
+    type: "authenticated",
+    expires_at: expiresAt,
+    attachment: false,
+  });
+}
+
 export async function verifyCloudinaryUploadResponse(input: {
   publicId: string;
   version: number;

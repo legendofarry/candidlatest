@@ -1,7 +1,14 @@
 import { getFirestoreDb } from "./firebase.server";
-import { FieldValue } from "./firestore-rest.server";
+import { FieldValue, type DocumentReference } from "./firestore-rest.server";
 import type { CommentRecord, ProfileRecord, StoryRecord } from "./firebase-data.server";
 import { getEffectiveMembershipTier } from "./membership";
+import {
+  createAuthenticatedImageUrl,
+  getCloudinaryEvidenceConfig,
+  signCloudinaryParams,
+  verifyCloudinaryUploadResponse,
+} from "./cloudinary-evidence.server";
+import { generateId } from "./firebase-data.server";
 
 /** The seeded owner account. Candid can always reach every user. */
 export const CANDID_USER_ID = "candid-official";
@@ -33,7 +40,124 @@ export type MessageRecord = {
   created_at: string;
   read_at: string | null;
   reactions: Record<string, string[]>;
+  image?: {
+    public_id: string;
+    version: number;
+    format: string;
+    bytes: number;
+    delivery_url: string;
+    delivery_url_expires_at: number;
+  } | null;
 };
+
+export type ChatImageUploadReceipt = {
+  ticket_id: string;
+  public_id: string;
+  version: number;
+  signature: string;
+  format: string;
+  bytes: number;
+};
+
+const CHAT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+const CHAT_IMAGE_FORMATS = new Set(["jpg", "png", "webp"]);
+
+export async function issueChatImageUpload(input: {
+  userId: string;
+  conversationId: string;
+  size: number;
+  mimeType: "image/jpeg" | "image/png" | "image/webp";
+}) {
+  if (input.size < 1 || input.size > CHAT_IMAGE_MAX_BYTES) {
+    throw new Error("Choose an image smaller than 8 MB.");
+  }
+  const db = getFirestoreDb();
+  const conversationSnap = await db.collection("conversations").doc(input.conversationId).get();
+  const conversation = conversationSnap.data() as ConversationRecord | undefined;
+  if (!conversationSnap.exists || !conversation?.participant_ids.includes(input.userId)) {
+    throw new Error("Not your conversation.");
+  }
+  const otherId = conversation.participant_ids.find((id) => id !== input.userId) ?? input.userId;
+  const gate = await canMessage(input.userId, otherId);
+  if (!gate.allowed) throw new Error(gate.reason);
+
+  const config = getCloudinaryEvidenceConfig();
+  const ticketId = generateId();
+  const publicId = `candid-chat/${input.conversationId}/${ticketId}`;
+  const format = input.mimeType === "image/jpeg" ? "jpg" : input.mimeType.split("/")[1]!;
+  const timestamp = Math.floor(Date.now() / 1000);
+  const signedParams = {
+    overwrite: "false",
+    public_id: publicId,
+    timestamp: String(timestamp),
+    type: "authenticated",
+  };
+  const signature = await signCloudinaryParams(signedParams, config.apiSecret);
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  await db.collection("chat_image_uploads").doc(ticketId).set({
+    id: ticketId,
+    user_id: input.userId,
+    conversation_id: input.conversationId,
+    cloudinary_public_id: publicId,
+    expected_format: format,
+    expected_bytes: input.size,
+    status: "issued",
+    created_at: now(),
+    expires_at: expiresAt,
+  });
+  return {
+    ticketId,
+    cloudName: config.cloudName,
+    apiKey: config.apiKey,
+    publicId,
+    timestamp,
+    type: "authenticated" as const,
+    overwrite: false as const,
+    signature,
+  };
+}
+
+export async function discardChatImageUpload(userId: string, ticketId: string) {
+  const db = getFirestoreDb();
+  const ticketRef = db.collection("chat_image_uploads").doc(ticketId);
+  const ticketSnap = await ticketRef.get();
+  const ticket = ticketSnap.data() as Record<string, unknown> | undefined;
+  if (!ticketSnap.exists || ticket?.["user_id"] !== userId) {
+    throw new Error("Image upload not found.");
+  }
+  if (ticket["status"] === "discarded") return { ok: true as const };
+  if (ticket["status"] !== "issued") throw new Error("This image is already attached to a message.");
+
+  const config = getCloudinaryEvidenceConfig();
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const params = {
+    invalidate: "true",
+    public_id: String(ticket["cloudinary_public_id"]),
+    timestamp,
+    type: "authenticated",
+  };
+  const signature = await signCloudinaryParams(params, config.apiSecret);
+  const form = new FormData();
+  form.set("api_key", config.apiKey);
+  form.set("public_id", params.public_id);
+  form.set("timestamp", timestamp);
+  form.set("type", params.type);
+  form.set("invalidate", params.invalidate);
+  form.set("signature", signature);
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(config.cloudName)}/image/destroy`,
+    { method: "POST", body: form },
+  );
+  const result = (await response.json().catch(() => ({}))) as {
+    result?: string;
+    error?: { message?: string };
+  };
+  if (!response.ok || !["ok", "not found"].includes(result.result ?? "")) {
+    throw new Error(result.error?.message || "The image could not be removed. Please retry.");
+  }
+  await ticketRef.update({ status: "discarded", discarded_at: now() }, { updateTime: ticketSnap.updateTime });
+  return { ok: true as const };
+}
 
 export type ChatParticipant = {
   id: string;
@@ -277,6 +401,29 @@ export async function readConversation(userId: string, conversationId: string) {
   const messages = messagesSnap.docs
     .map((doc) => doc.data() as MessageRecord)
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  const messagesWithImages = await Promise.all(
+    messages.map(async (message) => {
+      if (!message.image) return message;
+      const validFor = message.image.delivery_url_expires_at - Math.floor(Date.now() / 1000);
+      if (message.image.delivery_url && validFor > 15 * 60) return message;
+      const expiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+      const deliveryUrl = createAuthenticatedImageUrl(
+        message.image.public_id,
+        message.image.format,
+        expiresAt,
+      );
+      const refreshedImage = {
+        ...message.image,
+        delivery_url: deliveryUrl,
+        delivery_url_expires_at: expiresAt,
+      };
+      await db.collection("messages").doc(message.id).update({
+        "image.delivery_url": deliveryUrl,
+        "image.delivery_url_expires_at": expiresAt,
+      });
+      return { ...message, image: refreshedImage };
+    }),
+  );
 
   // Reading the thread clears this user's unread counter and marks their inbox read.
   const batch = db.batch();
@@ -293,13 +440,18 @@ export async function readConversation(userId: string, conversationId: string) {
   return {
     id: conversationId,
     with: participants.get(otherId)!,
-    messages,
+    messages: messagesWithImages,
     can_send: gate.allowed,
     blocked_reason: gate.allowed ? null : gate.reason,
   };
 }
 
-export async function sendMessage(input: { userId: string; conversationId: string; body: string }) {
+export async function sendMessage(input: {
+  userId: string;
+  conversationId: string;
+  body: string;
+  image?: ChatImageUploadReceipt | null;
+}) {
   const db = getFirestoreDb();
   const ref = db.collection("conversations").doc(input.conversationId);
   const snap = await ref.get();
@@ -311,6 +463,54 @@ export async function sendMessage(input: { userId: string; conversationId: strin
   const gate = await canMessage(input.userId, otherId);
   if (!gate.allowed) throw new Error(gate.reason);
 
+  let image: MessageRecord["image"] = null;
+  let ticketRef: DocumentReference | null = null;
+  let ticketUpdateTime: string | undefined;
+  if (input.image) {
+    ticketRef = db.collection("chat_image_uploads").doc(input.image.ticket_id);
+    const ticketSnap = await ticketRef.get();
+    const ticket = ticketSnap.data() as Record<string, unknown> | undefined;
+    const expectedFormat = String(ticket?.["expected_format"] ?? "");
+    const expectedBytes = Number(ticket?.["expected_bytes"] ?? 0);
+    const valid =
+      ticketSnap.exists &&
+      ticket?.["user_id"] === input.userId &&
+      ticket?.["conversation_id"] === input.conversationId &&
+      ticket?.["status"] === "issued" &&
+      String(ticket?.["expires_at"] ?? "") > now() &&
+      ticket?.["cloudinary_public_id"] === input.image.public_id &&
+      expectedFormat === input.image.format &&
+      expectedBytes === input.image.bytes &&
+      CHAT_IMAGE_FORMATS.has(input.image.format) &&
+      Number.isInteger(input.image.version) &&
+      input.image.bytes > 0 &&
+      input.image.bytes <= CHAT_IMAGE_MAX_BYTES &&
+      /^[a-f0-9]{40,64}$/i.test(input.image.signature);
+    if (!valid) throw new Error("That image upload expired or is not valid. Choose it again.");
+    const config = getCloudinaryEvidenceConfig();
+    const verified = await verifyCloudinaryUploadResponse({
+      publicId: input.image.public_id,
+      version: input.image.version,
+      signature: input.image.signature,
+      apiSecret: config.apiSecret,
+    });
+    if (!verified) throw new Error("Cloudinary could not verify the uploaded image.");
+    const deliveryExpiresAt = Math.floor(Date.now() / 1000) + 24 * 60 * 60;
+    image = {
+      public_id: input.image.public_id,
+      version: input.image.version,
+      format: input.image.format,
+      bytes: input.image.bytes,
+      delivery_url: createAuthenticatedImageUrl(
+        input.image.public_id,
+        input.image.format,
+        deliveryExpiresAt,
+      ),
+      delivery_url_expires_at: deliveryExpiresAt,
+    };
+    ticketUpdateTime = ticketSnap.updateTime;
+  }
+
   const messageRef = db.collection("messages").doc();
   const message: MessageRecord = {
     id: messageRef.id,
@@ -320,15 +520,23 @@ export async function sendMessage(input: { userId: string; conversationId: strin
     created_at: now(),
     read_at: null,
     reactions: {},
+    image,
   };
   const batch = db.batch();
   batch.set(messageRef, message);
   batch.update(ref, {
-    last_message: input.body,
+    last_message: input.body || (image ? "📷 Image" : ""),
     last_message_at: message.created_at,
     last_sender_id: input.userId,
     [`unread.${otherId}`]: FieldValue.increment(1),
   });
+  if (ticketRef && input.image) {
+    batch.update(
+      ticketRef,
+      { status: "attached", message_id: message.id, attached_at: message.created_at },
+      ticketUpdateTime ? { updateTime: ticketUpdateTime } : undefined,
+    );
+  }
   await batch.commit();
 
   return message;
