@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BadgeCheck, Check, Flame, Sparkles, WalletCards } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { switchMyMembership } from "@/lib/membership.functions";
 import { MEMBERSHIP_PLANS, type MembershipTier } from "@/lib/membership";
