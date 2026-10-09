@@ -1,4 +1,4 @@
-import { createFileRoute, useCanGoBack, useRouter } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BadgeCheck, Check, Flame, Sparkles, WalletCards } from "lucide-react";
@@ -6,7 +6,6 @@ import { getOnboardingState } from "@/lib/onboarding.functions";
 import { MEMBERSHIP_PLANS, type MembershipTier } from "@/lib/membership";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/billing")({
@@ -26,8 +25,6 @@ const FEATURES: Record<MembershipTier, string[]> = {
 };
 
 function BillingPage() {
-  const router = useRouter();
-  const canGoBack = useCanGoBack();
   const { user } = useAuth();
   const fetchProfile = useServerFn(getOnboardingState);
   const profile = useQuery({
@@ -39,12 +36,6 @@ function BillingPage() {
 
   return (
     <div className="min-h-screen bg-background pb-12">
-      <FloatingBackButton
-        onClick={() => {
-          if (canGoBack) router.history.back();
-          else void router.navigate({ to: "/" });
-        }}
-      />
       <div className="mx-auto w-full max-w-6xl px-5 pt-8 sm:px-8 md:px-12 md:pt-14">
         <header className="max-w-2xl">
           <div className="flex items-center gap-2 text-sm font-medium text-primary">

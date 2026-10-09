@@ -164,7 +164,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/support",
     "/profile",
     "/settings",
-    "/billing",
     "/onboarding",
     "/verify-email",
   ].includes(pathname);
