@@ -86,6 +86,7 @@ export class DocumentSnapshot {
     readonly id: string,
     readonly ref: DocumentReference,
     private readonly fields: DocumentData | undefined,
+    readonly updateTime?: string,
   ) {}
   get exists() {
     return this.fields !== undefined;
@@ -177,14 +178,14 @@ export class DocumentReference {
   async get() {
     const res = await this.db.request(`/${this.path}`, { method: "GET" }, true);
     if (!res) return new DocumentSnapshot(this.id, this, undefined);
-    return new DocumentSnapshot(this.id, this, decodeFields(res.fields ?? {}));
+    return new DocumentSnapshot(this.id, this, decodeFields(res.fields ?? {}), res.updateTime);
   }
   setWrite(data: DocumentData, options?: SetOptions): Write {
     const w: Write = { update: { name: this.name, fields: encodeFields(data) } };
     if (options?.merge) w["updateMask"] = { fieldPaths: leafPaths(data) };
     return w;
   }
-  updateWrite(data: DocumentData): Write {
+  updateWrite(data: DocumentData, precondition?: { updateTime?: string }): Write {
     const { nested, paths } = expandUpdate(data);
     const fieldTransforms: Array<Record<string, unknown>> = [];
     const transformedPaths = new Set<string>();
@@ -221,8 +222,13 @@ export class DocumentReference {
       update: { name: this.name, fields: encodeFields(stripTransforms(nested)) },
       updateMask: { fieldPaths: updatePaths },
       ...(fieldTransforms.length > 0 ? { updateTransforms: fieldTransforms } : {}),
-      currentDocument: { exists: true },
+      currentDocument: precondition?.updateTime
+        ? { updateTime: precondition.updateTime }
+        : { exists: true },
     };
+  }
+  createWrite(data: DocumentData): Write {
+    return { update: { name: this.name, fields: encodeFields(data) }, currentDocument: { exists: false } };
   }
   deleteWrite(): Write {
     return { delete: this.name };
@@ -230,8 +236,11 @@ export class DocumentReference {
   set(data: DocumentData, options?: SetOptions) {
     return this.db.commit([this.setWrite(data, options)]);
   }
-  update(data: DocumentData) {
-    return this.db.commit([this.updateWrite(data)]);
+  update(data: DocumentData, precondition?: { updateTime?: string }) {
+    return this.db.commit([this.updateWrite(data, precondition)]);
+  }
+  create(data: DocumentData) {
+    return this.db.commit([this.createWrite(data)]);
   }
   delete() {
     return this.db.commit([this.deleteWrite()]);
@@ -339,8 +348,12 @@ export class WriteBatch {
     this.writes.push(ref.setWrite(data, options));
     return this;
   }
-  update(ref: DocumentReference, data: DocumentData) {
-    this.writes.push(ref.updateWrite(data));
+  update(ref: DocumentReference, data: DocumentData, precondition?: { updateTime?: string }) {
+    this.writes.push(ref.updateWrite(data, precondition));
+    return this;
+  }
+  create(ref: DocumentReference, data: DocumentData) {
+    this.writes.push(ref.createWrite(data));
     return this;
   }
   delete(ref: DocumentReference) {

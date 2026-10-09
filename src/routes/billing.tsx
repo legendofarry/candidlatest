@@ -21,9 +21,9 @@ export const Route = createFileRoute("/billing")({
 });
 
 const FEATURES: Record<MembershipTier, string[]> = {
-  basic: ["Read workplace stories", "Share and save stories", "Private member messaging"],
-  premium: ["Everything in Basic", "Premium member badge", "Priority access to new tools"],
-  gold: ["Everything in Premium", "Gold member badge", "Early access to Candid features"],
+  basic: ["Read and share workplace stories", "Save stories and message members"],
+  premium: ["All Basic features", "Premium membership badge"],
+  gold: ["All Basic features", "Gold membership badge"],
 };
 
 function BillingPage() {
@@ -31,20 +31,28 @@ function BillingPage() {
   const queryClient = useQueryClient();
   const fetchProfile = useServerFn(getOnboardingState);
   const switchPackage = useServerFn(switchMyMembership);
-  const switchMutation = useMutation({
-    mutationFn: (tier: MembershipTier) => switchPackage({ data: { tier } }),
-    onSuccess: async (result) => {
-      await queryClient.invalidateQueries();
-      notify.success(result.changed ? `Switched to ${MEMBERSHIP_PLANS[result.tier].name}` : "You’re already on this package");
-    },
-    onError: (error) => {
-      notify.error(error instanceof Error ? error.message : "Could not change your package");
-    },
-  });
   const profile = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
     enabled: Boolean(user),
+  });
+  const switchMutation = useMutation({
+    mutationFn: ({ tier, expectedVersion }: { tier: MembershipTier; expectedVersion: number }) => switchPackage({
+      data: {
+        tier,
+        requestId: crypto.randomUUID(),
+        expectedVersion,
+      },
+    }),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries();
+      notify.success(result.changed
+        ? `Switched to ${MEMBERSHIP_PLANS[result.tier].name}. No payment was processed.`
+        : "You’re already on this package");
+    },
+    onError: (error) => {
+      notify.error(error instanceof Error ? error.message : "Could not change your package");
+    },
   });
   const currentTier = profile.data?.membership?.tier ?? "basic";
   const canSwitchPackages = profile.data?.membership?.switchUnlocked ?? currentTier === "gold";
@@ -59,6 +67,9 @@ function BillingPage() {
           <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
             Pick the membership that feels right.
           </h1>
+          <p className="mt-4 text-sm text-muted-foreground">
+            Package changes take effect immediately. Candid does not process membership payments yet; Premium and Gold access shown here is complimentary for eligible accounts.
+          </p>
         </header>
 
         <section className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
@@ -115,9 +126,12 @@ function BillingPage() {
                     disabled={isCurrent || !isAvailable || switchMutation.isPending}
                     variant={isCurrent ? "outline" : "default"}
                     className="mt-8 h-11 w-full rounded-xl"
-                    onClick={() => switchMutation.mutate(tier)}
+                    onClick={() => switchMutation.mutate({
+                      tier,
+                      expectedVersion: profile.data?.membership?.version ?? 0,
+                    })}
                   >
-                    {switchMutation.isPending && switchMutation.variables === tier
+                    {switchMutation.isPending && switchMutation.variables?.tier === tier
                       ? "Switching…"
                       : isCurrent
                         ? "Current package"

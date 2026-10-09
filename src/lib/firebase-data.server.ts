@@ -1,7 +1,7 @@
 const randomUUID = () => crypto.randomUUID();
 import type { DocumentData, QueryDocumentSnapshot } from "./firestore-rest.server";
 import { getFirestoreDb } from "./firebase.server";
-import { getMembershipBadgeTier } from "./membership";
+import { getEffectiveMembershipTier, type MembershipSource } from "./membership";
 
 export type CompanyRecord = {
   id: string;
@@ -59,11 +59,17 @@ export type ProfileRecord = {
   subscription_started_at?: string | null;
   subscription_period_ends_at?: string | null;
   subscription_switch_unlocked?: boolean;
+  subscription_source?: MembershipSource;
+  subscription_assigned_by?: string | null;
+  subscription_assigned_at?: string | null;
+  subscription_changed_at?: string | null;
+  subscription_change_id?: string | null;
+  subscription_version?: number;
   investigation_hold?: boolean | { active?: boolean; started_at?: string | null; updated_at?: string | null } | null;
 };
 
 function membershipBadgeTier(profile: ProfileRecord | undefined): "basic" | "premium" | "gold" {
-  return getMembershipBadgeTier(profile?.subscription_tier, profile?.subscription_status, profile?.subscription_period_ends_at);
+  return getEffectiveMembershipTier(profile);
 }
 
 export type CandidLensRecord = {

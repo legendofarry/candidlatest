@@ -1,6 +1,10 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { DEFAULT_MEMBERSHIP } from "./membership";
+import {
+  canSelfSwitchMembership,
+  DEFAULT_MEMBERSHIP,
+  getEffectiveMembershipTier,
+} from "./membership";
 import {
   requireFirebaseAuth,
   requireVerifiedFirebaseAuth,
@@ -56,13 +60,15 @@ export const getOnboardingState = createServerFn({ method: "POST" })
       socials: profile?.socials ?? null,
       accountType: profile?.account_type ?? "unknown",
       membership: {
-        tier: profile?.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
+        tier: getEffectiveMembershipTier(profile),
+        assignedTier: profile?.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
         status: profile?.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
+        source: profile?.subscription_source ?? (profile?.subscription_tier && profile.subscription_tier !== "basic" ? "manual" : "default"),
         provider: profile?.subscription_provider ?? null,
         startedAt: profile?.subscription_started_at ?? null,
         periodEndsAt: profile?.subscription_period_ends_at ?? null,
-        switchUnlocked:
-          profile?.subscription_switch_unlocked === true || profile?.subscription_tier === "gold",
+        version: profile?.subscription_version ?? 0,
+        switchUnlocked: canSelfSwitchMembership(profile),
       },
     };
   });

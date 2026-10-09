@@ -282,6 +282,12 @@ export async function claimUsername(
           subscription_provider: previous?.subscription_provider ?? DEFAULT_MEMBERSHIP.subscription_provider,
           subscription_started_at: previous?.subscription_started_at ?? DEFAULT_MEMBERSHIP.subscription_started_at,
           subscription_period_ends_at: previous?.subscription_period_ends_at ?? DEFAULT_MEMBERSHIP.subscription_period_ends_at,
+          subscription_source:
+            previous?.subscription_source ??
+            (previous?.subscription_tier && previous.subscription_tier !== "basic"
+              ? "manual"
+              : DEFAULT_MEMBERSHIP.subscription_source),
+          subscription_version: previous?.subscription_version ?? DEFAULT_MEMBERSHIP.subscription_version,
           created_at: previous?.created_at ?? now,
           onboarded_at: previous?.onboarded_at ?? now,
         },

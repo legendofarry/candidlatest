@@ -32,6 +32,8 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
       investigation_hold?: boolean | { active?: boolean } | null;
       subscription_tier?: string;
       subscription_status?: string;
+      subscription_source?: string;
+      subscription_version?: number;
     } | undefined;
     if (profileData?.banned) {
       throw new Error("This account has been restricted.");
@@ -48,6 +50,12 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
         subscription_provider: DEFAULT_MEMBERSHIP.subscription_provider,
         subscription_started_at: DEFAULT_MEMBERSHIP.subscription_started_at,
         subscription_period_ends_at: DEFAULT_MEMBERSHIP.subscription_period_ends_at,
+        subscription_source:
+          profileData?.subscription_source ??
+          (profileData?.subscription_tier && profileData.subscription_tier !== "basic"
+            ? "manual"
+            : DEFAULT_MEMBERSHIP.subscription_source),
+        subscription_version: profileData?.subscription_version ?? 0,
       }, { merge: true });
     }
 

@@ -141,6 +141,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
     enabled: Boolean(user) && !needsEmailVerification,
+    refetchInterval: 30_000,
+    refetchOnWindowFocus: true,
   });
   const fetchInvestigationHold = useServerFn(getInvestigationHoldState);
   const { data: investigationState } = useQuery({
