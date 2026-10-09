@@ -85,6 +85,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const discardImageUpload = useServerFn(discardChatImageUpload);
 
   const [draft, setDraft] = useState("");
+  const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageReceipt, setImageReceipt] = useState<ChatImageReceipt | null>(null);
   const [imageTicketId, setImageTicketId] = useState<string | null>(null);
@@ -383,7 +384,10 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                     )}
                   >
                     <span>{clock(message.created_at)}</span>
-                    <Popover>
+                    <Popover
+                      open={reactionPickerFor === message.id}
+                      onOpenChange={(open) => setReactionPickerFor(open ? message.id : null)}
+                    >
                       <PopoverTrigger asChild>
                         <button
                           type="button"
@@ -399,9 +403,10 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                             <button
                               key={emoji}
                               type="button"
-                              onClick={() =>
+                              onClick={() => {
                                 toggleReaction.mutate({ message_id: message.id, emoji })
-                              }
+                                setReactionPickerFor(null);
+                              }}
                               className="rounded-full px-1.5 py-1 text-base transition-transform hover:scale-125"
                             >
                               {emoji}
