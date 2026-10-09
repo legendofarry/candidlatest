@@ -33,7 +33,9 @@ export const clearDevelopmentFirestore = createServerFn({ method: "POST" })
       const snapshot = await db.collection(path).get();
       for (const document of snapshot.docs) {
         if (documents.length >= MAX_DOCUMENTS_PER_RESET) {
-          throw new Error(`Reset stopped after ${MAX_DOCUMENTS_PER_RESET.toLocaleString()} documents.`);
+          throw new Error(
+            `Reset stopped after ${MAX_DOCUMENTS_PER_RESET.toLocaleString()} documents.`,
+          );
         }
         const childCollections = await db.listCollectionIds(document.ref.path);
         for (const child of childCollections) {
@@ -52,7 +54,11 @@ export const clearDevelopmentFirestore = createServerFn({ method: "POST" })
     for (let index = 0; index < documents.length; index += 400) {
       const batch = db.batch();
       for (const document of documents.slice(index, index + 400)) {
-        batch.delete(db.collection(document.path.split("/").slice(0, -1).join("/")).doc(document.path.split("/").at(-1)!));
+        batch.delete(
+          db
+            .collection(document.path.split("/").slice(0, -1).join("/"))
+            .doc(document.path.split("/").at(-1)!),
+        );
       }
       await batch.commit();
     }

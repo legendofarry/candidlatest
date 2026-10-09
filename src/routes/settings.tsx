@@ -27,6 +27,7 @@ import {
   DatabaseZap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { PrivacySettings } from "@/components/site/privacy-settings";
 import { useAuth } from "@/hooks/useAuth";
@@ -126,11 +127,15 @@ function SettingsPage() {
       queryClient.clear();
       setDeveloperResetOpen(false);
       setDeveloperResetText("");
-      notify.success(`Cleared ${result.deleted.toLocaleString()} Firestore document${result.deleted === 1 ? "" : "s"}.`);
+      notify.success(
+        `Cleared ${result.deleted.toLocaleString()} Firestore document${result.deleted === 1 ? "" : "s"}.`,
+      );
       await firebaseAuth.signOut();
       await navigate({ to: "/auth" });
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : "Could not clear the development database.");
+      notify.error(
+        error instanceof Error ? error.message : "Could not clear the development database.",
+      );
     } finally {
       setDeveloperResetting(false);
     }
@@ -471,7 +476,9 @@ function SettingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Clear all Firestore development data?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes every Firestore document. Firebase Authentication accounts and Cloudinary uploads are not included. Type <strong>{RESET_CONFIRMATION}</strong> to continue.
+              This permanently removes every Firestore document. Firebase Authentication accounts and
+              Cloudinary uploads are not included. Type <strong>{RESET_CONFIRMATION}</strong> to
+              continue.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <Input
