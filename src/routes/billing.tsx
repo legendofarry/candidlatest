@@ -5,7 +5,6 @@ import { BadgeCheck, Check, Flame, Sparkles, WalletCards } from "lucide-react";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { MEMBERSHIP_PLANS, type MembershipTier } from "@/lib/membership";
 import { useAuth } from "@/hooks/useAuth";
-import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/billing")({
@@ -46,17 +45,20 @@ function BillingPage() {
           </h1>
         </header>
 
-        <section className="mt-10 grid max-w-md gap-4">
+        <section className="mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           {(Object.entries(MEMBERSHIP_PLANS) as [MembershipTier, (typeof MEMBERSHIP_PLANS)[MembershipTier]][])
-            .filter(([tier]) => tier === currentTier)
             .map(
             ([tier, plan]) => {
+              const isCurrent = tier === currentTier;
+              const isAvailable = tier === "basic" || isCurrent;
+
               return (
                 <article
                   key={tier}
                   className={cn(
-                    "relative flex flex-col overflow-hidden rounded-[1.75rem] border bg-card p-6 shadow-sm transition-transform duration-300 hover:-translate-y-1 hover:shadow-xl",
-                    tier === currentTier ? "border-primary/60 shadow-primary/10" : "border-border",
+                    "relative flex flex-col overflow-hidden rounded-[1.75rem] border bg-card p-6 shadow-sm transition-colors",
+                    isCurrent ? "border-primary/60 shadow-primary/10" : "border-border",
+                    !isAvailable && "opacity-65",
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -66,6 +68,18 @@ function BillingPage() {
                     <div>
                       <h2 className="font-display text-xl font-semibold">{plan.name}</h2>
                     </div>
+                    <span
+                      className={cn(
+                        "ml-auto rounded-full px-3 py-1 text-xs font-semibold",
+                        isCurrent
+                          ? "bg-primary/15 text-primary"
+                          : isAvailable
+                            ? "bg-secondary text-foreground"
+                            : "bg-muted text-muted-foreground",
+                      )}
+                    >
+                      {isCurrent ? "Current package" : isAvailable ? "Available" : "Unavailable"}
+                    </span>
                   </div>
                   <div className="mt-7 flex items-baseline gap-1">
                     <span className="font-display text-3xl font-semibold">
@@ -80,13 +94,6 @@ function BillingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Button
-                    disabled
-                    variant="default"
-                    className="mt-8 h-11 w-full rounded-xl"
-                  >
-                    Current plan
-                  </Button>
                 </article>
               );
             },
