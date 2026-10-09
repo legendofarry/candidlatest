@@ -5,11 +5,13 @@ import {
   createUserWithEmailAndPassword,
   getAdditionalUserInfo,
   GoogleAuthProvider,
+  reload,
   signInWithEmailAndPassword,
   signInWithPopup,
   signOut,
   sendPasswordResetEmail,
   sendEmailVerification,
+  updateEmail,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
 import { Eye, EyeOff, Flame, Loader2, ShieldCheck } from "lucide-react";
@@ -198,18 +200,47 @@ function AuthPage() {
       // auth can lose its cross-domain state in modern mobile browsers unless
       // the auth helper is proxied onto this domain. Popup auth avoids that flow.
       const result = await signInWithPopup(firebaseAuth, provider);
-      await result.user.reload();
-      const currentUser = firebaseAuth.currentUser;
-      // Firebase's refreshed user record is the source of truth here. Reading
-      // the just-issued token claim can briefly return stale data on Google
-      // sign-in and incorrectly send a valid account back to the auth screen.
-      if (!currentUser?.email || !currentUser.emailVerified) {
+      const currentUser = result.user;
+      await reload(currentUser);
+
+      // Some OAuth responses expose email on providerData/profile before
+      // Firebase has copied it to the User record.
+      const additionalInfo = getAdditionalUserInfo(result);
+      const profileEmail = additionalInfo?.profile?.["email"];
+      const googleEmail =
+        currentUser.email ??
+        currentUser.providerData.find((item) => item.providerId === "google.com")?.email ??
+        (typeof profileEmail === "string" ? profileEmail : null);
+      if (!googleEmail) {
         await signOut(firebaseAuth);
         throw new Error(
-          "Google did not provide a verified email address. Choose a different Google account and try again.",
+          "Google did not provide an email address. Choose a Google account with an email and try again.",
         );
       }
+
+      if (!currentUser.email) {
+        await updateEmail(currentUser, googleEmail);
+      }
+      await reload(currentUser);
+      await currentUser.getIdToken(true);
+
+      if (!currentUser.emailVerified) {
+        try {
+          await sendEmailVerification(currentUser, verificationActionSettings());
+          window.sessionStorage.setItem("candid:verification-email", "sent");
+          toast.success("Verify your email to finish signing in.");
+        } catch (error) {
+          window.sessionStorage.setItem("candid:verification-email", "failed");
+          console.error("Could not send Google account verification", error);
+          toast.error("Verify your email to continue. You can retry on the verification screen.");
+        }
+        await navigate({ to: "/verify-email" });
+        return;
+      }
+
       const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
+      const state = await fetchOnboardingState({ data: undefined });
+      await navigate({ to: state.needsOnboarding ? "/onboarding" : "/" });
       toast.success(
         isNewUser
           ? "Account created with Google. Your identity stays private."
