@@ -580,8 +580,9 @@ function ContributionsPanel({
                   {items.map((item) => (
                     <Link
                       key={`${item.type}-${item.id}`}
-                      to="/stories/$id"
-                      params={{ id: item.type === "story" ? item.id : (item.storyId ?? "") }}
+                      to={item.type === "story" ? "/post" : "/stories/$id"}
+                      params={item.type === "story" ? undefined : { id: item.storyId ?? "" }}
+                      search={item.type === "story" ? { edit: item.id } : undefined}
                       className="flex items-start gap-3 py-3 first:pt-1 last:pb-1"
                     >
                       <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -594,7 +595,7 @@ function ContributionsPanel({
                       <span className="min-w-0 flex-1">
                         <span className="line-clamp-2 block text-sm font-medium">{item.title}</span>
                         <span className="mt-1 block text-xs capitalize text-muted-foreground">
-                          {item.type} ·{" "}
+                          {item.type}{item.type === "story" ? " · Edit and resubmit for approval" : ""} ·{" "}
                           {item.createdAt
                             ? new Date(item.createdAt).toLocaleDateString("en-KE")
                             : "Date unavailable"}

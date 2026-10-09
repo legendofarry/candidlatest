@@ -20,7 +20,13 @@ import {
 } from "lucide-react";
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { getFilterOptions } from "@/lib/public.functions";
-import { createStory, ensureProfile, findOrCreateCompany } from "@/lib/actions.functions";
+import {
+  createStory,
+  ensureProfile,
+  findOrCreateCompany,
+  getStoryForEdit,
+  updateStory,
+} from "@/lib/actions.functions";
 import { buildStoryDraft } from "@/lib/story-draft";
 import {
   discardEmploymentEvidenceUpload,
@@ -96,6 +102,8 @@ type StoryDraft = {
 };
 
 export const Route = createFileRoute("/post")({
+  validateSearch: (search: Record<string, unknown>): { edit?: string } =>
+    typeof search["edit"] === "string" ? { edit: search["edit"] } : {},
   loader: ({ context }) => context.queryClient.ensureQueryData(filtersQuery),
   head: () => ({
     meta: [
@@ -116,6 +124,7 @@ export const Route = createFileRoute("/post")({
 });
 
 function PostPage() {
+  const { edit: editStoryId } = Route.useSearch();
   const { data: filters } = useSuspenseQuery(filtersQuery);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
@@ -123,6 +132,8 @@ function PostPage() {
   const ensure = useServerFn(ensureProfile);
   const findCompany = useServerFn(findOrCreateCompany);
   const create = useServerFn(createStory);
+  const fetchStoryForEdit = useServerFn(getStoryForEdit);
+  const update = useServerFn(updateStory);
   const issueEvidenceUpload = useServerFn(issueEmploymentEvidenceUpload);
   const discardEvidenceUpload = useServerFn(discardEmploymentEvidenceUpload);
 
@@ -146,6 +157,8 @@ function PostPage() {
   const [evidenceTicketId, setEvidenceTicketId] = useState<string | null>(null);
   const [evidenceError, setEvidenceError] = useState("");
   const [publishError, setPublishError] = useState("");
+  const [editLoading, setEditLoading] = useState(Boolean(editStoryId));
+  const [editLoaded, setEditLoaded] = useState(false);
   const [uploadingEvidence, setUploadingEvidence] = useState(false);
   const uploadLock = useRef(false);
   const uploadAbortController = useRef<AbortController | null>(null);
@@ -156,6 +169,44 @@ function PostPage() {
   const storageFailureNotified = useRef(false);
   const writingAttemptKey = useRef<string | null>(null);
   const storyDraftUserId = user?.uid;
+  const isEditing = Boolean(editStoryId);
+
+  useEffect(() => {
+    if (!editStoryId || !user) {
+      setEditLoading(false);
+      return;
+    }
+    let cancelled = false;
+    setEditLoading(true);
+    void fetchStoryForEdit({ data: { story_id: editStoryId } })
+      .then((story) => {
+        if (cancelled) return;
+        setCompanyName(story.company_name);
+        setIndustry(story.industry ?? "");
+        setCounty(story.county ?? "");
+        setReasons(story.reasons);
+        setTenure(story.tenure ?? "");
+        setRoleLevel(story.role_level ?? "");
+        setPosition(story.position ?? "");
+        setTitle(story.title);
+        setBody(story.body);
+        setWouldReturn(story.would_work_again);
+        setEditLoaded(true);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          const message = error instanceof Error ? error.message : "Could not load this story.";
+          setPublishError(message);
+          toast.error("Could not load story", { description: message });
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setEditLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editStoryId, fetchStoryForEdit, user]);
 
   const generateFromEarlierAnswers = useCallback(() => {
     const draft = buildStoryDraft({
@@ -248,7 +299,7 @@ function PostPage() {
   ]);
 
   useEffect(() => {
-    if (!storyDraftUserId) {
+    if (isEditing || !storyDraftUserId) {
       setDraftReadyForUser(null);
       return;
     }
@@ -303,10 +354,10 @@ function PostPage() {
     } finally {
       setDraftReadyForUser(storyDraftUserId);
     }
-  }, [storyDraftUserId]);
+  }, [isEditing, storyDraftUserId]);
 
   useEffect(() => {
-    if (!storyDraftUserId || draftReadyForUser !== storyDraftUserId || !dirty) return;
+    if (isEditing || !storyDraftUserId || draftReadyForUser !== storyDraftUserId || !dirty) return;
     try {
       window.localStorage.setItem(`candid:story-draft:${storyDraftUserId}`, storyDraftKey);
       setSavedDraftKey(storyDraftKey);
@@ -319,7 +370,7 @@ function PostPage() {
         storageFailureNotified.current = true;
       }
     }
-  }, [draftReadyForUser, dirty, storyDraftKey, storyDraftUserId]);
+  }, [draftReadyForUser, dirty, isEditing, storyDraftKey, storyDraftUserId]);
 
   if (loading) return null;
 
@@ -337,6 +388,10 @@ function PostPage() {
         </Button>
       </div>
     );
+  }
+
+  if (editLoading || (isEditing && !editLoaded && !publishError)) {
+    return <p className="mx-auto max-w-lg py-16 text-center text-sm text-muted-foreground">Loading your story…</p>;
   }
 
   const steps = ["Employer", "What happened", "Your role", "Your story", "Review"];
@@ -505,8 +560,7 @@ function PostPage() {
           ? { note: evidenceNote.trim() || null, upload: uploadedProof }
           : null;
 
-      const result = await create({
-        data: {
+      const storyData = {
           company_id: company.id,
           title: title.trim(),
           body: body.trim(),
@@ -518,18 +572,22 @@ function PostPage() {
           industry: industry || company.industry || null,
           would_work_again: wouldReturn,
           evidence,
-        },
-      });
+        };
+      const result = isEditing
+        ? await update({ data: { ...storyData, story_id: editStoryId! } })
+        : await create({ data: storyData });
 
       clearSavedDraft();
-      if (result.status === "published") {
+      if (!isEditing && result.status === "published") {
         toast.success("Your story is live");
         navigate({ to: "/stories/$id", params: { id: result.id } });
       } else {
-        inbox.info("Story submitted for review", {
-          description: "It will appear in the feed once a moderator approves it.",
+        inbox.info(isEditing ? "Changes submitted for approval" : "Story submitted for review", {
+          description: isEditing
+            ? "Your story is temporarily hidden while a moderator reviews the changes."
+            : "It will appear in the feed once a moderator approves it.",
         });
-        navigate({ to: "/" });
+        navigate({ to: isEditing ? "/profile" : "/" });
       }
     } catch (error) {
       const message = error instanceof Error
@@ -606,7 +664,7 @@ function PostPage() {
           <div className="flex items-start p-4 pt-3 md:h-dvh md:items-center md:overflow-y-auto md:p-8">
             <div className="w-full space-y-6">
               <header>
-                <h1 className="text-3xl font-semibold md:text-4xl">Share your exit story</h1>
+                <h1 className="text-3xl font-semibold md:text-4xl">{isEditing ? "Edit your story" : "Share your exit story"}</h1>
                 <div className="mt-4 flex gap-1.5">
                   {steps.map((label, index) => (
                     <div
@@ -869,7 +927,12 @@ function PostPage() {
 
                   {step === 4 ? (
                     <div className="space-y-4 text-sm">
-                      <h2 className="text-lg font-semibold">Before you publish</h2>
+                      <h2 className="text-lg font-semibold">{isEditing ? "Review your changes" : "Before you publish"}</h2>
+                      {isEditing ? (
+                        <p className="rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
+                          Editing the employer is allowed. Any change will send the full story for moderator approval, and it will be hidden until approved. Existing private evidence, if any, will be retained.
+                        </p>
+                      ) : null}
                       <ul className="space-y-2 text-muted-foreground">
                         <li>
                           · Your Candid handle appears with the story. Your email and legal name are
@@ -883,7 +946,7 @@ function PostPage() {
                           </li>
                       </ul>
 
-                      <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
+                      {!isEditing ? <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
                         <h3 className="flex items-center gap-2 font-semibold">
                           <Lock className="size-4 text-primary" /> Prove you worked there (optional,
                           private)
@@ -1024,7 +1087,7 @@ function PostPage() {
                             </p>
                           ) : null}
                         </div>
-                      </div>
+                      </div> : null}
 
                       <Button
                         className="w-full glow-primary"
@@ -1038,7 +1101,7 @@ function PostPage() {
                         ) : submitting ? (
                           "Screening and publishing…"
                         ) : (
-                          "Publish story"
+                          isEditing ? "Submit changes for approval" : "Publish story"
                         )}
                       </Button>
                       {publishError ? (

@@ -339,6 +339,138 @@ export const createStory = createServerFn({ method: "POST" })
     return { ok: true as const, id: created.id, status: created.status };
   });
 
+export const getStoryForEdit = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ story_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const story = await queryFirst<StoryRecord>("stories", "id", data.story_id);
+    if (!story || story.author_id !== context.userId) {
+      throw new Error("Story not found or you do not have permission to edit it.");
+    }
+    return {
+      id: story.id,
+      company_id: story.company_id,
+      company_name: story.company_name ?? "",
+      title: story.title,
+      body: story.body,
+      reasons: story.reasons ?? [],
+      role_level: story.role_level,
+      position: story.position ?? null,
+      county: story.county,
+      tenure: story.tenure,
+      industry: story.industry,
+      would_work_again: story.would_work_again,
+    };
+  });
+
+export const updateStory = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        story_id: z.string().uuid(),
+        company_id: z.string().uuid(),
+        title: z.string().min(8).max(160),
+        body: z.string().min(60).max(6000),
+        reasons: z.array(z.string().trim().min(2).max(60)).min(1).max(10),
+        role_level: z.string().max(40).nullable().default(null),
+        position: z.string().max(80).nullable().default(null),
+        county: z.string().max(60).nullable().default(null),
+        tenure: z.string().max(40).nullable().default(null),
+        industry: z.string().max(80).nullable().default(null),
+        would_work_again: z.boolean().nullable().default(null),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const db = context.db ?? getFirestoreDb();
+    const storyRef = db.collection("stories").doc(data.story_id);
+    const [storySnapshot, company] = await Promise.all([
+      storyRef.get(),
+      queryFirst<CompanyRecord>("companies", "id", data.company_id),
+    ]);
+    const story = storySnapshot.exists ? (storySnapshot.data() as StoryRecord) : null;
+    if (!story || story.author_id !== context.userId) {
+      throw new Error("Story not found or you do not have permission to edit it.");
+    }
+    if (!company) throw new Error("Company not found");
+
+    const evidenceRef = db.collection("employment_evidence").doc(data.story_id);
+    const evidenceSnapshot = await evidenceRef.get();
+    const existingEvidence = evidenceSnapshot.exists
+      ? (evidenceSnapshot.data() as Record<string, unknown>)
+      : null;
+    const evidencePublicId = existingEvidence?.["cloudinary_public_id"];
+    const evidenceFormat = existingEvidence?.["file_format"];
+    const evidenceBytes = existingEvidence?.["file_bytes"];
+
+    const { screenStory } = await import("./ai.server");
+    const screen = await screenStory({
+      title: data.title.trim(),
+      body: data.body.trim(),
+      evidence:
+        typeof evidencePublicId === "string" &&
+        typeof evidenceFormat === "string" &&
+        typeof evidenceBytes === "number"
+          ? { publicId: evidencePublicId, format: evidenceFormat, bytes: evidenceBytes }
+          : null,
+      evidenceNote:
+        typeof existingEvidence?.["note"] === "string" ? existingEvidence["note"] : null,
+    });
+    const now = new Date().toISOString();
+    const updated = {
+      company_id: company.id,
+      company_name: company.name,
+      company_slug: company.slug,
+      title: data.title.trim(),
+      body: data.body.trim(),
+      reasons: data.reasons,
+      role_level: data.role_level,
+      position: data.position?.trim() || null,
+      county: data.county,
+      tenure: data.tenure,
+      industry: data.industry ?? company.industry,
+      would_work_again: data.would_work_again,
+      status: "pending" as const,
+      moderation_note: screen.summary,
+      evidence_status: existingEvidence
+        ? screen.evidence_assessment === "unavailable" || screen.evidence_assessment === "not_provided"
+          ? "pending_review"
+          : "reviewed"
+        : null,
+      updated_at: now,
+    };
+    const batch = db.batch();
+    batch.update(storyRef, updated);
+    batch.set(db.collection("story_ai_reviews").doc(data.story_id), {
+      id: data.story_id,
+      story_id: data.story_id,
+      decision: screen.decision,
+      verdict: screen.verdict,
+      confidence: screen.confidence,
+      risk_level: screen.risk_level,
+      risk_flags: screen.risk_flags,
+      summary: screen.summary,
+      concerns: screen.concerns,
+      evidence_assessment: screen.evidence_assessment,
+      evidence_summary: screen.evidence_summary,
+      model: screen.model,
+      automated: false,
+      owner_reviewed: false,
+      reviewed_at: null,
+      created_at: now,
+    });
+    if (evidenceSnapshot.exists) {
+      batch.update(evidenceRef, {
+        company_id: company.id,
+        status: "pending_review",
+      });
+    }
+    await batch.commit();
+
+    return { ok: true as const, id: data.story_id, status: "pending" as const };
+  });
+
 export const castVote = createServerFn({ method: "POST" })
   .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
