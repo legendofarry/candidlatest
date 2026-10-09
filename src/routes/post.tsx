@@ -349,11 +349,7 @@ function PostPage() {
     try {
       window.localStorage.setItem(`candid:story-draft:${user.uid}`, storyDraftKey);
       setSavedDraftKey(storyDraftKey);
-      toast.success("Draft saved", {
-        description: evidenceFile || evidenceUpload
-          ? "Saved on this device. Reattach your proof file before publishing."
-          : "Saved on this device. Come back anytime to continue.",
-      });
+      toast.success("Draft saved");
     } catch {
       toast.error("Could not save draft", { description: "Check your device storage and try again." });
     }
@@ -669,15 +665,6 @@ function PostPage() {
                           </div>
                         ) : null}
 
-                        {companyName.trim().length > 1 && matches.length === 0 ? (
-                          <p className="rounded-2xl border border-dashed border-border px-3 py-2 text-xs text-muted-foreground">
-                            Can't find your employer? No problem — posting adds "
-                            <span className="font-medium text-foreground">
-                              {companyName.trim()}
-                            </span>
-                            " to the directory so others can find it too.
-                          </p>
-                        ) : null}
                       </div>
                       <ChipField
                         label="What kind of work do they do? (industry)"

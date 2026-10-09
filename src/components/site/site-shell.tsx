@@ -96,6 +96,7 @@ function nestedTitle(pathname: string) {
       "/post": "Post a story",
       "/support": "Help & support",
       "/settings": "Settings",
+      "/billing": "Billing & packages",
       "/profile": "Your profile",
       "/about": "About Candid",
       "/guidelines": "Community guidelines",
@@ -159,6 +160,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/support",
     "/profile",
     "/settings",
+    "/billing",
     "/onboarding",
     "/verify-email",
   ].includes(pathname);
@@ -484,6 +486,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                       className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-foreground hover:bg-secondary"
                     >
                       <Settings className="size-4" /> Settings
+                    </Link>
+                    <Link
+                      to="/billing"
+                      onClick={() => setUserMenuOpen(false)}
+                      className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-foreground hover:bg-secondary"
+                    >
+                      <Wallet className="size-4" /> Billing &amp; packages
                     </Link>
                     <button
                       type="button"

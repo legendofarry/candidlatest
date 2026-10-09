@@ -14,9 +14,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 const OPTIONS = [
-  { value: "everyone", label: "Everyone", hint: "Any member can start a chat." },
-  { value: "followers", label: "People you follow", hint: "Only accounts you follow." },
-  { value: "nobody", label: "No one", hint: "Chats stay closed." },
+  { value: "everyone", label: "Everyone" },
+  { value: "followers", label: "People you follow" },
+  { value: "nobody", label: "No one" },
 ] as const;
 
 export function PrivacySettings() {
@@ -54,12 +54,7 @@ export function PrivacySettings() {
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
             <MessageSquareLock className="size-4" />
           </span>
-          <div>
-            <p className="text-sm font-medium">Who can message you</p>
-            <p className="text-xs text-muted-foreground">
-              The Candid team can always reach you with important account updates.
-            </p>
-          </div>
+          <p className="text-sm font-medium">Who can message you</p>
         </div>
 
         <div className="grid gap-0 md:grid-cols-3 md:gap-2">
@@ -82,7 +77,6 @@ export function PrivacySettings() {
                   {option.label}
                   {active ? <BadgeCheck className="size-3.5 text-primary" /> : null}
                 </span>
-                <span className="mt-1 block text-xs text-muted-foreground">{option.hint}</span>
               </button>
             );
           })}

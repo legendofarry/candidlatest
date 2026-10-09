@@ -89,10 +89,7 @@ export function FollowedStories() {
               <Bookmark className="size-4" />
             </div>
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium">Your reading list starts here</p>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Follow a story to keep up with new replies and updates.
-              </p>
+              <p className="text-sm font-medium">No saved stories</p>
             </div>
             <Button asChild size="sm" variant="ghost" className="ml-auto">
               <Link to="/">

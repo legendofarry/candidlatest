@@ -250,10 +250,7 @@ export function SupportChat({
                     <div className="mx-auto mb-3 flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
                       <Sparkles className="size-4" />
                     </div>
-                    <p className="text-sm font-semibold">Your conversation starts here</p>
-                    <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
-                      Tell us what you need. Candid’s assistant handles common questions; messages needing a closer look are sent to the team in this private chat.
-                    </p>
+                    <p className="text-sm font-semibold">Start a conversation</p>
                   </div>
                 ) : null}
                 {chat.data?.messages?.map(
@@ -353,9 +350,6 @@ export function SupportChat({
         <span className="hidden pr-1 text-left md:block">
           <span className="block text-sm font-semibold leading-4">
             {open ? "Close chat" : "Chat with us"}
-          </span>
-          <span className="mt-1 block text-[10px] font-medium text-primary-foreground/75">
-            {open ? "Minimize this window" : "We’re here to help"}
           </span>
         </span>
       </Button>

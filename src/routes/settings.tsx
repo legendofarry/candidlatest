@@ -47,7 +47,6 @@ import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
-import { MEMBERSHIP_PLANS } from "@/lib/membership";
 import { clearDevelopmentFirestore, RESET_CONFIRMATION } from "@/lib/developer.functions";
 import {
   AlertDialog,
@@ -241,40 +240,13 @@ function SettingsPage() {
 
             {user ? (
               <SettingsGroup title="Membership">
-                <div className="space-y-4 p-4">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="font-medium">{MEMBERSHIP_PLANS[profile.data?.membership?.tier ?? "basic"].name} plan</p>
-                      <p className="text-xs text-muted-foreground">
-                        {profile.data?.membership?.tier === "basic"
-                          ? "Your account is on Basic. Candid is free while we prepare paid plans."
-                          : profile.data?.membership?.tier === "gold"
-                            ? "Your Gold member badge is included and appears beside your username."
-                            : "Your Premium member badge is included and appears beside your username."}
-                      </p>
-                    </div>
-                    <span className="rounded-full bg-primary/15 px-3 py-1 text-xs font-semibold text-primary">
-                      {profile.data?.membership?.status === "active" ? "Active" : profile.data?.membership?.status ?? "Active"}
-                    </span>
+                <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">{profile.data?.membership?.tier === "gold" ? "Gold" : profile.data?.membership?.tier === "premium" ? "Premium" : "Basic"} plan</p>
                   </div>
-                  <div className="grid gap-2 sm:grid-cols-3">
-                    {(Object.entries(MEMBERSHIP_PLANS) as [keyof typeof MEMBERSHIP_PLANS, (typeof MEMBERSHIP_PLANS)[keyof typeof MEMBERSHIP_PLANS]][]).map(([tier, plan]) => {
-                      const current = (profile.data?.membership?.tier ?? "basic") === tier;
-                      return (
-                        <div key={tier} className={`rounded-xl border p-3 ${current ? "border-primary bg-primary/5" : "border-border"}`}>
-                          <p className="text-sm font-semibold">{plan.name}</p>
-                          <p className="mt-1 text-xs text-muted-foreground">
-                            {plan.priceKes === 0 ? "Free" : `KSh ${plan.priceKes.toLocaleString("en-KE")} ${plan.interval}`}
-                          </p>
-                          <p className="mt-2 text-[11px] text-muted-foreground">
-                            {current
-                              ? tier === "gold" ? "Includes Gold member badge" : tier === "premium" ? "Includes Premium member badge" : "Your current plan"
-                              : "Available later"}
-                          </p>
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <Button asChild variant="outline" size="sm" className="shrink-0 rounded-xl">
+                    <Link to="/billing">View billing &amp; packages</Link>
+                  </Button>
                 </div>
               </SettingsGroup>
             ) : null}
@@ -678,7 +650,6 @@ function Row({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{title}</p>
-        <p className="text-xs text-muted-foreground">{description}</p>
       </div>
       {children}
     </div>

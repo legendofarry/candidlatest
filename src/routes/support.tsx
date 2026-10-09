@@ -109,7 +109,6 @@ function SupportPage() {
                   transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.3 }}
                 >
                   <ShieldCheck className="size-5" />
-                  <span className="text-xs text-white/80">A real person will follow up.</span>
                 </motion.div>
               </div>
             </motion.div>
@@ -164,9 +163,6 @@ function SupportPage() {
               </section>
               <section className="mt-8 border-0 bg-transparent p-0 md:rounded-3xl md:border md:border-border md:bg-card md:p-7">
                 <h2 className="font-display text-2xl font-semibold">Send a support ticket</h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  No account needed. We’ll use your contact details only to respond to this request.
-                </p>
                 {mutation.isSuccess ? (
                   <p className="mt-5 rounded-xl bg-primary/10 p-4 text-sm text-foreground">
                     Thanks — your ticket is with the team. We’ll get back to you as soon as we can.

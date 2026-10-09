@@ -427,10 +427,6 @@ function AuthPage() {
                   </form>
                 </div>
 
-                <p className="mt-6 text-center text-xs leading-5 text-muted-foreground/80">
-                  <ShieldCheck className="mr-1.5 inline size-3.5 -translate-y-px text-primary/80" />
-                  Your email stays private and is never shown to employers.
-                </p>
               </div>
             </div>
           </div>

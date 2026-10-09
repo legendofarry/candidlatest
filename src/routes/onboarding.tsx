@@ -750,20 +750,17 @@ function CandidLensExperience({
               <motion.section key="lens-intro" initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { opacity: 0, y: -8 }} transition={transition} className="w-full max-w-2xl">
                 <p className="mb-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><Sparkles className="size-4" /> A quick check-in</p>
                 <h1 className="max-w-2xl font-display text-4xl font-semibold leading-[1.06] tracking-[-0.04em] sm:text-6xl">What do you look for at work?</h1>
-                <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground sm:text-lg">Five everyday situations. Pick the response that feels right to you. It helps shape the work stories and details Candid brings into view.</p>
                 <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-5">
                   {LENS_SCENARIOS.map((item, index) => <div key={item.label} className="flex min-h-20 flex-col justify-between rounded-xl border border-border/70 bg-card/50 p-3"><span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground">0{index + 1}</span><span className="text-xs font-medium">{item.label.toLowerCase()}</span></div>)}
                 </div>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <Button onClick={onStart} className="h-12 w-full rounded-xl px-6 text-sm sm:w-auto">Start the check-in <ArrowRight className="size-4" /></Button>
-                  <span className="text-center text-xs text-muted-foreground sm:text-left">About 1 minute · no wrong answers</span>
                 </div>
               </motion.section>
             ) : screen === "scenario" && scenario ? (
               <motion.section key={`lens-scenario-${scenarioIndex}`} initial={reducedMotion ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={reducedMotion ? undefined : { opacity: 0, x: -12 }} transition={transition} aria-live="polite" className="w-full max-w-2xl">
                 <p className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><scenario.icon className="size-4" /> {scenario.label}</p>
                 <h1 className="font-display text-[1.75rem] font-semibold leading-[1.18] tracking-[-0.03em] sm:text-4xl">{scenario.text}</h1>
-                <p className="mt-4 text-sm text-muted-foreground">What would you do first?</p>
                 <div className="mt-7 grid gap-3 sm:grid-cols-2">
                   {scenario.choices.map((choice, index) => {
                     const selected = selectedChoice === choice.value;
@@ -773,7 +770,6 @@ function CandidLensExperience({
                     </motion.button>;
                   })}
                 </div>
-                <p className="mt-5 text-xs leading-5 text-muted-foreground">Choose what you’d actually do. Your answer isn’t a test score.</p>
               </motion.section>
             ) : screen === "transition" ? (
               <motion.section key="lens-transition" initial={reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={transition} aria-live="polite" className="flex min-h-64 flex-col justify-center">
@@ -785,13 +781,11 @@ function CandidLensExperience({
               <motion.section key="lens-result" initial={reducedMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={transition} className="w-full max-w-2xl">
                 <p className="mb-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><ShieldCheck className="size-4" /> Your Lens</p>
                 <h1 className="font-display text-4xl font-semibold leading-[1.06] tracking-[-0.04em] sm:text-6xl">We’ll keep an eye on what matters to you.</h1>
-                <p className="mt-5 max-w-xl text-base leading-7 text-muted-foreground">Your choices suggest the parts of work you pay attention to. They help Candid surface relevant stories and practical details.</p>
                 <div className="mt-7 grid gap-2 sm:grid-cols-2">
                   {highlightedInterests.map((item) => <div key={item.key} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/50 px-4 py-3"><span className="size-2 rounded-full bg-primary" /><span className="text-sm font-medium">{item.label}</span></div>)}
                 </div>
                 <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <Button onClick={onContinue} className="h-12 w-full rounded-xl px-6 text-sm sm:w-auto">Continue to your profile <ArrowRight className="size-4" /></Button>
-                  <span className="text-center text-xs text-muted-foreground sm:text-left">This isn’t a score or personality test.</span>
                 </div>
               </motion.section>
             ) : null}
@@ -802,27 +796,22 @@ function CandidLensExperience({
               <div className="rounded-3xl border border-border bg-card/65 p-7">
                 <span className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">What you noticed</span>
                 <div className="mt-7 space-y-5">{LENS_INTEREST_LABELS.map((item) => <div key={item.key}><div className="mb-2 flex justify-between text-sm"><span>{item.label}</span><span className="tabular-nums text-muted-foreground">{interests[item.key]}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-secondary"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, interests[item.key] * 25)}%` }} transition={{ duration: reducedMotion ? 0 : 0.6 }} className="h-full rounded-full bg-primary" /></div></div>)}</div>
-                <p className="mt-7 border-t border-border pt-5 text-xs leading-5 text-muted-foreground">Your answers are saved with your account and used to shape your Candid experience.</p>
               </div>
             ) : screen === "intro" ? (
               <div className="relative overflow-hidden rounded-3xl border border-border bg-card/65 p-7">
                 <div className="absolute -right-12 -top-16 size-48 rounded-full bg-primary/10 blur-3xl" />
-                <span className="relative text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">A little context</span>
                 <p className="relative mt-10 font-display text-3xl font-medium leading-tight">“The small details often tell you the most.”</p>
-                <p className="relative mt-4 text-sm leading-6 text-muted-foreground">This helps tune your Candid experience around the questions you care about.</p>
-                <div className="relative mt-10 flex items-center gap-2 border-t border-border pt-5 text-xs text-muted-foreground"><ShieldCheck className="size-4 text-primary" /> Your answers stay on your account</div>
               </div>
             ) : (
               <div className="rounded-3xl border border-border bg-card/65 p-7">
                 <span className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Your check-in</span>
                 <p className="mt-2 text-sm text-muted-foreground">{answersMade} of 5 answered</p>
                 <div className="mt-6 space-y-3">{LENS_SCENARIOS.map((item, index) => { const answer = answers[`scenario${index + 1}` as keyof LensAnswer]; return <div key={item.label} className="flex items-start gap-3 border-t border-border/70 pt-3"><span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] ${answer ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>{answer ? <Check className="size-3" /> : String(index + 1)}</span><span className="text-xs leading-5 text-muted-foreground">{item.label.toLowerCase()}{index === scenarioIndex ? <span className="ml-2 text-primary">Current</span> : ""}</span></div>; })}</div>
-                <p className="mt-6 border-t border-border pt-5 text-xs leading-5 text-muted-foreground">There are no right answers. Pick the response you’d choose in real life.</p>
               </div>
             )}
           </aside>
         </div>
-        <footer className="flex items-center justify-between border-t border-border/70 py-3 text-[11px] text-muted-foreground"><span>Candid · Kenya</span><span>{screen === "result" ? "Your answers are private" : "No right or wrong answers"}</span></footer>
+        <footer className="border-t border-border/70 py-3 text-[11px] text-muted-foreground">Candid · Kenya</footer>
       </div>
     </main>
   );

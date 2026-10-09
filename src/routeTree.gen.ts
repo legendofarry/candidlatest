@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as BillingRouteImport } from './routes/billing'
 import { Route as DownloadRouteImport } from './routes/download'
 import { Route as GuidelinesRouteImport } from './routes/guidelines'
 import { Route as LeaderboardsRouteImport } from './routes/leaderboards'
@@ -57,6 +58,11 @@ const AboutRoute = AboutRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BillingRoute = BillingRouteImport.update({
+  id: '/billing',
+  path: '/billing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DownloadRoute = DownloadRouteImport.update({
@@ -219,6 +225,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/billing': typeof BillingRoute
   '/download': typeof DownloadRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
@@ -255,6 +262,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/billing': typeof BillingRoute
   '/download': typeof DownloadRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
@@ -291,6 +299,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
+  '/billing': typeof BillingRoute
   '/download': typeof DownloadRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
@@ -329,6 +338,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/auth'
+    | '/billing'
     | '/download'
     | '/guidelines'
     | '/leaderboards'
@@ -365,6 +375,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/auth'
+    | '/billing'
     | '/download'
     | '/guidelines'
     | '/leaderboards'
@@ -400,6 +411,7 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/auth'
+    | '/billing'
     | '/download'
     | '/guidelines'
     | '/leaderboards'
@@ -437,6 +449,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
+  BillingRoute: typeof BillingRoute
   DownloadRoute: typeof DownloadRoute
   GuidelinesRoute: typeof GuidelinesRoute
   LeaderboardsRoute: typeof LeaderboardsRoute
@@ -489,6 +502,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/billing': {
+      id: '/billing'
+      path: '/billing'
+      fullPath: '/billing'
+      preLoaderRoute: typeof BillingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/download': {
@@ -729,6 +749,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
+  BillingRoute: BillingRoute,
   DownloadRoute: DownloadRoute,
   GuidelinesRoute: GuidelinesRoute,
   LeaderboardsRoute: LeaderboardsRoute,

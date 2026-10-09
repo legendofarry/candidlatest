@@ -375,7 +375,7 @@ function ProfilePage() {
                     {verification.data.companyName
                       ? `Your account is recognised as ${verification.data.companyName}.`
                       : "Your account is recognised as official."}{" "}
-                    Request the verified badge. AI checks routine requests; uncertain ones go to Candid review.
+                    Request the verified badge.
                   </p>
                   <Button size="sm" disabled={claiming} onClick={() => void handleClaimBadge()}>
                     Request review
