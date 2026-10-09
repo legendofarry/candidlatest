@@ -237,7 +237,37 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
 
   const toggleReaction = useMutation({
     mutationFn: async (input: { message_id: string; emoji: string }) => react({ data: input }),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["conversation", id] }),
+    onMutate: async ({ message_id, emoji }) => {
+      const queryKey = ["conversation", id] as const;
+      await queryClient.cancelQueries({ queryKey });
+      const previous = queryClient.getQueryData<NonNullable<typeof data>>(queryKey);
+      if (user && previous) {
+        queryClient.setQueryData<NonNullable<typeof data>>(queryKey, {
+          ...previous,
+          messages: previous.messages.map((message) => {
+            if (message.id !== message_id) return message;
+            const reactors = message.reactions?.[emoji] ?? [];
+            const hasReacted = reactors.includes(user.uid);
+            return {
+              ...message,
+              reactions: {
+                ...message.reactions,
+                [emoji]: hasReacted
+                  ? reactors.filter((reactorId) => reactorId !== user.uid)
+                  : [...reactors, user.uid],
+              },
+            };
+          }),
+        });
+      }
+      return { previous, queryKey };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previous) queryClient.setQueryData(context.queryKey, context.previous);
+    },
+    onSettled: (_result, _error, _input, context) => {
+      void queryClient.invalidateQueries({ queryKey: context?.queryKey ?? ["conversation", id] });
+    },
   });
 
   if (error) {
@@ -363,7 +393,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                           <Smile className="size-3.5" />
                         </button>
                       </PopoverTrigger>
-                      <PopoverContent className="w-auto rounded-full p-1.5" align="center">
+                      <PopoverContent className="z-[120] w-auto rounded-full p-1.5" align="center">
                         <div className="flex gap-1">
                           {EMOJI.map((emoji) => (
                             <button
