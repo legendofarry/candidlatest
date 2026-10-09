@@ -185,38 +185,48 @@ export async function markStorySeen(storyId: string, userId: string) {
   return { ok: true };
 }
 
-/** Builds an AI catch-up on everything that happened since the user last looked. */
+/** Builds a chronological follow-up for a story the user follows. */
 export async function buildStoryCatchUp(storyId: string, userId: string) {
   const db = getFirestoreDb();
   const followSnap = await db.collection("story_follows").doc(`${storyId}:${userId}`).get();
-  const record = followSnap.exists ? (followSnap.data() as StoryFollowRecord) : null;
-  const since = record ? new Date(record.last_seen_at).getTime() : 0;
+  if (!followSnap.exists) throw new Error("Follow this story to view its timeline.");
 
-  const [storyDoc, comments] = await Promise.all([
+  const [storyDoc, commentSnap] = await Promise.all([
     db.collection("stories").doc(storyId).get(),
-    readCollection<CommentRecord>("comments"),
+    db.collection("comments").where("story_id", "==", storyId).get(),
   ]);
   const story = storyDoc.exists ? (storyDoc.data() as StoryRecord) : null;
-  const fresh = comments
-    .filter(
-      (comment) => comment.story_id === storyId && new Date(comment.created_at).getTime() > since,
-    )
+  if (!story || story.status !== "published") throw new Error("This story is no longer available.");
+
+  const timeline = commentSnap.docs
+    .map((doc) => doc.data() as CommentRecord)
+    .filter((comment) => comment.status === "published")
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-  if (fresh.length === 0) {
-    return {
-      since: record?.last_seen_at ?? null,
-      newCount: 0,
-      summary: "Nothing new since you last checked in on this story.",
-    };
-  }
-
   const { summarizeStoryActivity } = await import("./ai.server");
-  const summary = await summarizeStoryActivity({
+  const summary = timeline.length
+    ? await summarizeStoryActivity({
     title: story?.title ?? "This story",
     body: story?.body ?? "",
-    comments: fresh.slice(0, 40).map((comment) => comment.body),
-  });
+    comments: timeline.slice(-40).map((comment) => comment.body),
+  })
+    : "The story has been shared, and there are no published replies yet.";
 
-  return { since: record?.last_seen_at ?? null, newCount: fresh.length, summary };
+  return {
+    story: {
+      title: story.title,
+      body: story.body,
+      created_at: story.created_at,
+      company_name: story.company_name,
+    },
+    summary,
+    timeline: timeline.map((comment) => ({
+      id: comment.id,
+      body: comment.body,
+      created_at: comment.created_at,
+      official: Boolean(comment.is_official),
+    })),
+    totalUpdates: timeline.length,
+    latestUpdateAt: timeline.at(-1)?.created_at ?? story.created_at,
+  };
 }

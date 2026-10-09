@@ -263,7 +263,7 @@ export async function researchCompany(input: {
   }
 }
 
-/** Short catch-up on what changed in a story thread since the reader last looked. */
+/** Short chronological recap of how a story thread has developed. */
 export async function summarizeStoryActivity(input: {
   title: string;
   body: string;
@@ -273,7 +273,7 @@ export async function summarizeStoryActivity(input: {
 
   const key = process.env["OPENROUTER_API_KEY"];
   if (!key) {
-    return `${input.comments.length} new ${input.comments.length === 1 ? "comment" : "comments"} since you last checked in.`;
+    return `The original story is followed by ${input.comments.length} published ${input.comments.length === 1 ? "reply" : "replies"}.`;
   }
 
   const gateway = createOpenRouterProvider(key);
@@ -281,14 +281,14 @@ export async function summarizeStoryActivity(input: {
     const { text } = await generateText({
       model: gateway(AI_MODEL),
       system:
-        "You summarise new activity on a Kenyan workplace story thread for someone who already read the story. Write 2-3 short sentences starting from what has changed since they last looked. Neutral, factual, no names of individuals, no advice, under 60 words.",
-      prompt: `Story title: ${input.title}\n\nStory: ${input.body.slice(0, 1200)}\n\nNew comments since the reader last looked:\n${input.comments
+        "You recap a Kenyan workplace story thread from its beginning to its latest supplied reply. Write 2-3 short sentences in chronological order, covering the original experience and how the discussion developed. Stay neutral and factual; do not name individuals or give advice. Under 60 words.",
+      prompt: `Story title: ${input.title}\n\nOriginal story: ${input.body.slice(0, 1200)}\n\nPublished replies in chronological order:\n${input.comments
         .map((comment, index) => `${index + 1}. ${comment}`)
         .join("\n")}`,
     });
     return text.trim();
   } catch (error) {
     console.error("[summarizeStoryActivity]", error);
-    return `${input.comments.length} new ${input.comments.length === 1 ? "comment" : "comments"} since you last checked in.`;
+    return `The original story is followed by ${input.comments.length} published ${input.comments.length === 1 ? "reply" : "replies"}.`;
   }
 }
