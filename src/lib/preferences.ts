@@ -35,7 +35,6 @@ const DEFAULTS: Preferences = {
 };
 
 let state: Preferences = DEFAULTS;
-let hydrated = false;
 const listeners = new Set<() => void>();
 
 function emit() {
@@ -57,8 +56,7 @@ function read(): Preferences {
 }
 
 export function hydratePreferences() {
-  if (typeof window === "undefined" || hydrated) return;
-  hydrated = true;
+  if (typeof window === "undefined") return;
   state = read();
   applySideEffects(state);
   emit();

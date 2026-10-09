@@ -48,7 +48,7 @@ import { getOnboardingState } from "@/lib/onboarding.functions";
 import { getInvestigationHoldState } from "@/lib/account-access.functions";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
-import { setPreference, usePreferences } from "@/lib/preferences";
+import { hydratePreferences, setPreference, usePreferences } from "@/lib/preferences";
 import { MessagesInbox } from "@/routes/messages.index";
 import { MessagesThread } from "@/routes/messages.$id";
 import {
@@ -131,6 +131,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const [mechanicEggOpen, setMechanicEggOpen] = useState(false);
   const brandTapTimer = useRef<number | null>(null);
   const prefs = usePreferences();
+
+  useEffect(() => {
+    hydratePreferences();
+  }, []);
   const canLock = Boolean(user && prefs.biometricUnlock && hasCredentialFor(user.uid));
   const fetchProfile = useServerFn(getOnboardingState);
   const { data: accountProfile } = useQuery({

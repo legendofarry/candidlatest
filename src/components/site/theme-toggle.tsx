@@ -11,7 +11,10 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       aria-label="Toggle theme"
-      onClick={() => setPreference("theme", dark ? "light" : "dark")}
+      onClick={() => {
+        const appliedDark = document.documentElement.classList.contains("dark");
+        setPreference("theme", appliedDark ? "light" : "dark");
+      }}
     >
       {dark ? <Sun className="size-4" /> : <Moon className="size-4" />}
     </Button>
