@@ -125,7 +125,7 @@ function RootShell({ children }: { children: ReactNode }) {
         <HeadContent />
         <script
           dangerouslySetInnerHTML={{
-            __html: `try{var saved=JSON.parse(localStorage.getItem("candid_preferences")||"{}");var theme=localStorage.getItem("lo-theme")||saved.theme;var dark=theme!=="light";document.documentElement.classList.toggle("dark",dark);var color=document.querySelector('meta[name="theme-color"]');if(color)color.setAttribute("content",dark?"#08070e":"#fbfafc")}catch{document.documentElement.classList.add("dark")}`,
+            __html: `try{var saved=JSON.parse(localStorage.getItem("candid_preferences")||"{}");var theme=saved.theme||localStorage.getItem("lo-theme");var dark=theme!=="light";document.documentElement.classList.toggle("dark",dark);var color=document.querySelector('meta[name="theme-color"]');if(color)color.setAttribute("content",dark?"#08070e":"#fbfafc")}catch{document.documentElement.classList.add("dark")}`,
           }}
         />
       </head>

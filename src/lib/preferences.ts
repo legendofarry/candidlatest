@@ -47,7 +47,9 @@ function read(): Preferences {
   try {
     const stored = localStorage.getItem(KEY);
     const parsed = stored ? (JSON.parse(stored) as Partial<Preferences>) : {};
-    const theme = (localStorage.getItem(THEME_KEY) as Preferences["theme"] | null) ?? parsed.theme;
+    // Prefer the current preferences object. The legacy theme key can be stale
+    // from an older build and must only be used as a migration fallback.
+    const theme = parsed.theme ?? localStorage.getItem(THEME_KEY);
     return { ...DEFAULTS, ...parsed, theme: theme === "light" ? "light" : "dark" };
   } catch {
     return DEFAULTS;
