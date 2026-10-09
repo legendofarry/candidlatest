@@ -12,10 +12,12 @@ import {
   Loader2,
   MessageCircle,
   Sparkles,
+  X as CloseIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
@@ -192,18 +194,32 @@ export function FollowedStories() {
           }
         }}
       >
-        <DialogContent className="!fixed !inset-0 !left-0 !top-0 !grid !h-[100dvh] !w-screen !max-w-none !translate-x-0 !translate-y-0 !grid-rows-[auto_minmax(0,1fr)_auto] !gap-0 !overflow-hidden !rounded-none !border-0 !p-0">
-          <DialogHeader className="border-b border-border bg-background/95 px-5 py-4 pr-14 text-left shadow-sm backdrop-blur sm:px-8 sm:py-5 sm:pr-16">
-            <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
-              Story follow-up
-            </p>
-            <DialogTitle className="mt-1 line-clamp-2 text-base sm:text-xl">
-              {storyTimeline?.data.story.title ?? selectedStory?.title ?? "Loading story…"}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              {storyTimeline?.data.story.company_name ?? selectedStory?.company_name ?? "Your followed story"}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent
+          hideCloseButton
+          className="!fixed !inset-0 !left-0 !top-0 !grid !h-[100dvh] !w-screen !max-w-none !translate-x-0 !translate-y-0 !grid-rows-[auto_minmax(0,1fr)_auto] !gap-0 !overflow-hidden !rounded-none !border-0 !p-0"
+        >
+          <div className="relative border-b border-border bg-background/95 px-5 py-4 pr-16 shadow-sm backdrop-blur sm:px-8 sm:py-5 sm:pr-20">
+            <DialogHeader className="text-left">
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                Story follow-up
+              </p>
+              <DialogTitle className="mt-1 line-clamp-2 text-base sm:text-xl">
+                {storyTimeline?.data.story.title ?? selectedStory?.title ?? "Loading story…"}
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                {storyTimeline?.data.story.company_name ?? selectedStory?.company_name ?? "Your followed story"}
+              </DialogDescription>
+            </DialogHeader>
+            <DialogClose asChild>
+              <button
+                type="button"
+                className="absolute right-4 top-1/2 flex min-h-11 -translate-y-1/2 items-center gap-2 rounded-full border border-border bg-background px-3 text-sm font-medium shadow-sm transition hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:right-6"
+              >
+                <CloseIcon className="size-4" />
+                <span>Close</span>
+              </button>
+            </DialogClose>
+          </div>
 
           <div className="overflow-y-auto overscroll-contain">
             <div className="mx-auto w-full max-w-3xl space-y-5 px-5 py-6 sm:px-8 sm:py-9">

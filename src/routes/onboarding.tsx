@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
+  AlertCircle,
   AtSign,
   BriefcaseBusiness,
   Check,
@@ -223,6 +224,7 @@ function OnboardingPage() {
     website: "",
   });
   const [saving, setSaving] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const requestId = useRef(0);
 
   useEffect(() => {
@@ -363,11 +365,19 @@ function OnboardingPage() {
   async function submit() {
     if (status !== "available") return;
     setSaving(true);
+    setSubmitError(null);
     try {
+      if (!user) {
+        navigate({ to: "/auth" });
+        return;
+      }
+      // Refresh claims before the server checks the verified-email requirement.
+      await user.getIdToken(true);
+      const lensComplete = Object.values(lensAnswers).filter(Boolean).length === 5;
       const result = await complete({
         data: {
           username: username.trim().toLowerCase(),
-          candidLens: lensSkipped
+          candidLens: lensSkipped || !lensComplete
             ? emptyLensData(true)
             : {
                 completed: true,
@@ -400,7 +410,13 @@ function OnboardingPage() {
       toast.success(`Welcome, @${username.trim().toLowerCase()}`);
       navigate({ to: "/" });
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save your username");
+      const reason = error instanceof Error ? error.message : "Could not save your username";
+      if (/verify your email|email verification required/i.test(reason)) {
+        navigate({ to: "/verify-email" });
+      } else {
+        setSubmitError(reason);
+        toast.error(reason);
+      }
     } finally {
       setSaving(false);
     }
@@ -670,6 +686,16 @@ function OnboardingPage() {
                   </motion.div>
                 ))}
               </div>
+
+              {submitError ? (
+                <div
+                  role="alert"
+                  className="mt-4 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-sm text-danger"
+                >
+                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                  <p className="min-w-0 break-words">{submitError}</p>
+                </div>
+              ) : null}
 
               <Button className="mt-6 w-full glow-primary" disabled={saving} onClick={submit}>
                 {saving ? <Loader2 className="size-4 animate-spin" /> : null}
