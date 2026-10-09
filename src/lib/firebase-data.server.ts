@@ -127,6 +127,7 @@ export type CommentRecord = {
   author_id: string | null;
   author_handle: string;
   author_username?: string | null;
+  author_photo_url?: string | null;
   author_verified?: boolean;
   author_membership_tier?: "basic" | "premium" | "gold";
   is_official?: boolean;
@@ -136,6 +137,7 @@ export type CommentRecord = {
 
 export type PublicComment = CommentRecord & {
   author_username: string | null;
+  author_photo_url: string | null;
   author_membership_tier: "basic" | "premium" | "gold";
   author_verified: boolean;
   is_official: boolean;
@@ -674,6 +676,7 @@ export async function getStoryView(id: string) {
     return {
       ...comment,
       author_username: comment.author_username ?? profile?.username ?? null,
+      author_photo_url: comment.author_photo_url ?? profile?.photo_url ?? null,
       author_membership_tier: membershipBadgeTier(profile),
       author_verified: comment.author_verified ?? verification?.badge_status === "claimed",
       is_official: official,

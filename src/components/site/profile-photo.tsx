@@ -24,10 +24,12 @@ export function ProfileAvatar({
   photoUrl,
   initials,
   className = "",
+  fallbackClassName = "",
 }: {
   photoUrl?: string | null | undefined;
   initials: string;
   className?: string;
+  fallbackClassName?: string;
 }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [photoUrl]);
@@ -41,7 +43,7 @@ export function ProfileAvatar({
   ) : (
     <span
       aria-hidden="true"
-      className={`flex aspect-square items-center justify-center rounded-full bg-primary/15 font-semibold text-primary ${className}`}
+      className={`flex aspect-square items-center justify-center rounded-full bg-primary/15 font-semibold text-primary ${className} ${fallbackClassName}`}
     >
       {initials || "?"}
     </span>

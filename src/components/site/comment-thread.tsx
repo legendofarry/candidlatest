@@ -26,6 +26,7 @@ import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { ProfileAvatar } from "@/components/site/profile-photo";
 import type { MembershipTier } from "@/lib/membership";
 
 export type ThreadComment = {
@@ -34,6 +35,7 @@ export type ThreadComment = {
   created_at: string;
   author_handle: string;
   author_username: string | null;
+  author_photo_url?: string | null;
   author_verified: boolean;
   author_membership_tier?: MembershipTier;
   is_official: boolean;
@@ -310,16 +312,17 @@ function CommentRow({
       style={{ marginLeft: depth > 0 ? Math.min(depth, 3) * 16 : 0 }}
     >
       <div className="flex gap-3">
-        <span
-          className={cn(
-            "mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-full text-xs font-semibold",
+        <ProfileAvatar
+          photoUrl={comment.author_photo_url}
+          initials={initial}
+          className={cn("mt-0.5 size-8 shrink-0 text-xs", comment.is_official && "ring-2 ring-primary/25")}
+          fallbackClassName={cn(
+            "text-xs",
             comment.is_official
               ? "bg-primary text-primary-foreground"
               : "bg-secondary text-foreground",
           )}
-        >
-          {initial}
-        </span>
+        />
 
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-1.5 text-xs">
