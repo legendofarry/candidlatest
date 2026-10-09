@@ -24,6 +24,7 @@ import {
   ShieldCheck,
   Sun,
   Trash2,
+  DatabaseZap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -46,6 +47,17 @@ import { firebaseAuth } from "@/integrations/firebase/client";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
 import { MEMBERSHIP_PLANS } from "@/lib/membership";
+import { clearDevelopmentFirestore, RESET_CONFIRMATION } from "@/lib/developer.functions";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -65,7 +77,12 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const [bioAvailable, setBioAvailable] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
+  const [developerResetOpen, setDeveloperResetOpen] = useState(false);
+  const [developerResetText, setDeveloperResetText] = useState("");
+  const [developerResetting, setDeveloperResetting] = useState(false);
   const fetchProfile = useServerFn(getOnboardingState);
+  const resetFirestore = useServerFn(clearDevelopmentFirestore);
+  const developerMode = import.meta.env.DEV || import.meta.env["VITE_DEVELOPER_MODE"] === "true";
   const profile = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
@@ -96,6 +113,26 @@ function SettingsPage() {
       });
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not enable biometric unlock");
+    }
+  }
+
+  async function clearDevelopmentDatabase() {
+    if (developerResetting || developerResetText !== RESET_CONFIRMATION) return;
+    setDeveloperResetting(true);
+    try {
+      const result = await resetFirestore({ data: { confirmation: RESET_CONFIRMATION } });
+      clearPersistedQueries();
+      storageService.clearCache();
+      queryClient.clear();
+      setDeveloperResetOpen(false);
+      setDeveloperResetText("");
+      notify.success(`Cleared ${result.deleted.toLocaleString()} Firestore document${result.deleted === 1 ? "" : "s"}.`);
+      await firebaseAuth.signOut();
+      await navigate({ to: "/auth" });
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not clear the development database.");
+    } finally {
+      setDeveloperResetting(false);
     }
   }
 
@@ -400,6 +437,21 @@ function SettingsPage() {
                   </SettingsGroup>
                 </div>
 
+                {developerMode ? (
+                  <div id="developer-tools">
+                    <SettingsGroup title="Developer tools">
+                      <ActionRow
+                        icon={<DatabaseZap className="size-4" />}
+                        title="Clear Firestore development data"
+                        description="Deletes every Firestore document, including profiles, stories and messages. Firebase Authentication accounts and uploaded files are not deleted."
+                        actionLabel="Clear database"
+                        destructive
+                        onClick={() => setDeveloperResetOpen(true)}
+                      />
+                    </SettingsGroup>
+                  </div>
+                ) : null}
+
                 <Button asChild variant="outline" className="w-full">
                   <Link to="/profile">View profile</Link>
                 </Button>
@@ -408,6 +460,42 @@ function SettingsPage() {
           </motion.div>
         </section>
       </div>
+      <AlertDialog
+        open={developerResetOpen}
+        onOpenChange={(open) => {
+          setDeveloperResetOpen(open);
+          if (!open && !developerResetting) setDeveloperResetText("");
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Clear all Firestore development data?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes every Firestore document. Firebase Authentication accounts and Cloudinary uploads are not included. Type <strong>{RESET_CONFIRMATION}</strong> to continue.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <Input
+            value={developerResetText}
+            onChange={(event) => setDeveloperResetText(event.target.value)}
+            placeholder={RESET_CONFIRMATION}
+            autoComplete="off"
+            disabled={developerResetting}
+          />
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={developerResetting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={developerResetText !== RESET_CONFIRMATION || developerResetting}
+              onClick={(event) => {
+                event.preventDefault();
+                void clearDevelopmentDatabase();
+              }}
+            >
+              {developerResetting ? "Clearing…" : "Clear Firestore"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

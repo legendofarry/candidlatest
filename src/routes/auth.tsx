@@ -101,7 +101,9 @@ function AuthPage() {
   const fetchOnboardingState = useServerFn(getOnboardingState);
 
   useEffect(() => {
-    if (authLoading || !user) return;
+    // Do not redirect while a provider popup is still completing. Firebase emits
+    // an auth-state update before Google profile data and token claims settle.
+    if (authLoading || !user || busy) return;
     if (!user.email) {
       // Firebase can technically create a Google-linked user without an email
       // when the provider response is incomplete. Candid cannot safely use it.
@@ -198,11 +200,10 @@ function AuthPage() {
       const result = await signInWithPopup(firebaseAuth, provider);
       await result.user.reload();
       const currentUser = firebaseAuth.currentUser;
-      const token = currentUser ? await currentUser.getIdTokenResult(true) : null;
-      const hasVerifiedGoogleEmail = Boolean(
-        currentUser?.email && token?.claims.email_verified === true,
-      );
-      if (!hasVerifiedGoogleEmail) {
+      // Firebase's refreshed user record is the source of truth here. Reading
+      // the just-issued token claim can briefly return stale data on Google
+      // sign-in and incorrectly send a valid account back to the auth screen.
+      if (!currentUser?.email || !currentUser.emailVerified) {
         await signOut(firebaseAuth);
         throw new Error(
           "Google did not provide a verified email address. Choose a different Google account and try again.",

@@ -138,11 +138,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     enabled: Boolean(user) && !needsEmailVerification,
   });
   const fetchInvestigationHold = useServerFn(getInvestigationHoldState);
-  const {
-    data: investigationState,
-    isLoading: checkingInvestigation,
-    isError: investigationCheckFailed,
-  } = useQuery({
+  const { data: investigationState } = useQuery({
     queryKey: ["investigation-hold", user?.uid ?? null],
     queryFn: () => fetchInvestigationHold(),
     enabled: Boolean(user),
@@ -270,27 +266,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }
 
   const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
-
-  if (user && !investigationState && (checkingInvestigation || investigationCheckFailed)) {
-    return (
-      <main className="fixed inset-0 z-[100] flex min-h-dvh items-center justify-center bg-background px-6 text-foreground">
-        <div className="text-center">
-          <Flame className="mx-auto size-8 animate-pulse text-primary" />
-          <p className="mt-5 font-display text-xl font-semibold">Checking account access</p>
-          <p className="mt-2 max-w-sm text-sm text-muted-foreground">
-            {investigationCheckFailed ? "We couldn’t confirm access right now. Sign out and try again later." : "One moment while Candid checks your account."}
-          </p>
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            className="mt-7 inline-flex min-h-11 items-center justify-center gap-2 rounded-full border border-border px-6 font-medium transition hover:bg-muted"
-          >
-            <LogOut className="size-4" /> Sign out
-          </button>
-        </div>
-      </main>
-    );
-  }
 
   if (user && investigationState?.active) {
     return (

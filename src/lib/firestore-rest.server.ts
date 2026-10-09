@@ -415,6 +415,17 @@ export class Firestore {
   collection(name: string) {
     return new CollectionReference(this, name);
   }
+
+  /** Lists direct child collections for the database root or a document path. */
+  async listCollectionIds(documentPath?: string) {
+    const path = documentPath ? `/${documentPath}:listCollectionIds` : ":listCollectionIds";
+    const result = (await this.request(path, {
+      method: "POST",
+      body: JSON.stringify({ pageSize: 100 }),
+    })) as { collectionIds?: string[] };
+    return result.collectionIds ?? [];
+  }
+
   batch() {
     return new WriteBatch(this);
   }
