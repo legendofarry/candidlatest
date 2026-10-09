@@ -78,7 +78,8 @@ export async function toggleStoryLike(storyId: string, userId: string) {
   const ref = db.collection("story_likes").doc(`${storyId}:${userId}`);
   const storyRef = db.collection("stories").doc(storyId);
   const [snap, storySnap] = await Promise.all([ref.get(), storyRef.get()]);
-  const current = Number((storySnap.data() as { likes?: number } | undefined)?.likes ?? 0);
+  const story = storySnap.data() as { likes?: number; author_id?: string | null; title?: string } | undefined;
+  const current = Number(story?.likes ?? 0);
 
   if (snap.exists) {
     await ref.delete();
@@ -95,6 +96,25 @@ export async function toggleStoryLike(storyId: string, userId: string) {
   };
   await ref.set(record);
   await storyRef.update({ likes: current + 1 });
+
+  if (story?.author_id && story.author_id !== userId) {
+    try {
+      const [{ pushServerNotification }, actorSnap] = await Promise.all([
+        import("./notifications.server"),
+        db.collection("profiles").doc(userId).get(),
+      ]);
+      const actor = (actorSnap.data() as { username?: string | null } | undefined)?.username;
+      await pushServerNotification({
+        userId: story.author_id,
+        kind: "info",
+        title: "Your story got a like",
+        description: `${actor ? `@${actor}` : "Someone"} liked “${story.title ?? "your story"}”.`,
+        link: `/stories/${storyId}`,
+      });
+    } catch (error) {
+      console.error("[toggleStoryLike] author notification failed", error);
+    }
+  }
   return { liked: true, likes: current + 1 };
 }
 

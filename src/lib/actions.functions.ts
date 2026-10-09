@@ -353,6 +353,18 @@ export const castVote = createServerFn({ method: "POST" })
     const field = data.kind === "up" ? "upvotes" : "metoo";
     const storySnap = await storyRef.get();
     const currentStory = storySnap.exists ? storySnap.data() : null;
+    const parentCommentSnap = data.parent_id
+      ? await db.collection("comments").doc(data.parent_id).get()
+      : null;
+    const parentComment = parentCommentSnap?.exists ? parentCommentSnap.data() : null;
+    if (
+      data.parent_id &&
+      (!parentComment ||
+        parentComment["story_id"] !== data.story_id ||
+        parentComment["status"] !== "published")
+    ) {
+      throw new Error("That comment is no longer available to reply to.");
+    }
 
     if (existing.exists) {
       await voteRef.delete();
@@ -423,27 +435,61 @@ export const addComment = createServerFn({ method: "POST" })
       });
     await storyRef.update({ comment_count: Number(currentStory?.["comment_count"] ?? 0) + 1 });
 
-    // Notify @mentioned users (deep link scrolls to and expands this comment).
+    // Notify the story author and the parent-comment author about new replies.
     try {
-      const { resolveMentionedUserIds, pushServerNotification } =
-        await import("./notifications.server");
-      const mentioned = await resolveMentionedUserIds(data.body, context.userId);
+      const { pushServerNotification, resolveMentionedUserIds } = await import("./notifications.server");
       const authorName = profile?.username ? `@${profile.username}` : "Someone";
       const storyTitle =
         typeof currentStory?.["title"] === "string" ? currentStory["title"] : "a story";
+      const targets = new Map<string, { title: string; description: string }>();
+      const storyAuthorId =
+        typeof currentStory?.["author_id"] === "string" ? currentStory["author_id"] : null;
+      const parentAuthorId =
+        typeof parentComment?.["author_id"] === "string" ? parentComment["author_id"] : null;
+      if (storyAuthorId && storyAuthorId !== context.userId) {
+        targets.set(storyAuthorId, {
+          title: "New reply on your story",
+          description: `${authorName} commented on “${storyTitle}”.`,
+        });
+      }
+      if (parentAuthorId && parentAuthorId !== context.userId) {
+        targets.set(parentAuthorId, {
+          title: "Someone replied to your comment",
+          description: `${authorName} replied in “${storyTitle}”.`,
+        });
+      }
       await Promise.all(
-        mentioned.map((userId) =>
+        [...targets].map(([userId, notification]) =>
           pushServerNotification({
             userId,
             kind: "info",
-            title: `${authorName} mentioned you`,
-            description: `In a comment on “${storyTitle}”`,
+            title: notification.title,
+            description: notification.description,
             link: `/stories/${data.story_id}?comment=${commentId}`,
           }),
         ),
       );
+      let mentioned: string[] = [];
+      try {
+        mentioned = await resolveMentionedUserIds(data.body, context.userId);
+      } catch (error) {
+        console.error("[addComment] mention lookup failed", error);
+      }
+      await Promise.all(
+        mentioned
+          .filter((userId) => !targets.has(userId))
+          .map((userId) =>
+            pushServerNotification({
+              userId,
+              kind: "info",
+              title: `${authorName} mentioned you`,
+              description: `In a comment on “${storyTitle}”`,
+              link: `/stories/${data.story_id}?comment=${commentId}`,
+            }),
+          ),
+      );
     } catch (error) {
-      console.error("[addComment] mention notifications failed", error);
+      console.error("[addComment] comment notifications failed", error);
     }
 
     return { ok: true, id: commentId };
@@ -458,7 +504,10 @@ export const likeComment = createServerFn({ method: "POST" })
     const likeRef = db.collection("comment_likes").doc(`${data.comment_id}:${context.userId}`);
     const commentRef = db.collection("comments").doc(data.comment_id);
     const [likeSnap, commentSnap] = await Promise.all([likeRef.get(), commentRef.get()]);
-    const current = Number((commentSnap.data() as { likes?: number } | undefined)?.likes ?? 0);
+    const comment = commentSnap.data() as
+      | { likes?: number; author_id?: string | null; story_id?: string; body?: string }
+      | undefined;
+    const current = Number(comment?.likes ?? 0);
 
     if (likeSnap.exists) {
       await likeRef.delete();
@@ -472,6 +521,27 @@ export const likeComment = createServerFn({ method: "POST" })
       created_at: new Date().toISOString(),
     });
     await commentRef.update({ likes: current + 1 });
+
+    if (comment?.author_id && comment.author_id !== context.userId) {
+      try {
+        const [{ pushServerNotification }, actorSnap, storySnap] = await Promise.all([
+          import("./notifications.server"),
+          db.collection("profiles").doc(context.userId).get(),
+          comment.story_id ? db.collection("stories").doc(comment.story_id).get() : Promise.resolve(null),
+        ]);
+        const actor = (actorSnap.data() as { username?: string | null } | undefined)?.username;
+        const story = storySnap?.data() as { title?: string } | undefined;
+        await pushServerNotification({
+          userId: comment.author_id,
+          kind: "info",
+          title: "Your comment got a like",
+          description: `${actor ? `@${actor}` : "Someone"} liked your comment${story?.title ? ` on “${story.title}”` : ""}.`,
+          link: comment.story_id ? `/stories/${comment.story_id}?comment=${data.comment_id}` : null,
+        });
+      } catch (error) {
+        console.error("[likeComment] author notification failed", error);
+      }
+    }
     return { liked: true, likes: current + 1 };
   });
 
