@@ -58,6 +58,7 @@ export type ProfileRecord = {
   subscription_provider?: string | null;
   subscription_started_at?: string | null;
   subscription_period_ends_at?: string | null;
+  subscription_switch_unlocked?: boolean;
   investigation_hold?: boolean | { active?: boolean; started_at?: string | null; updated_at?: string | null } | null;
 };
 

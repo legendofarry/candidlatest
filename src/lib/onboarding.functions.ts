@@ -61,6 +61,8 @@ export const getOnboardingState = createServerFn({ method: "POST" })
         provider: profile?.subscription_provider ?? null,
         startedAt: profile?.subscription_started_at ?? null,
         periodEndsAt: profile?.subscription_period_ends_at ?? null,
+        switchUnlocked:
+          profile?.subscription_switch_unlocked === true || profile?.subscription_tier === "gold",
       },
     };
   });

@@ -1,10 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { BadgeCheck, Check, Flame, Sparkles, WalletCards } from "lucide-react";
 import { getOnboardingState } from "@/lib/onboarding.functions";
+import { switchMyMembership } from "@/lib/membership.functions";
 import { MEMBERSHIP_PLANS, type MembershipTier } from "@/lib/membership";
 import { useAuth } from "@/hooks/useAuth";
+import { notify } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/billing")({
@@ -25,13 +27,26 @@ const FEATURES: Record<MembershipTier, string[]> = {
 
 function BillingPage() {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const fetchProfile = useServerFn(getOnboardingState);
+  const switchPackage = useServerFn(switchMyMembership);
+  const switchMutation = useMutation({
+    mutationFn: (tier: MembershipTier) => switchPackage({ data: { tier } }),
+    onSuccess: async (result) => {
+      await queryClient.invalidateQueries();
+      notify.success(result.changed ? `Switched to ${MEMBERSHIP_PLANS[result.tier].name}` : "You’re already on this package");
+    },
+    onError: (error) => {
+      notify.error(error instanceof Error ? error.message : "Could not change your package");
+    },
+  });
   const profile = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
     enabled: Boolean(user),
   });
   const currentTier = profile.data?.membership?.tier ?? "basic";
+  const canSwitchPackages = profile.data?.membership?.switchUnlocked ?? currentTier === "gold";
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -50,7 +65,7 @@ function BillingPage() {
             .map(
             ([tier, plan]) => {
               const isCurrent = tier === currentTier;
-              const isAvailable = tier === "basic" || isCurrent;
+              const isAvailable = tier === "basic" || isCurrent || canSwitchPackages;
 
               return (
                 <article
@@ -94,6 +109,21 @@ function BillingPage() {
                       </li>
                     ))}
                   </ul>
+                  <Button
+                    type="button"
+                    disabled={isCurrent || !isAvailable || switchMutation.isPending}
+                    variant={isCurrent ? "outline" : "default"}
+                    className="mt-8 h-11 w-full rounded-xl"
+                    onClick={() => switchMutation.mutate(tier)}
+                  >
+                    {switchMutation.isPending && switchMutation.variables === tier
+                      ? "Switching…"
+                      : isCurrent
+                        ? "Current package"
+                        : isAvailable
+                          ? `Switch to ${plan.name}`
+                          : "Unavailable"}
+                  </Button>
                 </article>
               );
             },
