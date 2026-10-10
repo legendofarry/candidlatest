@@ -225,9 +225,12 @@ export function ProfilePhotoPicker({
           <DialogHeader>
             <DialogTitle>{file ? "Update profile photo" : "Profile photo"}</DialogTitle>
             <DialogDescription>
-              {file ? "Check the preview, then upload it to your profile." : "View your current photo or choose a new one."}
+              {file ? "Check the preview, then decide whether to upload it." : "View your current photo or choose a new one."}
             </DialogDescription>
           </DialogHeader>
+          <p role="note" className="rounded-xl border border-border bg-secondary/50 p-3 text-sm leading-relaxed text-muted-foreground">
+            Your profile photo is public and appears beside your posts and comments. A real photo could make you recognizable even when you use an alias. Adding a photo is optional; you can use an illustration or leave it blank.
+          </p>
           <div className="flex flex-col items-center gap-4 py-2">
             <ProfileAvatar
               photoUrl={previewUrl ?? photoUrl}
@@ -278,8 +281,11 @@ export function ProfilePhotoPicker({
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>Profile photo</DialogTitle>
-            <DialogDescription>This is the photo shown on your Candid profile.</DialogDescription>
+            <DialogDescription>This is the photo shown publicly on your Candid profile, beside your posts and comments.</DialogDescription>
           </DialogHeader>
+          <p role="note" className="rounded-xl border border-border bg-secondary/50 p-3 text-sm leading-relaxed text-muted-foreground">
+            A real photo could make you recognizable even when you use an alias. Photos are optional; you can use an illustration or leave yours blank.
+          </p>
           {photoUrl ? (
             <img src={photoUrl} alt="Your profile photo" className="mx-auto max-h-[65dvh] max-w-full rounded-xl object-contain" />
           ) : null}
