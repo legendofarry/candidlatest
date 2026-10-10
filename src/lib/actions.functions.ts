@@ -30,9 +30,8 @@ function slugify(name: string) {
 function randomHandle() {
   const adjectives = ["Quiet", "Frank", "Steady", "Wary", "Bold", "Patient"];
   const roles = ["Analyst", "Agent", "Driver", "Teller", "Engineer", "Officer", "Clerk"];
-  return `Anon ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${
-    roles[Math.floor(Math.random() * roles.length)]
-  }`;
+  return `Anon ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${roles[Math.floor(Math.random() * roles.length)]
+    }`;
 }
 
 /** Ensures the signed-in user has a public-facing profile handle. */
@@ -224,10 +223,10 @@ export const createStory = createServerFn({ method: "POST" })
       body: data.body.trim(),
       evidence: uploadedEvidence
         ? {
-            publicId: uploadedEvidence.public_id,
-            format: uploadedEvidence.format,
-            bytes: uploadedEvidence.bytes,
-          }
+          publicId: uploadedEvidence.public_id,
+          format: uploadedEvidence.format,
+          bytes: uploadedEvidence.bytes,
+        }
         : null,
       evidenceNote: data.evidence?.note?.trim() || null,
     });
@@ -410,8 +409,8 @@ export const updateStory = createServerFn({ method: "POST" })
       body: data.body.trim(),
       evidence:
         typeof evidencePublicId === "string" &&
-        typeof evidenceFormat === "string" &&
-        typeof evidenceBytes === "number"
+          typeof evidenceFormat === "string" &&
+          typeof evidenceBytes === "number"
           ? { publicId: evidencePublicId, format: evidenceFormat, bytes: evidenceBytes }
           : null,
       evidenceNote:
@@ -539,10 +538,10 @@ export const addComment = createServerFn({ method: "POST" })
     const verificationSnap = await db.collection("account_verifications").doc(context.userId).get();
     const verification = verificationSnap.exists
       ? (verificationSnap.data() as {
-          account_type?: string;
-          company_id?: string | null;
-          badge_status?: string;
-        })
+        account_type?: string;
+        company_id?: string | null;
+        badge_status?: string;
+      })
       : null;
     const isOfficial = Boolean(
       verification?.account_type === "company" &&

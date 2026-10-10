@@ -561,18 +561,18 @@ function PostPage() {
           : null;
 
       const storyData = {
-          company_id: company.id,
-          title: title.trim(),
-          body: body.trim(),
-          reasons,
-          role_level: roleLevel || null,
-          position: position.trim() || null,
-          county: county || null,
-          tenure: tenure || null,
-          industry: industry || company.industry || null,
-          would_work_again: wouldReturn,
-          evidence,
-        };
+        company_id: company.id,
+        title: title.trim(),
+        body: body.trim(),
+        reasons,
+        role_level: roleLevel || null,
+        position: position.trim() || null,
+        county: county || null,
+        tenure: tenure || null,
+        industry: industry || company.industry || null,
+        would_work_again: wouldReturn,
+        evidence,
+      };
       const result = isEditing
         ? await update({ data: { ...storyData, story_id: editStoryId! } })
         : await create({ data: storyData });
@@ -758,7 +758,7 @@ function PostPage() {
                               className={cn(
                                 "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
                                 reasons.includes(reason) &&
-                                  "border-primary/50 bg-primary/10 text-foreground",
+                                "border-primary/50 bg-primary/10 text-foreground",
                               )}
                             >
                               {reason}
@@ -792,7 +792,7 @@ function PostPage() {
                           Each comma or Enter saves it as its own reason.
                         </p>
                         {reasons.filter((r) => !(REASONS as readonly string[]).includes(r)).length >
-                        0 ? (
+                          0 ? (
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {reasons
                               .filter((r) => !(REASONS as readonly string[]).includes(r))
@@ -862,7 +862,7 @@ function PostPage() {
                               className={cn(
                                 "rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground",
                                 wouldReturn === option.value &&
-                                  "border-primary/50 bg-primary/10 text-foreground",
+                                "border-primary/50 bg-primary/10 text-foreground",
                               )}
                             >
                               {option.label}
@@ -940,10 +940,10 @@ function PostPage() {
                         </li>
                         <li>· Do not name individual colleagues, managers or clients.</li>
                         <li>· Stick to what you experienced or can describe factually.</li>
-                          <li>
-                            · Automated AI reads each full story. Clear, low-risk stories may go
-                            live right away; uncertain or sensitive cases wait for moderator review.
-                          </li>
+                        <li>
+                          · Automated AI reads each full story. Clear, low-risk stories may go
+                          live right away; uncertain or sensitive cases wait for moderator review.
+                        </li>
                       </ul>
 
                       {!isEditing ? <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
