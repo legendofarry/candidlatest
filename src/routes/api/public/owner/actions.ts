@@ -76,7 +76,7 @@ export const Route = createFileRoute("/api/public/owner/actions")({
                   : input.moderation_note,
               moderated_at: timestamp,
             };
-          if (input.status === "published" && story["company_public"] !== false && typeof story["company_id"] === "string") {
+          if (input.status === "published" && typeof story["company_id"] === "string") {
             const companyRef = db.collection("companies").doc(String(story["company_id"]));
             const companySnap = await companyRef.get();
             const batch = db.batch();
@@ -109,7 +109,7 @@ export const Route = createFileRoute("/api/public/owner/actions")({
                 console.error("Could not notify story author of moderation decision", error);
               }
             }
-            if (input.status === "published" && story["company_public"] !== false && typeof story["company_id"] === "string") {
+            if (input.status === "published" && typeof story["company_id"] === "string") {
               try {
                 const [{ pushServerNotification }, companyOwners] = await Promise.all([
                   import("@/lib/notifications.server"),

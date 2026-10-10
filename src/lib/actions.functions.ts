@@ -298,7 +298,7 @@ export const createStory = createServerFn({ method: "POST" })
       position: data.position?.trim() || null,
       county: data.county,
       area: data.area?.trim() || null,
-      company_public: data.company_public,
+      company_public: true,
       company_location_suggestion: data.company_location_suggestion,
       tenure: data.tenure,
       industry: data.industry ?? company.industry,
@@ -321,7 +321,7 @@ export const createStory = createServerFn({ method: "POST" })
     const storyRef = db.collection("stories").doc(storyId);
     if ((await storyRef.get()).exists) throw new Error("This story has already been submitted.");
     batch.set(storyRef, created);
-    if (autoApproved && data.company_public) {
+    if (autoApproved) {
       batch.update(db.collection("companies").doc(company.id), { is_public: true });
     }
     batch.set(db.collection("story_ai_reviews").doc(storyId), {
@@ -384,7 +384,7 @@ export const createStory = createServerFn({ method: "POST" })
     }
 
     // Tell the company's claimed account it was tagged in a new live story.
-    if (created.status === "published" && created.company_public !== false) {
+    if (created.status === "published") {
       try {
         const owners = await db
           .collection("account_verifications")
@@ -431,7 +431,7 @@ export const getStoryForEdit = createServerFn({ method: "POST" })
       position: story.position ?? null,
       county: story.county,
       area: story.area ?? null,
-      company_public: story.company_public !== false,
+      company_public: true,
       company_location_suggestion: story.company_location_suggestion ?? null,
       tenure: story.tenure,
       industry: story.industry,
@@ -509,7 +509,7 @@ export const updateStory = createServerFn({ method: "POST" })
       position: data.position?.trim() || null,
       county: data.county,
       area: data.area?.trim() || null,
-      company_public: data.company_public,
+      company_public: true,
       company_location_suggestion: data.company_location_suggestion,
       tenure: data.tenure,
       industry: data.industry ?? company.industry,

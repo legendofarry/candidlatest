@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
@@ -35,7 +35,6 @@ import {
   checkUsername,
   completeOnboarding,
   getOnboardingState,
-  getUsernameSuggestions,
 } from "@/lib/onboarding.functions";
 
 export const Route = createFileRoute("/onboarding")({
@@ -166,6 +165,7 @@ const ALIAS_QUESTIONS = [
   { prompt: "Your instinct", options: ["Sage", "Scout"] },
 ] as const;
 const ALIAS_ENDINGS = ["Runner", "Rebel", "Nomad", "Comet", "ChomaBandit"];
+type AliasStage = "seed" | "questions" | "result";
 
 function getLensInterests(answers: LensAnswer): LensInterests {
   const interests: LensInterests = {
@@ -208,7 +208,6 @@ function OnboardingPage() {
   const { user, loading } = useAuth();
   const prefersReducedMotion = useReducedMotion();
   const check = useServerFn(checkUsername);
-  const suggest = useServerFn(getUsernameSuggestions);
   const complete = useServerFn(completeOnboarding);
   const state = useServerFn(getOnboardingState);
 
@@ -220,13 +219,14 @@ function OnboardingPage() {
   const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [usernameSeed, setUsernameSeed] = useState("");
   const [username, setUsername] = useState("");
-  const [aliasAnswers, setAliasAnswers] = useState([0, 1, 0, 1]);
+  const [aliasStage, setAliasStage] = useState<AliasStage>("seed");
+  const [aliasAnswers, setAliasAnswers] = useState<(number | null)[]>([null, null, null, null]);
   const [aliasIdea, setAliasIdea] = useState("");
   const [aliasRound, setAliasRound] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<string[]>([]);
   const [socials, setSocials] = useState<Record<SocialKey, string>>({
     x: "",
     instagram: "",
@@ -328,36 +328,31 @@ function OnboardingPage() {
     return () => window.clearTimeout(timer);
   }, [lensScreen, scenarioIndex, prefersReducedMotion]);
 
-  // Suggestions are intentionally unrelated to the user's email or legal identity.
-  const seed = "candid";
-
-  const loadSuggestions = useCallback(
-    async (value: string) => {
-      const result = await suggest({ data: { seed: value || seed } });
-      setSuggestions(result.suggestions);
-    },
-    [seed, suggest],
-  );
-
   function generateAlias() {
-    const pace = ALIAS_QUESTIONS[0].options[aliasAnswers[0] ?? 0];
-    const time = ALIAS_QUESTIONS[1].options[aliasAnswers[1] ?? 0];
-    const style = ALIAS_QUESTIONS[2].options[aliasAnswers[2] ?? 0];
-    const instinct = ALIAS_QUESTIONS[3].options[aliasAnswers[3] ?? 0];
-    const ending = ALIAS_ENDINGS[(aliasRound + (aliasAnswers[0] ?? 0) + (aliasAnswers[2] ?? 0)) % ALIAS_ENDINGS.length]!;
+    const base = usernameSeed.trim().replace(/[^a-z0-9]/gi, "").slice(0, 7);
+    if (base.length < 3) {
+      setAliasStage("seed");
+      return;
+    }
+    if (aliasAnswers.some((answer) => answer === null)) return;
+    const pace = ALIAS_QUESTIONS[0].options[aliasAnswers[0]!]!.toLowerCase();
+    const time = ALIAS_QUESTIONS[1].options[aliasAnswers[1]!]!.toLowerCase();
+    const energy = ALIAS_QUESTIONS[2].options[aliasAnswers[2]!]!.toLowerCase();
+    const instinct = ALIAS_QUESTIONS[3].options[aliasAnswers[3]!]!.toLowerCase();
+    const ending = ALIAS_ENDINGS[aliasRound % ALIAS_ENDINGS.length]!.toLowerCase();
     const options = [
-      `${time}${instinct}`,
-      `${pace}${ending}`,
-      `${style}${ending}`,
+      `${time}${base}${instinct}`,
+      `${pace}${base}${energy}`,
+      `${energy}${base}${ending}`,
+      `${base}${instinct}${ending}`,
+      `${pace}${base}${time}`,
     ];
-    setAliasIdea(options[aliasRound % options.length]!.replace(/[^a-zA-Z0-9]/g, ""));
+    const candidate = options[aliasRound % options.length]!.slice(0, 20);
+    setAliasIdea(candidate);
+    setUsername(candidate);
+    setAliasStage("result");
     setAliasRound((round) => round + 1);
   }
-
-  useEffect(() => {
-    if (!user) return;
-    void loadSuggestions(seed);
-  }, [user, seed, loadSuggestions]);
 
   useEffect(() => {
     if (!user) return;
@@ -376,7 +371,6 @@ function OnboardingPage() {
         if (requestId.current !== id) return;
         setStatus(result.available ? "available" : result.reason ? "taken" : "invalid");
         setMessage(result.reason);
-        if (!result.available) void loadSuggestions(value);
       } catch {
         if (requestId.current !== id) return;
         setStatus("invalid");
@@ -384,7 +378,7 @@ function OnboardingPage() {
       }
     }, 380);
     return () => clearTimeout(timer);
-  }, [username, user, check, loadSuggestions]);
+  }, [username, user, check]);
 
   async function submit() {
     if (status !== "available") return;
@@ -505,11 +499,15 @@ function OnboardingPage() {
             Step {step + 1} of 3
           </motion.span>
           <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-            {step === 0 ? "Pick your username" : step === 1 ? "Add a photo" : "Add your links"}
+            {step === 0 ? aliasStage === "seed" ? "Start with a username" : aliasStage === "questions" ? "Make it yours" : "Your Candid alias" : step === 1 ? "Add a photo" : "Add your links"}
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {step === 0
-                ? "This public alias appears on your posts and comments. It does not need to match your real name."
+                ? aliasStage === "seed"
+                  ? "Choose a starting name. Your answers will shape it into the public alias used across Candid. Avoid using your real name."
+                  : aliasStage === "questions"
+                    ? "Answer a few quick questions. Candid will combine your choices with your starting name."
+                    : "This generated alias is the name people will see on your posts and comments."
               : step === 1
                 ? "Optional. Your profile photo is public; skip it if you prefer to stay less identifiable."
                 : "Optional. These only show on your profile — skip if you'd rather not."}
@@ -539,139 +537,87 @@ function OnboardingPage() {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="rounded-none border-0 bg-transparent p-0 md:glass-card md:rounded-2xl md:border md:border-border md:p-5"
             >
-              <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/5 p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-medium">Create a private alias</p>
-                    <p className="mt-1 text-xs text-muted-foreground">Your public name does not need to match your real name.</p>
+              {aliasStage === "seed" ? (
+                <div className="space-y-4">
+                  <Label htmlFor="username-seed">Starting username</Label>
+                  <div className="flex items-center gap-2 rounded-xl border border-input px-3">
+                    <AtSign className="size-4 shrink-0 text-muted-foreground" />
+                    <Input
+                      id="username-seed"
+                      autoFocus
+                      autoComplete="off"
+                      spellCheck={false}
+                      maxLength={30}
+                      value={usernameSeed}
+                      onChange={(event) => setUsernameSeed(event.target.value)}
+                      placeholder="Choose a name to build from"
+                      className="border-0 bg-transparent px-0 focus-visible:ring-0"
+                    />
                   </div>
-                  <Button type="button" size="sm" variant="outline" onClick={generateAlias}>
-                    <Sparkles className="mr-1.5 size-4" /> {aliasIdea ? "Another idea" : "Make an alias"}
+                  <p className="text-xs text-muted-foreground">This is a starting point, not your final username. Candid will combine it with your answers. Don’t use your real name.</p>
+                  <Button className="w-full glow-primary" disabled={usernameSeed.trim().replace(/[^a-z0-9]/gi, "").length < 3} onClick={() => setAliasStage("questions")}>
+                    Next: answer a few questions <ArrowRight className="size-4" />
                   </Button>
                 </div>
-                <div className="mt-4 grid grid-cols-2 gap-2">
-                  {ALIAS_QUESTIONS.map((question, questionIndex) => (
-                    <label key={question.prompt} className="text-xs text-muted-foreground">
-                      {question.prompt}
-                      <select
-                        value={aliasAnswers[questionIndex]}
-                        onChange={(event) => setAliasAnswers((answers) => answers.map((answer, index) => index === questionIndex ? Number(event.target.value) : answer))}
-                        className="mt-1.5 block w-full rounded-lg border border-input bg-background px-2 py-2 text-sm text-foreground"
-                      >
-                        {question.options.map((option, optionIndex) => <option key={option} value={optionIndex}>{option}</option>)}
-                      </select>
-                    </label>
-                  ))}
-                </div>
-                {aliasIdea ? (
-                  <div className="mt-3 flex items-center justify-between rounded-xl bg-background px-3 py-2">
-                    <span className="font-display text-lg font-semibold">@{aliasIdea.toLowerCase()}</span>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => setUsername(aliasIdea.toLowerCase())}>Use this</Button>
+              ) : aliasStage === "questions" ? (
+                <div className="space-y-5">
+                  <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-2 text-sm">
+                    <span className="text-muted-foreground">Starting with</span>
+                    <span className="font-semibold">@{usernameSeed.trim().replace(/[^a-z0-9]/gi, "").slice(0, 7).toLowerCase()}</span>
                   </div>
-                ) : null}
-              </div>
-              <Label htmlFor="username" className="text-xs uppercase tracking-wider">
-                Username
-              </Label>
-              <div
-                className={`mt-2 flex items-center gap-2 rounded-xl border px-3 transition-colors ${
-                  status === "available"
-                    ? "border-verified/70 shadow-[0_0_0_3px_hsl(var(--verified)/0.12)]"
-                    : status === "taken" || status === "invalid"
-                      ? "border-destructive/70"
-                      : "border-input"
-                }`}
-              >
-                <AtSign className="size-4 shrink-0 text-muted-foreground" />
-                <Input
-                  id="username"
-                  autoFocus
-                  autoComplete="off"
-                  spellCheck={false}
-                  value={username}
-                  onChange={(event) =>
-                    setUsername(event.target.value.toLowerCase().replace(/\s+/g, "_"))
-                  }
-                  placeholder="e.g. quiet_analyst"
-                  className="border-0 bg-transparent px-0 focus-visible:ring-0"
-                />
-                <AnimatePresence mode="wait">
-                  {status === "checking" ? (
-                    <motion.span
-                      key="c"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                    >
-                      <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                    </motion.span>
-                  ) : status === "available" ? (
-                    <motion.span
-                      key="a"
-                      initial={{ scale: 0.5, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 14 }}
-                    >
-                      <Check className="size-4 text-verified" />
-                    </motion.span>
-                  ) : status === "taken" || status === "invalid" ? (
-                    <motion.span key="t" initial={{ x: -4 }} animate={{ x: [0, -4, 4, 0] }}>
-                      <XIcon className="size-4 text-destructive" />
-                    </motion.span>
-                  ) : null}
-                </AnimatePresence>
-              </div>
-
-              <AnimatePresence initial={false}>
-                {message || status === "available" ? (
-                  <motion.p
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: "auto" }}
-                    exit={{ opacity: 0, height: 0 }}
-                    className={`mt-2 text-xs ${
-                      status === "available" ? "text-verified" : "text-destructive"
-                    }`}
-                  >
-                    {status === "available" ? `@${username} is available` : message}
-                  </motion.p>
-                ) : null}
-              </AnimatePresence>
-
-              <div className="mt-5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-                  Available suggestions
-                </p>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <AnimatePresence initial={false}>
-                    {suggestions.map((item, index) => (
-                      <motion.button
-                        key={item}
-                        type="button"
-                        layout
-                        initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ delay: index * 0.04 }}
-                        whileTap={{ scale: 0.94 }}
-                        onClick={() => setUsername(item)}
-                        className="rounded-full border border-border bg-secondary/60 px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
-                      >
-                        @{item}
-                      </motion.button>
+                  <div className="grid grid-cols-2 gap-3">
+                    {ALIAS_QUESTIONS.map((question, questionIndex) => (
+                      <fieldset key={question.prompt} className="min-w-0">
+                        <legend className="mb-1.5 text-xs text-muted-foreground">{question.prompt}</legend>
+                        <div className="grid grid-cols-2 gap-1.5">
+                          {question.options.map((option, optionIndex) => {
+                            const selected = aliasAnswers[questionIndex] === optionIndex;
+                            return (
+                              <button
+                                key={option}
+                                type="button"
+                                aria-pressed={selected}
+                                onClick={() => setAliasAnswers((answers) => answers.map((answer, index) => index === questionIndex ? optionIndex : answer))}
+                                className={`min-h-10 rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${selected ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-primary/50"}`}
+                              >
+                                {option}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </fieldset>
                     ))}
-                  </AnimatePresence>
+                  </div>
+                  <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={() => setAliasStage("seed")}>Back</Button>
+                    <Button className="flex-1 glow-primary" disabled={aliasAnswers.some((answer) => answer === null)} onClick={generateAlias}><Sparkles className="size-4" /> Create my alias</Button>
+                  </div>
                 </div>
-              </div>
-
-              <Button
-                className="mt-6 w-full glow-primary"
-                disabled={status !== "available"}
-                onClick={() => setStep(1)}
-              >
-                Continue
-                <ArrowRight className="size-4" />
-              </Button>
+              ) : (
+                <div className="space-y-5 text-center">
+                  <motion.div
+                    key={aliasIdea}
+                    initial={prefersReducedMotion ? false : { opacity: 0, y: 10, scale: 0.96 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    transition={{ duration: 0.3 }}
+                    className="rounded-2xl border border-primary/25 bg-primary/5 px-4 py-7"
+                  >
+                    <Sparkles className="mx-auto size-5 text-primary" />
+                    <p className="mt-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Your Candid alias</p>
+                    <p className="mt-2 break-all font-display text-2xl font-semibold">@{aliasIdea}</p>
+                    <p className={`mt-2 text-sm ${status === "available" ? "text-verified" : status === "taken" || status === "invalid" ? "text-destructive" : "text-muted-foreground"}`}>
+                      {status === "checking" ? "Checking availability…" : status === "available" ? "Available to claim" : status === "taken" || status === "invalid" ? message ?? "Try another alias" : "Checking availability…"}
+                    </p>
+                  </motion.div>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button type="button" variant="outline" className="flex-1" onClick={generateAlias}>Try another</Button>
+                    <Button type="button" variant="ghost" className="flex-1" onClick={() => { setAliasStage("seed"); setUsername(""); setAliasIdea(""); }}>Change starting name</Button>
+                  </div>
+                  <Button className="w-full glow-primary" disabled={status !== "available"} onClick={() => setStep(1)}>
+                    Claim this alias <ArrowRight className="size-4" />
+                  </Button>
+                </div>
+              )}
             </motion.section>
           ) : step === 1 ? (
             <motion.section

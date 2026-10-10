@@ -92,7 +92,6 @@ type StoryDraft = {
   county: string;
   area: string;
   companyMapUrl: string;
-  showEmployer: boolean;
   reasons: string[];
   customReason: string;
   tenure: string;
@@ -146,7 +145,6 @@ function PostPage() {
   const [county, setCounty] = useState("");
   const [area, setArea] = useState("");
   const [companyMapUrl, setCompanyMapUrl] = useState("");
-  const [showEmployer, setShowEmployer] = useState(true);
   const [reasons, setReasons] = useState<string[]>([]);
   const [customReason, setCustomReason] = useState("");
   const [tenure, setTenure] = useState("");
@@ -192,7 +190,6 @@ function PostPage() {
         setCounty(story.county ?? "");
         setArea(story.area ?? "");
         setCompanyMapUrl(story.company_location_suggestion ?? "");
-        setShowEmployer(story.company_public !== false);
         setReasons(story.reasons);
         setTenure(story.tenure ?? "");
         setRoleLevel(story.role_level ?? "");
@@ -268,7 +265,6 @@ function PostPage() {
     county,
     area,
     companyMapUrl,
-    showEmployer,
     reasons,
     customReason,
     tenure,
@@ -331,7 +327,6 @@ function PostPage() {
           county: typeof parsed.county === "string" ? parsed.county : "",
           area: typeof parsed.area === "string" ? parsed.area : "",
           companyMapUrl: typeof parsed.companyMapUrl === "string" ? parsed.companyMapUrl : "",
-          showEmployer: typeof parsed.showEmployer === "boolean" ? parsed.showEmployer : true,
           reasons: Array.isArray(parsed.reasons)
             ? parsed.reasons.filter((reason): reason is string => typeof reason === "string").slice(0, 10)
             : [],
@@ -350,7 +345,6 @@ function PostPage() {
         setCounty(restored.county);
         setArea(restored.area);
         setCompanyMapUrl(restored.companyMapUrl);
-        setShowEmployer(restored.showEmployer);
         setReasons(restored.reasons);
         setCustomReason(restored.customReason);
         setTenure(restored.tenure);
@@ -588,7 +582,7 @@ function PostPage() {
         position: position.trim() || null,
         county: county || null,
         area: area.trim() || null,
-        company_public: showEmployer,
+        company_public: true,
         company_location_suggestion: companyMapUrl.trim() || null,
         tenure: tenure || null,
         industry: industry || company.industry || null,
@@ -710,23 +704,9 @@ function PostPage() {
                           placeholder="e.g. Sky Minimart, Naivas, a boda stage"
                           autoComplete="off"
                         />
-                        <p className="text-xs text-muted-foreground">
-                          Your employer is required for accurate company records. Your account email and legal name are never attached to the public story.
+                        <p className="rounded-xl border border-border bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
+                          The company name always appears on a published story. Your Candid username appears as the author; your account email and legal name are not shown. Avoid details that could identify you personally.
                         </p>
-                        <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-3 text-sm">
-                          <input
-                            type="checkbox"
-                            checked={!showEmployer}
-                            onChange={(event) => setShowEmployer(!event.target.checked)}
-                            className="mt-0.5 accent-[var(--primary)]"
-                          />
-                          <span>
-                            <span className="block font-medium">Hide employer name on the public story</span>
-                            <span className="mt-0.5 block text-xs text-muted-foreground">
-                              Candid keeps the company link for moderation and reporting, but readers and the employer see “Employer withheld.”
-                            </span>
-                          </span>
-                        </label>
 
                         {matches.length > 0 && !exactMatch ? (
                           <div className="space-y-1.5 rounded-2xl border border-border bg-secondary/40 p-3">

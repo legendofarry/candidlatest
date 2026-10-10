@@ -289,18 +289,6 @@ function median(values: number[]) {
   return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
-function redactCompanyMentions(value: string, company: CompanyRecord | null | undefined) {
-  let result = value;
-  const names = [company?.name, ...(company?.aliases ?? [])]
-    .filter((name): name is string => Boolean(name?.trim()))
-    .sort((a, b) => b.length - a.length);
-  for (const name of names) {
-    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    result = result.replace(new RegExp(escaped, "gi"), "the employer");
-  }
-  return result;
-}
-
 function isPublicCompany(company: CompanyRecord) {
   return company.is_public !== false && !isPlaceholderCompanyName(company.name);
 }
@@ -319,7 +307,7 @@ export async function buildCompanyScores() {
 
   const storiesByCompany = new Map<string, StoryRecord[]>();
   for (const story of stories) {
-    if (!story.company_id || story.status !== "published" || story.company_public === false) continue;
+    if (!story.company_id || story.status !== "published") continue;
     const list = storiesByCompany.get(story.company_id) ?? [];
     list.push(story);
     storiesByCompany.set(story.company_id, list);
@@ -601,23 +589,22 @@ export async function getPublicStories(input: {
     .filter((story) => story.status === "published")
     .filter((story) => (input.industry ? story.industry === input.industry : true))
     .filter((story) => (input.county ? story.county === input.county : true))
-    .filter((story) => (input.companySlug ? story.company_public !== false && story.company_slug === input.companySlug : true))
+    .filter((story) => (input.companySlug ? story.company_slug === input.companySlug : true))
     .filter((story) => (input.reason ? (story.reasons ?? []).includes(input.reason) : true))
     .map<PublicStoryRecord>((story) => {
       const company = companiesById.get(story.company_id);
-      const hideEmployer = story.company_public === false || isPlaceholderCompanyName(company?.name ?? story.company_name);
       return {
         ...story,
-        title: hideEmployer ? redactCompanyMentions(story.title, company) : story.title,
-        body: hideEmployer ? redactCompanyMentions(story.body, company) : story.body,
+        title: story.title,
+        body: story.body,
         company_location_suggestion: null,
         created_at: story.created_at,
         id: story.id,
-        company_id: hideEmployer ? null : story.company_id,
-        company_name: hideEmployer ? "Employer withheld" : (company?.name ?? story.company_name ?? null),
-        company_slug: hideEmployer ? null : (story.company_slug ?? company?.slug ?? null),
-        company_verified: hideEmployer ? false : Boolean(company?.verified),
-        area: hideEmployer ? null : (story.area ?? null),
+        company_id: story.company_id,
+        company_name: company?.name ?? story.company_name ?? null,
+        company_slug: story.company_slug ?? company?.slug ?? null,
+        company_verified: Boolean(company?.verified),
+        area: story.area ?? null,
         likes: Number(story.likes ?? 0),
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
@@ -662,7 +649,6 @@ export async function getCompanyView(slug: string) {
     profile,
     stories: stories
       .filter((story) => story.status === "published")
-      .filter((story) => story.company_public !== false && !isPlaceholderCompanyName(story.company_name))
       .filter((story) => story.company_id === company.id)
       .map<PublicStoryRecord>((story) => ({
         ...story,
@@ -693,7 +679,6 @@ export async function getStoryView(id: string) {
   const company =
     (story.company_id ? await readDocument<CompanyRecord>("companies", story.company_id) : null) ??
     null;
-  const hideEmployer = story.company_public === false || isPlaceholderCompanyName(company?.name ?? story.company_name);
   const authorProfile = story.author_id
     ? await readDocument<ProfileRecord>("profiles", story.author_id)
     : null;
@@ -732,7 +717,7 @@ export async function getStoryView(id: string) {
       );
     return {
       ...comment,
-      body: comment.is_deleted ? "" : hideEmployer ? redactCompanyMentions(comment.body, company) : comment.body,
+      body: comment.is_deleted ? "" : comment.body,
       author_username: comment.author_username ?? profile?.username ?? null,
       author_photo_url: comment.author_photo_url ?? profile?.photo_url ?? null,
       author_membership_tier: membershipBadgeTier(profile ?? undefined),
@@ -778,14 +763,14 @@ export async function getStoryView(id: string) {
   return {
     story: {
       ...story,
-      title: hideEmployer ? redactCompanyMentions(story.title, company) : story.title,
-      body: hideEmployer ? redactCompanyMentions(story.body, company) : story.body,
+      title: story.title,
+      body: story.body,
       company_location_suggestion: null,
-      company_id: hideEmployer ? null : story.company_id,
-      company_name: hideEmployer ? "Employer withheld" : (company?.name ?? story.company_name ?? null),
-      company_slug: hideEmployer ? null : (story.company_slug ?? company?.slug ?? null),
-      company_verified: hideEmployer ? false : Boolean(company?.verified),
-      area: hideEmployer ? null : (story.area ?? null),
+      company_id: story.company_id,
+      company_name: company?.name ?? story.company_name ?? null,
+      company_slug: story.company_slug ?? company?.slug ?? null,
+      company_verified: Boolean(company?.verified),
+      area: story.area ?? null,
       likes: Number(story.likes ?? 0),
       reasons: story.reasons ?? [],
       comment_count: story.comment_count,
@@ -823,7 +808,7 @@ export async function searchData(queryText: string) {
   const storyMatches = stories
     .filter((story) => story.status === "published")
     .filter((story) =>
-      [story.title, story.body, story.company_public === false || isPlaceholderCompanyName(story.company_name) ? "" : story.company_name ?? "", story.industry ?? "", story.county ?? ""]
+      [story.title, story.body, story.company_name ?? "", story.industry ?? "", story.county ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(q),
@@ -831,19 +816,18 @@ export async function searchData(queryText: string) {
     .slice(0, 15)
     .map<PublicStoryRecord>((story) => {
       const company = companies.find((entry) => entry.id === story.company_id);
-      const hideEmployer = story.company_public === false || isPlaceholderCompanyName(company?.name ?? story.company_name);
       return {
         ...story,
-        title: hideEmployer ? redactCompanyMentions(story.title, company) : story.title,
-        body: hideEmployer ? redactCompanyMentions(story.body, company) : story.body,
+        title: story.title,
+        body: story.body,
         company_location_suggestion: null,
         created_at: story.created_at,
         id: story.id,
-        company_id: hideEmployer ? null : story.company_id,
-        company_name: hideEmployer ? "Employer withheld" : company?.name ?? story.company_name ?? null,
-        company_slug: hideEmployer ? null : story.company_slug ?? company?.slug ?? null,
-        company_verified: hideEmployer ? false : Boolean(company?.verified),
-        area: hideEmployer ? null : story.area ?? null,
+        company_id: story.company_id,
+        company_name: company?.name ?? story.company_name ?? null,
+        company_slug: story.company_slug ?? company?.slug ?? null,
+        company_verified: Boolean(company?.verified),
+        area: story.area ?? null,
         likes: Number(story.likes ?? 0),
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
