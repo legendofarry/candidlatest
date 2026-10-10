@@ -159,10 +159,34 @@ const LENS_INTEREST_LABELS: { key: keyof LensInterests; label: string }[] = [
 ];
 
 const ALIAS_QUESTIONS = [
-  { prompt: "Your pace", options: ["Steady", "Bold"] },
-  { prompt: "Your hours", options: ["Dawn", "Night"] },
-  { prompt: "Your energy", options: ["Cozy", "Wild"] },
-  { prompt: "Your instinct", options: ["Sage", "Scout"] },
+  {
+    prompt: "When things get busy, what feels more like you?",
+    options: [
+      { label: "Take it steady", detail: "One step at a time.", token: "Steady" },
+      { label: "Go bold", detail: "Move first, adapt as you go.", token: "Bold" },
+    ],
+  },
+  {
+    prompt: "When do you feel most switched on?",
+    options: [
+      { label: "Early bird", detail: "I like getting a head start.", token: "Dawn" },
+      { label: "Night owl", detail: "My best ideas come later.", token: "Night" },
+    ],
+  },
+  {
+    prompt: "What kind of energy do you bring?",
+    options: [
+      { label: "Warm and grounded", detail: "Calm, welcoming, dependable.", token: "Cozy" },
+      { label: "Loud and lively", detail: "Curious, expressive, spontaneous.", token: "Wild" },
+    ],
+  },
+  {
+    prompt: "When something’s unclear, what do you do first?",
+    options: [
+      { label: "Read the room", detail: "Notice what others might miss.", token: "Sage" },
+      { label: "Find a way through", detail: "Explore until I find an answer.", token: "Scout" },
+    ],
+  },
 ] as const;
 const ALIAS_ENDINGS = ["Runner", "Rebel", "Nomad", "Comet", "ChomaBandit"];
 type AliasStage = "seed" | "questions" | "result";
@@ -222,6 +246,7 @@ function OnboardingPage() {
   const [usernameSeed, setUsernameSeed] = useState("");
   const [username, setUsername] = useState("");
   const [aliasStage, setAliasStage] = useState<AliasStage>("seed");
+  const [aliasQuestionIndex, setAliasQuestionIndex] = useState(0);
   const [aliasAnswers, setAliasAnswers] = useState<(number | null)[]>([null, null, null, null]);
   const [aliasIdea, setAliasIdea] = useState("");
   const [aliasRound, setAliasRound] = useState(0);
@@ -335,10 +360,10 @@ function OnboardingPage() {
       return;
     }
     if (aliasAnswers.some((answer) => answer === null)) return;
-    const pace = ALIAS_QUESTIONS[0].options[aliasAnswers[0]!]!.toLowerCase();
-    const time = ALIAS_QUESTIONS[1].options[aliasAnswers[1]!]!.toLowerCase();
-    const energy = ALIAS_QUESTIONS[2].options[aliasAnswers[2]!]!.toLowerCase();
-    const instinct = ALIAS_QUESTIONS[3].options[aliasAnswers[3]!]!.toLowerCase();
+    const pace = ALIAS_QUESTIONS[0].options[aliasAnswers[0]!]!.token.toLowerCase();
+    const time = ALIAS_QUESTIONS[1].options[aliasAnswers[1]!]!.token.toLowerCase();
+    const energy = ALIAS_QUESTIONS[2].options[aliasAnswers[2]!]!.token.toLowerCase();
+    const instinct = ALIAS_QUESTIONS[3].options[aliasAnswers[3]!]!.token.toLowerCase();
     const ending = ALIAS_ENDINGS[aliasRound % ALIAS_ENDINGS.length]!.toLowerCase();
     const options = [
       `${time}${base}${instinct}`,
@@ -558,37 +583,84 @@ function OnboardingPage() {
                   </Button>
                 </div>
               ) : aliasStage === "questions" ? (
-                <div className="space-y-5">
-                  <div className="flex items-center justify-between rounded-xl bg-secondary/50 px-3 py-2 text-sm">
-                    <span className="text-muted-foreground">Starting with</span>
-                    <span className="font-semibold">@{usernameSeed.trim().replace(/[^a-z0-9]/gi, "").slice(0, 7).toLowerCase()}</span>
+                <div className="space-y-6">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+                        Question {aliasQuestionIndex + 1} of {ALIAS_QUESTIONS.length}
+                      </p>
+                      <div className="mt-2 flex gap-1.5" aria-label={`Question ${aliasQuestionIndex + 1} of ${ALIAS_QUESTIONS.length}`}>
+                        {ALIAS_QUESTIONS.map((question, index) => (
+                          <span
+                            key={question.prompt}
+                            className={`h-1.5 w-8 rounded-full transition-colors ${index <= aliasQuestionIndex ? "bg-primary" : "bg-secondary"}`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                    <span className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground">
+                      Starting with <strong className="ml-1 font-semibold text-foreground">@{usernameSeed.trim().replace(/[^a-z0-9]/gi, "").slice(0, 7).toLowerCase()}</strong>
+                    </span>
                   </div>
-                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                    {ALIAS_QUESTIONS.map((question, questionIndex) => (
-                      <fieldset key={question.prompt} className="min-w-0">
-                        <legend className="mb-1.5 text-xs text-muted-foreground">{question.prompt}</legend>
-                        <div className="grid grid-cols-2 gap-1.5">
-                          {question.options.map((option, optionIndex) => {
-                            const selected = aliasAnswers[questionIndex] === optionIndex;
-                            return (
-                              <button
-                                key={option}
-                                type="button"
-                                aria-pressed={selected}
-                                onClick={() => setAliasAnswers((answers) => answers.map((answer, index) => index === questionIndex ? optionIndex : answer))}
-                                className={`min-h-10 rounded-lg border px-2 py-2 text-xs font-medium transition-colors ${selected ? "border-primary bg-primary/10 text-foreground" : "border-border bg-background text-muted-foreground hover:border-primary/50"}`}
-                              >
-                                {option}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </fieldset>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button type="button" variant="outline" onClick={() => setAliasStage("seed")}>Back</Button>
-                    <Button className="flex-1 glow-primary" disabled={aliasAnswers.some((answer) => answer === null)} onClick={generateAlias}><Sparkles className="size-4" /> Create my alias</Button>
+
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={aliasQuestionIndex}
+                      initial={prefersReducedMotion ? false : { opacity: 0, x: 12 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      {...(prefersReducedMotion ? {} : { exit: { opacity: 0, x: -12 } })}
+                      transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
+                      aria-live="polite"
+                    >
+                      <h2 className="max-w-xl font-display text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
+                        {ALIAS_QUESTIONS[aliasQuestionIndex]!.prompt}
+                      </h2>
+                      <p className="mt-2 text-sm text-muted-foreground">Pick the answer that feels closer. There’s no wrong choice.</p>
+
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                        {ALIAS_QUESTIONS[aliasQuestionIndex]!.options.map((option, optionIndex) => {
+                          const selected = aliasAnswers[aliasQuestionIndex] === optionIndex;
+                          return (
+                            <button
+                              key={option.token}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => setAliasAnswers((answers) => answers.map((answer, index) => index === aliasQuestionIndex ? optionIndex : answer))}
+                              className={`group flex min-h-24 w-full items-center gap-3 rounded-2xl border p-4 text-left transition-all active:scale-[0.99] sm:min-h-28 sm:p-5 ${selected ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "border-border bg-background hover:border-primary/50 hover:bg-secondary/40"}`}
+                            >
+                              <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold transition-colors ${selected ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground group-hover:text-foreground"}`}>
+                                {String.fromCharCode(65 + optionIndex)}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block text-sm font-semibold text-foreground sm:text-base">{option.label}</span>
+                                <span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.detail}</span>
+                              </span>
+                              <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border text-transparent"}`}>
+                                {selected ? <Check className="size-3.5" /> : null}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </motion.div>
+                  </AnimatePresence>
+
+                  <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => aliasQuestionIndex === 0 ? setAliasStage("seed") : setAliasQuestionIndex((index) => index - 1)}
+                    >
+                      Back
+                    </Button>
+                    <Button
+                      className="glow-primary"
+                      disabled={aliasAnswers[aliasQuestionIndex] === null}
+                      onClick={() => aliasQuestionIndex === ALIAS_QUESTIONS.length - 1 ? generateAlias() : setAliasQuestionIndex((index) => index + 1)}
+                    >
+                      {aliasQuestionIndex === ALIAS_QUESTIONS.length - 1 ? "Create my alias" : "Next question"}
+                      {aliasQuestionIndex === ALIAS_QUESTIONS.length - 1 ? <Sparkles className="size-4" /> : <ArrowRight className="size-4" />}
+                    </Button>
                   </div>
                 </div>
               ) : (
