@@ -380,7 +380,7 @@ function OnboardingPage() {
     return () => clearTimeout(timer);
   }, [username, user, check]);
 
-  async function submit() {
+  async function submit(includeSocials = true) {
     if (status !== "available") return;
     setSaving(true);
     setSubmitError(null);
@@ -404,11 +404,11 @@ function OnboardingPage() {
                 interests: getLensInterests(lensAnswers),
               },
           socials: {
-            x: socials.x.trim() || null,
-            instagram: socials.instagram.trim() || null,
-            linkedin: socials.linkedin.trim() || null,
-            tiktok: socials.tiktok.trim() || null,
-            website: socials.website.trim() || null,
+            x: includeSocials ? socials.x.trim() || null : null,
+            instagram: includeSocials ? socials.instagram.trim() || null : null,
+            linkedin: includeSocials ? socials.linkedin.trim() || null : null,
+            tiktok: includeSocials ? socials.tiktok.trim() || null : null,
+            website: includeSocials ? socials.website.trim() || null : null,
           },
         },
       });
@@ -479,42 +479,40 @@ function OnboardingPage() {
   }
 
   return (
-    <div className="relative -mx-4 -my-6 min-h-[100dvh] overflow-hidden px-4 py-10 sm:px-6">
-      <AuroraBackdrop />
-
-      <div className="relative mx-auto flex w-full max-w-md flex-col justify-center">
+    <main className="-mx-4 -my-6 min-h-[100dvh] bg-muted/30 px-4 py-5 sm:px-6 sm:py-8">
+      <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] w-full max-w-xl flex-col sm:min-h-[calc(100dvh-4rem)]">
+        <header className="mb-8 flex items-center justify-between">
+          <div className="flex items-center gap-2 font-display text-sm font-semibold">
+            <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Flame className="size-4" /></span>
+            Candid
+          </div>
+          <span className="text-xs text-muted-foreground">Your account</span>
+        </header>
+        <div className="my-auto">
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-6 text-center"
+          className="mb-7"
         >
-          <motion.span
-            initial={{ scale: 0.8, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ delay: 0.1, type: "spring", stiffness: 220, damping: 16 }}
-            className="inline-flex items-center gap-2 rounded-full border border-border bg-secondary/60 px-3 py-1 text-[11px] font-semibold uppercase tracking-widest text-primary"
-          >
-            <Sparkles className="size-3.5" />
-            Step {step + 1} of 3
-          </motion.span>
-          <h1 className="mt-4 text-3xl font-semibold tracking-tight sm:text-4xl">
-            {step === 0 ? aliasStage === "seed" ? "Start with a username" : aliasStage === "questions" ? "Make it yours" : "Your Candid alias" : step === 1 ? "Add a photo" : "Add your links"}
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary">A few quick choices · {step + 1} of 3</p>
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            {step === 0 ? aliasStage === "seed" ? "Choose your starting name" : aliasStage === "questions" ? "Make it yours" : "Your Candid name" : step === 1 ? "Add a profile photo" : "Add your links"}
           </h1>
-          <p className="mt-2 text-sm text-muted-foreground">
+          <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
             {step === 0
                 ? aliasStage === "seed"
-                  ? "Choose a starting name. Your answers will shape it into the public alias used across Candid. Avoid using your real name."
+                  ? "Start with a word or nickname. A few quick choices will shape it into the public alias you’ll use across Candid."
                   : aliasStage === "questions"
-                    ? "Answer a few quick questions. Candid will combine your choices with your starting name."
-                    : "This generated alias is the name people will see on your posts and comments."
+                    ? "Pick what feels more like you. We’ll use your starting name and these answers to make your alias."
+                    : "This is the name people will see on your posts and comments."
               : step === 1
-                ? "Optional. Your profile photo is public; skip it if you prefer to stay less identifiable."
-                : "Optional. These only show on your profile — skip if you'd rather not."}
+                ? "A photo is optional and visible on your profile. Choose an image that doesn’t identify you, or continue without one."
+                : "Social links are optional. Add any you want people to find on your profile."}
           </p>
         </motion.div>
 
-        <div className="mb-6 flex gap-2">
+        <div className="mb-5 flex gap-2" aria-label={`Profile setup step ${step + 1} of 3`}>
           {[0, 1, 2].map((index) => (
             <div key={index} className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
               <motion.div
@@ -535,7 +533,7 @@ function OnboardingPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="rounded-none border-0 bg-transparent p-0 md:glass-card md:rounded-2xl md:border md:border-border md:p-5"
+              className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
             >
               {aliasStage === "seed" ? (
                 <div className="space-y-4">
@@ -554,7 +552,7 @@ function OnboardingPage() {
                       className="border-0 bg-transparent px-0 focus-visible:ring-0"
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">This is a starting point, not your final username. Candid will combine it with your answers. Don’t use your real name.</p>
+                  <p className="text-xs leading-5 text-muted-foreground">This won’t be your final alias. Don’t enter your real name; choose a nickname or a word instead.</p>
                   <Button className="w-full glow-primary" disabled={usernameSeed.trim().replace(/[^a-z0-9]/gi, "").length < 3} onClick={() => setAliasStage("questions")}>
                     Next: answer a few questions <ArrowRight className="size-4" />
                   </Button>
@@ -565,7 +563,7 @@ function OnboardingPage() {
                     <span className="text-muted-foreground">Starting with</span>
                     <span className="font-semibold">@{usernameSeed.trim().replace(/[^a-z0-9]/gi, "").slice(0, 7).toLowerCase()}</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     {ALIAS_QUESTIONS.map((question, questionIndex) => (
                       <fieldset key={question.prompt} className="min-w-0">
                         <legend className="mb-1.5 text-xs text-muted-foreground">{question.prompt}</legend>
@@ -626,7 +624,7 @@ function OnboardingPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="space-y-5 rounded-none border-0 bg-transparent p-0 md:glass-card md:rounded-2xl md:border md:border-border md:p-5"
+              className="space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
             >
               <ProfilePhotoPicker
                 photoUrl={photoUrl}
@@ -663,7 +661,7 @@ function OnboardingPage() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -24 }}
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="rounded-none border-0 bg-transparent p-0 md:glass-card md:rounded-2xl md:border md:border-border md:p-5"
+              className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
             >
               <div className="space-y-3">
                 {SOCIAL_FIELDS.map((field, index) => (
@@ -697,10 +695,18 @@ function OnboardingPage() {
                 </div>
               ) : null}
 
-              <Button className="mt-6 w-full glow-primary" disabled={saving} onClick={submit}>
+              <Button className="mt-6 w-full glow-primary" disabled={saving} onClick={() => void submit()}>
                 {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-                Enter Candid as @{username}
+                {saving ? "Finishing setup…" : `Enter Candid as @${username}`}
               </Button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void submit(false)}
+                className="mt-3 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+              >
+                Skip links and finish
+              </button>
               <button
                 type="button"
                 onClick={() => setStep(1)}
@@ -711,8 +717,10 @@ function OnboardingPage() {
             </motion.section>
           )}
         </AnimatePresence>
+        </div>
+        <footer className="mt-8 pb-2 text-center text-xs text-muted-foreground">Your alias appears publicly. Candid cannot guarantee complete anonymity.</footer>
       </div>
-    </div>
+    </main>
   );
 }
 
