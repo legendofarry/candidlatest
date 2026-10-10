@@ -70,6 +70,15 @@ function authErrorMessage(error: unknown) {
     return "Email or password wasn’t recognized. Check your details, or try Google if you used it to create your account.";
   }
   if (code === "auth/weak-password") return "Choose a password with at least 8 characters.";
+  if (code === "auth/too-many-requests") {
+    return "Too many attempts. Wait a little and try again.";
+  }
+  if (code === "auth/user-disabled") {
+    return "This account is disabled. Contact Candid support for help.";
+  }
+  if (code === "auth/invalid-login-credentials") {
+    return "Email or password wasn’t recognized. Check your details, or try Google if you used it to create your account.";
+  }
   if (code === "auth/invalid-email") return "Enter a valid email address.";
   if (code === "auth/network-request-failed") {
     return "Could not reach the sign-in service. Check your connection and try again.";
@@ -100,12 +109,14 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [accountError, setAccountError] = useState<string | null>(null);
   const fetchOnboardingState = useServerFn(getOnboardingState);
 
   useEffect(() => {
     // Do not redirect while a provider popup is still completing. Firebase emits
     // an auth-state update before Google profile data and token claims settle.
-    if (authLoading || !user || busy) return;
+    if (authLoading || !user || busy || accountError) return;
     if (!user.email) {
       // Firebase can technically create a Google-linked user without an email
       // when the provider response is incomplete. Candid cannot safely use it.
@@ -126,29 +137,58 @@ function AuthPage() {
       .then((state) => {
         if (active) void navigate({ to: state.needsOnboarding ? "/onboarding" : "/" });
       })
-      .catch(() => {
-        if (active) void navigate({ to: "/onboarding" });
+      .catch((error: unknown) => {
+        console.error("Signed in, but Candid could not load the account profile", error);
+        if (active) {
+          setAccountError(
+            "You’re signed in, but Candid couldn’t load your account. Check your connection and try again.",
+          );
+        }
       });
     return () => {
       active = false;
     };
-  }, [authLoading, user, fetchOnboardingState, navigate, mode, busy]);
+  }, [authLoading, user, fetchOnboardingState, navigate, mode, busy, accountError]);
 
-  if (authLoading || user) {
+  if (authLoading) {
     return (
       <div className="flex min-h-dvh items-center justify-center bg-background px-6 text-sm text-muted-foreground">
         <Loader2 className="mr-2 size-4 animate-spin" />
-        {user ? "Opening your account…" : "Checking your session…"}
+        Checking your session…
       </div>
+    );
+  }
+
+  if (user) {
+    return (
+      <main className="flex min-h-dvh items-center justify-center bg-background px-5 text-foreground">
+        <section className="w-full max-w-md rounded-2xl border border-border bg-card p-6 text-center shadow-sm sm:p-8">
+          {accountError ? (
+            <>
+              <h1 className="text-xl font-semibold">You’re signed in</h1>
+              <p role="alert" className="mt-3 text-sm leading-6 text-muted-foreground">{accountError}</p>
+              <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:justify-center">
+                <Button onClick={() => setAccountError(null)}>Try again</Button>
+                <Button variant="outline" onClick={() => void signOut(firebaseAuth)}>Sign out</Button>
+              </div>
+            </>
+          ) : (
+            <p className="flex items-center justify-center text-sm text-muted-foreground">
+              <Loader2 className="mr-2 size-4 animate-spin" /> Opening your account…
+            </p>
+          )}
+        </section>
+      </main>
     );
   }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
+    setAuthError(null);
     setBusy(true);
     try {
       if (mode === "signup") {
-        const credential = await createUserWithEmailAndPassword(firebaseAuth, email, password);
+        const credential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
         try {
           await sendEmailVerification(credential.user, verificationActionSettings());
           window.sessionStorage.setItem("candid:verification-email", "sent");
@@ -160,9 +200,9 @@ function AuthPage() {
         navigate({ to: "/verify-email" });
         return;
       }
-      await signInWithEmailAndPassword(firebaseAuth, email, password);
+      await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
     } catch (error) {
-      toast.error(authErrorMessage(error));
+      setAuthError(authErrorMessage(error));
     } finally {
       setBusy(false);
     }
@@ -175,19 +215,21 @@ function AuthPage() {
       return;
     }
     setBusy(true);
+    setAuthError(null);
     try {
       await sendPasswordResetEmail(firebaseAuth, address);
       toast.success(
         "If this email has password sign-in, reset instructions are on the way. If you use Google, choose Continue with Google.",
       );
     } catch (error) {
-      toast.error(authErrorMessage(error));
+      setAuthError(authErrorMessage(error));
     } finally {
       setBusy(false);
     }
   }
 
   async function googleSignIn() {
+    setAuthError(null);
     setBusy(true);
     try {
       const provider = new GoogleAuthProvider();
@@ -240,7 +282,15 @@ function AuthPage() {
     } catch (error) {
       const code = authErrorCode(error);
       if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
-        toast.error(authErrorMessage(error));
+        const message = authErrorMessage(error);
+        if (firebaseAuth.currentUser) {
+          console.error("Google sign-in succeeded but account setup did not finish", error);
+          setAccountError(
+            "Google signed you in, but Candid couldn’t load your account. Check your connection and try again.",
+          );
+        } else {
+          setAuthError(message);
+        }
       }
     } finally {
       setBusy(false);
@@ -252,6 +302,7 @@ function AuthPage() {
     setMode(nextMode);
     setPassword("");
     setShowPassword(false);
+    setAuthError(null);
   }
 
   return (
@@ -341,6 +392,11 @@ function AuthPage() {
                 </div>
 
                 <div id="auth-panel" role="tabpanel" aria-labelledby={`auth-tab-${mode}`}>
+                  {authError ? (
+                    <div role="alert" className="mb-4 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2.5 text-sm leading-5 text-danger">
+                      {authError}
+                    </div>
+                  ) : null}
                   <Button
                     type="button"
                     variant="outline"
