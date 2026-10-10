@@ -479,8 +479,8 @@ function OnboardingPage() {
   }
 
   return (
-    <main className="-mx-4 -my-6 min-h-[100dvh] bg-muted/30 px-4 py-5 sm:px-6 sm:py-8">
-      <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] w-full max-w-xl flex-col sm:min-h-[calc(100dvh-4rem)]">
+    <main className="min-h-dvh w-full bg-muted/30 px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
+      <div className="mx-auto w-full max-w-2xl">
         <header className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-2 font-display text-sm font-semibold">
             <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Flame className="size-4" /></span>
@@ -488,7 +488,7 @@ function OnboardingPage() {
           </div>
           <span className="text-xs text-muted-foreground">Your account</span>
         </header>
-        <div className="my-auto">
+        <div>
         <motion.div
           initial={{ opacity: 0, y: 18 }}
           animate={{ opacity: 1, y: 0 }}
@@ -718,7 +718,7 @@ function OnboardingPage() {
           )}
         </AnimatePresence>
         </div>
-        <footer className="mt-8 pb-2 text-center text-xs text-muted-foreground">Your alias appears publicly. Candid cannot guarantee complete anonymity.</footer>
+        <footer className="mt-6 pb-2 text-center text-xs leading-5 text-muted-foreground">Your alias appears publicly. Candid cannot guarantee complete anonymity.</footer>
       </div>
     </main>
   );
