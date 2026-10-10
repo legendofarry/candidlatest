@@ -31,7 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { PrivacySettings } from "@/components/site/privacy-settings";
 import { useAuth } from "@/hooks/useAuth";
-import { inbox, notify, openNotifications } from "@/lib/notifications-store";
+import { notify, openNotifications } from "@/lib/notifications-store";
 import { setPreference, usePreferences } from "@/lib/preferences";
 import { clearPersistedQueries } from "@/lib/query-persist";
 import { storageService } from "@/lib/storage";
@@ -100,17 +100,12 @@ function SettingsPage() {
       clearCredentials();
       setEnrolled(false);
       setPreference("biometricUnlock", false);
-      notify.info("Fast unlock turned off");
       return;
     }
     try {
       await registerBiometric(user.uid, user.email ?? "Candid user");
       setEnrolled(true);
       setPreference("biometricUnlock", true);
-      inbox.success("Fingerprint / face unlock enabled on this device", {
-        description: "You can turn it off any time from settings.",
-        dedupeKey: "biometric-enabled",
-      });
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not enable biometric unlock");
     }
@@ -120,15 +115,12 @@ function SettingsPage() {
     if (developerResetting || developerResetText !== RESET_CONFIRMATION) return;
     setDeveloperResetting(true);
     try {
-      const result = await resetFirestore({ data: { confirmation: RESET_CONFIRMATION } });
+      await resetFirestore({ data: { confirmation: RESET_CONFIRMATION } });
       clearPersistedQueries();
       storageService.clearCache();
       queryClient.clear();
       setDeveloperResetOpen(false);
       setDeveloperResetText("");
-      notify.success(
-        `Cleared ${result.deleted.toLocaleString()} Firestore document${result.deleted === 1 ? "" : "s"}.`,
-      );
       await firebaseAuth.signOut();
       await navigate({ to: "/auth" });
     } catch (error) {
@@ -362,7 +354,6 @@ function SettingsPage() {
                       actionLabel="Refresh"
                       onClick={() => {
                         void queryClient.invalidateQueries();
-                        notify.success("Fetching the latest content");
                       }}
                     />
                     <ActionRow
@@ -375,7 +366,6 @@ function SettingsPage() {
                         clearPersistedQueries();
                         storageService.clearCache();
                         queryClient.clear();
-                        notify.info("Local cache cleared");
                       }}
                     />
                   </SettingsGroup>
@@ -507,7 +497,6 @@ function SignInMethods({ user }: { user: User | null }) {
       provider.setCustomParameters({ prompt: "select_account" });
       const result = await linkWithPopup(user, provider);
       setProviderIds(result.user.providerData.map((item) => item.providerId));
-      notify.success("Google is connected. You can use either sign-in method now.");
     } catch (error) {
       const code = signInMethodErrorCode(error);
       if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
@@ -527,7 +516,6 @@ function SignInMethods({ user }: { user: User | null }) {
       const result = await linkWithCredential(user, credential);
       setProviderIds(result.user.providerData.map((item) => item.providerId));
       setPassword("");
-      notify.success("Password added. You can use either sign-in method now.");
     } catch (error) {
       notify.error(signInMethodError(error));
     } finally {

@@ -152,7 +152,6 @@ function AuthPage() {
         try {
           await sendEmailVerification(credential.user, verificationActionSettings());
           window.sessionStorage.setItem("candid:verification-email", "sent");
-          toast.success("Check your inbox for a verification link.");
         } catch (error) {
           window.sessionStorage.setItem("candid:verification-email", "failed");
           console.error("Could not send email verification", error);
@@ -162,7 +161,6 @@ function AuthPage() {
         return;
       }
       await signInWithEmailAndPassword(firebaseAuth, email, password);
-      toast.success("Signed in successfully.");
     } catch (error) {
       toast.error(authErrorMessage(error));
     } finally {
@@ -228,7 +226,6 @@ function AuthPage() {
         try {
           await sendEmailVerification(currentUser, verificationActionSettings());
           window.sessionStorage.setItem("candid:verification-email", "sent");
-          toast.success("Verify your email to finish signing in.");
         } catch (error) {
           window.sessionStorage.setItem("candid:verification-email", "failed");
           console.error("Could not send Google account verification", error);
@@ -238,14 +235,8 @@ function AuthPage() {
         return;
       }
 
-      const isNewUser = getAdditionalUserInfo(result)?.isNewUser ?? false;
       const state = await fetchOnboardingState({ data: undefined });
       await navigate({ to: state.needsOnboarding ? "/onboarding" : "/" });
-      toast.success(
-        isNewUser
-          ? "Account created with Google. Your identity stays private."
-          : "Signed in with Google.",
-      );
     } catch (error) {
       const code = authErrorCode(error);
       if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {

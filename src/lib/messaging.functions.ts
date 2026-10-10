@@ -65,6 +65,14 @@ export const postMessage = createServerFn({ method: "POST" })
     });
   });
 
+export const deleteChatMessage = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ message_id: z.string().min(1).max(180) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { deleteMessage } = await import("./messaging.server");
+    return deleteMessage(context.userId, data.message_id);
+  });
+
 export const issueChatImageUpload = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>

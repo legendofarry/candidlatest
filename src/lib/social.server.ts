@@ -143,11 +143,16 @@ export async function toggleStoryFollow(storyId: string, userId: string) {
 /** Everything the viewer has engaged with on a story. */
 export async function readStoryEngagement(storyId: string, userId: string) {
   const db = getFirestoreDb();
-  const [like, follow] = await Promise.all([
+  const [like, follow, story] = await Promise.all([
     db.collection("story_likes").doc(`${storyId}:${userId}`).get(),
     db.collection("story_follows").doc(`${storyId}:${userId}`).get(),
+    db.collection("stories").doc(storyId).get(),
   ]);
-  return { liked: like.exists, following: follow.exists };
+  return {
+    liked: like.exists,
+    following: follow.exists,
+    likes: Number((story.data() as { likes?: number } | undefined)?.likes ?? 0),
+  };
 }
 
 export type FollowedStory = {

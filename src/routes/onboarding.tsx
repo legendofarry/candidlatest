@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
@@ -159,6 +159,14 @@ const LENS_INTEREST_LABELS: { key: keyof LensInterests; label: string }[] = [
   { key: "career", label: "Career decisions" },
 ];
 
+const ALIAS_QUESTIONS = [
+  { prompt: "Your pace", options: ["Steady", "Bold"] },
+  { prompt: "Your hours", options: ["Dawn", "Night"] },
+  { prompt: "Your energy", options: ["Cozy", "Wild"] },
+  { prompt: "Your instinct", options: ["Sage", "Scout"] },
+] as const;
+const ALIAS_ENDINGS = ["Runner", "Rebel", "Nomad", "Comet", "ChomaBandit"];
+
 function getLensInterests(answers: LensAnswer): LensInterests {
   const interests: LensInterests = {
     payBenefits: 0,
@@ -213,6 +221,9 @@ function OnboardingPage() {
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [username, setUsername] = useState("");
+  const [aliasAnswers, setAliasAnswers] = useState([0, 1, 0, 1]);
+  const [aliasIdea, setAliasIdea] = useState("");
+  const [aliasRound, setAliasRound] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -317,10 +328,8 @@ function OnboardingPage() {
     return () => window.clearTimeout(timer);
   }, [lensScreen, scenarioIndex, prefersReducedMotion]);
 
-  const seed = useMemo(() => {
-    const raw = user?.email?.split("@")[0] ?? "candid";
-    return raw.toLowerCase().replace(/[^a-z0-9._]/g, "");
-  }, [user?.email]);
+  // Suggestions are intentionally unrelated to the user's email or legal identity.
+  const seed = "candid";
 
   const loadSuggestions = useCallback(
     async (value: string) => {
@@ -329,6 +338,21 @@ function OnboardingPage() {
     },
     [seed, suggest],
   );
+
+  function generateAlias() {
+    const pace = ALIAS_QUESTIONS[0].options[aliasAnswers[0] ?? 0];
+    const time = ALIAS_QUESTIONS[1].options[aliasAnswers[1] ?? 0];
+    const style = ALIAS_QUESTIONS[2].options[aliasAnswers[2] ?? 0];
+    const instinct = ALIAS_QUESTIONS[3].options[aliasAnswers[3] ?? 0];
+    const ending = ALIAS_ENDINGS[(aliasRound + (aliasAnswers[0] ?? 0) + (aliasAnswers[2] ?? 0)) % ALIAS_ENDINGS.length]!;
+    const options = [
+      `${time}${instinct}`,
+      `${pace}${ending}`,
+      `${style}${ending}`,
+    ];
+    setAliasIdea(options[aliasRound % options.length]!.replace(/[^a-zA-Z0-9]/g, ""));
+    setAliasRound((round) => round + 1);
+  }
 
   useEffect(() => {
     if (!user) return;
@@ -407,7 +431,6 @@ function OnboardingPage() {
           // A stored draft is harmless if browser storage cannot be cleared.
         }
       }
-      toast.success(`Welcome, @${username.trim().toLowerCase()}`);
       navigate({ to: "/" });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Could not save your username";
@@ -486,9 +509,9 @@ function OnboardingPage() {
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
             {step === 0
-              ? "This is the name every post, comment and reply of yours will carry."
+                ? "This public alias appears on your posts and comments. It does not need to match your real name."
               : step === 1
-                ? "Optional. Add a photo to your profile, or continue without one."
+                ? "Optional. Your profile photo is public; skip it if you prefer to stay less identifiable."
                 : "Optional. These only show on your profile — skip if you'd rather not."}
           </p>
         </motion.div>
@@ -516,6 +539,37 @@ function OnboardingPage() {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="rounded-none border-0 bg-transparent p-0 md:glass-card md:rounded-2xl md:border md:border-border md:p-5"
             >
+              <div className="mb-5 rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="font-medium">Create a private alias</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Your public name does not need to match your real name.</p>
+                  </div>
+                  <Button type="button" size="sm" variant="outline" onClick={generateAlias}>
+                    <Sparkles className="mr-1.5 size-4" /> {aliasIdea ? "Another idea" : "Make an alias"}
+                  </Button>
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-2">
+                  {ALIAS_QUESTIONS.map((question, questionIndex) => (
+                    <label key={question.prompt} className="text-xs text-muted-foreground">
+                      {question.prompt}
+                      <select
+                        value={aliasAnswers[questionIndex]}
+                        onChange={(event) => setAliasAnswers((answers) => answers.map((answer, index) => index === questionIndex ? Number(event.target.value) : answer))}
+                        className="mt-1.5 block w-full rounded-lg border border-input bg-background px-2 py-2 text-sm text-foreground"
+                      >
+                        {question.options.map((option, optionIndex) => <option key={option} value={optionIndex}>{option}</option>)}
+                      </select>
+                    </label>
+                  ))}
+                </div>
+                {aliasIdea ? (
+                  <div className="mt-3 flex items-center justify-between rounded-xl bg-background px-3 py-2">
+                    <span className="font-display text-lg font-semibold">@{aliasIdea.toLowerCase()}</span>
+                    <Button type="button" size="sm" variant="ghost" onClick={() => setUsername(aliasIdea.toLowerCase())}>Use this</Button>
+                  </div>
+                ) : null}
+              </div>
               <Label htmlFor="username" className="text-xs uppercase tracking-wider">
                 Username
               </Label>
@@ -773,7 +827,7 @@ function CandidLensExperience({
         <div className="grid flex-1 items-center gap-8 py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)] lg:gap-16 lg:py-10">
           <AnimatePresence mode="wait" initial={false}>
             {screen === "intro" ? (
-              <motion.section key="lens-intro" initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? undefined : { opacity: 0, y: -8 }} transition={transition} className="w-full max-w-2xl">
+              <motion.section key="lens-intro" initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} {...(reducedMotion ? {} : { exit: { opacity: 0, y: -8 } })} transition={transition} className="w-full max-w-2xl">
                 <p className="mb-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><Sparkles className="size-4" /> A quick check-in</p>
                 <h1 className="max-w-2xl font-display text-4xl font-semibold leading-[1.06] tracking-[-0.04em] sm:text-6xl">What do you look for at work?</h1>
                 <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-5">
@@ -784,13 +838,13 @@ function CandidLensExperience({
                 </div>
               </motion.section>
             ) : screen === "scenario" && scenario ? (
-              <motion.section key={`lens-scenario-${scenarioIndex}`} initial={reducedMotion ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} exit={reducedMotion ? undefined : { opacity: 0, x: -12 }} transition={transition} aria-live="polite" className="w-full max-w-2xl">
+              <motion.section key={`lens-scenario-${scenarioIndex}`} initial={reducedMotion ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} {...(reducedMotion ? {} : { exit: { opacity: 0, x: -12 } })} transition={transition} aria-live="polite" className="w-full max-w-2xl">
                 <p className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><scenario.icon className="size-4" /> {scenario.label}</p>
                 <h1 className="font-display text-[1.75rem] font-semibold leading-[1.18] tracking-[-0.03em] sm:text-4xl">{scenario.text}</h1>
                 <div className="mt-7 grid gap-3 sm:grid-cols-2">
                   {scenario.choices.map((choice, index) => {
                     const selected = selectedChoice === choice.value;
-                    return <motion.button key={choice.value} type="button" disabled={Boolean(selectedChoice)} aria-pressed={answers[scenarioKey] === choice.value} onClick={() => onAnswer(choice.value)} whileTap={reducedMotion ? undefined : { scale: 0.985 }} className={`group flex min-h-28 w-full flex-col items-start justify-between rounded-2xl border p-4 text-left transition-all sm:min-h-36 sm:p-5 ${selected ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-border bg-card/60 hover:border-primary/50 hover:bg-card"}`}>
+                    return <motion.button key={choice.value} type="button" disabled={Boolean(selectedChoice)} aria-pressed={answers[scenarioKey] === choice.value} onClick={() => onAnswer(choice.value)} {...(reducedMotion ? {} : { whileTap: { scale: 0.985 } })} className={`group flex min-h-28 w-full flex-col items-start justify-between rounded-2xl border p-4 text-left transition-all sm:min-h-36 sm:p-5 ${selected ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-border bg-card/60 hover:border-primary/50 hover:bg-card"}`}>
                       <span className={`flex size-7 items-center justify-center rounded-full border text-xs ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground group-hover:border-primary/50"}`}>{selected ? <Check className="size-4" /> : index + 1}</span>
                       <span className="mt-4 text-sm font-semibold leading-6 sm:text-base">{choice.label}</span>
                     </motion.button>;

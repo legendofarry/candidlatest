@@ -48,6 +48,8 @@ export type MessageRecord = {
     delivery_url: string;
     delivery_url_expires_at: number;
   } | null;
+  is_deleted?: boolean;
+  deleted_at?: string | null;
 };
 
 export type ChatImageUploadReceipt = {
@@ -155,7 +157,7 @@ export async function discardChatImageUpload(userId: string, ticketId: string) {
   if (!response.ok || !["ok", "not found"].includes(result.result ?? "")) {
     throw new Error(result.error?.message || "The image could not be removed. Please retry.");
   }
-  await ticketRef.update({ status: "discarded", discarded_at: now() }, { updateTime: ticketSnap.updateTime });
+  await ticketRef.update({ status: "discarded", discarded_at: now() }, ticketSnap.updateTime ? { updateTime: ticketSnap.updateTime } : undefined);
   return { ok: true as const };
 }
 
@@ -521,6 +523,7 @@ export async function sendMessage(input: {
     read_at: null,
     reactions: {},
     image,
+    is_deleted: false,
   };
   const batch = db.batch();
   batch.set(messageRef, message);
@@ -540,6 +543,62 @@ export async function sendMessage(input: {
   await batch.commit();
 
   return message;
+}
+
+/** Sender can retract a message for both participants during the first two minutes. */
+export async function deleteMessage(userId: string, messageId: string) {
+  const db = getFirestoreDb();
+  const messageRef = db.collection("messages").doc(messageId);
+  const messageSnap = await messageRef.get();
+  const message = messageSnap.data() as MessageRecord | undefined;
+  if (!messageSnap.exists || !message) throw new Error("Message not found.");
+  if (message.sender_id !== userId) throw new Error("You can only delete your own messages.");
+  if (message.is_deleted) return { ok: true as const };
+  const age = Date.now() - new Date(message.created_at).getTime();
+  if (!Number.isFinite(age) || age < 0 || age > 2 * 60 * 1000) {
+    throw new Error("Messages can only be deleted for everyone within two minutes.");
+  }
+  const conversationRef = db.collection("conversations").doc(message.conversation_id);
+  const conversationSnap = await conversationRef.get();
+  const conversation = conversationSnap.data() as ConversationRecord | undefined;
+  if (!conversationSnap.exists || !conversation?.participant_ids.includes(userId)) {
+    throw new Error("Not your conversation.");
+  }
+  const batch = db.batch();
+  batch.update(messageRef, {
+    body: "",
+    image: null,
+    reactions: {},
+    is_deleted: true,
+    deleted_at: now(),
+  }, messageSnap.updateTime ? { updateTime: messageSnap.updateTime } : undefined);
+  if (conversation.last_message_at === message.created_at && conversation.last_sender_id === userId) {
+    batch.update(conversationRef, { last_message: "Message deleted" });
+  }
+  await batch.commit();
+  if (message.image?.public_id) {
+    try {
+      const config = getCloudinaryEvidenceConfig();
+      const timestamp = String(Math.floor(Date.now() / 1000));
+      const params = { invalidate: "true", public_id: message.image.public_id, timestamp, type: "authenticated" };
+      const signature = await signCloudinaryParams(params, config.apiSecret);
+      const form = new FormData();
+      form.set("api_key", config.apiKey);
+      form.set("public_id", params.public_id);
+      form.set("timestamp", timestamp);
+      form.set("type", params.type);
+      form.set("invalidate", params.invalidate);
+      form.set("signature", signature);
+      const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(config.cloudName)}/image/destroy`, { method: "POST", body: form });
+      const result = (await response.json().catch(() => ({}))) as { result?: string };
+      if (!response.ok || !["ok", "not found"].includes(result.result ?? "")) {
+        console.error("Deleted chat message image could not be removed from Cloudinary", message.image.public_id);
+      }
+    } catch (error) {
+      console.error("Deleted chat message image cleanup failed", error);
+    }
+  }
+  return { ok: true as const };
 }
 
 export async function toggleReaction(userId: string, messageId: string, emoji: string) {

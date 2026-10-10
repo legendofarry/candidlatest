@@ -9,7 +9,15 @@ export type CompanyRecord = {
   name: string;
   industry: string | null;
   county: string | null;
+  area?: string | null;
+  website?: string | null;
+  address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  map_url?: string | null;
   verified: boolean;
+  /** New employers remain private until a public story is approved or an owner lists them. */
+  is_public?: boolean;
   created_at: string;
   aliases?: string[];
   claimed_by?: string | null;
@@ -48,6 +56,7 @@ export type ProfileRecord = {
   role_label: string | null;
   username?: string | null;
   photo_url?: string | null;
+  verified?: boolean;
   username_changed_at?: string | null;
   socials?: ProfileSocials | null;
   candid_lens?: CandidLensRecord | null;
@@ -103,16 +112,22 @@ export type StoryRecord = {
   role_level: string | null;
   position?: string | null;
   county: string | null;
+  area?: string | null;
+  /** Employer stays linked internally while the public story can hide its identity. */
+  company_public?: boolean;
+  company_location_suggestion?: string | null;
   tenure: string | null;
   industry: string | null;
   would_work_again: boolean | null;
   author_id: string | null;
   author_username?: string | null;
   author_membership_tier?: "basic" | "premium" | "gold";
+  verified?: boolean;
   status: "published" | "pending" | "hidden";
   moderation_note: string | null;
   evidence_status?: "pending_review" | "reviewed" | null;
   upvotes: number;
+  likes?: number;
   metoo: number;
   comment_count: number;
   created_at: string;
@@ -132,6 +147,8 @@ export type CommentRecord = {
   author_membership_tier?: "basic" | "premium" | "gold";
   is_official?: boolean;
   likes?: number;
+  is_deleted?: boolean;
+  edited_at?: string;
   created_at: string;
 };
 
@@ -272,6 +289,26 @@ function median(values: number[]) {
   return ((sorted[middle - 1] ?? 0) + (sorted[middle] ?? 0)) / 2;
 }
 
+function redactCompanyMentions(value: string, company: CompanyRecord | null | undefined) {
+  let result = value;
+  const names = [company?.name, ...(company?.aliases ?? [])]
+    .filter((name): name is string => Boolean(name?.trim()))
+    .sort((a, b) => b.length - a.length);
+  for (const name of names) {
+    const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result.replace(new RegExp(escaped, "gi"), "the employer");
+  }
+  return result;
+}
+
+function isPublicCompany(company: CompanyRecord) {
+  return company.is_public !== false && !isPlaceholderCompanyName(company.name);
+}
+
+function isPlaceholderCompanyName(name: string | null | undefined) {
+  return /^(n\/?a|none|unknown|not applicable|confidential)$/i.test(name?.trim() ?? "");
+}
+
 export async function buildCompanyScores() {
   const [companies, stories, ratings, profiles] = await Promise.all([
     readCollection<CompanyRecord>("companies"),
@@ -282,7 +319,7 @@ export async function buildCompanyScores() {
 
   const storiesByCompany = new Map<string, StoryRecord[]>();
   for (const story of stories) {
-    if (!story.company_id) continue;
+    if (!story.company_id || story.status !== "published" || story.company_public === false) continue;
     const list = storiesByCompany.get(story.company_id) ?? [];
     list.push(story);
     storiesByCompany.set(story.company_id, list);
@@ -299,7 +336,7 @@ export async function buildCompanyScores() {
     profiles.map((profile) => [profile.company_id, profile] as const),
   );
 
-  return companies.map<CompanyScoreRecord>((company) => {
+  return companies.filter(isPublicCompany).map<CompanyScoreRecord>((company) => {
     const companyStories = storiesByCompany.get(company.id) ?? [];
     const companyRatings = ratingsByCompany.get(company.id) ?? [];
 
@@ -430,7 +467,7 @@ export async function buildCompanySalaryDirectory() {
   }
 
   const rows: CompanySalarySummary[] = [];
-  for (const company of companies) {
+  for (const company of companies.filter(isPublicCompany)) {
     const items = byCompany.get(company.id) ?? [];
     if (items.length === 0) continue;
     const positions = new Set(items.map((item) => item.role_title.trim().toLowerCase()));
@@ -456,7 +493,7 @@ export async function buildCompanySalaryDirectory() {
 /** Per-position breakdown for one company. */
 export async function buildCompanySalaryDetail(slug: string) {
   const companies = await readCollection<CompanyRecord>("companies");
-  const company = companies.find((entry) => entry.slug === slug) ?? null;
+  const company = companies.find((entry) => entry.slug === slug && isPublicCompany(entry)) ?? null;
   if (!company) return null;
 
   const reports = (await readCollection<SalaryReportRecord>("salary_reports")).filter(
@@ -498,10 +535,11 @@ export async function buildCompanySalaryDetail(slug: string) {
   };
 }
 
-export type PublicStoryRecord = Omit<StoryRecord, "status" | "moderation_note"> & {
+export type PublicStoryRecord = Omit<StoryRecord, "status" | "moderation_note" | "body" | "created_at" | "id" | "company_id" | "reasons" | "company_name" | "company_slug" | "company_verified" | "comment_count" | "metoo" | "upvotes" | "likes" | "would_work_again" | "author_username" | "author_membership_tier" | "area" | "company_location_suggestion"> & {
   body: string | null;
   created_at: string | null;
   id: string | null;
+  company_id: string | null;
   reasons: string[] | null;
   company_name: string | null;
   company_slug: string | null;
@@ -509,9 +547,12 @@ export type PublicStoryRecord = Omit<StoryRecord, "status" | "moderation_note"> 
   comment_count: number | null;
   metoo: number | null;
   upvotes: number | null;
+  likes: number | null;
   would_work_again: boolean | null;
   author_username: string | null;
   author_membership_tier: "basic" | "premium" | "gold";
+  area: string | null;
+  company_location_suggestion: null;
 };
 
 /** Map of user id -> claimed username, for showing authors on public stories. */
@@ -530,7 +571,7 @@ async function readAuthorMembershipTiers(): Promise<Map<string, "basic" | "premi
 }
 
 export async function getFilterOptionsData() {
-  const companies = await readCollection<CompanyRecord>("companies");
+  const companies = (await readCollection<CompanyRecord>("companies")).filter(isPublicCompany);
   const industries = [
     ...new Set(companies.map((company) => company.industry).filter(Boolean)),
   ].sort() as string[];
@@ -560,18 +601,24 @@ export async function getPublicStories(input: {
     .filter((story) => story.status === "published")
     .filter((story) => (input.industry ? story.industry === input.industry : true))
     .filter((story) => (input.county ? story.county === input.county : true))
-    .filter((story) => (input.companySlug ? story.company_slug === input.companySlug : true))
+    .filter((story) => (input.companySlug ? story.company_public !== false && story.company_slug === input.companySlug : true))
     .filter((story) => (input.reason ? (story.reasons ?? []).includes(input.reason) : true))
     .map<PublicStoryRecord>((story) => {
       const company = companiesById.get(story.company_id);
+      const hideEmployer = story.company_public === false || isPlaceholderCompanyName(company?.name ?? story.company_name);
       return {
         ...story,
-        body: story.body,
+        title: hideEmployer ? redactCompanyMentions(story.title, company) : story.title,
+        body: hideEmployer ? redactCompanyMentions(story.body, company) : story.body,
+        company_location_suggestion: null,
         created_at: story.created_at,
         id: story.id,
-        company_name: story.company_name ?? company?.name ?? null,
-        company_slug: story.company_slug ?? company?.slug ?? null,
-        company_verified: Boolean(company?.verified),
+        company_id: hideEmployer ? null : story.company_id,
+        company_name: hideEmployer ? "Employer withheld" : (company?.name ?? story.company_name ?? null),
+        company_slug: hideEmployer ? null : (story.company_slug ?? company?.slug ?? null),
+        company_verified: hideEmployer ? false : Boolean(company?.verified),
+        area: hideEmployer ? null : (story.area ?? null),
+        likes: Number(story.likes ?? 0),
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
         metoo: story.metoo,
@@ -598,7 +645,7 @@ export async function getPublicStories(input: {
 
 export async function getCompanyView(slug: string) {
   const companies = await readCollection<CompanyRecord>("companies");
-  const company = companies.find((entry) => entry.slug === slug) ?? null;
+  const company = companies.find((entry) => entry.slug === slug && isPublicCompany(entry)) ?? null;
   if (!company) return null;
 
   const [scores, profile, stories, authorUsernames, authorMembershipTiers] = await Promise.all([
@@ -615,17 +662,21 @@ export async function getCompanyView(slug: string) {
     profile,
     stories: stories
       .filter((story) => story.status === "published")
+      .filter((story) => story.company_public !== false && !isPlaceholderCompanyName(story.company_name))
       .filter((story) => story.company_id === company.id)
       .map<PublicStoryRecord>((story) => ({
         ...story,
         body: story.body,
         created_at: story.created_at,
         id: story.id,
-        company_name: story.company_name ?? company.name,
-        company_slug: story.company_slug ?? company.slug,
+        company_location_suggestion: null,
+        company_name: company.name,
+        company_slug: company.slug,
         company_verified: Boolean(company.verified),
+        area: story.area ?? null,
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
+        likes: Number(story.likes ?? 0),
         metoo: story.metoo,
         upvotes: story.upvotes,
         would_work_again: story.would_work_again,
@@ -642,12 +693,18 @@ export async function getStoryView(id: string) {
   const company =
     (story.company_id ? await readDocument<CompanyRecord>("companies", story.company_id) : null) ??
     null;
+  const hideEmployer = story.company_public === false || isPlaceholderCompanyName(company?.name ?? story.company_name);
   const authorProfile = story.author_id
     ? await readDocument<ProfileRecord>("profiles", story.author_id)
     : null;
-  const rawComments = (await readCollection<CommentRecord>("comments"))
-    .filter((comment) => comment.status === "published")
-    .filter((comment) => comment.story_id === id);
+  const commentSnapshot = await getFirestoreDb()
+    .collection("comments")
+    .where("story_id", "==", id)
+    .where("status", "==", "published")
+    .orderBy("created_at", "asc")
+    .limit(1000)
+    .get();
+  const rawComments = commentSnapshot.docs.map((doc) => doc.data() as CommentRecord);
 
   const profiles = await readCollection<ProfileRecord>("profiles");
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile] as const));
@@ -675,9 +732,10 @@ export async function getStoryView(id: string) {
       );
     return {
       ...comment,
+      body: comment.is_deleted ? "" : hideEmployer ? redactCompanyMentions(comment.body, company) : comment.body,
       author_username: comment.author_username ?? profile?.username ?? null,
       author_photo_url: comment.author_photo_url ?? profile?.photo_url ?? null,
-      author_membership_tier: membershipBadgeTier(profile),
+      author_membership_tier: membershipBadgeTier(profile ?? undefined),
       author_verified: comment.author_verified ?? verification?.badge_status === "claimed",
       is_official: official,
       likes: Number(comment.likes ?? 0),
@@ -720,16 +778,22 @@ export async function getStoryView(id: string) {
   return {
     story: {
       ...story,
-      company_name: story.company_name ?? company?.name ?? null,
-      company_slug: story.company_slug ?? company?.slug ?? null,
-      company_verified: Boolean(company?.verified),
+      title: hideEmployer ? redactCompanyMentions(story.title, company) : story.title,
+      body: hideEmployer ? redactCompanyMentions(story.body, company) : story.body,
+      company_location_suggestion: null,
+      company_id: hideEmployer ? null : story.company_id,
+      company_name: hideEmployer ? "Employer withheld" : (company?.name ?? story.company_name ?? null),
+      company_slug: hideEmployer ? null : (story.company_slug ?? company?.slug ?? null),
+      company_verified: hideEmployer ? false : Boolean(company?.verified),
+      area: hideEmployer ? null : (story.area ?? null),
+      likes: Number(story.likes ?? 0),
       reasons: story.reasons ?? [],
       comment_count: story.comment_count,
       metoo: story.metoo,
       upvotes: story.upvotes,
       would_work_again: story.would_work_again,
       author_username: authorProfile?.username ?? null,
-      author_membership_tier: membershipBadgeTier(authorProfile),
+      author_membership_tier: membershipBadgeTier(authorProfile ?? undefined),
     } as PublicStoryRecord,
     comments: roots,
     commentTotal: enriched.length,
@@ -747,7 +811,7 @@ export async function searchData(queryText: string) {
     readAuthorMembershipTiers(),
   ]);
 
-  const companyMatches = companies
+  const companyMatches = companies.filter(isPublicCompany)
     .filter((company) =>
       [company.name, company.industry ?? "", company.county ?? ""]
         .join(" ")
@@ -759,36 +823,37 @@ export async function searchData(queryText: string) {
   const storyMatches = stories
     .filter((story) => story.status === "published")
     .filter((story) =>
-      [story.title, story.body, story.company_name ?? "", story.industry ?? "", story.county ?? ""]
+      [story.title, story.body, story.company_public === false || isPlaceholderCompanyName(story.company_name) ? "" : story.company_name ?? "", story.industry ?? "", story.county ?? ""]
         .join(" ")
         .toLowerCase()
         .includes(q),
     )
     .slice(0, 15)
-    .map<PublicStoryRecord>((story) => ({
-      ...story,
-      body: story.body,
-      created_at: story.created_at,
-      id: story.id,
-      company_name:
-        story.company_name ??
-        companies.find((company) => company.id === story.company_id)?.name ??
-        null,
-      company_slug:
-        story.company_slug ??
-        companies.find((company) => company.id === story.company_id)?.slug ??
-        null,
-      company_verified: Boolean(
-        companies.find((company) => company.id === story.company_id)?.verified,
-      ),
-      reasons: story.reasons ?? [],
-      comment_count: story.comment_count,
-      metoo: story.metoo,
-      upvotes: story.upvotes,
-      would_work_again: story.would_work_again,
-      author_username: story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null,
-      author_membership_tier: story.author_id ? (authorMembershipTiers.get(story.author_id) ?? "basic") : "basic",
-    }));
+    .map<PublicStoryRecord>((story) => {
+      const company = companies.find((entry) => entry.id === story.company_id);
+      const hideEmployer = story.company_public === false || isPlaceholderCompanyName(company?.name ?? story.company_name);
+      return {
+        ...story,
+        title: hideEmployer ? redactCompanyMentions(story.title, company) : story.title,
+        body: hideEmployer ? redactCompanyMentions(story.body, company) : story.body,
+        company_location_suggestion: null,
+        created_at: story.created_at,
+        id: story.id,
+        company_id: hideEmployer ? null : story.company_id,
+        company_name: hideEmployer ? "Employer withheld" : company?.name ?? story.company_name ?? null,
+        company_slug: hideEmployer ? null : story.company_slug ?? company?.slug ?? null,
+        company_verified: hideEmployer ? false : Boolean(company?.verified),
+        area: hideEmployer ? null : story.area ?? null,
+        likes: Number(story.likes ?? 0),
+        reasons: story.reasons ?? [],
+        comment_count: story.comment_count,
+        metoo: story.metoo,
+        upvotes: story.upvotes,
+        would_work_again: story.would_work_again,
+        author_username: story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null,
+        author_membership_tier: story.author_id ? (authorMembershipTiers.get(story.author_id) ?? "basic") : "basic",
+      };
+    });
 
   return { companies: companyMatches, stories: storyMatches };
 }

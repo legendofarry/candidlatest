@@ -102,7 +102,6 @@ export function CompanyRatingDialog({
           reasons,
         },
       });
-      toast.success("Thanks — your rating is counted.");
       await queryClient.invalidateQueries({ queryKey: ["company"] });
       await queryClient.invalidateQueries({ queryKey: ["company-intel", companyId] });
       onOpenChange(false);

@@ -96,15 +96,6 @@ function ProfilePage() {
     try {
       await declareType({ data: { accountType } });
       await queryClient.invalidateQueries({ queryKey: ["onboarding-state"] });
-      toast.success(
-        accountType === "company" ? "Employer account confirmed" : "Thanks — you are set",
-        {
-          description:
-            accountType === "company"
-              ? "You can now reply to stories about your company and add your location."
-              : "Your account is marked as an individual worker.",
-        },
-      );
     } catch {
       toast.error("Could not save that", {
         description: "Check your connection and try again.",
@@ -124,7 +115,6 @@ function ProfilePage() {
       }
       await queryClient.invalidateQueries({ queryKey: ["onboarding-state", user?.uid] });
       setEditingUsername(false);
-      toast.success(`Username changed to @${result.username}`);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not change username.");
     } finally {
@@ -581,8 +571,7 @@ function ContributionsPanel({
                     <Link
                       key={`${item.type}-${item.id}`}
                       to={item.type === "story" ? "/post" : "/stories/$id"}
-                      params={item.type === "story" ? undefined : { id: item.storyId ?? "" }}
-                      search={item.type === "story" ? { edit: item.id } : undefined}
+                      {...(item.type === "story" ? { search: { edit: item.id } } : { params: { id: item.storyId ?? "" } })}
                       className="flex items-start gap-3 py-3 first:pt-1 last:pb-1"
                     >
                       <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">

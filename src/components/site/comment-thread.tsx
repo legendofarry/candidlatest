@@ -10,7 +10,9 @@ import {
   Heart,
   Loader2,
   MoreHorizontal,
+  Pencil,
   Send,
+  Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,12 +23,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ReportDialog } from "@/components/site/report-dialog";
-import { addComment, getMyEngagement, likeComment } from "@/lib/actions.functions";
+import { addComment, deleteComment, editComment, getMyEngagement, likeComment } from "@/lib/actions.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { ProfileAvatar } from "@/components/site/profile-photo";
+import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import type { MembershipTier } from "@/lib/membership";
 
 export type ThreadComment = {
@@ -34,12 +37,15 @@ export type ThreadComment = {
   body: string;
   created_at: string;
   author_handle: string;
+  author_id?: string | null;
   author_username: string | null;
   author_photo_url?: string | null;
   author_verified: boolean;
   author_membership_tier?: MembershipTier;
   is_official: boolean;
   likes: number;
+  is_deleted?: boolean;
+  edited_at?: string;
   replies: ThreadComment[];
 };
 
@@ -80,6 +86,7 @@ export function CommentThread({
   const engagementFn = useServerFn(getMyEngagement);
   const [body, setBody] = useState("");
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
+  const [visibleRootCount, setVisibleRootCount] = useState(30);
 
   useEffect(() => {
     if (!focusCommentId) return;
@@ -123,7 +130,6 @@ export function CommentThread({
     onSuccess: () => {
       setBody("");
       setReplyTo(null);
-      toast.success("Comment posted");
       void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -153,7 +159,7 @@ export function CommentThread({
         className={cn("divide-y divide-border/60", panelMode && "min-h-0 flex-1 overflow-y-auto")}
       >
         <AnimatePresence initial={false}>
-          {sortedComments.map((comment) => (
+          {sortedComments.slice(0, visibleRootCount).map((comment) => (
             <CommentRow
               key={comment.id}
               comment={comment}
@@ -176,6 +182,14 @@ export function CommentThread({
           </p>
         ) : null}
       </div>
+
+      {sortedComments.length > visibleRootCount ? (
+        <div className="border-t border-border/60 p-3 text-center">
+          <Button variant="ghost" size="sm" onClick={() => setVisibleRootCount((count) => count + 30)}>
+            Show more comments
+          </Button>
+        </div>
+      ) : null}
 
       <div
         className={cn(
@@ -270,6 +284,8 @@ function CommentRow({
 }) {
   const { user } = useAuth();
   const like = useServerFn(likeComment);
+  const edit = useServerFn(editComment);
+  const remove = useServerFn(deleteComment);
   const [open, setOpen] = useState(
     (depth === 0 && comment.replies.some((r) => r.is_official)) ||
       (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
@@ -278,6 +294,14 @@ function CommentRow({
   const [localLiked, setLocalLiked] = useState<boolean | null>(null);
   const [localLikes, setLocalLikes] = useState(comment.likes);
   const [localReported, setLocalReported] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [editedBody, setEditedBody] = useState(comment.body);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [visibleReplies, setVisibleReplies] = useState(10);
+
+  useEffect(() => {
+    if (!editing) setEditedBody(comment.body);
+  }, [comment.body, editing]);
 
   const isLiked = localLiked ?? liked.has(comment.id);
   const isReported = localReported || reported.has(comment.id);
@@ -287,7 +311,7 @@ function CommentRow({
     .toUpperCase();
 
   const toggleLike = async () => {
-    if (!user) return;
+    if (!user || comment.is_deleted) return;
     const next = !isLiked;
     setLocalLiked(next);
     setLocalLikes((value) => Math.max(0, value + (next ? 1 : -1)));
@@ -300,6 +324,26 @@ function CommentRow({
       toast.error((error as Error).message);
     }
   };
+
+  async function saveEdit() {
+    try {
+      await edit({ data: { comment_id: comment.id, body: editedBody } });
+      setEditing(false);
+      onChanged();
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  }
+
+  async function deleteOwnComment() {
+    try {
+      await remove({ data: { comment_id: comment.id } });
+      setConfirmDelete(false);
+      onChanged();
+    } catch (error) {
+      toast.error((error as Error).message);
+    }
+  }
 
   return (
     <motion.div
@@ -347,11 +391,25 @@ function CommentRow({
             <span className="text-muted-foreground">· {timeAgo(comment.created_at)}</span>
           </div>
 
-          <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">{comment.body}</p>
+          {editing ? (
+            <div className="mt-2 space-y-2">
+              <Textarea rows={3} maxLength={2000} value={editedBody} onChange={(event) => setEditedBody(event.target.value)} />
+              <div className="flex gap-2">
+                <Button size="sm" disabled={editedBody.trim().length < 2} onClick={() => void saveEdit()}>Save</Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+              </div>
+            </div>
+          ) : (
+            <p className={cn("mt-1 whitespace-pre-line text-sm leading-relaxed", comment.is_deleted && "italic text-muted-foreground")}>
+              {comment.is_deleted ? "This comment was deleted" : comment.body}
+              {comment.edited_at && !comment.is_deleted ? <span className="ml-1 text-xs text-muted-foreground">(edited)</span> : null}
+            </p>
+          )}
 
           <div className="mt-1.5 flex items-center gap-4 text-[11px] font-medium text-muted-foreground">
             <button
               type="button"
+              disabled={comment.is_deleted}
               className="hover:text-foreground"
               onClick={() => onReply(comment)}
             >
@@ -366,24 +424,27 @@ function CommentRow({
                 <ChevronDown
                   className={cn("size-3.5 transition-transform", open && "rotate-180")}
                 />
-                {open ? "Hide" : `View ${comment.replies.length}`} repl
-                {comment.replies.length === 1 ? "y" : "ies"}
+                {open ? "Hide" : `View ${comment.replies.length}`} {comment.replies.length === 1 ? "reply" : "replies"}
               </button>
             ) : null}
           </div>
         </div>
 
         <div className="flex flex-col items-center gap-1">
-          <button
-            type="button"
-            aria-label="Like comment"
-            disabled={!user}
-            onClick={() => void toggleLike()}
-            className="text-muted-foreground transition-transform active:scale-90 disabled:opacity-50"
-          >
-            <Heart className={cn("size-4", isLiked && "fill-danger text-danger")} />
-          </button>
-          <span className="text-[10px] text-muted-foreground">{localLikes}</span>
+          {!comment.is_deleted ? (
+            <>
+              <button
+                type="button"
+                aria-label="Like comment"
+                disabled={!user}
+                onClick={() => void toggleLike()}
+                className="text-muted-foreground transition-transform active:scale-90 disabled:opacity-50"
+              >
+                <Heart className={cn("size-4", isLiked && "fill-danger text-danger")} />
+              </button>
+              <span className="text-[10px] text-muted-foreground">{localLikes}</span>
+            </>
+          ) : null}
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -396,16 +457,20 @@ function CommentRow({
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                disabled={!user || isReported}
-                className="text-danger"
-                onSelect={(event) => {
-                  event.preventDefault();
-                  setReportOpen(true);
-                }}
-              >
-                {isReported ? "Already reported" : "Report comment"}
-              </DropdownMenuItem>
+              {comment.author_id === user?.uid && !comment.is_deleted ? (
+                <>
+                  <DropdownMenuItem onSelect={(event) => { event.preventDefault(); setEditing(true); }}>
+                    <Pencil className="mr-2 size-4" /> Edit comment
+                  </DropdownMenuItem>
+                  <DropdownMenuItem className="text-danger" onSelect={(event) => { event.preventDefault(); setConfirmDelete(true); }}>
+                    <Trash2 className="mr-2 size-4" /> Delete comment
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                <DropdownMenuItem disabled={!user || isReported} className="text-danger" onSelect={(event) => { event.preventDefault(); setReportOpen(true); }}>
+                  {isReported ? "Already reported" : "Report comment"}
+                </DropdownMenuItem>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -413,7 +478,7 @@ function CommentRow({
 
       <AnimatePresence initial={false}>
         {open
-          ? comment.replies.map((reply) => (
+          ? comment.replies.slice(0, visibleReplies).map((reply) => (
               <CommentRow
                 key={reply.id}
                 comment={reply}
@@ -429,6 +494,12 @@ function CommentRow({
           : null}
       </AnimatePresence>
 
+      {open && comment.replies.length > visibleReplies ? (
+        <button type="button" className="ml-12 mt-1 text-xs font-medium text-primary" onClick={() => setVisibleReplies((count) => count + 10)}>
+          Show more replies
+        </button>
+      ) : null}
+
       <ReportDialog
         open={reportOpen}
         onOpenChange={setReportOpen}
@@ -438,6 +509,15 @@ function CommentRow({
           setLocalReported(true);
           onChanged();
         }}
+      />
+      <ConfirmDialog
+        open={confirmDelete}
+        onOpenChange={setConfirmDelete}
+        title="Delete this comment?"
+        description="The text will be removed. Replies will stay in the conversation."
+        confirmLabel="Delete comment"
+        destructive
+        onConfirm={() => void deleteOwnComment()}
       />
     </motion.div>
   );

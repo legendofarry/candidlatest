@@ -93,7 +93,7 @@ export async function buildPulse(): Promise<PulseSnapshot> {
     storiesTotal: published.length,
     storiesLast7Days: published.filter((story) => story.created_at >= week).length,
     storiesLast24Hours: published.filter((story) => story.created_at >= day).length,
-    companies: companies.length,
+    companies: companies.filter((company) => company.is_public !== false).length,
     counties: counties.size,
     voices: profiles.length,
     topReasons: [...reasonTally.entries()]

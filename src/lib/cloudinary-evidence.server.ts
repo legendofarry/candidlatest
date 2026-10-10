@@ -26,7 +26,6 @@ export async function signCloudinaryParams(
   return cloudinary.utils.api_sign_request(
     params,
     apiSecret.trim(),
-    algorithm === "SHA-256" ? "sha256" : "sha1",
   );
 }
 

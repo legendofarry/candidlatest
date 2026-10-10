@@ -107,14 +107,17 @@ export async function resolveVerification(
   const domain = emailDomain(email);
   const corporate = Boolean(domain && !FREE_EMAIL_DOMAINS.has(domain));
 
-  let company: CompanyRecord | null = null;
+  let matchedCompany: CompanyRecord | null = null;
   if (corporate && domain) {
     const snapshot = await db.collection("companies").get();
     const companies = snapshot.docs.map(
       (doc) => ({ ...(doc.data() as CompanyRecord), id: doc.id }) as CompanyRecord,
     );
-    company = matchCompanyByDomain(domain, companies);
+    matchedCompany = matchCompanyByDomain(domain, companies);
   }
+
+  const claimedElsewhere = Boolean(matchedCompany?.claimed_by && matchedCompany.claimed_by !== userId);
+  const company = claimedElsewhere ? null : matchedCompany;
 
   const detected: AccountType = company ? "company" : corporate ? "unknown" : "individual";
   const accountType: AccountType = existing.owner_override ?? detected;
@@ -130,9 +133,9 @@ export async function resolveVerification(
     ...existing,
     account_type: accountType,
     badge_status: badgeStatus,
-    company_id: company?.id ?? existing.company_id,
-    company_name: company?.name ?? existing.company_name,
-    company_slug: company?.slug ?? existing.company_slug,
+    company_id: claimedElsewhere ? null : company?.id ?? existing.company_id,
+    company_name: claimedElsewhere ? null : company?.name ?? existing.company_name,
+    company_slug: claimedElsewhere ? null : company?.slug ?? existing.company_slug,
     checked_at: new Date().toISOString(),
   };
 
@@ -165,7 +168,10 @@ export async function claimBadge(userId: string, email: string | null, emailVeri
   const companySnapshot = current.company_id
     ? await db.collection("companies").doc(current.company_id).get()
     : null;
-  const company = companySnapshot?.data() as { verified?: boolean } | undefined;
+  const company = companySnapshot?.data() as { verified?: boolean; claimed_by?: string | null } | undefined;
+  if (current.account_type === "company" && current.company_id && company?.claimed_by && company.claimed_by !== userId) {
+    return { ok: false as const, reason: "This company account is already linked to another official account." };
+  }
   const { reviewAccountVerification } = await import("./ai.server");
   const screen = await reviewAccountVerification({
     email,
@@ -177,7 +183,7 @@ export async function claimBadge(userId: string, email: string | null, emailVeri
   });
   const timestamp = new Date().toISOString();
   const autoApproved = screen.decision === "auto_approved";
-  await reviewRef.set({
+  const reviewRecord = {
     id: userId,
     user_id: userId,
     status: autoApproved ? "approved" : "pending_review",
@@ -191,20 +197,27 @@ export async function claimBadge(userId: string, email: string | null, emailVeri
     requested_at: timestamp,
     reviewed_at: autoApproved ? timestamp : null,
     reviewed_by: autoApproved ? "ai" : null,
-  });
-  await db.collection("account_verifications").doc(userId).set({
+  };
+  const verificationRef = db.collection("account_verifications").doc(userId);
+  const profileRef = db.collection("profiles").doc(userId);
+  const auditRef = db.collection("owner_audit_log").doc();
+  const batch = db.batch();
+  if (autoApproved && current.account_type === "company" && current.company_id && companySnapshot?.exists && !company?.claimed_by) {
+    batch.update(db.collection("companies").doc(current.company_id), { claimed_by: userId }, companySnapshot.updateTime ? { updateTime: companySnapshot.updateTime } : undefined);
+  }
+  batch.set(reviewRef, reviewRecord);
+  batch.set(verificationRef, {
     badge_status: autoApproved ? "claimed" : "eligible",
     approval_status: autoApproved ? "approved" : "pending_review",
     claimed_at: autoApproved ? timestamp : null,
     requested_at: timestamp,
     snoozed_until: null,
   }, { merge: true });
-  await db.collection("profiles").doc(userId).set({
+  batch.set(profileRef, {
     verified: autoApproved,
     account_type: current.account_type,
   }, { merge: true });
-  const auditRef = db.collection("owner_audit_log").doc();
-  await auditRef.set({
+  batch.create(auditRef, {
     id: auditRef.id,
     action: autoApproved ? "account_verification.ai_approved" : "account_verification.ai_queued",
     target_type: "user",
@@ -218,6 +231,14 @@ export async function claimBadge(userId: string, email: string | null, emailVeri
     },
     created_at: timestamp,
   });
+  try {
+    await batch.commit();
+  } catch (error) {
+    if (autoApproved && current.account_type === "company") {
+      return { ok: false as const, reason: "Another account claimed this company first. Contact Candid if this is your official account." };
+    }
+    throw error;
+  }
   return autoApproved
     ? { ok: true as const, approved: true as const }
     : { ok: true as const, pending: true as const };

@@ -24,9 +24,11 @@ export const Route = createFileRoute("/api/public/owner/companies")({
           readCollection<CompanyRecord>("companies"),
           readCollection<CompanyAIProfileRecord>("company_ai_profiles"),
         ]);
+        const locations = await readCollection<Record<string, unknown>>("company_locations");
         const profileByCompany = new Map(
           profiles.map((profile) => [profile.company_id, profile] as const),
         );
+        const locationByCompany = new Map(locations.map((location) => [String(location["company_id"] ?? location["id"] ?? ""), location] as const));
 
         const filtered = companies
           .filter((company) =>
@@ -43,6 +45,7 @@ export const Route = createFileRoute("/api/public/owner/companies")({
           companies: filtered.slice(offset, offset + limit).map((company) => ({
             ...company,
             company_ai_profiles: profileByCompany.get(company.id) ?? null,
+            company_location: locationByCompany.get(company.id) ?? null,
           })),
         });
       },

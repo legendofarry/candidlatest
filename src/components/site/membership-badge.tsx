@@ -6,17 +6,18 @@ export function MembershipBadge({
   tier,
   className,
 }: {
-  tier?: MembershipTier | null;
+  tier?: MembershipTier | null | undefined;
   className?: string;
 }) {
   if (!tier || tier === "basic") return null;
 
   return (
+    <span title="Candid badge" className="inline-flex">
     <BadgeCheck
       aria-label="Candid badge"
       role="img"
-      title="Candid badge"
       className={`inline-block size-4 shrink-0 text-primary ${className ?? ""}`}
     />
+    </span>
   );
 }

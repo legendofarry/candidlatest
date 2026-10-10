@@ -108,6 +108,7 @@ function StoryPage() {
               <MapPin className="size-3" /> {story.county}
             </span>
           )}
+          {story.area ? <span>· {story.area}</span> : null}
           <span>· {story.tenure}</span>
           <span>· {story.role_level}</span>
         </div>
@@ -164,7 +165,7 @@ function StoryPage() {
         >
           <Users className="size-4" /> This happened to me too {story.metoo ?? 0}
         </Button>
-        <StorySocial storyId={id} />
+        <StorySocial storyId={id} likes={story.likes ?? 0} />
         <Button
           variant="ghost"
           className="ml-auto text-danger"

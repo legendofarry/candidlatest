@@ -18,7 +18,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { inbox, notify as toast } from "@/lib/notifications-store";
+import { notify as toast } from "@/lib/notifications-store";
 import { getFilterOptions } from "@/lib/public.functions";
 import {
   createStory,
@@ -90,6 +90,9 @@ type StoryDraft = {
   companyName: string;
   industry: string;
   county: string;
+  area: string;
+  companyMapUrl: string;
+  showEmployer: boolean;
   reasons: string[];
   customReason: string;
   tenure: string;
@@ -141,6 +144,9 @@ function PostPage() {
   const [companyName, setCompanyName] = useState("");
   const [industry, setIndustry] = useState("");
   const [county, setCounty] = useState("");
+  const [area, setArea] = useState("");
+  const [companyMapUrl, setCompanyMapUrl] = useState("");
+  const [showEmployer, setShowEmployer] = useState(true);
   const [reasons, setReasons] = useState<string[]>([]);
   const [customReason, setCustomReason] = useState("");
   const [tenure, setTenure] = useState("");
@@ -184,6 +190,9 @@ function PostPage() {
         setCompanyName(story.company_name);
         setIndustry(story.industry ?? "");
         setCounty(story.county ?? "");
+        setArea(story.area ?? "");
+        setCompanyMapUrl(story.company_location_suggestion ?? "");
+        setShowEmployer(story.company_public !== false);
         setReasons(story.reasons);
         setTenure(story.tenure ?? "");
         setRoleLevel(story.role_level ?? "");
@@ -238,6 +247,8 @@ function PostPage() {
     companyName.trim().length > 0 ||
     industry.trim().length > 0 ||
     county.trim().length > 0 ||
+    area.trim().length > 0 ||
+    companyMapUrl.trim().length > 0 ||
     reasons.length > 0 ||
     customReason.trim().length > 0 ||
     tenure.length > 0 ||
@@ -255,6 +266,9 @@ function PostPage() {
     companyName,
     industry,
     county,
+    area,
+    companyMapUrl,
+    showEmployer,
     reasons,
     customReason,
     tenure,
@@ -315,6 +329,9 @@ function PostPage() {
           companyName: typeof parsed.companyName === "string" ? parsed.companyName : "",
           industry: typeof parsed.industry === "string" ? parsed.industry : "",
           county: typeof parsed.county === "string" ? parsed.county : "",
+          area: typeof parsed.area === "string" ? parsed.area : "",
+          companyMapUrl: typeof parsed.companyMapUrl === "string" ? parsed.companyMapUrl : "",
+          showEmployer: typeof parsed.showEmployer === "boolean" ? parsed.showEmployer : true,
           reasons: Array.isArray(parsed.reasons)
             ? parsed.reasons.filter((reason): reason is string => typeof reason === "string").slice(0, 10)
             : [],
@@ -331,6 +348,9 @@ function PostPage() {
         setCompanyName(restored.companyName);
         setIndustry(restored.industry);
         setCounty(restored.county);
+        setArea(restored.area);
+        setCompanyMapUrl(restored.companyMapUrl);
+        setShowEmployer(restored.showEmployer);
         setReasons(restored.reasons);
         setCustomReason(restored.customReason);
         setTenure(restored.tenure);
@@ -341,9 +361,6 @@ function PostPage() {
         setWouldReturn(restored.wouldReturn);
         setEvidenceNote(restored.evidenceNote);
         setSavedDraftKey(JSON.stringify(restored));
-        toast.info("Draft restored", {
-          description: "Your saved story draft is ready on this device. Reattach proof if needed.",
-        });
       }
     } catch {
       try {
@@ -404,7 +421,6 @@ function PostPage() {
     try {
       window.localStorage.setItem(`candid:story-draft:${user.uid}`, storyDraftKey);
       setSavedDraftKey(storyDraftKey);
-      toast.success("Draft saved");
     } catch {
       toast.error("Could not save draft", { description: "Check your device storage and try again." });
     }
@@ -550,6 +566,9 @@ function PostPage() {
       let uploadedProof = evidenceUpload;
       if (evidenceFile && !uploadedProof) uploadedProof = await uploadEvidenceFile(evidenceFile);
 
+      if (companyName.trim().length < 2 || /^(n\/?a|none|unknown|not applicable)$/i.test(companyName.trim())) {
+        throw new Error("Enter the employer's name. Use the employer privacy option if you do not want it shown publicly.");
+      }
       await ensure({ data: { county: county || null } });
       const company = await findCompany({
         data: { name: companyName.trim(), industry: industry || null, county: county || null },
@@ -568,6 +587,9 @@ function PostPage() {
         role_level: roleLevel || null,
         position: position.trim() || null,
         county: county || null,
+        area: area.trim() || null,
+        company_public: showEmployer,
+        company_location_suggestion: companyMapUrl.trim() || null,
         tenure: tenure || null,
         industry: industry || company.industry || null,
         would_work_again: wouldReturn,
@@ -579,15 +601,9 @@ function PostPage() {
 
       clearSavedDraft();
       if (!isEditing && result.status === "published") {
-        toast.success("Your story is live");
         navigate({ to: "/stories/$id", params: { id: result.id } });
       } else {
-        inbox.info(isEditing ? "Changes submitted for approval" : "Story submitted for review", {
-          description: isEditing
-            ? "Your story is temporarily hidden while a moderator reviews the changes."
-            : "It will appear in the feed once a moderator approves it.",
-        });
-        navigate({ to: isEditing ? "/profile" : "/" });
+        navigate({ to: "/profile" });
       }
     } catch (error) {
       const message = error instanceof Error
@@ -695,9 +711,22 @@ function PostPage() {
                           autoComplete="off"
                         />
                         <p className="text-xs text-muted-foreground">
-                          The shop, company, or person you worked for — whatever name everyone knows
-                          it by.
+                          Your employer is required for accurate company records. Your account email and legal name are never attached to the public story.
                         </p>
+                        <label className="flex cursor-pointer items-start gap-2 rounded-xl border border-border p-3 text-sm">
+                          <input
+                            type="checkbox"
+                            checked={!showEmployer}
+                            onChange={(event) => setShowEmployer(!event.target.checked)}
+                            className="mt-0.5 accent-[var(--primary)]"
+                          />
+                          <span>
+                            <span className="block font-medium">Hide employer name on the public story</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              Candid keeps the company link for moderation and reporting, but readers and the employer see “Employer withheld.”
+                            </span>
+                          </span>
+                        </label>
 
                         {matches.length > 0 && !exactMatch ? (
                           <div className="space-y-1.5 rounded-2xl border border-border bg-secondary/40 p-3">
@@ -736,6 +765,28 @@ function PostPage() {
                         value={county}
                         onChange={setCounty}
                       />
+                      <div className="space-y-2">
+                        <Label htmlFor="work-area">Which area did you work in? (optional)</Label>
+                        <Input
+                          id="work-area"
+                          value={area}
+                          onChange={(event) => setArea(event.target.value)}
+                          maxLength={100}
+                          placeholder="e.g. Westlands, Industrial Area"
+                        />
+                        <p className="text-xs text-muted-foreground">Leave this blank if it could identify you.</p>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="company-map">Google Maps link (optional)</Label>
+                        <Input
+                          id="company-map"
+                          value={companyMapUrl}
+                          onChange={(event) => setCompanyMapUrl(event.target.value)}
+                          maxLength={500}
+                          placeholder="https://maps.google.com/..."
+                        />
+                        <p className="text-xs text-muted-foreground">This is a location suggestion for Candid to review. It does not change the public company location by itself.</p>
+                      </div>
                     </>
                   ) : null}
 

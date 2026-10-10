@@ -214,7 +214,6 @@ function CompanyLocationPrompt({
           lng,
         },
       });
-      toast.success("Location saved.");
       await queryClient.invalidateQueries({ queryKey: companyIntelQueryKey(companyId) });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not save the location");

@@ -38,7 +38,6 @@ export function PrivacySettings() {
     try {
       await saveSettings({ data: { who_can_message: value } });
       await queryClient.invalidateQueries({ queryKey: ["privacy-settings"] });
-      notify.success("Message privacy updated");
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not save that");
     }
@@ -113,7 +112,6 @@ export function PrivacySettings() {
                         void (async () => {
                           await unblock({ data: { user_id: account.id } });
                           await queryClient.invalidateQueries({ queryKey: ["privacy-settings"] });
-                          notify.success(`Unblocked @${account.username}`);
                         })()
                       }
                     >

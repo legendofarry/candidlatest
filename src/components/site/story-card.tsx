@@ -15,9 +15,11 @@ export type PublicStory = {
   company_verified?: boolean;
   role_level: string | null;
   county: string | null;
+  area?: string | null;
   tenure: string | null;
   industry: string | null;
   upvotes: number | null;
+  likes?: number | null;
   metoo: number | null;
   comment_count: number | null;
   created_at: string | null;
@@ -86,6 +88,7 @@ export function StoryCard({
           <MapPin className="size-3" />
           {story.county}
         </span>
+        {story.area ? <span>· {story.area}</span> : null}
         {story.tenure ? <span>· {story.tenure}</span> : null}
         {story.role_level ? <span>· {story.role_level}</span> : null}
       </div>
@@ -135,6 +138,7 @@ export function StoryCard({
           upvotes={story.upvotes ?? 0}
           metoo={story.metoo ?? 0}
           commentCount={story.comment_count ?? 0}
+          likes={story.likes ?? 0}
           discussionOpen={discussionOpen}
           onToggleDiscussion={onToggleDiscussion}
         />

@@ -158,7 +158,6 @@ export function ProfilePhotoPicker({
       onSaved(saved.photoUrl);
       setFile(null);
       setActionsOpen(false);
-      notify.success("Profile photo updated.");
     } catch (uploadError) {
       if (controller.signal.aborted) return;
       setError(uploadError instanceof Error ? uploadError.message : "Upload failed. Try again.");

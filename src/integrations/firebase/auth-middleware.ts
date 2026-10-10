@@ -21,7 +21,7 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
     if (!decoded.uid) {
       throw new Error("Unauthorized: Firebase token missing uid");
     }
-    if (!decoded.email || decoded.email_verified !== true) {
+    if (!decoded.email || decoded["email_verified"] !== true) {
       throw new Error("Email verification required. Open /verify-email to continue.");
     }
 

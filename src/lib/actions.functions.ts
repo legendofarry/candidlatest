@@ -34,6 +34,13 @@ function randomHandle() {
     }`;
 }
 
+function validateEmployerName(value: string) {
+  const name = value.trim();
+  if (name.length < 2 || /^(n\/?a|none|unknown|not applicable|confidential)$/i.test(name)) {
+    throw new Error("Enter the employer's name. Do not use N/A or a placeholder.");
+  }
+}
+
 /** Ensures the signed-in user has a public-facing profile handle. */
 export const ensureProfile = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
@@ -70,9 +77,20 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
+    const clientCompany = (company: CompanyRecord) => ({
+      id: company.id,
+      slug: company.slug,
+      name: company.name,
+      industry: company.industry,
+      county: company.county,
+      verified: company.verified,
+      aliases: company.aliases ?? [],
+    });
+    validateEmployerName(data.name);
     const slug = slugify(data.name);
+    if (!slug) throw new Error("Enter a valid employer name.");
 
-    const { findCompanyMatches } = await import("./company-match");
+    const { findCompanyMatches, normalizeCompanyName } = await import("./company-match");
     const all = await readCollection<CompanyRecord>("companies");
     const exact =
       all.find((company) => company.slug === slug) ??
@@ -89,7 +107,29 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
           .update({ aliases: [...aliases] });
         exact.aliases = [...aliases];
       }
-      return exact;
+      const normalized = normalizeCompanyName(data.name);
+      const indexId = slugify(normalized);
+      if (indexId) {
+        const indexRef = db.collection("company_name_index").doc(indexId);
+        try { await indexRef.create({ company_id: exact.id, normalized_name: normalized, created_at: new Date().toISOString() }); } catch { /* another alias/index may already exist */ }
+      }
+      return clientCompany(exact);
+    }
+
+    const normalized = normalizeCompanyName(data.name);
+    const indexId = slugify(normalized);
+    if (!indexId) throw new Error("Enter a valid employer name.");
+    const indexRef = db.collection("company_name_index").doc(indexId);
+    try {
+      await indexRef.create({ normalized_name: normalized, company_id: null, created_at: new Date().toISOString() });
+    } catch {
+      const racedIndex = await indexRef.get();
+      const racedCompanyId = (racedIndex.data() as { company_id?: string | null } | undefined)?.company_id;
+      if (racedCompanyId) {
+        const racedCompany = await db.collection("companies").doc(racedCompanyId).get();
+        if (racedCompany.exists) return clientCompany({ ...(racedCompany.data() as CompanyRecord), id: racedCompany.id });
+      }
+      throw new Error("This employer is being added already. Try selecting it again in a moment.");
     }
 
     const created: CompanyRecord = {
@@ -98,11 +138,20 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       name: data.name,
       industry: data.industry,
       county: data.county,
+      is_public: false,
       verified: false,
       created_at: new Date().toISOString(),
       aliases: [],
     };
-    await db.collection("companies").doc(created.id).set(created);
+    try {
+      const batch = db.batch();
+      batch.create(db.collection("companies").doc(created.id), created);
+      batch.update(indexRef, { company_id: created.id });
+      await batch.commit();
+    } catch (error) {
+      try { await indexRef.delete(); } catch { /* retain any index that now points at a live company */ }
+      throw error;
+    }
 
     try {
       const { researchCompany } = await import("./ai.server");
@@ -126,7 +175,7 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       console.error("[findOrCreateCompany] research failed", error);
     }
 
-    return created;
+    return clientCompany(created);
   });
 
 export const createStory = createServerFn({ method: "POST" })
@@ -141,6 +190,9 @@ export const createStory = createServerFn({ method: "POST" })
         role_level: z.string().max(40).nullable().default(null),
         position: z.string().max(80).nullable().default(null),
         county: z.string().max(60).nullable().default(null),
+        area: z.string().max(100).nullable().default(null),
+        company_public: z.boolean().default(true),
+        company_location_suggestion: z.string().url().max(500).nullable().default(null),
         tenure: z.string().max(40).nullable().default(null),
         industry: z.string().max(80).nullable().default(null),
         would_work_again: z.boolean().nullable().default(null),
@@ -174,6 +226,7 @@ export const createStory = createServerFn({ method: "POST" })
     const db = context.db ?? getFirestoreDb();
     const company = await queryFirst<CompanyRecord>("companies", "id", data.company_id);
     if (!company) throw new Error("Company not found");
+    validateEmployerName(company.name);
 
     const evidenceNote = data.evidence?.note?.trim() || null;
     const uploadedEvidence = data.evidence?.upload ?? null;
@@ -244,6 +297,9 @@ export const createStory = createServerFn({ method: "POST" })
       role_level: data.role_level,
       position: data.position?.trim() || null,
       county: data.county,
+      area: data.area?.trim() || null,
+      company_public: data.company_public,
+      company_location_suggestion: data.company_location_suggestion,
       tenure: data.tenure,
       industry: data.industry ?? company.industry,
       would_work_again: data.would_work_again,
@@ -265,6 +321,9 @@ export const createStory = createServerFn({ method: "POST" })
     const storyRef = db.collection("stories").doc(storyId);
     if ((await storyRef.get()).exists) throw new Error("This story has already been submitted.");
     batch.set(storyRef, created);
+    if (autoApproved && data.company_public) {
+      batch.update(db.collection("companies").doc(company.id), { is_public: true });
+    }
     batch.set(db.collection("story_ai_reviews").doc(storyId), {
       id: storyId,
       story_id: storyId,
@@ -309,8 +368,23 @@ export const createStory = createServerFn({ method: "POST" })
     }
     await batch.commit();
 
+    if (autoApproved) {
+      try {
+        const { pushServerNotification } = await import("./notifications.server");
+        await pushServerNotification({
+          userId: context.userId,
+          kind: "success",
+          title: "Your story is approved",
+          description: "Your story is now visible on Candid.",
+          link: `/stories/${encodeURIComponent(storyId)}`,
+        });
+      } catch (error) {
+        console.error("Could not notify story author of automatic approval", error);
+      }
+    }
+
     // Tell the company's claimed account it was tagged in a new live story.
-    if (created.status === "published") {
+    if (created.status === "published" && created.company_public !== false) {
       try {
         const owners = await db
           .collection("account_verifications")
@@ -356,6 +430,9 @@ export const getStoryForEdit = createServerFn({ method: "POST" })
       role_level: story.role_level,
       position: story.position ?? null,
       county: story.county,
+      area: story.area ?? null,
+      company_public: story.company_public !== false,
+      company_location_suggestion: story.company_location_suggestion ?? null,
       tenure: story.tenure,
       industry: story.industry,
       would_work_again: story.would_work_again,
@@ -375,6 +452,9 @@ export const updateStory = createServerFn({ method: "POST" })
         role_level: z.string().max(40).nullable().default(null),
         position: z.string().max(80).nullable().default(null),
         county: z.string().max(60).nullable().default(null),
+        area: z.string().max(100).nullable().default(null),
+        company_public: z.boolean().default(true),
+        company_location_suggestion: z.string().url().max(500).nullable().default(null),
         tenure: z.string().max(40).nullable().default(null),
         industry: z.string().max(80).nullable().default(null),
         would_work_again: z.boolean().nullable().default(null),
@@ -393,6 +473,7 @@ export const updateStory = createServerFn({ method: "POST" })
       throw new Error("Story not found or you do not have permission to edit it.");
     }
     if (!company) throw new Error("Company not found");
+    validateEmployerName(company.name);
 
     const evidenceRef = db.collection("employment_evidence").doc(data.story_id);
     const evidenceSnapshot = await evidenceRef.get();
@@ -427,6 +508,9 @@ export const updateStory = createServerFn({ method: "POST" })
       role_level: data.role_level,
       position: data.position?.trim() || null,
       county: data.county,
+      area: data.area?.trim() || null,
+      company_public: data.company_public,
+      company_location_suggestion: data.company_location_suggestion,
       tenure: data.tenure,
       industry: data.industry ?? company.industry,
       would_work_again: data.would_work_again,
@@ -484,19 +568,6 @@ export const castVote = createServerFn({ method: "POST" })
     const field = data.kind === "up" ? "upvotes" : "metoo";
     const storySnap = await storyRef.get();
     const currentStory = storySnap.exists ? storySnap.data() : null;
-    const parentCommentSnap = data.parent_id
-      ? await db.collection("comments").doc(data.parent_id).get()
-      : null;
-    const parentComment = parentCommentSnap?.exists ? parentCommentSnap.data() : null;
-    if (
-      data.parent_id &&
-      (!parentComment ||
-        parentComment["story_id"] !== data.story_id ||
-        parentComment["status"] !== "published")
-    ) {
-      throw new Error("That comment is no longer available to reply to.");
-    }
-
     if (existing.exists) {
       await voteRef.delete();
       await storyRef.update({
@@ -534,6 +605,14 @@ export const addComment = createServerFn({ method: "POST" })
     const storyRef = db.collection("stories").doc(data.story_id);
     const storySnap = await storyRef.get();
     const currentStory = storySnap.exists ? storySnap.data() : null;
+    if (!currentStory || currentStory["status"] !== "published") throw new Error("Story not found.");
+    const parentCommentSnap = data.parent_id
+      ? await db.collection("comments").doc(data.parent_id).get()
+      : null;
+    const parentComment = parentCommentSnap?.exists ? parentCommentSnap.data() : null;
+    if (data.parent_id && (!parentComment || parentComment["story_id"] !== data.story_id || parentComment["status"] !== "published" || parentComment["is_deleted"] === true)) {
+      throw new Error("That comment is no longer available to reply to.");
+    }
 
     const verificationSnap = await db.collection("account_verifications").doc(context.userId).get();
     const verification = verificationSnap.exists
@@ -563,6 +642,7 @@ export const addComment = createServerFn({ method: "POST" })
         likes: 0,
         status: "published",
         created_at: new Date().toISOString(),
+        is_deleted: false,
       });
     await storyRef.update({ comment_count: Number(currentStory?.["comment_count"] ?? 0) + 1 });
 
@@ -674,6 +754,38 @@ export const likeComment = createServerFn({ method: "POST" })
       }
     }
     return { liked: true, likes: current + 1 };
+  });
+
+export const editComment = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ comment_id: z.string().uuid(), body: z.string().trim().min(2).max(2000) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const db = context.db ?? getFirestoreDb();
+    const ref = db.collection("comments").doc(data.comment_id);
+    const snap = await ref.get();
+    const comment = snap.data() as Record<string, unknown> | undefined;
+    if (!snap.exists || comment?.["author_id"] !== context.userId || comment["status"] !== "published" || comment["is_deleted"] === true) {
+      throw new Error("You can no longer edit this comment.");
+    }
+    await ref.update({ body: data.body, edited_at: new Date().toISOString() }, snap.updateTime ? { updateTime: snap.updateTime } : undefined);
+    return { ok: true as const };
+  });
+
+export const deleteComment = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ comment_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const db = context.db ?? getFirestoreDb();
+    const ref = db.collection("comments").doc(data.comment_id);
+    const snap = await ref.get();
+    const comment = snap.data() as Record<string, unknown> | undefined;
+    if (!snap.exists || comment?.["author_id"] !== context.userId || comment["status"] !== "published" || comment["is_deleted"] === true) {
+      throw new Error("You can no longer delete this comment.");
+    }
+    await ref.update({ body: "", is_deleted: true, deleted_at: new Date().toISOString() }, snap.updateTime ? { updateTime: snap.updateTime } : undefined);
+    return { ok: true as const };
   });
 
 /** What the signed-in user has already done on this story (likes, votes, reports). */

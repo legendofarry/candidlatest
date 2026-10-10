@@ -15,7 +15,13 @@ export const Route = createFileRoute("/api/public/owner/users")({
 
         const search = url.searchParams.get("q");
         const banned = url.searchParams.get("banned");
-        const profiles = await readCollection<ProfileRecord>("profiles");
+        const [profiles, verifications, verificationReviews] = await Promise.all([
+          readCollection<ProfileRecord>("profiles"),
+          readCollection<Record<string, unknown>>("account_verifications"),
+          readCollection<Record<string, unknown>>("account_verification_reviews"),
+        ]);
+        const verificationByUser = new Map(verifications.map((item) => [String(item["user_id"] ?? item["id"] ?? ""), item]));
+        const reviewByUser = new Map(verificationReviews.map((item) => [String(item["user_id"] ?? item["id"] ?? ""), item]));
         const filtered = profiles
           .filter((profile) =>
             search ? profile.handle.toLowerCase().includes(search.toLowerCase()) : true,
@@ -28,7 +34,11 @@ export const Route = createFileRoute("/api/public/owner/users")({
           total: filtered.length,
           limit,
           offset,
-          users: filtered.slice(offset, offset + limit),
+          users: filtered.slice(offset, offset + limit).map((profile) => ({
+            ...profile,
+            account_verification: verificationByUser.get(profile.id) ?? null,
+            verification_review: reviewByUser.get(profile.id) ?? null,
+          })),
         });
       },
     },

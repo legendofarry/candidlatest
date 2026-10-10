@@ -24,6 +24,7 @@ export function StoryActions({
   upvotes,
   metoo,
   commentCount,
+  likes,
   discussionOpen = false,
   onToggleDiscussion,
 }: {
@@ -31,6 +32,7 @@ export function StoryActions({
   upvotes: number;
   metoo: number;
   commentCount: number;
+  likes?: number;
   discussionOpen?: boolean;
   onToggleDiscussion?: (() => void) | undefined;
 }) {
@@ -76,7 +78,6 @@ export function StoryActions({
     onSuccess: () => {
       setBody("");
       setOptimistic((prev) => ({ ...prev, comments: prev.comments + 1 }));
-      toast.success("Comment posted.");
       void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
       void queryClient.invalidateQueries({ queryKey: ["stories"] });
     },
@@ -117,7 +118,7 @@ export function StoryActions({
             }
           }}
         />
-        <StorySocial storyId={storyId} className="contents sm:flex" />
+        <StorySocial storyId={storyId} likes={likes ?? 0} className="contents sm:flex" />
 
         <ActionChip
           icon={<Flag className="size-4" />}

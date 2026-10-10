@@ -44,11 +44,8 @@ function BillingPage() {
         expectedVersion,
       },
     }),
-    onSuccess: async (result) => {
+    onSuccess: async () => {
       await queryClient.invalidateQueries();
-      notify.success(result.changed
-        ? `Switched to ${MEMBERSHIP_PLANS[result.tier].name}. No payment was processed.`
-        : "You’re already on this package");
     },
     onError: (error) => {
       notify.error(error instanceof Error ? error.message : "Could not change your package");

@@ -93,12 +93,11 @@ function PublicProfilePage() {
 
   const profile = data;
 
-  async function run(action: () => Promise<unknown>, message: string) {
+  async function run(action: () => Promise<unknown>) {
     setBusy(true);
     try {
       await action();
       await queryClient.invalidateQueries({ queryKey: ["public-profile", username] });
-      notify.success(message);
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Something went wrong");
     } finally {
@@ -156,7 +155,6 @@ function PublicProfilePage() {
               onClick={() =>
                 void run(
                   () => follow({ data: { user_id: profile.id } }),
-                  profile.isFollowing ? "Unfollowed" : "Following",
                 )
               }
             >
@@ -203,7 +201,6 @@ function PublicProfilePage() {
                 onClick={() =>
                   void run(
                     () => block({ data: { user_id: profile.id } }),
-                    profile.isBlocked ? "Unblocked" : "Account blocked",
                   )
                 }
               >

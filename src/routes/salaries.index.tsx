@@ -164,7 +164,6 @@ function ContributeCard() {
           max_kes: Number(form.max_kes),
         },
       });
-      toast.success("Thanks — your range is in.");
       setForm({ role_title: "", min_kes: "", max_kes: "" });
       setCompany(null);
       setCompanyQuery("");

@@ -3,9 +3,10 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeCheck, CheckCheck, ImagePlus, Loader2, Send, Smile, X } from "lucide-react";
+import { BadgeCheck, CheckCheck, ImagePlus, Loader2, Send, Smile, Trash2, X } from "lucide-react";
 import {
   discardChatImageUpload,
+  deleteChatMessage,
   getConversation,
   issueChatImageUpload,
   postMessage,
@@ -80,6 +81,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const queryClient = useQueryClient();
   const fetchConversation = useServerFn(getConversation);
   const sendMessage = useServerFn(postMessage);
+  const deleteMessage = useServerFn(deleteChatMessage);
   const react = useServerFn(reactToMessage);
   const issueImageUpload = useServerFn(issueChatImageUpload);
   const discardImageUpload = useServerFn(discardChatImageUpload);
@@ -90,6 +92,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const [imageReceipt, setImageReceipt] = useState<ChatImageReceipt | null>(null);
   const [imageTicketId, setImageTicketId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [clockNow, setClockNow] = useState(Date.now());
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageTicketRef = useRef<string | null>(null);
   const discardUploadRef = useRef(discardImageUpload);
@@ -122,6 +125,11 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
 
   const conversation = data;
   const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setClockNow(Date.now()), 5000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   async function clearImageAttachment() {
     if (imageTicketId) {
@@ -234,6 +242,15 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
       void queryClient.invalidateQueries({ queryKey: ["conversations"] });
     },
     onError: (err: Error) => toast.error("Message not sent", { description: err.message }),
+  });
+
+  const removeMessage = useMutation({
+    mutationFn: (messageId: string) => deleteMessage({ data: { message_id: messageId } }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["conversation", id] });
+      void queryClient.invalidateQueries({ queryKey: ["conversations"] });
+    },
+    onError: (err: Error) => toast.error(err.message),
   });
 
   const toggleReaction = useMutation({
@@ -358,24 +375,30 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 className={cn("flex", mine ? "justify-end" : "justify-start")}
               >
                 <div className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start")}>
-                  <div
-                    className={cn(
-                      "rounded-3xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
-                      mine
-                        ? "rounded-br-md bg-primary text-primary-foreground"
-                        : "rounded-bl-md border border-border bg-card",
-                    )}
-                  >
-                    {message.image?.delivery_url ? (
-                      <img
-                        src={message.image.delivery_url}
-                        alt="Image shared in chat"
-                        loading="lazy"
-                        className="mb-2 max-h-80 max-w-full rounded-xl object-contain"
-                      />
-                    ) : null}
-                    {message.body ? <p className="whitespace-pre-wrap">{message.body}</p> : null}
-                  </div>
+                  {message.is_deleted ? (
+                    <div className="rounded-3xl border border-border/70 px-4 py-2.5 text-sm italic text-muted-foreground">
+                      This message was deleted
+                    </div>
+                  ) : (
+                    <>
+                      {message.image?.delivery_url ? (
+                        <img
+                          src={message.image.delivery_url}
+                          alt="Image shared in chat"
+                          loading="lazy"
+                          className="max-h-80 max-w-full rounded-xl object-contain"
+                        />
+                      ) : null}
+                      {message.body ? (
+                        <div className={cn(
+                          "rounded-3xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                          mine ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md border border-border bg-card",
+                        )}>
+                          <p className="whitespace-pre-wrap">{message.body}</p>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
 
                   <div
                     className={cn(
@@ -384,7 +407,19 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                     )}
                   >
                     <span>{clock(message.created_at)}</span>
-                    <Popover
+                    {mine && !message.is_deleted && clockNow - new Date(message.created_at).getTime() >= 0 && clockNow - new Date(message.created_at).getTime() <= 120_000 ? (
+                      <button
+                        type="button"
+                        aria-label="Delete message for everyone"
+                        title="Delete for everyone"
+                        disabled={removeMessage.isPending}
+                        onClick={() => removeMessage.mutate(message.id)}
+                        className="rounded p-0.5 hover:text-danger disabled:opacity-50"
+                      >
+                        <Trash2 className="size-3.5" />
+                      </button>
+                    ) : null}
+                    {!message.is_deleted ? <Popover
                       open={reactionPickerFor === message.id}
                       onOpenChange={(open) => setReactionPickerFor(open ? message.id : null)}
                     >
@@ -414,13 +449,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                           ))}
                         </div>
                       </PopoverContent>
-                    </Popover>
+                    </Popover> : null}
                     {mine ? (
                       <CheckCheck className={cn("size-3.5", message.read_at && "text-primary")} />
                     ) : null}
                   </div>
 
-                  {reactions.length > 0 ? (
+                  {!message.is_deleted && reactions.length > 0 ? (
                     <div className={cn("mt-1 flex gap-1", mine ? "justify-end" : "")}>
                       {reactions.map(([emoji, ids]) => (
                         <button

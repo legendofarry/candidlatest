@@ -3,6 +3,12 @@
 const NOISE_WORDS = new Set([
   "ltd",
   "limited",
+  "plc",
+  "inc",
+  "incorporated",
+  "llc",
+  "corp",
+  "corporation",
   "kenya",
   "ke",
   "ea",
