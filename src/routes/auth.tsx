@@ -5,7 +5,6 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut,
-  sendPasswordResetEmail,
   sendEmailVerification,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
@@ -196,26 +195,6 @@ function AuthPage() {
     }
   }
 
-  async function resetPassword() {
-    const address = email.trim();
-    if (!address) {
-      toast.error("Enter your email first so we can send a reset link.");
-      return;
-    }
-    setBusy(true);
-    setAuthError(null);
-    try {
-      await sendPasswordResetEmail(firebaseAuth, address);
-      toast.success(
-        "If an account with password sign-in uses this email, reset instructions are on the way.",
-      );
-    } catch (error) {
-      setAuthError(authErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
   function switchMode(nextMode: "signin" | "signup") {
     if (nextMode === mode) return;
     setMode(nextMode);
@@ -225,9 +204,9 @@ function AuthPage() {
   }
 
   return (
-    <div className="auth-screen min-h-dvh w-full bg-[#050505] text-[#f5f5f0] lg:h-dvh lg:overflow-hidden">
-      <div className="relative min-h-dvh w-full overflow-hidden bg-[#050505] lg:h-dvh">
-        <div className="grid min-h-dvh w-full lg:h-dvh lg:grid-cols-2">
+    <div className="auth-screen h-dvh w-full overflow-hidden bg-[#050505] text-[#f5f5f0]">
+      <div className="relative h-dvh w-full overflow-hidden bg-[#050505]">
+        <div className="grid h-dvh w-full lg:grid-cols-2">
           <section className="relative hidden overflow-hidden border-r border-white/10 bg-[#0b0d0b] lg:flex lg:min-h-dvh lg:flex-col lg:justify-between lg:p-14 xl:p-20">
             <div className="relative z-10 flex items-center gap-3 font-display text-[1.65rem] font-bold tracking-tight">
               <Flame className="size-9 stroke-[2.2] text-[#c7ff00]" />
@@ -258,9 +237,9 @@ function AuthPage() {
             </div>
           </section>
 
-          <main className="flex min-h-dvh flex-col px-6 py-7 sm:px-10 sm:py-10 lg:h-dvh lg:justify-center lg:overflow-hidden lg:px-14 lg:py-12 xl:px-20">
+          <main className="flex h-dvh flex-col overflow-hidden px-6 py-5 sm:px-10 sm:py-8 lg:justify-center lg:px-14 lg:py-12 xl:px-20">
             <div className="mx-auto w-full max-w-[620px] animate-rise">
-              <div className="mb-14 flex items-center justify-between lg:hidden">
+              <div className="mb-8 flex items-center justify-between sm:mb-12 lg:hidden">
                 <Link
                   to="/"
                   className="inline-flex items-center gap-3 font-display text-[1.65rem] font-bold tracking-tight text-[#f5f5f0]"
@@ -273,19 +252,19 @@ function AuthPage() {
               <div className="mb-14 hidden items-center justify-end lg:flex">
                 <span className="text-xs font-medium uppercase tracking-[0.16em] text-white/45">Make it yours.</span>
               </div>
-              <div className="mb-16 flex items-center justify-between">
+              <div className="mb-10 flex items-center justify-between sm:mb-14">
                 <div>
                   <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">Your next chapter</p>
                 </div>
               </div>
               <div className="max-w-[700px]">
-                <div className="mb-10 mt-6">
-                  <h1 className="max-w-[650px] font-display text-[3.25rem] font-semibold leading-[0.98] tracking-[-0.055em] text-[#f5f5f0] sm:text-6xl lg:text-[4.35rem]">
+                <div className="mb-7 mt-4 sm:mb-10 sm:mt-6">
+                  <h1 className="max-w-[650px] font-display text-[2.7rem] font-semibold leading-[0.98] tracking-[-0.055em] text-[#f5f5f0] sm:text-6xl lg:text-[4.35rem]">
                     {mode === "signin" ? (
                       <>Good to have<br /><span className="text-[#c7ff00]">you back.</span></>
                     ) : "Make it yours."}
                   </h1>
-                  <p className="mt-7 text-lg text-white/50 sm:text-xl">
+                  <p className="mt-5 text-base text-white/50 sm:mt-7 sm:text-xl">
                     {mode === "signin"
                       ? "Pick up where you left off."
                       : "A little spark. A new beginning."}
@@ -295,7 +274,7 @@ function AuthPage() {
                 <div
                   role="tablist"
                   aria-label="Choose sign in or account creation"
-                  className="mb-10 grid max-w-[680px] grid-cols-2 border-b border-white/15"
+                  className="mb-7 grid max-w-[680px] grid-cols-2 border-b border-white/15 sm:mb-10"
                 >
                   {([
                     ["signin", "Sign in"],
@@ -329,9 +308,9 @@ function AuthPage() {
                       {authError}
                     </div>
                   ) : null}
-                  <form onSubmit={submit} className="max-w-[680px] space-y-8">
+                  <form onSubmit={submit} className="max-w-[680px] space-y-6 sm:space-y-8">
                     <div className="space-y-3">
-                      <Label htmlFor="email" className="text-lg font-medium text-[#f5f5f0]">
+                      <Label htmlFor="email" className="text-base font-medium text-[#f5f5f0] sm:text-lg">
                         Email address
                       </Label>
                       <Input
@@ -342,23 +321,21 @@ function AuthPage() {
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         placeholder="you@example.com"
-                        className="h-14 rounded-none border-0 border-b border-white/15 bg-transparent px-0 text-lg text-[#f5f5f0] placeholder:text-white/30 shadow-none focus-visible:border-[#c7ff00] focus-visible:ring-0"
+                        className="h-12 rounded-none border-0 border-b border-white/15 bg-transparent px-0 text-base text-[#f5f5f0] placeholder:text-white/30 shadow-none focus-visible:border-[#c7ff00] focus-visible:ring-0 sm:h-14 sm:text-lg"
                       />
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-lg font-medium text-[#f5f5f0]">
+                        <Label htmlFor="password" className="text-base font-medium text-[#f5f5f0] sm:text-lg">
                           Password
                         </Label>
                         {mode === "signin" ? (
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => void resetPassword()}
-                            className="text-sm font-medium text-[#c7ff00] transition-colors hover:text-[#d8ff70] disabled:opacity-50"
+                          <Link
+                            to="/forgot-password"
+                            className="text-sm font-medium text-[#c7ff00] transition-colors hover:text-[#d8ff70]"
                           >
                             Forgot password?
-                          </button>
+                          </Link>
                         ) : null}
                       </div>
                       <div className="relative">
@@ -371,7 +348,7 @@ function AuthPage() {
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
                           placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-                          className="h-14 rounded-none border-0 border-b border-white/15 bg-transparent px-0 pr-12 text-lg text-[#f5f5f0] placeholder:text-white/30 shadow-none focus-visible:border-[#c7ff00] focus-visible:ring-0"
+                          className="h-12 rounded-none border-0 border-b border-white/15 bg-transparent px-0 pr-12 text-base text-[#f5f5f0] placeholder:text-white/30 shadow-none focus-visible:border-[#c7ff00] focus-visible:ring-0 sm:h-14 sm:text-lg"
                         />
                       <button
                         type="button"
@@ -391,7 +368,7 @@ function AuthPage() {
                     <Button
                       type="submit"
                       disabled={busy}
-                      className="mt-1 h-16 w-full justify-between rounded-lg border-0 bg-[#c7ff00] px-7 text-left text-lg font-medium text-black shadow-[0_12px_40px_-22px_#c7ff00] transition-all hover:bg-[#d4ff4a] active:scale-[0.99]"
+                      className="mt-1 h-14 w-full justify-between rounded-lg border-0 bg-[#c7ff00] px-6 text-left text-base font-medium text-black shadow-[0_12px_40px_-22px_#c7ff00] transition-all hover:bg-[#d4ff4a] active:scale-[0.99] sm:h-16 sm:px-7 sm:text-lg"
                     >
                       {busy ? <Loader2 className="size-4 animate-spin" /> : null}
                       <span>{mode === "signin" ? "Sign in" : "Create account"}</span>
@@ -401,7 +378,7 @@ function AuthPage() {
                 </div>
 
               </div>
-              <footer className="mt-14 flex max-w-[680px] flex-col gap-5 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between">
+              <footer className="mt-8 flex max-w-[680px] flex-col gap-3 text-xs text-white/40 sm:mt-14 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:text-sm">
                 <p className="flex items-center gap-3"><span aria-hidden>⌑</span> Your space. Safe and secure.</p>
                 <div className="flex items-center gap-5"><span>© 2026 Candid</span><Link to="/privacy" className="hover:text-white">Privacy</Link><Link to="/guidelines" className="hover:text-white">Terms</Link></div>
               </footer>

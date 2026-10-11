@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BillingRouteImport } from './routes/billing'
 import { Route as DownloadRouteImport } from './routes/download'
+import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as GuidelinesRouteImport } from './routes/guidelines'
 import { Route as LeaderboardsRouteImport } from './routes/leaderboards'
 import { Route as NotificationsRouteImport } from './routes/notifications'
@@ -68,6 +69,11 @@ const BillingRoute = BillingRouteImport.update({
 const DownloadRoute = DownloadRouteImport.update({
   id: '/download',
   path: '/download',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ForgotPasswordRoute = ForgotPasswordRouteImport.update({
+  id: '/forgot-password',
+  path: '/forgot-password',
   getParentRoute: () => rootRouteImport,
 } as any)
 const GuidelinesRoute = GuidelinesRouteImport.update({
@@ -227,6 +233,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/billing': typeof BillingRoute
   '/download': typeof DownloadRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
   '/notifications': typeof NotificationsRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/billing': typeof BillingRoute
   '/download': typeof DownloadRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
   '/notifications': typeof NotificationsRoute
@@ -301,6 +309,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/billing': typeof BillingRoute
   '/download': typeof DownloadRoute
+  '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
   '/notifications': typeof NotificationsRoute
@@ -340,6 +349,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/billing'
     | '/download'
+    | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
     | '/notifications'
@@ -377,6 +387,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/billing'
     | '/download'
+    | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
     | '/notifications'
@@ -413,6 +424,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/billing'
     | '/download'
+    | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
     | '/notifications'
@@ -451,6 +463,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   BillingRoute: typeof BillingRoute
   DownloadRoute: typeof DownloadRoute
+  ForgotPasswordRoute: typeof ForgotPasswordRoute
   GuidelinesRoute: typeof GuidelinesRoute
   LeaderboardsRoute: typeof LeaderboardsRoute
   NotificationsRoute: typeof NotificationsRoute
@@ -516,6 +529,13 @@ declare module '@tanstack/react-router' {
       path: '/download'
       fullPath: '/download'
       preLoaderRoute: typeof DownloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/forgot-password': {
+      id: '/forgot-password'
+      path: '/forgot-password'
+      fullPath: '/forgot-password'
+      preLoaderRoute: typeof ForgotPasswordRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/guidelines': {
@@ -751,6 +771,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   BillingRoute: BillingRoute,
   DownloadRoute: DownloadRoute,
+  ForgotPasswordRoute: ForgotPasswordRoute,
   GuidelinesRoute: GuidelinesRoute,
   LeaderboardsRoute: LeaderboardsRoute,
   NotificationsRoute: NotificationsRoute,

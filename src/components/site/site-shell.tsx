@@ -168,8 +168,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/settings",
     "/onboarding",
     "/verify-email",
+    "/forgot-password",
   ].includes(pathname);
-  const fullscreenRoute = ["/auth", "/onboarding", "/download", "/verify-email"].includes(pathname);
+  const fullscreenRoute = ["/auth", "/onboarding", "/download", "/verify-email", "/forgot-password"].includes(pathname);
   const directConversationRoute = /^\/messages\/[^/]+$/.test(pathname);
   const headerBack =
     (nested && (!standaloneDesktopRoute || pathname === "/support" || pathname === "/settings")) ||
