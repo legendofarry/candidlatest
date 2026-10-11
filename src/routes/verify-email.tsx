@@ -115,7 +115,7 @@ function VerifyEmailPage() {
     const current = firebaseAuth.currentUser;
     if (!current || sending || cooldown > 0) return;
     if (!current.email) {
-      setNotice("This account has no email address. Sign out and use an email or Google account to continue.");
+      setNotice("This account has no email address. Sign out and use an account with an email address to continue.");
       return;
     }
     setSending(true);
@@ -172,7 +172,7 @@ function VerifyEmailPage() {
         <p className="mt-4 max-w-md text-base leading-7 text-muted-foreground">
           {user.email
             ? "Use the verification link in your inbox. Open it on this device or another one; this screen will notice when you’re verified."
-            : "Candid requires a verified email before you can continue. Sign out, then use Google or an email-and-password account."}
+            : "Candid requires a verified email before you can continue. Sign out and use an email-and-password account."}
         </p>
 
         <div className="mt-8 rounded-2xl border border-border bg-card/70 p-4 sm:p-5">

@@ -685,11 +685,15 @@ export async function getStoryView(id: string) {
   const commentSnapshot = await getFirestoreDb()
     .collection("comments")
     .where("story_id", "==", id)
-    .where("status", "==", "published")
-    .orderBy("created_at", "asc")
     .limit(1000)
     .get();
-  const rawComments = commentSnapshot.docs.map((doc) => doc.data() as CommentRecord);
+  // Filter and sort after the indexed story_id lookup. Combining the status
+  // filter and created_at ordering here requires a composite Firestore index;
+  // without it, the public story route throws before it can render comments.
+  const rawComments = commentSnapshot.docs
+    .map((doc) => doc.data() as CommentRecord)
+    .filter((comment) => comment.status === "published")
+    .sort((a, b) => Date.parse(a.created_at) - Date.parse(b.created_at));
 
   const profiles = await readCollection<ProfileRecord>("profiles");
   const profilesById = new Map(profiles.map((profile) => [profile.id, profile] as const));

@@ -6,9 +6,7 @@ import { motion } from "motion/react";
 import type { User } from "firebase/auth";
 import {
   EmailAuthProvider,
-  GoogleAuthProvider,
   linkWithCredential,
-  linkWithPopup,
 } from "firebase/auth";
 import {
   ArrowLeft,
@@ -470,42 +468,18 @@ function SettingsPage() {
 }
 
 function SignInMethods({ user }: { user: User | null }) {
-  const [providerIds, setProviderIds] = useState(
-    () => user?.providerData.map((provider) => provider.providerId) ?? [],
-  );
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [passwordLinked, setPasswordLinked] = useState(() =>
+    Boolean(user?.providerData.some((provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID)),
+  );
+  const accountEmail = user?.email ?? null;
 
   useEffect(() => {
-    setProviderIds(user?.providerData.map((provider) => provider.providerId) ?? []);
+    setPasswordLinked(
+      Boolean(user?.providerData.some((provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID)),
+    );
   }, [user]);
-
-  const googleLinked = providerIds.includes(GoogleAuthProvider.PROVIDER_ID);
-  const passwordLinked = providerIds.includes(EmailAuthProvider.PROVIDER_ID);
-  const googleEmail = user?.providerData.find(
-    (provider) => provider.providerId === GoogleAuthProvider.PROVIDER_ID,
-  )?.email;
-  const accountEmail = user?.email ?? googleEmail ?? null;
-
-  async function connectGoogle() {
-    if (!user) return;
-    setBusy(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope("email");
-      provider.addScope("profile");
-      provider.setCustomParameters({ prompt: "select_account" });
-      const result = await linkWithPopup(user, provider);
-      setProviderIds(result.user.providerData.map((item) => item.providerId));
-    } catch (error) {
-      const code = signInMethodErrorCode(error);
-      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
-        notify.error(signInMethodError(error));
-      }
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function addPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -514,7 +488,10 @@ function SignInMethods({ user }: { user: User | null }) {
     try {
       const credential = EmailAuthProvider.credential(accountEmail, password);
       const result = await linkWithCredential(user, credential);
-      setProviderIds(result.user.providerData.map((item) => item.providerId));
+      if (!result.user.providerData.some((item) => item.providerId === EmailAuthProvider.PROVIDER_ID)) {
+        throw new Error("Could not enable email and password sign-in for this account.");
+      }
+      setPasswordLinked(true);
       setPassword("");
     } catch (error) {
       notify.error(signInMethodError(error));
@@ -527,37 +504,14 @@ function SignInMethods({ user }: { user: User | null }) {
     <SettingsGroup title="Sign-in methods">
       {!user ? (
         <p className="p-4 text-sm text-muted-foreground">
-          Sign in to connect Google and email/password to one account.
+          Sign in to manage email and password access.
         </p>
       ) : (
         <div className="space-y-4 p-4">
           <p className="text-sm text-muted-foreground">
-            Connect both methods to use either one for this same Candid account.
+            Add a password to sign in with your email address.
           </p>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-sm font-medium">Google</p>
-              <p className="text-xs text-muted-foreground">
-                {googleLinked
-                  ? accountEmail
-                    ? `Connected as ${accountEmail}`
-                    : "Connected, but Google did not share an email"
-                  : "Not connected"}
-              </p>
-            </div>
-            {!googleLinked ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={busy}
-                onClick={connectGoogle}
-              >
-                Connect Google
-              </Button>
-            ) : null}
-          </div>
-          <div className="border-t border-border pt-4">
+          <div>
             <p className="text-sm font-medium">Email and password</p>
             {passwordLinked ? (
               <p className="mt-1 text-xs text-muted-foreground">Connected to this account</p>
@@ -580,8 +534,7 @@ function SignInMethods({ user }: { user: User | null }) {
               </form>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">
-                Google did not provide an email for this account, so a password cannot be added.
-                Continue signing in with Google.
+                This account has no email address. Contact Candid support to update it before setting a password.
               </p>
             )}
           </div>

@@ -3,15 +3,10 @@ import { useEffect, useState } from "react";
 import { motion } from "motion/react";
 import {
   createUserWithEmailAndPassword,
-  getAdditionalUserInfo,
-  GoogleAuthProvider,
-  reload,
   signInWithEmailAndPassword,
-  signInWithPopup,
   signOut,
   sendPasswordResetEmail,
   sendEmailVerification,
-  updateEmail,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
 import { Eye, EyeOff, Flame, Loader2, ShieldCheck } from "lucide-react";
@@ -54,10 +49,10 @@ function authErrorCode(error: unknown) {
 function authErrorMessage(error: unknown) {
   const code = authErrorCode(error);
   if (code === "auth/email-already-in-use") {
-    return "An account already uses this email. Sign in, or choose Google if that’s how you created it.";
+    return "An account already uses this email. Sign in with its password or contact Candid support to recover access.";
   }
   if (code === "auth/account-exists-with-different-credential") {
-    return "This email uses another sign-in method. Sign in with that method first, then connect Google in Settings → Security & access.";
+    return "This email is already linked to another sign-in method. Contact Candid support to recover access.";
   }
   if (code === "auth/credential-already-in-use") {
     return "That sign-in method is connected to another Candid account. Sign in to the account you want to keep; accounts are not merged automatically.";
@@ -67,7 +62,7 @@ function authErrorMessage(error: unknown) {
     code === "auth/wrong-password" ||
     code === "auth/user-not-found"
   ) {
-    return "Email or password wasn’t recognized. Check your details, or try Google if you used it to create your account.";
+    return "Email or password wasn’t recognized. Check your details and try again.";
   }
   if (code === "auth/weak-password") return "Choose a password with at least 8 characters.";
   if (code === "auth/too-many-requests") {
@@ -77,20 +72,17 @@ function authErrorMessage(error: unknown) {
     return "This account is disabled. Contact Candid support for help.";
   }
   if (code === "auth/invalid-login-credentials") {
-    return "Email or password wasn’t recognized. Check your details, or try Google if you used it to create your account.";
+    return "Email or password wasn’t recognized. Check your details and try again.";
   }
   if (code === "auth/invalid-email") return "Enter a valid email address.";
   if (code === "auth/network-request-failed") {
     return "Could not reach the sign-in service. Check your connection and try again.";
   }
-  if (code === "auth/popup-blocked") {
-    return "Your browser blocked the Google sign-in window. Allow popups for Candid, or choose email and password.";
-  }
   if (code === "auth/unauthorized-domain") {
     return "This site is not enabled for Firebase sign-in. Add its domain to Firebase Authentication’s authorized domains.";
   }
   if (code === "auth/operation-not-allowed") {
-    return "Google sign-in is disabled for this Firebase project. Enable Google in Firebase Authentication sign-in providers.";
+    return "Email and password sign-in is disabled for this Firebase project. Enable it in Firebase Authentication sign-in providers.";
   }
   if (code === "auth/invalid-api-key" || code === "auth/app-not-authorized") {
     return "This app’s Firebase sign-in configuration is invalid. Check the Firebase web app and API key settings.";
@@ -114,14 +106,10 @@ function AuthPage() {
   const fetchOnboardingState = useServerFn(getOnboardingState);
 
   useEffect(() => {
-    // Do not redirect while a provider popup is still completing. Firebase emits
-    // an auth-state update before Google profile data and token claims settle.
     if (authLoading || !user || busy || accountError) return;
     if (!user.email) {
-      // Firebase can technically create a Google-linked user without an email
-      // when the provider response is incomplete. Candid cannot safely use it.
       void signOut(firebaseAuth).then(() => {
-        toast.error("This account has no email address attached. Choose a Google account with an email and try again.");
+        toast.error("This account has no email address attached. Contact Candid support for help signing in.");
       });
       return;
     }
@@ -219,79 +207,10 @@ function AuthPage() {
     try {
       await sendPasswordResetEmail(firebaseAuth, address);
       toast.success(
-        "If this email has password sign-in, reset instructions are on the way. If you use Google, choose Continue with Google.",
+        "If an account with password sign-in uses this email, reset instructions are on the way.",
       );
     } catch (error) {
       setAuthError(authErrorMessage(error));
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function googleSignIn() {
-    setAuthError(null);
-    setBusy(true);
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.addScope("email");
-      provider.addScope("profile");
-      provider.setCustomParameters({ prompt: "select_account" });
-      // This app is hosted on Netlify, not Firebase Hosting. Firebase redirect
-      // auth can lose its cross-domain state in modern mobile browsers unless
-      // the auth helper is proxied onto this domain. Popup auth avoids that flow.
-      const result = await signInWithPopup(firebaseAuth, provider);
-      const currentUser = result.user;
-      await reload(currentUser);
-
-      // Some OAuth responses expose email on providerData/profile before
-      // Firebase has copied it to the User record.
-      const additionalInfo = getAdditionalUserInfo(result);
-      const profileEmail = additionalInfo?.profile?.["email"];
-      const googleEmail =
-        currentUser.email ??
-        currentUser.providerData.find((item) => item.providerId === "google.com")?.email ??
-        (typeof profileEmail === "string" ? profileEmail : null);
-      if (!googleEmail) {
-        await signOut(firebaseAuth);
-        throw new Error(
-          "Google did not provide an email address. Choose a Google account with an email and try again.",
-        );
-      }
-
-      if (!currentUser.email) {
-        await updateEmail(currentUser, googleEmail);
-      }
-      await reload(currentUser);
-      await currentUser.getIdToken(true);
-
-      if (!currentUser.emailVerified) {
-        try {
-          await sendEmailVerification(currentUser, verificationActionSettings());
-          window.sessionStorage.setItem("candid:verification-email", "sent");
-        } catch (error) {
-          window.sessionStorage.setItem("candid:verification-email", "failed");
-          console.error("Could not send Google account verification", error);
-          toast.error("Verify your email to continue. You can retry on the verification screen.");
-        }
-        await navigate({ to: "/verify-email" });
-        return;
-      }
-
-      const state = await fetchOnboardingState({ data: undefined });
-      await navigate({ to: state.needsOnboarding ? "/onboarding" : "/" });
-    } catch (error) {
-      const code = authErrorCode(error);
-      if (code !== "auth/popup-closed-by-user" && code !== "auth/cancelled-popup-request") {
-        const message = authErrorMessage(error);
-        if (firebaseAuth.currentUser) {
-          console.error("Google sign-in succeeded but account setup did not finish", error);
-          setAccountError(
-            "Google signed you in, but Candid couldn’t load your account. Check your connection and try again.",
-          );
-        } else {
-          setAuthError(message);
-        }
-      }
     } finally {
       setBusy(false);
     }
@@ -397,44 +316,6 @@ function AuthPage() {
                       {authError}
                     </div>
                   ) : null}
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={busy}
-                    onClick={googleSignIn}
-                    className="h-12 w-full rounded-xl border-border bg-card font-medium text-foreground shadow-none transition-all hover:border-primary/40 hover:bg-secondary active:scale-[0.99]"
-                  >
-                    {busy ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <svg className="size-[18px]" viewBox="0 0 24 24" aria-hidden>
-                        <path
-                          fill="#4285F4"
-                          d="M21.6 12.23c0-.75-.07-1.47-.2-2.16H12v4.09h5.38a4.6 4.6 0 0 1-2 3.02v2.5h3.23c1.89-1.74 2.99-4.3 2.99-7.45Z"
-                        />
-                        <path
-                          fill="#34A853"
-                          d="M12 22c2.7 0 4.96-.9 6.61-2.42l-3.23-2.5c-.9.6-2.05.96-3.38.96-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z"
-                        />
-                        <path
-                          fill="#FBBC05"
-                          d="M6.41 13.92a6 6 0 0 1 0-3.83V7.5H3.07a10 10 0 0 0 0 9l3.34-2.58Z"
-                        />
-                        <path
-                          fill="#EA4335"
-                          d="M12 5.98c1.47 0 2.79.5 3.83 1.5l2.87-2.87C16.95 2.99 14.7 2 12 2a10 10 0 0 0-8.93 5.5l3.34 2.59C7.2 7.73 9.4 5.98 12 5.98Z"
-                        />
-                      </svg>
-                    )}
-                    Continue with Google
-                  </Button>
-
-                  <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground/75">
-                    <span className="h-px flex-1 bg-border" />
-                    or use email
-                    <span className="h-px flex-1 bg-border" />
-                  </div>
-
                   <form onSubmit={submit} className="space-y-4">
                     <div className="space-y-2">
                       <Label htmlFor="email" className="text-[13px] font-medium text-foreground">
