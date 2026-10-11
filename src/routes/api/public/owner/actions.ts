@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { readCollection, readDocument, type CommentRecord } from "@/lib/firebase-data.server";
+import { generateId, readCollection, readDocument, type CommentRecord } from "@/lib/firebase-data.server";
 import { FieldValue } from "@/lib/firestore-rest.server";
 import { auditOwnerAction, getAdmin, json, verifyOwnerKey } from "@/lib/owner-api.server";
+import { CANDID_USER_ID, CANDID_USERNAME, ensureCandidAccount } from "@/lib/messaging.server";
 
 const documentId = z
   .string()
@@ -46,6 +47,12 @@ const ActionInput = z.discriminatedUnion("entity", [
     }).optional(),
   }),
   z.object({ entity: z.literal("company_claim"), id: documentId, user_id: documentId, approve: z.boolean() }),
+  z.object({
+    entity: z.literal("official_comment"),
+    story_id: documentId,
+    body: z.string().trim().min(2).max(2000),
+    parent_id: documentId.nullable().optional(),
+  }),
 ]);
 
 export const Route = createFileRoute("/api/public/owner/actions")({
@@ -61,7 +68,46 @@ export const Route = createFileRoute("/api/public/owner/actions")({
         const db = await getAdmin();
         const timestamp = new Date().toISOString();
 
-        if (input.entity === "story") {
+        if (input.entity === "official_comment") {
+          await ensureCandidAccount();
+          const story = await readDocument("stories", input.story_id);
+          if (!story || story["status"] !== "published") {
+            return json({ error: "Published story not found" }, 404);
+          }
+          const parentId = input.parent_id ?? null;
+          if (parentId) {
+            const parent = await readDocument("comments", parentId);
+            if (!parent || parent["story_id"] !== input.story_id || parent["status"] !== "published") {
+              return json({ error: "Parent comment not found" }, 400);
+            }
+          }
+          const id = generateId();
+          await db.collection("comments").doc(id).create({
+            id,
+            story_id: input.story_id,
+            parent_id: parentId,
+            body: input.body,
+            status: "published",
+            author_id: CANDID_USER_ID,
+            author_handle: "Candid team",
+            author_username: CANDID_USERNAME,
+            author_verified: true,
+            is_official: true,
+            likes: 0,
+            is_deleted: false,
+            created_at: timestamp,
+          });
+          await db.collection("stories").doc(input.story_id).update({
+            comment_count: FieldValue.increment(1),
+          });
+          await auditOwnerAction({
+            action: "official.comment_published",
+            targetType: "comment",
+            targetId: id,
+            payload: { story_id: input.story_id, parent_id: parentId },
+          });
+          return json({ ok: true, comment_id: id, author: CANDID_USERNAME });
+        } else if (input.entity === "story") {
           const story = await readDocument("stories", input.id);
           if (!story) return json({ error: "Story not found" }, 404);
           const previousStatus = String(story["status"] ?? "pending");

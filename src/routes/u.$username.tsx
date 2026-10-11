@@ -129,6 +129,9 @@ function PublicProfilePage() {
             {profile.role_label ? (
               <p className="text-sm text-muted-foreground">{profile.role_label}</p>
             ) : null}
+            {profile.official ? (
+              <p className="text-xs font-medium text-primary">Official Candid account</p>
+            ) : null}
             {profile.county ? (
               <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
                 <MapPin className="size-3" /> {profile.county}

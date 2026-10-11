@@ -191,7 +191,7 @@ export async function ensureCandidAccount() {
     created_at: existingProfile?.created_at ?? timestamp,
     role_label: "Candid team",
     username: CANDID_USERNAME,
-    account_type: "company",
+    account_type: "official",
     verified: true,
     onboarded_at: existingProfile?.onboarded_at ?? timestamp,
   }, { merge: true });
@@ -208,9 +208,12 @@ export async function ensureCandidAccount() {
   const existingVerification = verificationSnapshot.data() as { claimed_at?: string } | undefined;
   await verificationRef.set({
     user_id: CANDID_USER_ID,
-    account_type: "company",
+    account_type: "official",
+    company_id: null,
+    company_name: null,
+    company_slug: null,
+    owner_override: "official",
     badge_status: "claimed",
-    owner_override: "company",
     owner_verified: true,
     approval_status: "approved",
     claimed_at: existingVerification?.claimed_at ?? timestamp,
@@ -238,7 +241,7 @@ async function readParticipants(ids: string[]): Promise<Map<string, ChatParticip
         username: profile?.username ?? profile?.handle ?? "member",
         photo_url: profile?.photo_url ?? null,
         verified: id === CANDID_USER_ID || profile?.verified === true || verification?.badge_status === "claimed" || Boolean(verification?.owner_verified),
-        official: id === CANDID_USER_ID,
+        official: id === CANDID_USER_ID || profile?.account_type === "official",
         membership_tier: getEffectiveMembershipTier(profile),
       });
     }),
@@ -651,6 +654,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
   return {
     ...participants.get(userId)!,
     role_label: profile?.role_label ?? null,
+    account_type: profile?.account_type ?? "unknown",
     photo_url: profile?.photo_url ?? null,
     county: profile?.county ?? null,
     socials: profile?.socials ?? null,

@@ -60,7 +60,7 @@ export type ProfileRecord = {
   username_changed_at?: string | null;
   socials?: ProfileSocials | null;
   candid_lens?: CandidLensRecord | null;
-  account_type?: "individual" | "company" | "unknown";
+  account_type?: "individual" | "company" | "official" | "unknown";
   onboarded_at?: string | null;
   subscription_tier?: "basic" | "premium" | "gold";
   subscription_status?: "active" | "cancelled" | "expired" | "past_due";
@@ -712,7 +712,8 @@ export async function getStoryView(id: string) {
     const profile = comment.author_id ? profilesById.get(comment.author_id) : null;
     const verification = comment.author_id ? verificationByUser.get(comment.author_id) : null;
     const official =
-      comment.is_official ??
+      comment.author_id === "candid-official" ||
+      (comment.is_official ?? false) ||
       Boolean(
         verification &&
         verification.account_type === "company" &&

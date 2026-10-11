@@ -9,7 +9,7 @@ import {
   sendEmailVerification,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
-import { Eye, EyeOff, Flame, Loader2, ShieldCheck } from "lucide-react";
+import { Eye, EyeOff, Flame, Loader2 } from "lucide-react";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -225,64 +225,77 @@ function AuthPage() {
   }
 
   return (
-    <div className="min-h-dvh w-full bg-background bg-[radial-gradient(ellipse_at_50%_0%,_rgba(132,204,22,0.09),_transparent_42%)] dark:bg-[radial-gradient(ellipse_at_50%_0%,_rgba(190,242,100,0.11),_transparent_34%),linear-gradient(155deg,#121411_0%,#0b0c0b_52%,#11120f_100%)] md:h-dvh md:overflow-hidden">
-      <div className="relative min-h-dvh w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/70 md:shadow-2xl md:backdrop-blur-xl">
-        <div className="grid min-h-dvh md:h-dvh md:min-h-0 md:grid-cols-2">
-          <div className="relative hidden overflow-hidden border-r border-border bg-secondary/40 dark:bg-[radial-gradient(ellipse_at_30%_28%,_rgba(190,242,100,0.14),_transparent_34%),linear-gradient(145deg,#171b14_0%,#111512_48%,#171713_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
-            <motion.div
-              initial={{ opacity: 0, x: -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ duration: 0.55, ease: "easeOut" }}
-              className="relative w-full max-w-xl space-y-7"
-            >
-              <div className="flex items-center gap-3 text-foreground">
-                <span className="flex size-11 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary shadow-[0_0_35px_-12px_rgba(190,242,100,0.35)]">
-                  <Flame className="size-5" />
-                </span>
-                <span className="font-display text-xl font-semibold tracking-tight">Candid</span>
-              </div>
-              <div className="space-y-4">
-                <h2 className="max-w-lg font-display text-5xl font-semibold leading-[1.08] tracking-tight text-foreground">
-                  Know what you&apos;re walking into.
-                </h2>
-                <p className="max-w-md text-base leading-7 text-muted-foreground">
-                  Straight stories about pay, respect and what a job is really like.
-                </p>
-              </div>
-              <div className="flex items-center gap-3 pt-2 text-sm text-muted-foreground">
-                <ShieldCheck className="size-4 shrink-0 text-primary" />
-                <span>Stories from people who have done the work.</span>
-              </div>
-            </motion.div>
-          </div>
+    <div className="auth-screen min-h-dvh w-full bg-[#050505] text-[#f5f5f0] lg:h-dvh lg:overflow-hidden">
+      <div className="relative min-h-dvh w-full overflow-hidden bg-[#050505] lg:h-dvh">
+        <div className="grid min-h-dvh w-full lg:h-dvh lg:grid-cols-2">
+          <section className="relative hidden overflow-hidden border-r border-white/10 bg-[#0b0d0b] lg:flex lg:min-h-dvh lg:flex-col lg:justify-between lg:p-14 xl:p-20">
+            <div className="relative z-10 flex items-center gap-3 font-display text-[1.65rem] font-bold tracking-tight">
+              <Flame className="size-9 stroke-[2.2] text-[#c7ff00]" />
+              <span>Candid<span className="text-[#c7ff00]">.</span></span>
+            </div>
+            <div className="relative z-10 max-w-xl pb-10">
+              <p className="mb-6 text-xs font-semibold uppercase tracking-[0.3em] text-white/40">A clearer view of work</p>
+              <h2 className="font-display text-6xl font-semibold leading-[0.96] tracking-[-0.06em] text-[#f5f5f0] xl:text-7xl">
+                Know what you&apos;re walking into<span className="text-[#c7ff00]">.</span>
+              </h2>
+              <p className="mt-7 max-w-md text-lg leading-8 text-white/50">
+                Real workplace stories, shared safely by the people who lived them.
+              </p>
+            </div>
+            <div className="pointer-events-none absolute inset-0 overflow-hidden" aria-hidden="true">
+              <motion.div
+                animate={{ y: [0, -18, 0], rotate: [0, 4, 0] }}
+                transition={{ duration: 7, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute left-[18%] top-[27%] size-56 rounded-[3rem] border border-[#c7ff00]/20 bg-[#c7ff00]/[0.04] shadow-[0_0_100px_-30px_#c7ff00]"
+              />
+              <motion.div
+                animate={{ y: [0, 24, 0], x: [0, 10, 0] }}
+                transition={{ duration: 9, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute -bottom-24 -right-20 size-80 rounded-full border border-[#c7ff00]/15 bg-[#c7ff00]/[0.03]"
+              />
+              <div className="absolute right-[17%] top-[34%] size-3 rounded-full bg-[#c7ff00] shadow-[0_0_24px_8px_rgba(199,255,0,0.22)]" />
+              <div className="absolute bottom-[24%] left-[12%] h-px w-28 bg-[#c7ff00]/40" />
+            </div>
+          </section>
 
-          <div className="flex min-h-dvh flex-col justify-start px-5 pb-8 pt-6 sm:px-8 md:h-dvh md:min-h-0 md:justify-center md:overflow-y-auto md:px-10 md:py-10">
-            <div className="mx-auto w-full animate-rise md:max-w-[25rem]">
-              <Link
-                to="/"
-                className="mb-7 inline-flex items-center gap-3 font-display text-xl font-semibold tracking-tight text-foreground md:hidden"
-              >
-                <span className="flex size-12 items-center justify-center rounded-2xl border border-primary/25 bg-primary/10 text-primary shadow-[0_0_32px_-12px_rgba(190,242,100,0.7)]">
-                  <Flame className="size-6" />
-                </span>
-                Candid
-              </Link>
-              <div className="rounded-none border-0 bg-transparent p-0 shadow-none md:rounded-[1.75rem] md:border md:border-border md:bg-card/75 md:p-8 md:shadow-xl">
-                <div className="mb-6">
-                  <h1 className="font-display text-[2rem] font-semibold tracking-tight text-foreground">
-                    {mode === "signin" ? "Welcome back" : "Join Candid"}
+          <main className="flex min-h-dvh flex-col px-6 py-7 sm:px-10 sm:py-10 lg:h-dvh lg:justify-center lg:overflow-hidden lg:px-14 lg:py-12 xl:px-20">
+            <div className="mx-auto w-full max-w-[620px] animate-rise">
+              <div className="mb-14 flex items-center justify-between lg:hidden">
+                <Link
+                  to="/"
+                  className="inline-flex items-center gap-3 font-display text-[1.65rem] font-bold tracking-tight text-[#f5f5f0]"
+                >
+                  <Flame className="size-9 stroke-[2.2] text-[#c7ff00]" />
+                  <span>Candid<span className="text-[#c7ff00]">.</span></span>
+                </Link>
+                <span className="text-xs font-medium uppercase tracking-[0.16em] text-white/45">Make it yours.</span>
+              </div>
+              <div className="mb-14 hidden items-center justify-end lg:flex">
+                <span className="text-xs font-medium uppercase tracking-[0.16em] text-white/45">Make it yours.</span>
+              </div>
+              <div className="mb-16 flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">Your next chapter</p>
+                </div>
+              </div>
+              <div className="max-w-[700px]">
+                <div className="mb-10 mt-6">
+                  <h1 className="max-w-[650px] font-display text-[3.25rem] font-semibold leading-[0.98] tracking-[-0.055em] text-[#f5f5f0] sm:text-6xl lg:text-[4.35rem]">
+                    {mode === "signin" ? (
+                      <>Good to have<br /><span className="text-[#c7ff00]">you back.</span></>
+                    ) : "Make it yours."}
                   </h1>
-                  <p className="mt-1.5 text-sm text-muted-foreground">
+                  <p className="mt-7 text-lg text-white/50 sm:text-xl">
                     {mode === "signin"
                       ? "Pick up where you left off."
-                      : "A better read on work starts here."}
+                      : "A little spark. A new beginning."}
                   </p>
                 </div>
 
                 <div
                   role="tablist"
                   aria-label="Choose sign in or account creation"
-                  className="mb-5 grid grid-cols-2 rounded-2xl border border-border bg-secondary/60 p-1"
+                  className="mb-10 grid max-w-[680px] grid-cols-2 border-b border-white/15"
                 >
                   {([
                     ["signin", "Sign in"],
@@ -296,13 +309,13 @@ function AuthPage() {
                       aria-selected={mode === tabMode}
                       aria-controls="auth-panel"
                       onClick={() => switchMode(tabMode)}
-                      className={`relative isolate min-h-11 rounded-[0.8rem] px-3 text-sm font-medium transition-colors duration-200 ${mode === tabMode ? "text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                      className={`relative min-h-14 px-3 text-base font-medium transition-colors duration-200 ${mode === tabMode ? "text-[#c7ff00]" : "text-white/45 hover:text-white/80"}`}
                     >
                       {mode === tabMode ? (
                         <motion.span
                           layoutId="auth-mode-pill"
                           transition={{ type: "spring", stiffness: 420, damping: 34 }}
-                          className="absolute inset-0 -z-10 rounded-[0.8rem] border border-border bg-background shadow-sm"
+                          className="absolute inset-x-0 bottom-[-1px] -z-10 h-[3px] bg-[#c7ff00]"
                         />
                       ) : null}
                       {label}
@@ -312,13 +325,13 @@ function AuthPage() {
 
                 <div id="auth-panel" role="tabpanel" aria-labelledby={`auth-tab-${mode}`}>
                   {authError ? (
-                    <div role="alert" className="mb-4 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2.5 text-sm leading-5 text-danger">
+                    <div role="alert" className="mb-6 border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm leading-5 text-red-200">
                       {authError}
                     </div>
                   ) : null}
-                  <form onSubmit={submit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="email" className="text-[13px] font-medium text-foreground">
+                  <form onSubmit={submit} className="max-w-[680px] space-y-8">
+                    <div className="space-y-3">
+                      <Label htmlFor="email" className="text-lg font-medium text-[#f5f5f0]">
                         Email address
                       </Label>
                       <Input
@@ -329,12 +342,12 @@ function AuthPage() {
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
                         placeholder="you@example.com"
-                        className="h-12 rounded-xl border-input bg-background px-4 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus-visible:border-primary/45 focus-visible:ring-primary/20 dark:bg-white/[0.035] dark:shadow-inner dark:shadow-black/10"
+                        className="h-14 rounded-none border-0 border-b border-white/15 bg-transparent px-0 text-lg text-[#f5f5f0] placeholder:text-white/30 shadow-none focus-visible:border-[#c7ff00] focus-visible:ring-0"
                       />
                     </div>
-                    <div className="space-y-2">
+                    <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <Label htmlFor="password" className="text-[13px] font-medium text-foreground">
+                        <Label htmlFor="password" className="text-lg font-medium text-[#f5f5f0]">
                           Password
                         </Label>
                         {mode === "signin" ? (
@@ -342,7 +355,7 @@ function AuthPage() {
                             type="button"
                             disabled={busy}
                             onClick={() => void resetPassword()}
-                            className="text-xs font-medium text-primary/90 transition-colors hover:text-primary disabled:opacity-50"
+                            className="text-sm font-medium text-[#c7ff00] transition-colors hover:text-[#d8ff70] disabled:opacity-50"
                           >
                             Forgot password?
                           </button>
@@ -358,14 +371,14 @@ function AuthPage() {
                           value={password}
                           onChange={(event) => setPassword(event.target.value)}
                           placeholder={mode === "signup" ? "At least 8 characters" : "Your password"}
-                          className="h-12 rounded-xl border-input bg-background px-4 pr-12 text-[15px] text-foreground placeholder:text-muted-foreground/70 focus-visible:border-primary/45 focus-visible:ring-primary/20 dark:bg-white/[0.035] dark:shadow-inner dark:shadow-black/10"
+                          className="h-14 rounded-none border-0 border-b border-white/15 bg-transparent px-0 pr-12 text-lg text-[#f5f5f0] placeholder:text-white/30 shadow-none focus-visible:border-[#c7ff00] focus-visible:ring-0"
                         />
                       <button
                         type="button"
                         aria-label={showPassword ? "Hide password" : "Show password"}
                         aria-pressed={showPassword}
                         onClick={() => setShowPassword((visible) => !visible)}
-                        className="absolute inset-y-0 right-1 flex w-10 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
+                        className="absolute inset-y-0 right-0 flex w-10 items-center justify-center text-white/50 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#c7ff00]"
                       >
                         {showPassword ? (
                           <EyeOff className="size-[18px]" />
@@ -378,17 +391,22 @@ function AuthPage() {
                     <Button
                       type="submit"
                       disabled={busy}
-                      className="mt-1 h-12 w-full rounded-xl font-semibold shadow-[0_10px_30px_-15px_rgba(190,242,100,0.7)] transition-all hover:brightness-105 active:scale-[0.99]"
+                      className="mt-1 h-16 w-full justify-between rounded-lg border-0 bg-[#c7ff00] px-7 text-left text-lg font-medium text-black shadow-[0_12px_40px_-22px_#c7ff00] transition-all hover:bg-[#d4ff4a] active:scale-[0.99]"
                     >
                       {busy ? <Loader2 className="size-4 animate-spin" /> : null}
-                      {mode === "signin" ? "Sign in" : "Create account"}
+                      <span>{mode === "signin" ? "Sign in" : "Create account"}</span>
+                      {!busy ? <span aria-hidden className="text-3xl leading-none">→</span> : null}
                     </Button>
                   </form>
                 </div>
 
               </div>
+              <footer className="mt-14 flex max-w-[680px] flex-col gap-5 text-sm text-white/40 sm:flex-row sm:items-center sm:justify-between">
+                <p className="flex items-center gap-3"><span aria-hidden>⌑</span> Your space. Safe and secure.</p>
+                <div className="flex items-center gap-5"><span>© 2026 Candid</span><Link to="/privacy" className="hover:text-white">Privacy</Link><Link to="/guidelines" className="hover:text-white">Terms</Link></div>
+              </footer>
             </div>
-          </div>
+          </main>
         </div>
       </div>
     </div>

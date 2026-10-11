@@ -2,6 +2,18 @@
 @source "../src";
 @import "tw-animate-css";
 
+/* Keep browser autofill aligned with the dark authentication surface. */
+.auth-screen input:-webkit-autofill,
+.auth-screen input:-webkit-autofill:hover,
+.auth-screen input:-webkit-autofill:focus,
+.auth-screen input:-webkit-autofill:active {
+  -webkit-text-fill-color: #f5f5f0;
+  -webkit-box-shadow: 0 0 0 1000px #050505 inset;
+  box-shadow: 0 0 0 1000px #050505 inset;
+  caret-color: #f5f5f0;
+  transition: background-color 9999s ease-out 0s;
+}
+
 @keyframes candid-glitch {
   0%,
   100% {

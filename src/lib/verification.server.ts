@@ -1,7 +1,7 @@
 import { getFirestoreDb } from "./firebase.server";
 import type { CompanyRecord } from "./firebase-data.server";
 
-export type AccountType = "individual" | "company" | "unknown";
+export type AccountType = "individual" | "company" | "official" | "unknown";
 export type BadgeStatus = "none" | "eligible" | "claimed";
 
 export type VerificationRecord = {
@@ -122,7 +122,7 @@ export async function resolveVerification(
   const detected: AccountType = company ? "company" : corporate ? "unknown" : "individual";
   const accountType: AccountType = existing.owner_override ?? detected;
 
-  const eligible = existing.owner_verified || (
+  const eligible = accountType === "official" || existing.owner_verified || (
     accountType === "company" && emailVerified && Boolean(company?.verified)
   );
 
@@ -151,6 +151,9 @@ export async function resolveVerification(
 export async function claimBadge(userId: string, email: string | null, emailVerified: boolean) {
   const db = getFirestoreDb();
   const current = await readVerification(userId);
+  if (current?.account_type === "official" && current.owner_verified) {
+    return { ok: true as const, approved: true as const };
+  }
   if (!current || current.badge_status === "none") {
     return { ok: false as const, reason: "This account is not eligible for a badge yet." };
   }

@@ -622,10 +622,11 @@ export const addComment = createServerFn({ method: "POST" })
         badge_status?: string;
       })
       : null;
-    const isOfficial = Boolean(
-      verification?.account_type === "company" &&
-      verification.company_id &&
-      verification.company_id === currentStory?.["company_id"],
+    const isOfficial = context.userId === "candid-official" || Boolean(
+      verification?.account_type === "official" ||
+      (verification?.account_type === "company" &&
+        verification.company_id &&
+        verification.company_id === currentStory?.["company_id"]),
     );
 
     await db
