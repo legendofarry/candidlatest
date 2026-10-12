@@ -27,10 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import {
-  declareAccountType,
-  getOnboardingState,
-} from "@/lib/onboarding.functions";
+import { declareAccountType, getOnboardingState } from "@/lib/onboarding.functions";
 import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
 import { useAuth } from "@/hooks/useAuth";
@@ -122,7 +119,9 @@ function ProfilePage() {
         });
         await verification.refetch();
       } else if (result.ok && "pending" in result && result.pending) {
-        inbox.success("Verification request sent for review", { dedupeKey: "badge-review-pending" });
+        inbox.success("Verification request sent for review", {
+          dedupeKey: "badge-review-pending",
+        });
         await verification.refetch();
       } else {
         toast.error("reason" in result ? result.reason : "Could not submit the request");
@@ -235,11 +234,16 @@ function ProfilePage() {
                       >
                         {handle}
                       </Link>
-                    ) : handle}
+                    ) : (
+                      handle
+                    )}
                     {verification.data?.badgeStatus === "claimed" ? (
                       <BadgeCheck className="size-5 shrink-0 text-verified" aria-label="Verified" />
                     ) : null}
-                    <MembershipBadge tier={onboarding.data?.membership?.tier} />
+                    <MembershipBadge
+                      tier={onboarding.data?.membership?.tier}
+                      official={onboarding.data?.accountType === "official"}
+                    />
                   </h1>
                   <p className="truncate text-sm text-muted-foreground">
                     {loading
@@ -251,7 +255,9 @@ function ProfilePage() {
                 </div>
                 {user && !onboarding.data?.username && !onboarding.isLoading ? (
                   <Button asChild size="sm" variant="outline" className="ml-auto">
-                    <Link to="/onboarding" search={{ editUsername: false }}>Claim username</Link>
+                    <Link to="/onboarding" search={{ editUsername: false }}>
+                      Claim username
+                    </Link>
                   </Button>
                 ) : null}
                 {!user && !loading ? (
@@ -265,15 +271,20 @@ function ProfilePage() {
                   {onboarding.data?.username ? (
                     <div className="flex flex-wrap items-center gap-2">
                       {nextUsernameChangeAt !== null && Date.now() < nextUsernameChangeAt ? (
-                        <Button size="sm" variant="outline" disabled>Change username</Button>
+                        <Button size="sm" variant="outline" disabled>
+                          Change username
+                        </Button>
                       ) : (
                         <Button asChild size="sm" variant="outline">
-                          <Link to="/onboarding" search={{ editUsername: true }}>Change username</Link>
+                          <Link to="/onboarding" search={{ editUsername: true }}>
+                            Change username
+                          </Link>
                         </Button>
                       )}
                       {nextUsernameChangeAt ? (
                         <span className="text-xs text-muted-foreground">
-                          Next change after {new Date(nextUsernameChangeAt).toLocaleDateString("en-KE")}.
+                          Next change after{" "}
+                          {new Date(nextUsernameChangeAt).toLocaleDateString("en-KE")}.
                         </span>
                       ) : (
                         <span className="text-xs text-muted-foreground">
@@ -313,7 +324,10 @@ function ProfilePage() {
               {verification.data?.approvalStatus === "pending_review" ? (
                 <div className="mt-4 flex items-center gap-3 rounded-xl border border-primary/25 bg-primary/5 p-3">
                   <BadgeCheck className="size-5 shrink-0 text-primary" />
-                  <p className="text-sm text-muted-foreground">Your verification request is being reviewed. We’ll update this profile when there’s a decision.</p>
+                  <p className="text-sm text-muted-foreground">
+                    Your verification request is being reviewed. We’ll update this profile when
+                    there’s a decision.
+                  </p>
                 </div>
               ) : null}
               <div className="mt-4 flex items-start gap-3 border-l-2 border-verified/35 py-2 pl-3 md:mt-5 md:rounded-xl md:border md:border-verified/15 md:bg-verified/5 md:p-4">
@@ -460,7 +474,9 @@ function ContributionsPanel({
   data,
   loading,
 }: {
-  data?: undefined | { active: ContributionGroup; inactive: ContributionGroup; pending: ContributionGroup };
+  data?:
+    | undefined
+    | { active: ContributionGroup; inactive: ContributionGroup; pending: ContributionGroup };
   loading: boolean;
 }) {
   const groups = data ?? {
@@ -509,7 +525,9 @@ function ContributionsPanel({
                     <Link
                       key={`${item.type}-${item.id}`}
                       to={item.type === "story" ? "/post" : "/stories/$id"}
-                      {...(item.type === "story" ? { search: { edit: item.id } } : { params: { id: item.storyId ?? "" } })}
+                      {...(item.type === "story"
+                        ? { search: { edit: item.id } }
+                        : { params: { id: item.storyId ?? "" } })}
                       className="flex items-start gap-3 py-3 first:pt-1 last:pb-1"
                     >
                       <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -522,7 +540,8 @@ function ContributionsPanel({
                       <span className="min-w-0 flex-1">
                         <span className="line-clamp-2 block text-sm font-medium">{item.title}</span>
                         <span className="mt-1 block text-xs capitalize text-muted-foreground">
-                          {item.type}{item.type === "story" ? " · Edit and resubmit for approval" : ""} ·{" "}
+                          {item.type}
+                          {item.type === "story" ? " · Edit and resubmit for approval" : ""} ·{" "}
                           {item.createdAt
                             ? new Date(item.createdAt).toLocaleDateString("en-KE")
                             : "Date unavailable"}

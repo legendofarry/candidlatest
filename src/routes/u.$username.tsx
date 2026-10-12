@@ -124,7 +124,7 @@ function PublicProfilePage() {
             <h1 className="flex items-center gap-1.5 font-display text-2xl font-semibold tracking-tight">
               @{profile.username}
               {profile.verified ? <BadgeCheck className="size-5 text-primary" /> : null}
-              <MembershipBadge tier={profile.membership_tier} />
+              <MembershipBadge tier={profile.membership_tier} official={profile.official} />
             </h1>
             {profile.role_label ? (
               <p className="text-sm text-muted-foreground">{profile.role_label}</p>
@@ -155,11 +155,7 @@ function PublicProfilePage() {
               disabled={busy}
               variant={profile.isFollowing ? "outline" : "default"}
               className={cn(!profile.isFollowing && "glow-primary")}
-              onClick={() =>
-                void run(
-                  () => follow({ data: { user_id: profile.id } }),
-                )
-              }
+              onClick={() => void run(() => follow({ data: { user_id: profile.id } }))}
             >
               {profile.isFollowing ? (
                 <>
@@ -201,11 +197,7 @@ function PublicProfilePage() {
                 variant="ghost"
                 disabled={busy}
                 className="text-danger"
-                onClick={() =>
-                  void run(
-                    () => block({ data: { user_id: profile.id } }),
-                  )
-                }
+                onClick={() => void run(() => block({ data: { user_id: profile.id } }))}
               >
                 <Ban className="size-4" /> {profile.isBlocked ? "Unblock" : "Block"}
               </Button>

@@ -23,7 +23,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { ReportDialog } from "@/components/site/report-dialog";
-import { addComment, deleteComment, editComment, getMyEngagement, likeComment } from "@/lib/actions.functions";
+import {
+  addComment,
+  deleteComment,
+  editComment,
+  getMyEngagement,
+  likeComment,
+} from "@/lib/actions.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -185,7 +191,11 @@ export function CommentThread({
 
       {sortedComments.length > visibleRootCount ? (
         <div className="border-t border-border/60 p-3 text-center">
-          <Button variant="ghost" size="sm" onClick={() => setVisibleRootCount((count) => count + 30)}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setVisibleRootCount((count) => count + 30)}
+          >
             Show more comments
           </Button>
         </div>
@@ -202,7 +212,8 @@ export function CommentThread({
             {replyTo ? (
               <div className="mb-2 flex items-center gap-2 rounded-lg bg-secondary/60 px-3 py-1.5 text-xs">
                 <CornerDownRight className="size-3.5" />
-                Replying to {replyTo.author_username ? (
+                Replying to{" "}
+                {replyTo.author_username ? (
                   <>
                     <Link
                       to="/u/$username"
@@ -211,9 +222,14 @@ export function CommentThread({
                     >
                       @{replyTo.author_username}
                     </Link>
-                    <MembershipBadge tier={replyTo.author_membership_tier} />
+                    <MembershipBadge
+                      tier={replyTo.author_membership_tier}
+                      official={replyTo.author_username?.toLowerCase() === "candid"}
+                    />
                   </>
-                ) : "comment"}
+                ) : (
+                  "comment"
+                )}
                 <button
                   type="button"
                   className="ml-auto text-muted-foreground hover:text-foreground"
@@ -359,7 +375,10 @@ function CommentRow({
         <ProfileAvatar
           photoUrl={comment.author_photo_url}
           initials={initial}
-          className={cn("mt-0.5 size-8 shrink-0 text-xs", comment.is_official && "ring-2 ring-primary/25")}
+          className={cn(
+            "mt-0.5 size-8 shrink-0 text-xs",
+            comment.is_official && "ring-2 ring-primary/25",
+          )}
           fallbackClassName={cn(
             "text-xs",
             comment.is_official
@@ -382,7 +401,10 @@ function CommentRow({
               <span className="font-semibold text-foreground">{comment.author_handle}</span>
             )}
             {comment.author_verified ? <BadgeCheck className="size-3.5 text-primary" /> : null}
-            <MembershipBadge tier={comment.author_membership_tier} />
+            <MembershipBadge
+              tier={comment.author_membership_tier}
+              official={comment.author_username?.toLowerCase() === "candid"}
+            />
             {comment.is_official ? (
               <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
                 Official reply
@@ -393,16 +415,36 @@ function CommentRow({
 
           {editing ? (
             <div className="mt-2 space-y-2">
-              <Textarea rows={3} maxLength={2000} value={editedBody} onChange={(event) => setEditedBody(event.target.value)} />
+              <Textarea
+                rows={3}
+                maxLength={2000}
+                value={editedBody}
+                onChange={(event) => setEditedBody(event.target.value)}
+              />
               <div className="flex gap-2">
-                <Button size="sm" disabled={editedBody.trim().length < 2} onClick={() => void saveEdit()}>Save</Button>
-                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>Cancel</Button>
+                <Button
+                  size="sm"
+                  disabled={editedBody.trim().length < 2}
+                  onClick={() => void saveEdit()}
+                >
+                  Save
+                </Button>
+                <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>
+                  Cancel
+                </Button>
               </div>
             </div>
           ) : (
-            <p className={cn("mt-1 whitespace-pre-line text-sm leading-relaxed", comment.is_deleted && "italic text-muted-foreground")}>
+            <p
+              className={cn(
+                "mt-1 whitespace-pre-line text-sm leading-relaxed",
+                comment.is_deleted && "italic text-muted-foreground",
+              )}
+            >
               {comment.is_deleted ? "This comment was deleted" : comment.body}
-              {comment.edited_at && !comment.is_deleted ? <span className="ml-1 text-xs text-muted-foreground">(edited)</span> : null}
+              {comment.edited_at && !comment.is_deleted ? (
+                <span className="ml-1 text-xs text-muted-foreground">(edited)</span>
+              ) : null}
             </p>
           )}
 
@@ -424,7 +466,8 @@ function CommentRow({
                 <ChevronDown
                   className={cn("size-3.5 transition-transform", open && "rotate-180")}
                 />
-                {open ? "Hide" : `View ${comment.replies.length}`} {comment.replies.length === 1 ? "reply" : "replies"}
+                {open ? "Hide" : `View ${comment.replies.length}`}{" "}
+                {comment.replies.length === 1 ? "reply" : "replies"}
               </button>
             ) : null}
           </div>
@@ -459,15 +502,33 @@ function CommentRow({
             <DropdownMenuContent align="end">
               {comment.author_id === user?.uid && !comment.is_deleted ? (
                 <>
-                  <DropdownMenuItem onSelect={(event) => { event.preventDefault(); setEditing(true); }}>
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setEditing(true);
+                    }}
+                  >
                     <Pencil className="mr-2 size-4" /> Edit comment
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-danger" onSelect={(event) => { event.preventDefault(); setConfirmDelete(true); }}>
+                  <DropdownMenuItem
+                    className="text-danger"
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      setConfirmDelete(true);
+                    }}
+                  >
                     <Trash2 className="mr-2 size-4" /> Delete comment
                   </DropdownMenuItem>
                 </>
               ) : (
-                <DropdownMenuItem disabled={!user || isReported} className="text-danger" onSelect={(event) => { event.preventDefault(); setReportOpen(true); }}>
+                <DropdownMenuItem
+                  disabled={!user || isReported}
+                  className="text-danger"
+                  onSelect={(event) => {
+                    event.preventDefault();
+                    setReportOpen(true);
+                  }}
+                >
                   {isReported ? "Already reported" : "Report comment"}
                 </DropdownMenuItem>
               )}
@@ -478,24 +539,30 @@ function CommentRow({
 
       <AnimatePresence initial={false}>
         {open
-          ? comment.replies.slice(0, visibleReplies).map((reply) => (
-              <CommentRow
-                key={reply.id}
-                comment={reply}
-                storyId={storyId}
-                depth={depth + 1}
-                liked={liked}
-                reported={reported}
-                focusCommentId={focusCommentId}
-                onReply={onReply}
-                onChanged={onChanged}
-              />
-            ))
+          ? comment.replies
+              .slice(0, visibleReplies)
+              .map((reply) => (
+                <CommentRow
+                  key={reply.id}
+                  comment={reply}
+                  storyId={storyId}
+                  depth={depth + 1}
+                  liked={liked}
+                  reported={reported}
+                  focusCommentId={focusCommentId}
+                  onReply={onReply}
+                  onChanged={onChanged}
+                />
+              ))
           : null}
       </AnimatePresence>
 
       {open && comment.replies.length > visibleReplies ? (
-        <button type="button" className="ml-12 mt-1 text-xs font-medium text-primary" onClick={() => setVisibleReplies((count) => count + 10)}>
+        <button
+          type="button"
+          className="ml-12 mt-1 text-xs font-medium text-primary"
+          onClick={() => setVisibleReplies((count) => count + 10)}
+        >
           Show more replies
         </button>
       ) : null}

@@ -15,7 +15,13 @@ import { MembershipBadge } from "@/components/site/membership-badge";
 function useDemoConversation() {
   return null as null | {
     id: string;
-    with: { username: string; verified?: boolean; photo_url?: string | null; membership_tier?: "basic" | "premium" | "gold" };
+    with: {
+      username: string;
+      verified?: boolean;
+      official?: boolean;
+      photo_url?: string | null;
+      membership_tier?: "basic" | "premium" | "gold";
+    };
     last_message: string;
     last_message_at: string;
     unread: number;
@@ -186,11 +192,16 @@ export function MessagesInbox({
                         >
                           @{item.with.username}
                         </Link>
-                      ) : <span className="truncate font-medium">Member</span>}
+                      ) : (
+                        <span className="truncate font-medium">Member</span>
+                      )}
                       {item.with?.verified ? (
                         <BadgeCheck className="size-4 shrink-0 text-primary" />
                       ) : null}
-                      <MembershipBadge tier={item.with?.membership_tier} />
+                      <MembershipBadge
+                        tier={item.with?.membership_tier}
+                        official={item.with?.official}
+                      />
                       <span className="ml-auto text-xs text-muted-foreground">
                         {timeAgo(item.last_message_at)}
                       </span>

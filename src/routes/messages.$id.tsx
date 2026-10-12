@@ -112,9 +112,12 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     [],
   );
 
-  useEffect(() => () => {
-    if (imagePreview) URL.revokeObjectURL(imagePreview);
-  }, [imagePreview]);
+  useEffect(
+    () => () => {
+      if (imagePreview) URL.revokeObjectURL(imagePreview);
+    },
+    [imagePreview],
+  );
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["conversation", id],
@@ -165,7 +168,11 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     let ticketId: string | null = null;
     try {
       const ticket = await issueImageUpload({
-        data: { conversation_id: id, size: file.size, mimeType: file.type as "image/jpeg" | "image/png" | "image/webp" },
+        data: {
+          conversation_id: id,
+          size: file.size,
+          mimeType: file.type as "image/jpeg" | "image/png" | "image/webp",
+        },
       });
       ticketId = ticket.ticketId;
       imageTicketRef.current = ticket.ticketId;
@@ -330,7 +337,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           <span className="flex items-center gap-1.5 font-medium">
             @{partner?.username ?? "…"}
             {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
-            <MembershipBadge tier={partner?.membership_tier} />
+            <MembershipBadge tier={partner?.membership_tier} official={partner?.official} />
           </span>
           <span className="block text-xs text-muted-foreground">
             {partner?.official ? "Official Candid account" : "Tap to view profile"}
@@ -344,137 +351,146 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           inSidebar ? "space-y-3 pb-4" : "px-4 py-5 sm:px-6",
         )}
       >
-        <div
-          className={cn(
-            "flex flex-col gap-3",
-            !inSidebar && "mx-auto max-w-2xl",
-          )}
-        >
-        {isLoading ? (
-          <div className="flex justify-center py-10">
-            <Loader2 className="size-5 animate-spin text-muted-foreground" />
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex min-h-40 flex-1 items-center justify-center py-10 text-center">
-            <p className="text-sm text-muted-foreground">No messages yet — say hello.</p>
-          </div>
-        ) : null}
+        <div className={cn("flex flex-col gap-3", !inSidebar && "mx-auto max-w-2xl")}>
+          {isLoading ? (
+            <div className="flex justify-center py-10">
+              <Loader2 className="size-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : messages.length === 0 ? (
+            <div className="flex min-h-40 flex-1 items-center justify-center py-10 text-center">
+              <p className="text-sm text-muted-foreground">No messages yet — say hello.</p>
+            </div>
+          ) : null}
 
-        <AnimatePresence initial={false}>
-          {messages.map((message) => {
-            const mine = message.sender_id === user?.uid;
-            const reactions = Object.entries(message.reactions ?? {}).filter(
-              ([, ids]) => ids.length > 0,
-            );
-            return (
-              <motion.div
-                key={message.id}
-                layout
-                initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                className={cn("flex", mine ? "justify-end" : "justify-start")}
-              >
-                <div className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start")}>
-                  {message.is_deleted ? (
-                    <div className="rounded-3xl border border-border/70 px-4 py-2.5 text-sm italic text-muted-foreground">
-                      This message was deleted
-                    </div>
-                  ) : (
-                    <>
-                      {message.image?.delivery_url ? (
-                        <img
-                          src={message.image.delivery_url}
-                          alt="Image shared in chat"
-                          loading="lazy"
-                          className="max-h-80 max-w-full rounded-xl object-contain"
-                        />
-                      ) : null}
-                      {message.body ? (
-                        <div className={cn(
-                          "rounded-3xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
-                          mine ? "rounded-br-md bg-primary text-primary-foreground" : "rounded-bl-md border border-border bg-card",
-                        )}>
-                          <p className="whitespace-pre-wrap">{message.body}</p>
-                        </div>
-                      ) : null}
-                    </>
-                  )}
-
+          <AnimatePresence initial={false}>
+            {messages.map((message) => {
+              const mine = message.sender_id === user?.uid;
+              const reactions = Object.entries(message.reactions ?? {}).filter(
+                ([, ids]) => ids.length > 0,
+              );
+              return (
+                <motion.div
+                  key={message.id}
+                  layout
+                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  className={cn("flex", mine ? "justify-end" : "justify-start")}
+                >
                   <div
-                    className={cn(
-                      "mt-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground",
-                      mine ? "justify-end" : "justify-start",
-                    )}
+                    className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start")}
                   >
-                    <span>{clock(message.created_at)}</span>
-                    {mine && !message.is_deleted && clockNow - new Date(message.created_at).getTime() >= 0 && clockNow - new Date(message.created_at).getTime() <= 120_000 ? (
-                      <button
-                        type="button"
-                        aria-label="Delete message for everyone"
-                        title="Delete for everyone"
-                        disabled={removeMessage.isPending}
-                        onClick={() => removeMessage.mutate(message.id)}
-                        className="rounded p-0.5 hover:text-danger disabled:opacity-50"
-                      >
-                        <Trash2 className="size-3.5" />
-                      </button>
-                    ) : null}
-                    {!message.is_deleted ? <Popover
-                      open={reactionPickerFor === message.id}
-                      onOpenChange={(open) => setReactionPickerFor(open ? message.id : null)}
+                    {message.is_deleted ? (
+                      <div className="rounded-3xl border border-border/70 px-4 py-2.5 text-sm italic text-muted-foreground">
+                        This message was deleted
+                      </div>
+                    ) : (
+                      <>
+                        {message.image?.delivery_url ? (
+                          <img
+                            src={message.image.delivery_url}
+                            alt="Image shared in chat"
+                            loading="lazy"
+                            className="max-h-80 max-w-full rounded-xl object-contain"
+                          />
+                        ) : null}
+                        {message.body ? (
+                          <div
+                            className={cn(
+                              "rounded-3xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                              mine
+                                ? "rounded-br-md bg-primary text-primary-foreground"
+                                : "rounded-bl-md border border-border bg-card",
+                            )}
+                          >
+                            <p className="whitespace-pre-wrap">{message.body}</p>
+                          </div>
+                        ) : null}
+                      </>
+                    )}
+
+                    <div
+                      className={cn(
+                        "mt-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground",
+                        mine ? "justify-end" : "justify-start",
+                      )}
                     >
-                      <PopoverTrigger asChild>
+                      <span>{clock(message.created_at)}</span>
+                      {mine &&
+                      !message.is_deleted &&
+                      clockNow - new Date(message.created_at).getTime() >= 0 &&
+                      clockNow - new Date(message.created_at).getTime() <= 120_000 ? (
                         <button
                           type="button"
-                          aria-label="React to message"
-                          className="rounded-full p-0.5 transition-colors hover:text-foreground"
+                          aria-label="Delete message for everyone"
+                          title="Delete for everyone"
+                          disabled={removeMessage.isPending}
+                          onClick={() => removeMessage.mutate(message.id)}
+                          className="rounded p-0.5 hover:text-danger disabled:opacity-50"
                         >
-                          <Smile className="size-3.5" />
+                          <Trash2 className="size-3.5" />
                         </button>
-                      </PopoverTrigger>
-                      <PopoverContent className="z-[120] w-auto rounded-full p-1.5" align="center">
-                        <div className="flex gap-1">
-                          {EMOJI.map((emoji) => (
+                      ) : null}
+                      {!message.is_deleted ? (
+                        <Popover
+                          open={reactionPickerFor === message.id}
+                          onOpenChange={(open) => setReactionPickerFor(open ? message.id : null)}
+                        >
+                          <PopoverTrigger asChild>
                             <button
-                              key={emoji}
                               type="button"
-                              onClick={() => {
-                                toggleReaction.mutate({ message_id: message.id, emoji })
-                                setReactionPickerFor(null);
-                              }}
-                              className="rounded-full px-1.5 py-1 text-base transition-transform hover:scale-125"
+                              aria-label="React to message"
+                              className="rounded-full p-0.5 transition-colors hover:text-foreground"
                             >
-                              {emoji}
+                              <Smile className="size-3.5" />
                             </button>
-                          ))}
-                        </div>
-                      </PopoverContent>
-                    </Popover> : null}
-                    {mine ? (
-                      <CheckCheck className={cn("size-3.5", message.read_at && "text-primary")} />
+                          </PopoverTrigger>
+                          <PopoverContent
+                            className="z-[120] w-auto rounded-full p-1.5"
+                            align="center"
+                          >
+                            <div className="flex gap-1">
+                              {EMOJI.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => {
+                                    toggleReaction.mutate({ message_id: message.id, emoji });
+                                    setReactionPickerFor(null);
+                                  }}
+                                  className="rounded-full px-1.5 py-1 text-base transition-transform hover:scale-125"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </PopoverContent>
+                        </Popover>
+                      ) : null}
+                      {mine ? (
+                        <CheckCheck className={cn("size-3.5", message.read_at && "text-primary")} />
+                      ) : null}
+                    </div>
+
+                    {!message.is_deleted && reactions.length > 0 ? (
+                      <div className={cn("mt-1 flex gap-1", mine ? "justify-end" : "")}>
+                        {reactions.map(([emoji, ids]) => (
+                          <button
+                            key={emoji}
+                            type="button"
+                            onClick={() => toggleReaction.mutate({ message_id: message.id, emoji })}
+                            className="rounded-full border border-border bg-card px-2 py-0.5 text-xs"
+                          >
+                            {emoji} {ids.length}
+                          </button>
+                        ))}
+                      </div>
                     ) : null}
                   </div>
-
-                  {!message.is_deleted && reactions.length > 0 ? (
-                    <div className={cn("mt-1 flex gap-1", mine ? "justify-end" : "")}>
-                      {reactions.map(([emoji, ids]) => (
-                        <button
-                          key={emoji}
-                          type="button"
-                          onClick={() => toggleReaction.mutate({ message_id: message.id, emoji })}
-                          className="rounded-full border border-border bg-card px-2 py-0.5 text-xs"
-                        >
-                          {emoji} {ids.length}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                </div>
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-        <div ref={bottomRef} />
+                </motion.div>
+              );
+            })}
+          </AnimatePresence>
+          <div ref={bottomRef} />
         </div>
       </div>
 
@@ -502,7 +518,11 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           >
             {imagePreview ? (
               <div className="relative mx-1 mt-1 w-fit rounded-xl border border-border bg-background p-1.5">
-                <img src={imagePreview} alt="Image ready to send" className="h-20 max-w-32 rounded-lg object-cover" />
+                <img
+                  src={imagePreview}
+                  alt="Image ready to send"
+                  className="h-20 max-w-32 rounded-lg object-cover"
+                />
                 <span className="absolute -right-2 -top-2 rounded-full bg-background shadow">
                   <button
                     type="button"
@@ -544,33 +564,33 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               >
                 <ImagePlus className="size-5" />
               </Button>
-            <Textarea
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" && !event.shiftKey) {
-                  event.preventDefault();
-                  if (draft.trim() || imageReceipt) send.mutate();
-                }
-              }}
-              rows={1}
-              placeholder="Write a message"
-              className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 focus-visible:ring-0"
-            />
-            <Button
-              type="button"
-              size="icon"
-              className="glow-primary rounded-full"
-              aria-label="Send message"
-              disabled={send.isPending || uploadingImage || (!draft.trim() && !imageReceipt)}
-              onClick={() => send.mutate()}
-            >
-              {send.isPending ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                <Send className="size-4" />
-              )}
-            </Button>
+              <Textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey) {
+                    event.preventDefault();
+                    if (draft.trim() || imageReceipt) send.mutate();
+                  }
+                }}
+                rows={1}
+                placeholder="Write a message"
+                className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 focus-visible:ring-0"
+              />
+              <Button
+                type="button"
+                size="icon"
+                className="glow-primary rounded-full"
+                aria-label="Send message"
+                disabled={send.isPending || uploadingImage || (!draft.trim() && !imageReceipt)}
+                onClick={() => send.mutate()}
+              >
+                {send.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Send className="size-4" />
+                )}
+              </Button>
             </div>
           </div>
         </div>

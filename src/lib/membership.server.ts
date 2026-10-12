@@ -2,6 +2,7 @@ import { DEFAULT_MEMBERSHIP, type MembershipTier } from "./membership";
 import { getFirestoreDb } from "./firebase.server";
 
 type MembershipRecord = {
+  account_type?: "individual" | "company" | "official" | "unknown";
   subscription_tier?: MembershipTier;
   subscription_status?: string | null;
   subscription_source?: "default" | "complimentary" | "manual" | "paid";
@@ -10,10 +11,14 @@ type MembershipRecord = {
 };
 
 function canSelfSwitch(profile: MembershipRecord, currentTier: MembershipTier) {
+  if (profile.account_type === "official") return false;
   // Preserve the one legacy Gold account's self-service package access. New
   // complimentary Gold assignments do not unlock paid-tier selection.
-  return profile.subscription_switch_unlocked === true ||
-    (currentTier === "gold" && (!profile.subscription_source || profile.subscription_source === "manual"));
+  return (
+    profile.subscription_switch_unlocked === true ||
+    (currentTier === "gold" &&
+      (!profile.subscription_source || profile.subscription_source === "manual"))
+  );
 }
 
 function isFirestoreConflict(error: unknown) {
@@ -33,7 +38,11 @@ export async function switchMembership(
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const existingEvent = await eventRef.get();
     if (existingEvent.exists) {
-      const event = existingEvent.data() as { user_id?: string; to_tier?: MembershipTier; version?: number };
+      const event = existingEvent.data() as {
+        user_id?: string;
+        to_tier?: MembershipTier;
+        version?: number;
+      };
       if (event.user_id !== userId) throw new Error("Invalid package change request.");
       return {
         tier: event.to_tier ?? tier,
@@ -51,6 +60,9 @@ export async function switchMembership(
       throw new Error("Could not find your Candid profile. Please refresh and try again.");
     }
     const profile = profileSnapshot.data() as MembershipRecord;
+    if (profile.account_type === "official") {
+      throw new Error("The official Candid account permanently uses Gold access.");
+    }
     const currentTier = profile.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier;
     const switchUnlocked = canSelfSwitch(profile, currentTier);
     const currentVersion = Number.isInteger(profile.subscription_version)
@@ -58,7 +70,9 @@ export async function switchMembership(
       : 0;
 
     if (currentVersion !== expectedVersion) {
-      throw new Error("Your package changed in another session. Refresh the page before switching again.");
+      throw new Error(
+        "Your package changed in another session. Refresh the page before switching again.",
+      );
     }
     if (tier !== "basic" && !switchUnlocked) {
       throw new Error("Premium and Gold are not available for this account yet.");
@@ -69,7 +83,7 @@ export async function switchMembership(
         changed: false,
         duplicate: false,
         version: currentVersion,
-        assignmentType: tier === "basic" ? "default" as const : "complimentary" as const,
+        assignmentType: tier === "basic" ? ("default" as const) : ("complimentary" as const),
         paymentProcessed: false as const,
         switchUnlocked,
       };

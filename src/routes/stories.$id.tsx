@@ -123,7 +123,10 @@ function StoryPage() {
               >
                 @{story.author_username}
               </Link>
-              <MembershipBadge tier={story.author_membership_tier} />
+              <MembershipBadge
+                tier={story.author_membership_tier}
+                official={story.author_username?.toLowerCase() === "candid"}
+              />
             </>
           ) : (
             "Candid member"

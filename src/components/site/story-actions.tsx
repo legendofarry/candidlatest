@@ -195,7 +195,10 @@ export function StoryActions({
                         >
                           @{item.author_username}
                         </Link>
-                        <MembershipBadge tier={item.author_membership_tier} />
+                        <MembershipBadge
+                          tier={item.author_membership_tier}
+                          official={item.author_username?.toLowerCase() === "candid"}
+                        />
                       </>
                     ) : (
                       item.author_handle

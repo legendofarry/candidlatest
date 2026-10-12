@@ -9,6 +9,7 @@ export type MembershipStatus = "active" | "cancelled" | "expired" | "past_due";
 export type MembershipSource = "default" | "complimentary" | "manual" | "paid";
 
 export type MembershipProfile = {
+  account_type?: "individual" | "company" | "official" | "unknown" | null;
   subscription_tier?: MembershipTier | null;
   subscription_status?: MembershipStatus | null;
   subscription_period_ends_at?: string | null;
@@ -36,6 +37,7 @@ export function getEffectiveMembershipTier(
   profile: MembershipProfile | null | undefined,
   now = Date.now(),
 ): MembershipTier {
+  if (profile?.account_type === "official") return "gold";
   const currentTier = profile?.subscription_tier ?? "basic";
   const source = profile?.subscription_source ?? (currentTier === "basic" ? "default" : "manual");
   return getMembershipBadgeTier(
@@ -48,9 +50,13 @@ export function getEffectiveMembershipTier(
 }
 
 export function canSelfSwitchMembership(profile: MembershipProfile | null | undefined) {
+  if (profile?.account_type === "official") return false;
   const currentTier = profile?.subscription_tier ?? "basic";
-  return profile?.subscription_switch_unlocked === true ||
-    (currentTier === "gold" && (!profile?.subscription_source || profile.subscription_source === "manual"));
+  return (
+    profile?.subscription_switch_unlocked === true ||
+    (currentTier === "gold" &&
+      (!profile?.subscription_source || profile.subscription_source === "manual"))
+  );
 }
 
 export function getMembershipBadgeTier(
@@ -64,7 +70,8 @@ export function getMembershipBadgeTier(
   if (currentTier === "basic") return "basic";
   const currentStatus = status ?? "active";
   const periodEnd = periodEndsAt ? new Date(periodEndsAt).getTime() : NaN;
-  const active = currentStatus === "active" ||
+  const active =
+    currentStatus === "active" ||
     (currentStatus === "cancelled" && source === "paid" && periodEnd > now);
   return active ? currentTier : "basic";
 }
