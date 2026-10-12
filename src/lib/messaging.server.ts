@@ -688,6 +688,24 @@ export async function sendMessage(input: {
   }
   await batch.commit();
 
+  try {
+    const [{ dispatchWebPush }, senderSnap] = await Promise.all([
+      import("./push.server"),
+      db.collection("profiles").doc(input.userId).get(),
+    ]);
+    const sender = senderSnap.data() as { username?: string | null } | undefined;
+    const messagePreview = image ? "Sent you a photo" : input.body.replace(/\s+/g, " ").trim().slice(0, 180);
+    await dispatchWebPush(otherId, {
+      title: sender?.username ? `@${sender.username}` : "New message",
+      body: messagePreview || "Sent you a message",
+      link: `/messages/${input.conversationId}`,
+      notificationId: message.id,
+    });
+  } catch (error) {
+    // The message is already saved; push delivery must never make sending fail.
+    console.warn("[message push] Could not notify recipient", error instanceof Error ? error.message : "unknown error");
+  }
+
   return message;
 }
 

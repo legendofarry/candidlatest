@@ -397,7 +397,7 @@ function SettingsPage() {
                     <ToggleRow
                       icon={<BellRing className="size-4" />}
                       title="Push notifications on this device"
-                      description={pushBusy ? "Updating this device…" : pushPermission === "denied" ? "Notifications are blocked in your browser settings." : pushPermission === "unsupported" || !pushAvailable ? "This browser or device does not support push notifications." : !import.meta.env["VITE_FIREBASE_VAPID_KEY"] ? "Push notifications are not configured for this site." : "Show Candid alerts when the app is closed."}
+                      description={pushBusy ? "Updating this device…" : pushPermission === "denied" ? "Notifications are blocked in your browser settings." : pushPermission === "unsupported" || !pushAvailable ? "This browser or device does not support push notifications." : !import.meta.env["VITE_FIREBASE_VAPID_KEY"] ? "Push notifications are not configured for this site." : "Show message and notification previews when the app is closed."}
                       checked={pushEnabled}
                       disabled={!user || !pushAvailable || pushBusy || pushPermission === "denied" || pushPermission === "unsupported" || !import.meta.env["VITE_FIREBASE_VAPID_KEY"]}
                       onCheckedChange={(next) => void togglePushNotifications(next)}

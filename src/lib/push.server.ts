@@ -26,7 +26,7 @@ export async function removePushToken(userId: string, token: string) {
   return { removed: true as const };
 }
 
-/** Pushes a privacy-safe alert; full notification details stay inside the signed-in app. */
+/** Pushes an alert preview; users can control whether their OS shows previews on the lock screen. */
 export async function dispatchWebPush(userId: string, input: PushMessage) {
   try {
     const db = getFirestoreDb();
@@ -50,8 +50,8 @@ export async function dispatchWebPush(userId: string, input: PushMessage) {
               webpush: {
                 headers: { Urgency: "high" },
                 notification: {
-                  title: "Candid",
-                  body: "You have a new notification.",
+                  title: input.title.slice(0, 100),
+                  body: (input.body || "You have a new notification.").replace(/\s+/g, " ").trim().slice(0, 180),
                   icon: "/icons/icon-192.png",
                   tag: input.notificationId || "candid-notification",
                   renotify: false,

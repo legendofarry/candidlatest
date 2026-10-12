@@ -48,4 +48,4 @@ Before deploying push notifications:
 3. Set `PUBLIC_APP_URL` to the deployed Main App origin in both app environments. The Main App also needs its existing Firebase service account credentials so it can send FCM messages.
 4. Deploy the Owner Admin App with its existing Firebase Admin service account. Both apps must use the same Firebase project.
 
-Members must allow notifications in their browser. On iPhone and iPad, install Candid to the Home Screen first; iOS web push is available for installed web apps. Push previews intentionally use generic text so private story details do not appear on a lock screen.
+Members must allow notifications in their browser. On iPhone and iPad, install Candid to the Home Screen first; iOS web push is available for installed web apps. Push alerts preview the sender and message text or notification title and description. These previews may be visible on the device lock screen; members can change lock-screen preview behavior in their device settings.
