@@ -84,11 +84,14 @@ export const checkUsername = createServerFn({ method: "POST" })
 export const getUsernameSuggestions = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ seed: z.string().max(40).default("candid") }).parse(input ?? {}),
+    z.object({
+      seed: z.string().max(40).default("candid"),
+      ageRange: z.enum(["18-24", "25-34", "35-44", "45+", "skip"]).optional(),
+    }).parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     const { suggestUsernames } = await import("./onboarding.server");
-    return { suggestions: await suggestUsernames(data.seed, 5, context.userId) };
+    return { suggestions: await suggestUsernames(data.seed, 5, context.userId, data.ageRange) };
   });
 
 export const completeOnboarding = createServerFn({ method: "POST" })

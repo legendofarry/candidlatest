@@ -1,6 +1,7 @@
 import { getFirestoreDb } from "./firebase.server";
 import type { CandidLensRecord, ProfileRecord } from "./firebase-data.server";
 import { DEFAULT_MEMBERSHIP } from "./membership";
+import { generateAliasCandidate, type AliasAgeRange } from "./alias-generator";
 
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;
@@ -85,32 +86,20 @@ export async function checkUsernameAvailability(
   };
 }
 
-const FLAVOURS = ["real", "hq", "ke", "254", "official_ish", "here", "speaks", "daily"];
-
-function candidatesFor(seed: string): string[] {
-  const base =
-    normalizeUsername(seed)
-      .replace(/[^a-z0-9._]/g, "")
-      .slice(0, 14) || "candid_user";
-  const out = new Set<string>();
-  for (const flavour of FLAVOURS) out.add(`${base}_${flavour}`.slice(0, USERNAME_MAX));
-  for (let i = 0; i < 40; i += 1) {
-    out.add(`${base}${Math.floor(Math.random() * 9999)}`.slice(0, USERNAME_MAX));
-    out.add(`${base}.${Math.floor(Math.random() * 99)}`.slice(0, USERNAME_MAX));
-  }
-  return [...out];
-}
-
 /** Only returns usernames that were confirmed free at generation time. */
-export async function suggestUsernames(seed: string, limit = 5, currentUserId?: string) {
-  const pool = candidatesFor(seed).filter((value) => validateUsername(value).ok);
-  const found: string[] = [];
-  for (const candidate of pool) {
-    if (found.length >= limit) break;
-
-    if (await isUsernameFree(candidate, currentUserId)) found.push(candidate);
+export async function suggestUsernames(
+  seed: string,
+  limit = 5,
+  currentUserId?: string,
+  ageRange: AliasAgeRange = "skip",
+) {
+  const found = new Set<string>();
+  for (let attempt = 0; attempt < 80 && found.size < Math.min(limit, 10); attempt += 1) {
+    const candidate = generateAliasCandidate(seed, [], ageRange, attempt);
+    if (!validateUsername(candidate).ok || !(await isUsernameFree(candidate, currentUserId))) continue;
+    found.add(candidate);
   }
-  return found;
+  return [...found];
 }
 
 export type SocialLinks = {

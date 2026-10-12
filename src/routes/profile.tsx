@@ -30,7 +30,6 @@ import { useServerFn } from "@tanstack/react-start";
 import {
   declareAccountType,
   getOnboardingState,
-  updateMyUsername,
 } from "@/lib/onboarding.functions";
 import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
@@ -63,9 +62,6 @@ function ProfilePage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
-  const [editingUsername, setEditingUsername] = useState(false);
-  const [usernameDraft, setUsernameDraft] = useState("");
-  const [savingUsername, setSavingUsername] = useState(false);
 
   const fetchOnboardingState = useServerFn(getOnboardingState);
   const onboarding = useQuery({
@@ -74,7 +70,6 @@ function ProfilePage() {
     enabled: Boolean(user),
   });
   const socials = onboarding.data?.socials ?? null;
-  const updateUsername = useServerFn(updateMyUsername);
   const fetchContributions = useServerFn(getMyContributions);
   const contributions = useQuery({
     queryKey: ["my-contributions", user?.uid ?? null],
@@ -102,23 +97,6 @@ function ProfilePage() {
       });
     } finally {
       setSavingType(false);
-    }
-  }
-  async function saveUsername() {
-    if (savingUsername) return;
-    setSavingUsername(true);
-    try {
-      const result = await updateUsername({ data: { username: usernameDraft } });
-      if (!result.ok) {
-        toast.error(result.reason);
-        return;
-      }
-      await queryClient.invalidateQueries({ queryKey: ["onboarding-state", user?.uid] });
-      setEditingUsername(false);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not change username.");
-    } finally {
-      setSavingUsername(false);
     }
   }
   const socialLinks = socials
@@ -273,7 +251,7 @@ function ProfilePage() {
                 </div>
                 {user && !onboarding.data?.username && !onboarding.isLoading ? (
                   <Button asChild size="sm" variant="outline" className="ml-auto">
-                    <Link to="/onboarding">Claim username</Link>
+                    <Link to="/onboarding" search={{ editUsername: false }}>Claim username</Link>
                   </Button>
                 ) : null}
                 {!user && !loading ? (
@@ -286,61 +264,21 @@ function ProfilePage() {
                 <div className="mt-4 space-y-4 border-t border-border pt-4">
                   {onboarding.data?.username ? (
                     <div className="flex flex-wrap items-center gap-2">
-                      {editingUsername ? (
-                        <>
-                          <input
-                            value={usernameDraft}
-                            onChange={(event) =>
-                              setUsernameDraft(
-                                event.target.value.toLowerCase().replace(/\s+/g, "_"),
-                              )
-                            }
-                            maxLength={20}
-                            autoComplete="off"
-                            className="h-10 min-w-0 flex-1 rounded-xl border border-input bg-background px-3 text-sm outline-none focus:border-primary"
-                            aria-label="New username"
-                          />
-                          <Button
-                            size="sm"
-                            disabled={savingUsername || !usernameDraft.trim()}
-                            onClick={() => void saveUsername()}
-                          >
-                            {savingUsername ? "Saving…" : "Save"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            onClick={() => setEditingUsername(false)}
-                          >
-                            Cancel
-                          </Button>
-                        </>
+                      {nextUsernameChangeAt !== null && Date.now() < nextUsernameChangeAt ? (
+                        <Button size="sm" variant="outline" disabled>Change username</Button>
                       ) : (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={
-                              nextUsernameChangeAt !== null && Date.now() < nextUsernameChangeAt
-                            }
-                            onClick={() => {
-                              setUsernameDraft(onboarding.data?.username ?? "");
-                              setEditingUsername(true);
-                            }}
-                          >
-                            Change username
-                          </Button>
-                          {nextUsernameChangeAt ? (
-                            <span className="text-xs text-muted-foreground">
-                              Next change after{" "}
-                              {new Date(nextUsernameChangeAt).toLocaleDateString("en-KE")}.
-                            </span>
-                          ) : (
-                            <span className="text-xs text-muted-foreground">
-                              Username changes are limited to once every 2 weeks.
-                            </span>
-                          )}
-                        </>
+                        <Button asChild size="sm" variant="outline">
+                          <Link to="/onboarding" search={{ editUsername: true }}>Change username</Link>
+                        </Button>
+                      )}
+                      {nextUsernameChangeAt ? (
+                        <span className="text-xs text-muted-foreground">
+                          Next change after {new Date(nextUsernameChangeAt).toLocaleDateString("en-KE")}.
+                        </span>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">
+                          Username changes are limited to once every 2 weeks.
+                        </span>
                       )}
                     </div>
                   ) : null}

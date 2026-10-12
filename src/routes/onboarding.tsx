@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ArrowRight,
+  ArrowLeft,
   AlertCircle,
   AtSign,
   BriefcaseBusiness,
@@ -26,6 +27,7 @@ import {
 import { useReducedMotion } from "motion/react";
 import { useAuth } from "@/hooks/useAuth";
 import { requiresEmailVerification } from "@/lib/email-verification";
+import { generateAliasCandidate, type AliasAgeRange } from "@/lib/alias-generator";
 import { notify as toast } from "@/lib/notifications-store";
 import { Button } from "@/components/ui/button";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
@@ -35,9 +37,13 @@ import {
   checkUsername,
   completeOnboarding,
   getOnboardingState,
+  updateMyUsername,
 } from "@/lib/onboarding.functions";
 
 export const Route = createFileRoute("/onboarding")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    editUsername: search["editUsername"] === true || search["editUsername"] === "true",
+  }),
   head: () => ({
     meta: [
       { title: "Claim your username | Candid" },
@@ -187,8 +193,17 @@ const ALIAS_QUESTIONS = [
       { label: "Find a way through", detail: "Explore until I find an answer.", token: "Scout" },
     ],
   },
+  {
+    prompt: "Which age range should your alias feel right for?",
+    options: [
+      { label: "18–24", detail: "Fresh, lively word choices.", token: "18-24" },
+      { label: "25–34", detail: "Modern, balanced word choices.", token: "25-34" },
+      { label: "35–44", detail: "Confident, timeless word choices.", token: "35-44" },
+      { label: "45+", detail: "Clear, classic word choices.", token: "45+" },
+      { label: "Prefer not to say", detail: "Use a mix of neutral words.", token: "skip" },
+    ],
+  },
 ] as const;
-const ALIAS_ENDINGS = ["Runner", "Rebel", "Nomad", "Comet", "ChomaBandit"];
 type AliasStage = "seed" | "questions" | "result";
 
 function getLensInterests(answers: LensAnswer): LensInterests {
@@ -227,12 +242,14 @@ function emptyLensData(skipped: boolean): CandidLensData {
 }
 
 function OnboardingPage() {
+  const { editUsername } = Route.useSearch();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, loading } = useAuth();
   const prefersReducedMotion = useReducedMotion();
   const check = useServerFn(checkUsername);
   const complete = useServerFn(completeOnboarding);
+  const updateUsername = useServerFn(updateMyUsername);
   const state = useServerFn(getOnboardingState);
 
   const [lensScreen, setLensScreen] = useState<LensScreen>("intro");
@@ -247,7 +264,7 @@ function OnboardingPage() {
   const [username, setUsername] = useState("");
   const [aliasStage, setAliasStage] = useState<AliasStage>("seed");
   const [aliasQuestionIndex, setAliasQuestionIndex] = useState(0);
-  const [aliasAnswers, setAliasAnswers] = useState<(number | null)[]>([null, null, null, null]);
+  const [aliasAnswers, setAliasAnswers] = useState<(number | null)[]>([null, null, null, null, null]);
   const [aliasIdea, setAliasIdea] = useState("");
   const [aliasRound, setAliasRound] = useState(0);
   const [status, setStatus] = useState<Status>("idle");
@@ -283,32 +300,41 @@ function OnboardingPage() {
       .then((result) => {
         if (!active) return;
         setPhotoUrl(result.photoUrl);
-        if (!result.needsOnboarding) {
+        if (!result.needsOnboarding && !editUsername) {
           navigate({ to: "/" });
           return;
         }
-        try {
-          const rawDraft = window.localStorage.getItem(storageKey);
-          if (rawDraft) {
-            const draft = JSON.parse(rawDraft) as Partial<LensDraft>;
-            const validScreen = [
-              "intro",
-              "scenario",
-              "transition",
-              "result",
-              "onboarding",
-            ].includes(String(draft.screen));
-            if (validScreen) {
-              setLensScreen(draft.screen as LensScreen);
-              setScenarioIndex(Math.max(0, Math.min(4, Number(draft.scenarioIndex) || 0)));
-              setLensAnswers(
-                draft.answers && typeof draft.answers === "object" ? draft.answers : {},
-              );
-              setLensSkipped(Boolean(draft.skipped));
+        if (editUsername) {
+          setLensScreen("onboarding");
+          setAliasStage("seed");
+          setStep(0);
+          setAliasQuestionIndex(0);
+          setAliasAnswers([null, null, null, null, null]);
+        }
+        if (!editUsername) {
+          try {
+            const rawDraft = window.localStorage.getItem(storageKey);
+            if (rawDraft) {
+              const draft = JSON.parse(rawDraft) as Partial<LensDraft>;
+              const validScreen = [
+                "intro",
+                "scenario",
+                "transition",
+                "result",
+                "onboarding",
+              ].includes(String(draft.screen));
+              if (validScreen) {
+                setLensScreen(draft.screen as LensScreen);
+                setScenarioIndex(Math.max(0, Math.min(4, Number(draft.scenarioIndex) || 0)));
+                setLensAnswers(
+                  draft.answers && typeof draft.answers === "object" ? draft.answers : {},
+                );
+                setLensSkipped(Boolean(draft.skipped));
+              }
             }
+          } catch {
+            window.localStorage.removeItem(storageKey);
           }
-        } catch {
-          window.localStorage.removeItem(storageKey);
         }
         setLensHydrated(true);
       })
@@ -320,7 +346,7 @@ function OnboardingPage() {
     return () => {
       active = false;
     };
-  }, [loading, user, navigate, state]);
+  }, [loading, user, navigate, state, editUsername]);
 
   useEffect(() => {
     if (!user || !lensHydrated) return;
@@ -354,25 +380,9 @@ function OnboardingPage() {
   }, [lensScreen, scenarioIndex, prefersReducedMotion]);
 
   function generateAlias() {
-    const base = usernameSeed.trim().replace(/[^a-z0-9]/gi, "").slice(0, 7);
-    if (base.length < 3) {
-      setAliasStage("seed");
-      return;
-    }
     if (aliasAnswers.some((answer) => answer === null)) return;
-    const pace = ALIAS_QUESTIONS[0].options[aliasAnswers[0]!]!.token.toLowerCase();
-    const time = ALIAS_QUESTIONS[1].options[aliasAnswers[1]!]!.token.toLowerCase();
-    const energy = ALIAS_QUESTIONS[2].options[aliasAnswers[2]!]!.token.toLowerCase();
-    const instinct = ALIAS_QUESTIONS[3].options[aliasAnswers[3]!]!.token.toLowerCase();
-    const ending = ALIAS_ENDINGS[aliasRound % ALIAS_ENDINGS.length]!.toLowerCase();
-    const options = [
-      `${time}${base}${instinct}`,
-      `${pace}${base}${energy}`,
-      `${energy}${base}${ending}`,
-      `${base}${instinct}${ending}`,
-      `${pace}${base}${time}`,
-    ];
-    const candidate = options[aliasRound % options.length]!.slice(0, 20);
+    const ageRange = ALIAS_QUESTIONS[4].options[aliasAnswers[4]!]!.token as AliasAgeRange;
+    const candidate = generateAliasCandidate(usernameSeed, aliasAnswers, ageRange, aliasRound);
     setAliasIdea(candidate);
     setUsername(candidate);
     setAliasStage("result");
@@ -404,6 +414,29 @@ function OnboardingPage() {
     }, 380);
     return () => clearTimeout(timer);
   }, [username, user, check]);
+
+  async function saveAliasChange() {
+    if (status !== "available" || saving) return;
+    setSaving(true);
+    setSubmitError(null);
+    try {
+      const result = await updateUsername({ data: { username: username.trim().toLowerCase() } });
+      if (!result.ok) {
+        setStatus("taken");
+        setMessage(result.reason ?? "That username is no longer available.");
+        return;
+      }
+      await queryClient.invalidateQueries({ queryKey: ["onboarding-state", user?.uid] });
+      toast.success("Your new alias is live.");
+      await navigate({ to: "/profile" });
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Could not update your alias.";
+      setSubmitError(reason);
+      toast.error(reason);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function submit(includeSocials = true) {
     if (status !== "available") return;
@@ -511,7 +544,11 @@ function OnboardingPage() {
             <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Flame className="size-4" /></span>
             Candid
           </div>
-          <span className="text-xs text-muted-foreground">Your account</span>
+          {editUsername ? (
+            <button type="button" onClick={() => void navigate({ to: "/profile" })} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+              <ArrowLeft className="size-3.5" /> Cancel edit
+            </button>
+          ) : <span className="text-xs text-muted-foreground">Your account</span>}
         </header>
         <div>
         <motion.div
@@ -520,12 +557,22 @@ function OnboardingPage() {
           transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
           className="mb-7"
         >
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary">A few quick choices · {step + 1} of 3</p>
+          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            {editUsername ? "Create a new public alias" : `A few quick choices · ${step + 1} of 3`}
+          </p>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            {step === 0 ? aliasStage === "seed" ? "Choose your starting name" : aliasStage === "questions" ? "Make it yours" : "Your Candid name" : step === 1 ? "Add a profile photo" : "Add your links"}
+            {editUsername
+              ? aliasStage === "seed" ? "Choose a new alias" : aliasStage === "questions" ? "Shape your new alias" : "Your new Candid name"
+              : step === 0 ? aliasStage === "seed" ? "Choose your starting name" : aliasStage === "questions" ? "Make it yours" : "Your Candid name" : step === 1 ? "Add a profile photo" : "Add your links"}
           </h1>
           <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
-            {step === 0
+            {editUsername
+              ? aliasStage === "seed"
+                ? "Choose a word or nickname to inspire a fresh alias. The word itself will never appear in the generated username."
+                : aliasStage === "questions"
+                  ? "Your answers and age range shape the style. The range is used for this step only and isn’t saved. Each alias is randomized and checked before you save it."
+                  : "Review your new public alias. Your current one stays active until you save this change."
+              : step === 0
                 ? aliasStage === "seed"
                   ? "Start with a word or nickname. A few quick choices will shape it into the public alias you’ll use across Candid."
                   : aliasStage === "questions"
@@ -537,7 +584,7 @@ function OnboardingPage() {
           </p>
         </motion.div>
 
-        <div className="mb-5 flex gap-2" aria-label={`Profile setup step ${step + 1} of 3`}>
+        {!editUsername ? <div className="mb-5 flex gap-2" aria-label={`Profile setup step ${step + 1} of 3`}>
           {[0, 1, 2].map((index) => (
             <div key={index} className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
               <motion.div
@@ -548,7 +595,7 @@ function OnboardingPage() {
               />
             </div>
           ))}
-        </div>
+        </div> : null}
 
         <AnimatePresence mode="wait" initial={false}>
           {step === 0 ? (
@@ -577,7 +624,7 @@ function OnboardingPage() {
                       className="border-0 bg-transparent px-0 focus-visible:ring-0"
                     />
                   </div>
-                  <p className="text-xs leading-5 text-muted-foreground">This won’t be your final alias. Don’t enter your real name; choose a nickname or a word instead.</p>
+                      <p className="text-xs leading-5 text-muted-foreground">This is inspiration only and won’t appear in your alias. Don’t enter your real name; choose a nickname or a word instead.</p>
                   <Button className="w-full glow-primary" disabled={usernameSeed.trim().replace(/[^a-z0-9]/gi, "").length < 3} onClick={() => setAliasStage("questions")}>
                     Next: answer a few questions <ArrowRight className="size-4" />
                   </Button>
@@ -599,7 +646,7 @@ function OnboardingPage() {
                       </div>
                     </div>
                     <span className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground">
-                      Starting with <strong className="ml-1 font-semibold text-foreground">@{usernameSeed.trim().replace(/[^a-z0-9]/gi, "").slice(0, 7).toLowerCase()}</strong>
+                      Your inspiration <strong className="ml-1 font-semibold text-foreground">isn’t shown</strong>
                     </span>
                   </div>
 
@@ -681,10 +728,16 @@ function OnboardingPage() {
                   </motion.div>
                   <div className="flex flex-col gap-2 sm:flex-row">
                     <Button type="button" variant="outline" className="flex-1" onClick={generateAlias}>Try another</Button>
-                    <Button type="button" variant="ghost" className="flex-1" onClick={() => { setAliasStage("seed"); setUsername(""); setAliasIdea(""); }}>Change starting name</Button>
+                    <Button type="button" variant="ghost" className="flex-1" onClick={() => { setAliasStage("seed"); setUsername(""); setAliasIdea(""); }}>Change inspiration</Button>
                   </div>
-                  <Button className="w-full glow-primary" disabled={status !== "available"} onClick={() => setStep(1)}>
-                    Claim this alias <ArrowRight className="size-4" />
+                  <Button
+                    className="w-full glow-primary"
+                    disabled={status !== "available" || saving}
+                    onClick={() => editUsername ? void saveAliasChange() : setStep(1)}
+                  >
+                    {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                    {editUsername ? saving ? "Saving alias…" : "Save new alias" : "Claim this alias"}
+                    {!saving ? <ArrowRight className="size-4" /> : null}
                   </Button>
                 </div>
               )}
