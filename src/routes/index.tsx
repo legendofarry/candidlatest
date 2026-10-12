@@ -68,6 +68,7 @@ function FeedPage() {
   const [sort, setSort] = useState<"new" | "top" | "trending">("new");
   const [industry, setIndustry] = useState<string | null>(null);
   const [county, setCounty] = useState<string | null>(null);
+  const [area, setArea] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [activeDiscussion, setActiveDiscussion] = useState<PublicStory | null>(null);
   const [pulseSheetOpen, setPulseSheetOpen] = useState(false);
@@ -76,11 +77,11 @@ function FeedPage() {
    * The unfiltered view reuses the data the loader already fetched, so the
    * server and the first client render agree (no hydration mismatch).
    */
-  const isDefaultView = sort === "new" && industry === null && county === null;
+  const isDefaultView = sort === "new" && industry === null && county === null && area === null;
 
   const { data, isPending } = useQuery({
-    queryKey: ["stories", sort, industry, county],
-    queryFn: () => listStories({ data: { sort, industry, county } }),
+    queryKey: ["stories", sort, industry, county, area],
+    queryFn: () => listStories({ data: { sort, industry, county, area } }),
     ...(isDefaultView ? { initialData: initialFeed } : {}),
   });
 
@@ -105,7 +106,7 @@ function FeedPage() {
     );
   }
 
-  const canReset = Boolean(needle) || industry !== null || county !== null || sort !== "new";
+  const canReset = Boolean(needle) || industry !== null || county !== null || area !== null || sort !== "new";
 
   return (
     <div className="space-y-5 md:space-y-8">
@@ -215,6 +216,7 @@ function FeedPage() {
               setQ("");
               setIndustry(null);
               setCounty(null);
+              setArea(null);
               setSort("new");
             }}
             centerFiltersOnMobile
@@ -241,6 +243,13 @@ function FeedPage() {
                 value: county,
                 options: filters.counties,
                 onChange: setCounty,
+              },
+              {
+                id: "area",
+                label: "Area",
+                value: area,
+                options: filters.areas,
+                onChange: setArea,
               },
             ]}
           />

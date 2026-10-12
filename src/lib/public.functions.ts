@@ -23,6 +23,7 @@ const FeedInput = z.object({
   sort: z.enum(["new", "top", "trending"]).default("new"),
   industry: z.string().nullable().default(null),
   county: z.string().nullable().default(null),
+  area: z.string().nullable().default(null),
   reason: z.string().nullable().default(null),
   companySlug: z.string().nullable().default(null),
   limit: z.number().min(1).max(50).default(20),
@@ -37,6 +38,7 @@ export const listStories = createServerFn({ method: "GET" })
         sort: data.sort,
         industry: data.industry,
         county: data.county,
+        area: data.area,
         reason: data.reason,
         companySlug: data.companySlug,
         limit: data.limit,
@@ -59,13 +61,14 @@ export const getFilterOptions = createServerFn({ method: "GET" }).handler(async 
       companies: result.companies.length,
       industries: result.industries.length,
       counties: result.counties.length,
+      areas: result.areas.length,
     });
     return result;
   } catch (error) {
     console.error("[getFilterOptions] Full error:", error);
     if (!isFirebaseReadUnavailable(error)) throw error;
     console.warn("[getFilterOptions] Firebase public read unavailable", error);
-    return { companies: [], industries: [], counties: [] };
+    return { companies: [], industries: [], counties: [], areas: [] };
   }
 });
 

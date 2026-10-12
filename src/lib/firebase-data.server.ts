@@ -621,13 +621,22 @@ export async function getFilterOptionsData() {
   const counties = [
     ...new Set(companies.map((company) => company.county).filter(Boolean)),
   ].sort() as string[];
-  return { companies, industries, counties };
+  const areas = [
+    ...new Set(
+      stories
+        .filter((story) => story.status === "published")
+        .map((story) => story.area?.trim())
+        .filter((area): area is string => Boolean(area)),
+    ),
+  ].sort((a, b) => a.localeCompare(b));
+  return { companies, industries, counties, areas };
 }
 
 export async function getPublicStories(input: {
   sort: "new" | "top" | "trending";
   industry?: string | null;
   county?: string | null;
+  area?: string | null;
   reason?: string | null;
   companySlug?: string | null;
   limit?: number;
@@ -651,6 +660,7 @@ export async function getPublicStories(input: {
     .filter((story) => story.status === "published")
     .filter((story) => (input.industry ? story.industry === input.industry : true))
     .filter((story) => (input.county ? story.county === input.county : true))
+    .filter((story) => (input.area ? story.area?.trim() === input.area : true))
     .filter((story) => (input.companySlug ? story.company_slug === input.companySlug : true))
     .filter((story) => (input.reason ? (story.reasons ?? []).includes(input.reason) : true))
     .map<PublicStoryRecord>((story) => {
