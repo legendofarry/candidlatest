@@ -146,7 +146,7 @@ export function StoryActions({
       />
 
       {open ? (
-        <div className="animate-fade mt-3 space-y-3 rounded-xl bg-secondary/40 p-3">
+        <div className="animate-fade mt-3 space-y-3 border-t border-border/70 pt-3">
           {user ? (
             <div className="space-y-2">
               <Textarea
@@ -181,10 +181,10 @@ export function StoryActions({
           {thread.isPending ? (
             <p className="text-xs text-muted-foreground">Loading comments…</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="divide-y divide-border/60">
               {(thread.data?.comments ?? []).slice(0, 4).map((item) => (
-                <li key={item.id} className="rounded-lg bg-background/80 p-2.5">
-                  <p className="text-[11px] font-medium text-muted-foreground">
+                <li key={item.id} className="py-2.5 first:pt-0 last:pb-0">
+                  <p className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted-foreground">
                     {item.author_username ? (
                       <>
                         <Link
@@ -202,10 +202,10 @@ export function StoryActions({
                       </>
                     ) : (
                       item.author_handle
-                    )}{" "}
-                    · {formatDate(item.created_at)}
+                    )}
+                    <span>· {formatDate(item.created_at)}</span>
                   </p>
-                  <p className="mt-1 text-sm">{item.body}</p>
+                  <p className="mt-1 break-words text-sm leading-relaxed">{item.body}</p>
                 </li>
               ))}
               {(thread.data?.comments?.length ?? 0) === 0 ? (

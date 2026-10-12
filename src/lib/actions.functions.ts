@@ -898,15 +898,30 @@ export const submitSalary = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
-    const salaryId = generateId();
-    await db
-      .collection("salary_reports")
-      .doc(salaryId)
-      .set({
+    const reports = db.collection("salary_reports");
+    const salaryId = `${data.company_id}:${context.userId}`;
+    await db.runTransaction(async (transaction) => {
+      const existingForUser = await transaction.get(reports.where("user_id", "==", context.userId));
+      if (existingForUser.docs.some((doc) => doc.get("company_id") === data.company_id)) {
+        throw new Error("You have already submitted a salary range for this company.");
+      }
+      transaction.create(reports.doc(salaryId), {
         id: salaryId,
         ...data,
         user_id: context.userId,
         created_at: new Date().toISOString(),
       });
+    });
     return { ok: true };
+  });
+
+export const getMySalaryCompanyIds = createServerFn({ method: "GET" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .handler(async ({ context }) => {
+    const db = context.db ?? getFirestoreDb();
+    const snapshot = await db
+      .collection("salary_reports")
+      .where("user_id", "==", context.userId)
+      .get();
+    return [...new Set(snapshot.docs.map((doc) => doc.get("company_id")).filter(Boolean))] as string[];
   });

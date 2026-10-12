@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import { Building2, ChevronRight, Loader2, Wallet } from "lucide-react";
 import { notify as toast } from "@/lib/notifications-store";
 import { getFilterOptions, getSalaryCompanies } from "@/lib/public.functions";
-import { submitSalary } from "@/lib/actions.functions";
+import { getMySalaryCompanyIds, submitSalary } from "@/lib/actions.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -135,15 +135,24 @@ function ContributeCard() {
     queryFn: () => getFilterOptions(),
     enabled: Boolean(user),
   });
+  const mySubmissions = useQuery({
+    queryKey: ["my-salary-companies", user?.uid],
+    queryFn: () => getMySalaryCompanyIds(),
+    enabled: Boolean(user),
+  });
+  const submittedCompanyIds = useMemo(
+    () => new Set(mySubmissions.data ?? []),
+    [mySubmissions.data],
+  );
 
   const matches = useMemo(() => {
-    const list = options.data?.companies ?? [];
+    const list = (options.data?.companies ?? []).filter((item) => !submittedCompanyIds.has(item.id));
     const needle = companyQuery.trim().toLowerCase();
     return (needle ? list.filter((item) => item.name.toLowerCase().includes(needle)) : list).slice(
       0,
       8,
     );
-  }, [options.data, companyQuery]);
+  }, [options.data, companyQuery, submittedCompanyIds]);
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -168,6 +177,7 @@ function ContributeCard() {
       setCompany(null);
       setCompanyQuery("");
       await queryClient.invalidateQueries({ queryKey: ["salary-companies"] });
+      await queryClient.invalidateQueries({ queryKey: ["my-salary-companies", user?.uid] });
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not submit");
     } finally {
@@ -221,7 +231,11 @@ function ContributeCard() {
                   ))}
                   {matches.length === 0 ? (
                     <p className="px-1 py-2 text-xs text-muted-foreground">
-                      No match. Employers are added when someone posts a story about them.
+                      {options.data?.companies.some((item) =>
+                        item.name.toLowerCase().includes(companyQuery.trim().toLowerCase()),
+                      )
+                        ? "You’ve already submitted a salary range for this employer."
+                        : "No match. Employers are added when someone posts a story about them."}
                     </p>
                   ) : null}
                 </div>
