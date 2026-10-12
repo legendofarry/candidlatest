@@ -299,6 +299,11 @@ function isPlaceholderCompanyName(name: string | null | undefined) {
   return /^(n\/?a|none|unknown|not applicable|confidential)$/i.test(name?.trim() ?? "");
 }
 
+function isDiscoverableCompany(company: CompanyRecord, publishedCompanyIds: ReadonlySet<string>) {
+  return !isPlaceholderCompanyName(company.name) &&
+    (isPublicCompany(company) || publishedCompanyIds.has(company.id));
+}
+
 export async function buildCompanyScores() {
   const [companies, stories, ratings, profiles] = await Promise.all([
     readCollection<CompanyRecord>("companies"),
@@ -325,12 +330,13 @@ export async function buildCompanyScores() {
   const profileByCompany = new Map(
     profiles.map((profile) => [profile.company_id, profile] as const),
   );
+  const publishedCompanyIds = new Set(storiesByCompany.keys());
 
   // A published story is itself a public reference to its employer. This also
   // repairs older approval flows that published the story without flipping the
   // company's is_public flag.
   return companies
-    .filter((company) => isPublicCompany(company) || storiesByCompany.has(company.id))
+    .filter((company) => isDiscoverableCompany(company, publishedCompanyIds))
     .map<CompanyScoreRecord>((company) => {
       const companyStories = storiesByCompany.get(company.id) ?? [];
       const companyRatings = ratingsByCompany.get(company.id) ?? [];
@@ -448,10 +454,15 @@ function midpoint(report: SalaryReportRecord) {
 
 /** Company-first salary listing for the directory screen. */
 export async function buildCompanySalaryDirectory() {
-  const [companies, reports] = await Promise.all([
+  const [companies, reports, stories] = await Promise.all([
     readCollection<CompanyRecord>("companies"),
     readCollection<SalaryReportRecord>("salary_reports"),
+    readCollection<StoryRecord>("stories"),
   ]);
+
+  const companiesWithPublishedStories = new Set(
+    stories.filter((story) => story.status === "published" && story.company_id).map((story) => story.company_id),
+  );
 
   const byCompany = new Map<string, SalaryReportRecord[]>();
   for (const report of reports) {
@@ -462,7 +473,7 @@ export async function buildCompanySalaryDirectory() {
   }
 
   const rows: CompanySalarySummary[] = [];
-  for (const company of companies.filter(isPublicCompany)) {
+  for (const company of companies.filter((entry) => isDiscoverableCompany(entry, companiesWithPublishedStories))) {
     const items = byCompany.get(company.id) ?? [];
     if (items.length === 0) continue;
     const positions = new Set(items.map((item) => item.role_title.trim().toLowerCase()));
@@ -487,8 +498,16 @@ export async function buildCompanySalaryDirectory() {
 
 /** Per-position breakdown for one company. */
 export async function buildCompanySalaryDetail(slug: string) {
-  const companies = await readCollection<CompanyRecord>("companies");
-  const company = companies.find((entry) => entry.slug === slug && isPublicCompany(entry)) ?? null;
+  const [companies, stories] = await Promise.all([
+    readCollection<CompanyRecord>("companies"),
+    readCollection<StoryRecord>("stories"),
+  ]);
+  const company = companies.find((entry) => entry.slug === slug) ?? null;
+  const hasPublishedStory = Boolean(company && stories.some(
+    (story) => story.company_id === company.id && story.status === "published",
+  ));
+  if (company && isPlaceholderCompanyName(company.name)) return null;
+  if (company && !isPublicCompany(company) && !hasPublishedStory) return null;
   if (!company) return null;
 
   const reports = (await readCollection<SalaryReportRecord>("salary_reports")).filter(
@@ -588,7 +607,14 @@ async function readAuthorMembershipTiers(): Promise<Map<string, "basic" | "premi
 }
 
 export async function getFilterOptionsData() {
-  const companies = (await readCollection<CompanyRecord>("companies")).filter(isPublicCompany);
+  const [allCompanies, stories] = await Promise.all([
+    readCollection<CompanyRecord>("companies"),
+    readCollection<StoryRecord>("stories"),
+  ]);
+  const companiesWithPublishedStories = new Set(
+    stories.filter((story) => story.status === "published" && story.company_id).map((story) => story.company_id),
+  );
+  const companies = allCompanies.filter((company) => isDiscoverableCompany(company, companiesWithPublishedStories));
   const industries = [
     ...new Set(companies.map((company) => company.industry).filter(Boolean)),
   ].sort() as string[];
