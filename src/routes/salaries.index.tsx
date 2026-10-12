@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Building2, ChevronRight, Loader2, Wallet } from "lucide-react";
+import { Building2, ChevronRight, Loader2, Plus, Wallet, X } from "lucide-react";
 import { notify as toast } from "@/lib/notifications-store";
 import { getFilterOptions, getSalaryCompanies } from "@/lib/public.functions";
 import { getMySalaryCompanyIds, submitSalary } from "@/lib/actions.functions";
@@ -126,6 +126,7 @@ function ContributeCard() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [companyQuery, setCompanyQuery] = useState("");
   const [company, setCompany] = useState<{ id: string; name: string; verified: boolean } | null>(null);
   const [form, setForm] = useState({ role_title: "", min_kes: "", max_kes: "" });
@@ -176,6 +177,7 @@ function ContributeCard() {
       setForm({ role_title: "", min_kes: "", max_kes: "" });
       setCompany(null);
       setCompanyQuery("");
+      setFormOpen(false);
       await queryClient.invalidateQueries({ queryKey: ["salary-companies"] });
       await queryClient.invalidateQueries({ queryKey: ["my-salary-companies", user?.uid] });
     } catch (error) {
@@ -190,9 +192,23 @@ function ContributeCard() {
       <div className="flex items-center gap-2 text-primary">
         <Wallet className="size-5" />
         <h2 className="font-display text-lg font-semibold">Add your range</h2>
+        <Button
+          type="button"
+          size="icon"
+          variant="ghost"
+          className="ml-auto md:hidden"
+          aria-label={formOpen ? "Hide salary form" : "Show salary form"}
+          aria-expanded={formOpen}
+          onClick={() => setFormOpen((open) => !open)}
+        >
+          {formOpen ? <X className="size-5" /> : <Plus className="size-5" />}
+        </Button>
       </div>
       {user ? (
-        <form onSubmit={submit} className="mt-4 space-y-3">
+        <form
+          onSubmit={submit}
+          className={cn("mt-4 space-y-3", !formOpen && "hidden md:block")}
+        >
           <div className="space-y-1.5">
             <Label htmlFor="company">Employer</Label>
             {company ? (
@@ -282,7 +298,7 @@ function ContributeCard() {
           </Button>
         </form>
       ) : (
-        <div className="mt-4 space-y-3 text-sm text-muted-foreground">
+        <div className={cn("mt-4 space-y-3 text-sm text-muted-foreground", !formOpen && "hidden md:block")}>
           <p>Sign in to add a salary range. Your identity is never attached to it.</p>
           <Button asChild variant="outline" className="w-full">
             <Link to="/auth">Sign in to contribute</Link>
