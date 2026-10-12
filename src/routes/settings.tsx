@@ -7,6 +7,7 @@ import type { User } from "firebase/auth";
 import { EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import {
   ArrowLeft,
+  BellRing,
   BookOpen,
   Fingerprint,
   Gauge,
@@ -40,6 +41,8 @@ import { firebaseAuth } from "@/integrations/firebase/client";
 import { claimOfficialCandidAccount, getOnboardingState } from "@/lib/onboarding.functions";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
 import { clearDevelopmentFirestore, RESET_CONFIRMATION } from "@/lib/developer.functions";
+import { registerMyPushToken, unregisterMyPushToken } from "@/lib/push.functions";
+import { firebaseApp, registerFirebaseServiceWorker } from "@/integrations/firebase/client";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,9 +76,16 @@ function SettingsPage() {
   const [developerResetText, setDeveloperResetText] = useState("");
   const [developerResetting, setDeveloperResetting] = useState(false);
   const [claimingCandid, setClaimingCandid] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushAvailable, setPushAvailable] = useState(false);
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [pushBusy, setPushBusy] = useState(false);
+  const [pushToken, setPushToken] = useState<string | null>(null);
   const fetchProfile = useServerFn(getOnboardingState);
   const claimCandidAccount = useServerFn(claimOfficialCandidAccount);
   const resetFirestore = useServerFn(clearDevelopmentFirestore);
+  const registerPush = useServerFn(registerMyPushToken);
+  const unregisterPush = useServerFn(unregisterMyPushToken);
   const developerMode = import.meta.env.DEV || import.meta.env["VITE_DEVELOPER_MODE"] === "true";
   const profile = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
@@ -87,6 +97,74 @@ function SettingsPage() {
     void isPlatformAuthenticatorAvailable().then(setBioAvailable);
     setEnrolled(user ? hasCredentialFor(user.uid) : false);
   }, [user]);
+
+  useEffect(() => {
+    let active = true;
+    void (async () => {
+      if (!user || typeof Notification === "undefined" || !("serviceWorker" in navigator)) {
+        if (active) { setPushAvailable(false); setPushEnabled(false); setPushPermission("unsupported"); }
+        return;
+      }
+      const messagingSdk = await import("firebase/messaging");
+      const supported = await messagingSdk.isSupported().catch(() => false);
+      if (!active) return;
+      setPushAvailable(supported);
+      setPushPermission(Notification.permission);
+      if (!supported || Notification.permission !== "granted") { setPushEnabled(false); return; }
+      const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
+      if (!vapidKey) return;
+      try {
+        const registration = await registerFirebaseServiceWorker();
+        const messaging = messagingSdk.getMessaging(firebaseApp);
+        const token = await messagingSdk.getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+        if (!token || !active) return;
+        await registerPush({ data: { token } });
+        if (active) { setPushToken(token); setPushEnabled(true); }
+      } catch (error) {
+        console.warn("[push settings] Could not restore this device", error);
+      }
+    })();
+    return () => { active = false; };
+  }, [user, registerPush]);
+
+  async function togglePushNotifications(next: boolean) {
+    if (!user || pushBusy) return;
+    setPushBusy(true);
+    try {
+      const messagingSdk = await import("firebase/messaging");
+      if (!await messagingSdk.isSupported()) throw new Error("This browser does not support mobile notifications.");
+      const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
+      if (!vapidKey) throw new Error("Push notifications are not configured for this Candid site yet.");
+      const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
+      const installed = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
+      if (next && ios && !installed) throw new Error("On iPhone or iPad, add Candid to your Home Screen before enabling notifications.");
+
+      const messaging = messagingSdk.getMessaging(firebaseApp);
+      if (!next) {
+        const token = pushToken || await messagingSdk.getToken(messaging, { vapidKey });
+        if (token) await unregisterPush({ data: { token } });
+        await messagingSdk.deleteToken(messaging);
+        setPushToken(null);
+        setPushEnabled(false);
+        return;
+      }
+      let permission = Notification.permission;
+      if (permission === "default") permission = await Notification.requestPermission();
+      setPushPermission(permission);
+      if (permission !== "granted") throw new Error(permission === "denied" ? "Notifications are blocked by your browser. Allow them in the browser's site settings." : "Allow notifications to enable Candid alerts.");
+      const registration = await registerFirebaseServiceWorker();
+      const token = await messagingSdk.getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+      if (!token) throw new Error("This device did not return a notification token. Try again.");
+      await registerPush({ data: { token } });
+      setPushToken(token);
+      setPushEnabled(true);
+      notify.success("Notifications are enabled on this device.");
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not update notification settings.");
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   async function toggleBiometric(next: boolean) {
     if (!user) return;
@@ -315,6 +393,17 @@ function SettingsPage() {
               </nav>
               <div className="space-y-8">
                 <div id="security">
+                  <SettingsGroup title="Notifications">
+                    <ToggleRow
+                      icon={<BellRing className="size-4" />}
+                      title="Push notifications on this device"
+                      description={pushBusy ? "Updating this device…" : pushPermission === "denied" ? "Notifications are blocked in your browser settings." : pushPermission === "unsupported" || !pushAvailable ? "This browser or device does not support push notifications." : !import.meta.env["VITE_FIREBASE_VAPID_KEY"] ? "Push notifications are not configured for this site." : "Show Candid alerts when the app is closed."}
+                      checked={pushEnabled}
+                      disabled={!user || !pushAvailable || pushBusy || pushPermission === "denied" || pushPermission === "unsupported" || !import.meta.env["VITE_FIREBASE_VAPID_KEY"]}
+                      onCheckedChange={(next) => void togglePushNotifications(next)}
+                    />
+                  </SettingsGroup>
+                  <div className="mt-4">
                   <SettingsGroup title="Security & access">
                     <ToggleRow
                       icon={<Fingerprint className="size-4" />}
@@ -336,6 +425,7 @@ function SettingsPage() {
                       </p>
                     ) : null}
                   </SettingsGroup>
+                  </div>
                   <div className="mt-4">
                     <SignInMethods user={user} />
                   </div>

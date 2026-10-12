@@ -36,3 +36,16 @@ Employers who believe a story is false can request a reply or a review. Stories 
 How to reach us
 
 Contact details have not been published yet. In the meantime, report anything urgent straight from the story it concerns — reports reach the team immediately.
+
+Mobile push notifications
+
+Push alerts are opt-in per browser/device from Settings. They use Firebase Cloud Messaging and the existing Firestore notification inbox; message alerts remain in Messages.
+
+Before deploying push notifications:
+
+1. In Firebase Console, open Project settings → Cloud Messaging → Web configuration and create a Web Push certificate key pair.
+2. Set the public key as `VITE_FIREBASE_VAPID_KEY` in the Main App's build environment, then rebuild and deploy the Main App.
+3. Set `PUBLIC_APP_URL` to the deployed Main App origin in both app environments. The Main App also needs its existing Firebase service account credentials so it can send FCM messages.
+4. Deploy the Owner Admin App with its existing Firebase Admin service account. Both apps must use the same Firebase project.
+
+Members must allow notifications in their browser. On iPhone and iPad, install Candid to the Home Screen first; iOS web push is available for installed web apps. Push previews intentionally use generic text so private story details do not appear on a lock screen.

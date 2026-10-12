@@ -154,6 +154,10 @@ export async function writeSupportMessage(userId: string, body: string) {
       created_at: answeredAt,
     });
   });
+  if (notificationRef) {
+    const { dispatchWebPush } = await import("./push.server");
+    await dispatchWebPush(userIdOnly, { title: "Candid support is following up", body: "Your question needs a closer look. The team will reply here.", link: "/support", notificationId: notificationRef.id });
+  }
   return {
     id: userMessageRef.id,
     created_at: createdAt,

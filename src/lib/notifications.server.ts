@@ -30,7 +30,15 @@ export async function pushServerNotification(input: {
     link: input.link ?? null,
     created_at: new Date().toISOString(),
   };
-  await db.collection("notifications").doc(record.id).set(record);
+  const ref = db.collection("notifications").doc(record.id);
+  try {
+    await ref.create(record);
+  } catch (error) {
+    if (error instanceof Error && /\[(409|412)\]/.test(error.message)) return record;
+    throw error;
+  }
+  const { dispatchWebPush } = await import("./push.server");
+  await dispatchWebPush(input.userId, { title: record.title, body: record.description, link: record.link, notificationId: record.id });
   return record;
 }
 

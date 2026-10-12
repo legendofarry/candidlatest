@@ -57,6 +57,42 @@ export function getFirestoreDb() {
   return db;
 }
 
+let messagingToken: { value: string; expiresAt: number; projectId: string } | undefined;
+
+/** Mints a short-lived OAuth token for sending Firebase Cloud Messaging notifications. */
+export async function getFirebaseMessagingCredentials() {
+  const credentials = parseServiceAccount();
+  if (messagingToken && messagingToken.projectId === credentials.projectId && messagingToken.expiresAt > Date.now() + 60_000) {
+    return { accessToken: messagingToken.value, projectId: credentials.projectId };
+  }
+  const key = await importPKCS8(credentials.privateKey, "RS256");
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const assertion = await new SignJWT({ scope: "https://www.googleapis.com/auth/firebase.messaging" })
+    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(credentials.clientEmail)
+    .setAudience("https://oauth2.googleapis.com/token")
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + 3600)
+    .sign(key);
+  const response = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "content-type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion,
+    }),
+  });
+  if (!response.ok) throw new Error(`Firebase messaging authorization failed (${response.status}).`);
+  const result = await response.json() as { access_token?: string; expires_in?: number };
+  if (!result.access_token) throw new Error("Firebase did not return a messaging access token.");
+  messagingToken = {
+    value: result.access_token,
+    projectId: credentials.projectId,
+    expiresAt: Date.now() + Math.max(60, result.expires_in ?? 3600) * 1000,
+  };
+  return { accessToken: result.access_token, projectId: credentials.projectId };
+}
+
 let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 
 /** Verifies Firebase Auth ID tokens against Google's public keys. */

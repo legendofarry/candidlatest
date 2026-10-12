@@ -1,7 +1,7 @@
 import { getApp, getApps, initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: import.meta.env["VITE_FIREBASE_API_KEY"] ?? "AIzaSyBHbdPGXQddWpgbwAm6_w1kxlg22XCCyf8",
   authDomain: import.meta.env["VITE_FIREBASE_AUTH_DOMAIN"] ?? "candid-431db.firebaseapp.com",
   projectId: import.meta.env["VITE_FIREBASE_PROJECT_ID"] ?? "candid-431db",
@@ -11,3 +11,8 @@ const firebaseConfig = {
 
 export const firebaseApp = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const firebaseAuth = getAuth(firebaseApp);
+
+export async function registerFirebaseServiceWorker() {
+  const config = encodeURIComponent(JSON.stringify(firebaseConfig));
+  return navigator.serviceWorker.register(`/sw.js?firebaseConfig=${config}`);
+}

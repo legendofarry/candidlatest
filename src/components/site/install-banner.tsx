@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { Download, Flame, Share, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { registerFirebaseServiceWorker } from "@/integrations/firebase/client";
 import {
   Dialog,
   DialogContent,
@@ -69,7 +70,7 @@ export function InstallBanner() {
 
   useEffect(() => {
     if (isPreviewOrLocal() || !("serviceWorker" in navigator)) return;
-    void navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
+    void registerFirebaseServiceWorker().catch((error: unknown) => {
       console.warn("[PWA] Service worker registration failed", error);
     });
   }, []);

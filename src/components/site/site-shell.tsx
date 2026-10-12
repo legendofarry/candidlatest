@@ -47,6 +47,7 @@ import { requiresEmailVerification } from "@/lib/email-verification";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { getInvestigationHoldState } from "@/lib/account-access.functions";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
+import { usePushRegistrationSync } from "@/hooks/use-push-registration-sync";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
 import { hydratePreferences, setPreference, usePreferences } from "@/lib/preferences";
 import { MessagesInbox } from "@/routes/messages.index";
@@ -111,6 +112,7 @@ function nestedTitle(pathname: string) {
 export function SiteShell({ children }: { children: React.ReactNode }) {
   const { user, signOut } = useAuth();
   useServerNotificationsSync();
+  usePushRegistrationSync();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const needsEmailVerification = requiresEmailVerification(user);
