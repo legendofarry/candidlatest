@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -130,6 +130,7 @@ function PostPage() {
   const { data: filters } = useSuspenseQuery(filtersQuery);
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
 
   const ensure = useServerFn(ensureProfile);
   const findCompany = useServerFn(findOrCreateCompany);
@@ -328,7 +329,9 @@ function PostPage() {
           area: typeof parsed.area === "string" ? parsed.area : "",
           companyMapUrl: typeof parsed.companyMapUrl === "string" ? parsed.companyMapUrl : "",
           reasons: Array.isArray(parsed.reasons)
-            ? parsed.reasons.filter((reason): reason is string => typeof reason === "string").slice(0, 10)
+            ? parsed.reasons
+                .filter((reason): reason is string => typeof reason === "string")
+                .slice(0, 10)
             : [],
           customReason: typeof parsed.customReason === "string" ? parsed.customReason : "",
           tenure: typeof parsed.tenure === "string" ? parsed.tenure : "",
@@ -402,7 +405,11 @@ function PostPage() {
   }
 
   if (editLoading || (isEditing && !editLoaded && !publishError)) {
-    return <p className="mx-auto max-w-lg py-16 text-center text-sm text-muted-foreground">Loading your story…</p>;
+    return (
+      <p className="mx-auto max-w-lg py-16 text-center text-sm text-muted-foreground">
+        Loading your story…
+      </p>
+    );
   }
 
   const steps = ["Employer", "What happened", "Your role", "Your story", "Review"];
@@ -416,7 +423,9 @@ function PostPage() {
       window.localStorage.setItem(`candid:story-draft:${user.uid}`, storyDraftKey);
       setSavedDraftKey(storyDraftKey);
     } catch {
-      toast.error("Could not save draft", { description: "Check your device storage and try again." });
+      toast.error("Could not save draft", {
+        description: "Check your device storage and try again.",
+      });
     }
   }
 
@@ -560,8 +569,13 @@ function PostPage() {
       let uploadedProof = evidenceUpload;
       if (evidenceFile && !uploadedProof) uploadedProof = await uploadEvidenceFile(evidenceFile);
 
-      if (companyName.trim().length < 2 || /^(n\/?a|none|unknown|not applicable)$/i.test(companyName.trim())) {
-        throw new Error("Enter the employer's name. Use the employer privacy option if you do not want it shown publicly.");
+      if (
+        companyName.trim().length < 2 ||
+        /^(n\/?a|none|unknown|not applicable)$/i.test(companyName.trim())
+      ) {
+        throw new Error(
+          "Enter the employer's name. Use the employer privacy option if you do not want it shown publicly.",
+        );
       }
       await ensure({ data: { county: county || null } });
       const company = await findCompany({
@@ -593,6 +607,7 @@ function PostPage() {
         ? await update({ data: { ...storyData, story_id: editStoryId! } })
         : await create({ data: storyData });
 
+      await queryClient.invalidateQueries({ queryKey: ["company-scores"] });
       clearSavedDraft();
       if (!isEditing && result.status === "published") {
         navigate({ to: "/stories/$id", params: { id: result.id } });
@@ -600,11 +615,12 @@ function PostPage() {
         navigate({ to: "/profile" });
       }
     } catch (error) {
-      const message = error instanceof Error
-        ? error.name === "AbortError"
-          ? "Proof upload canceled. Your story was not submitted."
-          : error.message
-        : "Something went wrong while publishing your story.";
+      const message =
+        error instanceof Error
+          ? error.name === "AbortError"
+            ? "Proof upload canceled. Your story was not submitted."
+            : error.message
+          : "Something went wrong while publishing your story.";
       setPublishError(message);
       if (message.includes("Proof uploads are not configured")) setEvidenceError(message);
       toast.error("Could not publish story", { description: message });
@@ -674,7 +690,9 @@ function PostPage() {
           <div className="flex items-start p-4 pt-3 md:h-dvh md:items-center md:overflow-y-auto md:p-8">
             <div className="w-full space-y-6">
               <header>
-                <h1 className="text-3xl font-semibold md:text-4xl">{isEditing ? "Edit your story" : "Share your exit story"}</h1>
+                <h1 className="text-3xl font-semibold md:text-4xl">
+                  {isEditing ? "Edit your story" : "Share your exit story"}
+                </h1>
                 <div className="mt-4 flex gap-1.5">
                   {steps.map((label, index) => (
                     <div
@@ -705,7 +723,9 @@ function PostPage() {
                           autoComplete="off"
                         />
                         <p className="rounded-xl border border-border bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
-                          The company name always appears on a published story. Your Candid username appears as the author; your account email and legal name are not shown. Avoid details that could identify you personally.
+                          The company name always appears on a published story. Your Candid username
+                          appears as the author; your account email and legal name are not shown.
+                          Avoid details that could identify you personally.
                         </p>
 
                         {matches.length > 0 && !exactMatch ? (
@@ -731,7 +751,6 @@ function PostPage() {
                             </div>
                           </div>
                         ) : null}
-
                       </div>
                       <ChipField
                         label="What kind of work do they do? (industry)"
@@ -754,7 +773,9 @@ function PostPage() {
                           maxLength={100}
                           placeholder="e.g. Westlands, Industrial Area"
                         />
-                        <p className="text-xs text-muted-foreground">Leave this blank if it could identify you.</p>
+                        <p className="text-xs text-muted-foreground">
+                          Leave this blank if it could identify you.
+                        </p>
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="company-map">Google Maps link (optional)</Label>
@@ -765,7 +786,10 @@ function PostPage() {
                           maxLength={500}
                           placeholder="https://maps.google.com/..."
                         />
-                        <p className="text-xs text-muted-foreground">This is a location suggestion for Candid to review. It does not change the public company location by itself.</p>
+                        <p className="text-xs text-muted-foreground">
+                          This is a location suggestion for Candid to review. It does not change the
+                          public company location by itself.
+                        </p>
                       </div>
                     </>
                   ) : null}
@@ -789,7 +813,7 @@ function PostPage() {
                               className={cn(
                                 "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
                                 reasons.includes(reason) &&
-                                "border-primary/50 bg-primary/10 text-foreground",
+                                  "border-primary/50 bg-primary/10 text-foreground",
                               )}
                             >
                               {reason}
@@ -823,7 +847,7 @@ function PostPage() {
                           Each comma or Enter saves it as its own reason.
                         </p>
                         {reasons.filter((r) => !(REASONS as readonly string[]).includes(r)).length >
-                          0 ? (
+                        0 ? (
                           <div className="flex flex-wrap gap-1.5 pt-1">
                             {reasons
                               .filter((r) => !(REASONS as readonly string[]).includes(r))
@@ -893,7 +917,7 @@ function PostPage() {
                               className={cn(
                                 "rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground",
                                 wouldReturn === option.value &&
-                                "border-primary/50 bg-primary/10 text-foreground",
+                                  "border-primary/50 bg-primary/10 text-foreground",
                               )}
                             >
                               {option.label}
@@ -910,10 +934,12 @@ function PostPage() {
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
                             <h2 className="flex items-center gap-2 text-sm font-semibold">
-                              <FileText className="size-4 text-primary" /> Smart draft from your answers
+                              <FileText className="size-4 text-primary" /> Smart draft from your
+                              answers
                             </h2>
                             <p className="mt-1 text-xs text-muted-foreground">
-                              This draft uses a local writing helper, so no AI service is called to create it. Add details only you know, then edit it below.
+                              This draft uses a local writing helper, so no AI service is called to
+                              create it. Add details only you know, then edit it below.
                             </p>
                           </div>
                           <Button
@@ -927,7 +953,8 @@ function PostPage() {
                         </div>
                         {storyDraftedFromAnswers ? (
                           <p className="mt-3 text-xs text-muted-foreground">
-                            Draft created from your answers. Check it for accuracy before continuing.
+                            Draft created from your answers. Check it for accuracy before
+                            continuing.
                           </p>
                         ) : null}
                       </div>
@@ -958,10 +985,14 @@ function PostPage() {
 
                   {step === 4 ? (
                     <div className="space-y-4 text-sm">
-                      <h2 className="text-lg font-semibold">{isEditing ? "Review your changes" : "Before you publish"}</h2>
+                      <h2 className="text-lg font-semibold">
+                        {isEditing ? "Review your changes" : "Before you publish"}
+                      </h2>
                       {isEditing ? (
                         <p className="rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
-                          Editing the employer is allowed. Any change will send the full story for moderator approval, and it will be hidden until approved. Existing private evidence, if any, will be retained.
+                          Editing the employer is allowed. Any change will send the full story for
+                          moderator approval, and it will be hidden until approved. Existing private
+                          evidence, if any, will be retained.
                         </p>
                       ) : null}
                       <ul className="space-y-2 text-muted-foreground">
@@ -972,153 +1003,158 @@ function PostPage() {
                         <li>· Do not name individual colleagues, managers or clients.</li>
                         <li>· Stick to what you experienced or can describe factually.</li>
                         <li>
-                          · Automated AI reads each full story. Clear, low-risk stories may go
-                          live right away; uncertain or sensitive cases wait for moderator review.
+                          · Automated AI reads each full story. Clear, low-risk stories may go live
+                          right away; uncertain or sensitive cases wait for moderator review.
                         </li>
                       </ul>
 
-                      {!isEditing ? <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
-                        <h3 className="flex items-center gap-2 font-semibold">
-                          <Lock className="size-4 text-primary" /> Prove you worked there (optional,
-                          private)
-                        </h3>
-                        <p className="text-xs text-muted-foreground">
-                          Add a document or image that can help moderators review your story. Proof
-                          is uploaded to restricted Cloudinary storage, is{" "}
-                          <span className="font-medium text-foreground">never published</span>, and
-                          is never shown to the employer. If attached, AI checks it for relevance and
-                          exposed sensitive details; this does not verify that the story is true.
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          Paid via M-Pesa from your boss's personal number? That's normal for small
-                          businesses — just add a short note below telling us.
-                        </p>
+                      {!isEditing ? (
+                        <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
+                          <h3 className="flex items-center gap-2 font-semibold">
+                            <Lock className="size-4 text-primary" /> Prove you worked there
+                            (optional, private)
+                          </h3>
+                          <p className="text-xs text-muted-foreground">
+                            Add a document or image that can help moderators review your story.
+                            Proof is uploaded to restricted Cloudinary storage, is{" "}
+                            <span className="font-medium text-foreground">never published</span>,
+                            and is never shown to the employer. If attached, AI checks it for
+                            relevance and exposed sensitive details; this does not verify that the
+                            story is true.
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            Paid via M-Pesa from your boss's personal number? That's normal for
+                            small businesses — just add a short note below telling us.
+                          </p>
 
-                        <Textarea
-                          rows={2}
-                          value={evidenceNote}
-                          onChange={(event) => setEvidenceNote(event.target.value)}
-                          placeholder="Optional private note, e.g. “Salary came from the owner's personal M-Pesa.”"
-                        />
+                          <Textarea
+                            rows={2}
+                            value={evidenceNote}
+                            onChange={(event) => setEvidenceNote(event.target.value)}
+                            placeholder="Optional private note, e.g. “Salary came from the owner's personal M-Pesa.”"
+                          />
 
-                        <div className="space-y-3 border-t border-border/70 pt-3">
-                          <div className="flex flex-wrap items-center justify-between gap-2">
-                            <div>
-                              <p className="text-sm font-medium">Attach proof (optional)</p>
-                              <p className="text-xs text-muted-foreground">
-                                JPG, PNG, WebP, or PDF · up to 5 MB
-                              </p>
-                            </div>
-                            <label
-                              className={cn(
-                                "inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium hover:border-primary/50",
-                                uploadingEvidence && "pointer-events-none opacity-60",
-                                evidenceUpload && "pointer-events-none opacity-60",
-                              )}
-                            >
-                              <Paperclip className="size-4" />
-                              {evidenceFile
-                                ? evidenceUpload
-                                  ? "Uploaded"
-                                  : "Choose another"
-                                : "Choose file"}
-                              <input
-                                type="file"
-                                className="sr-only"
-                                accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
-                                disabled={
-                                  uploadingEvidence || submitting || Boolean(evidenceUpload)
-                                }
-                                onChange={(event) => {
-                                  void selectEvidenceFile(event.currentTarget.files?.[0]);
-                                  event.currentTarget.value = "";
-                                }}
-                              />
-                            </label>
-                          </div>
-
-                          {evidenceFile ? (
-                            <div className="flex items-center gap-3 rounded-xl border border-border bg-background/70 p-3">
-                              {evidenceFile.type.startsWith("image/") && evidencePreviewUrl ? (
-                                <img
-                                  src={evidencePreviewUrl}
-                                  alt="Selected proof preview"
-                                  className="size-14 rounded-lg object-cover"
-                                />
-                              ) : (
-                                <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-                                  <FileText className="size-6" />
-                                </span>
-                              )}
-                              <div className="min-w-0 flex-1">
-                                <p className="truncate text-sm font-medium">{evidenceFile.name}</p>
+                          <div className="space-y-3 border-t border-border/70 pt-3">
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                              <div>
+                                <p className="text-sm font-medium">Attach proof (optional)</p>
                                 <p className="text-xs text-muted-foreground">
-                                  {(evidenceFile.size / (1024 * 1024)).toFixed(2)} MB
+                                  JPG, PNG, WebP, or PDF · up to 5 MB
                                 </p>
                               </div>
-                              {uploadingEvidence ? (
-                                <button
-                                  type="button"
-                                  className="text-xs text-muted-foreground underline underline-offset-4"
-                                  onClick={() => uploadAbortController.current?.abort()}
-                                >
-                                  Cancel
-                                </button>
-                              ) : evidenceUpload ? (
-                                <button
-                                  type="button"
-                                  aria-label="Remove proof file"
-                                  disabled={submitting}
-                                  onClick={() => void removeEvidenceFile()}
-                                  className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                                >
-                                  <X className="size-4" />
-                                </button>
-                              ) : evidenceTicketId ? (
-                                <button
-                                  type="button"
-                                  aria-label="Remove proof file"
-                                  disabled={submitting}
-                                  onClick={() => void removeEvidenceFile()}
-                                  className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                                >
-                                  <X className="size-4" />
-                                </button>
-                              ) : (
-                                <>
-                                  <ImageIcon className="size-5 shrink-0 text-muted-foreground" />
+                              <label
+                                className={cn(
+                                  "inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium hover:border-primary/50",
+                                  uploadingEvidence && "pointer-events-none opacity-60",
+                                  evidenceUpload && "pointer-events-none opacity-60",
+                                )}
+                              >
+                                <Paperclip className="size-4" />
+                                {evidenceFile
+                                  ? evidenceUpload
+                                    ? "Uploaded"
+                                    : "Choose another"
+                                  : "Choose file"}
+                                <input
+                                  type="file"
+                                  className="sr-only"
+                                  accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+                                  disabled={
+                                    uploadingEvidence || submitting || Boolean(evidenceUpload)
+                                  }
+                                  onChange={(event) => {
+                                    void selectEvidenceFile(event.currentTarget.files?.[0]);
+                                    event.currentTarget.value = "";
+                                  }}
+                                />
+                              </label>
+                            </div>
+
+                            {evidenceFile ? (
+                              <div className="flex items-center gap-3 rounded-xl border border-border bg-background/70 p-3">
+                                {evidenceFile.type.startsWith("image/") && evidencePreviewUrl ? (
+                                  <img
+                                    src={evidencePreviewUrl}
+                                    alt="Selected proof preview"
+                                    className="size-14 rounded-lg object-cover"
+                                  />
+                                ) : (
+                                  <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+                                    <FileText className="size-6" />
+                                  </span>
+                                )}
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate text-sm font-medium">
+                                    {evidenceFile.name}
+                                  </p>
+                                  <p className="text-xs text-muted-foreground">
+                                    {(evidenceFile.size / (1024 * 1024)).toFixed(2)} MB
+                                  </p>
+                                </div>
+                                {uploadingEvidence ? (
                                   <button
                                     type="button"
-                                    aria-label="Remove selected proof file"
+                                    className="text-xs text-muted-foreground underline underline-offset-4"
+                                    onClick={() => uploadAbortController.current?.abort()}
+                                  >
+                                    Cancel
+                                  </button>
+                                ) : evidenceUpload ? (
+                                  <button
+                                    type="button"
+                                    aria-label="Remove proof file"
                                     disabled={submitting}
                                     onClick={() => void removeEvidenceFile()}
                                     className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
                                   >
                                     <X className="size-4" />
                                   </button>
-                                </>
-                              )}
-                            </div>
-                          ) : null}
+                                ) : evidenceTicketId ? (
+                                  <button
+                                    type="button"
+                                    aria-label="Remove proof file"
+                                    disabled={submitting}
+                                    onClick={() => void removeEvidenceFile()}
+                                    className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                                  >
+                                    <X className="size-4" />
+                                  </button>
+                                ) : (
+                                  <>
+                                    <ImageIcon className="size-5 shrink-0 text-muted-foreground" />
+                                    <button
+                                      type="button"
+                                      aria-label="Remove selected proof file"
+                                      disabled={submitting}
+                                      onClick={() => void removeEvidenceFile()}
+                                      className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                                    >
+                                      <X className="size-4" />
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            ) : null}
 
-                          {evidenceError ? (
-                            <p role="alert" className="text-xs text-danger">
-                              {evidenceError}
-                            </p>
-                          ) : null}
-                          {evidenceUpload ? (
-                            <p className="text-xs text-primary">
-                              Proof uploaded securely. It will be attached when you submit the
-                              story.
-                            </p>
-                          ) : evidenceFile ? (
-                            <p className="text-xs text-muted-foreground">
-                              It will upload securely when you publish. Remove it above to publish
-                              without proof.
-                            </p>
-                          ) : null}
+                            {evidenceError ? (
+                              <p role="alert" className="text-xs text-danger">
+                                {evidenceError}
+                              </p>
+                            ) : null}
+                            {evidenceUpload ? (
+                              <p className="text-xs text-primary">
+                                Proof uploaded securely. It will be attached when you submit the
+                                story.
+                              </p>
+                            ) : evidenceFile ? (
+                              <p className="text-xs text-muted-foreground">
+                                It will upload securely when you publish. Remove it above to publish
+                                without proof.
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                      </div> : null}
+                      ) : null}
 
                       <Button
                         className="w-full glow-primary"
@@ -1131,12 +1167,17 @@ function PostPage() {
                           </>
                         ) : submitting ? (
                           "Screening and publishing…"
+                        ) : isEditing ? (
+                          "Submit changes for approval"
                         ) : (
-                          isEditing ? "Submit changes for approval" : "Publish story"
+                          "Publish story"
                         )}
                       </Button>
                       {publishError ? (
-                        <p role="alert" className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+                        <p
+                          role="alert"
+                          className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger"
+                        >
                           {publishError}
                         </p>
                       ) : null}

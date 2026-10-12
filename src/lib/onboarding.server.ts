@@ -1,4 +1,5 @@
 import { getFirestoreDb } from "./firebase.server";
+import { isPresetAvatarUrl } from "./preset-avatars";
 import type { CandidLensRecord, ProfileRecord } from "./firebase-data.server";
 import { DEFAULT_MEMBERSHIP } from "./membership";
 import { generateAliasCandidate, type AliasAgeRange } from "./alias-generator";
@@ -96,7 +97,8 @@ export async function suggestUsernames(
   const found = new Set<string>();
   for (let attempt = 0; attempt < 80 && found.size < Math.min(limit, 10); attempt += 1) {
     const candidate = generateAliasCandidate(seed, [], ageRange, attempt);
-    if (!validateUsername(candidate).ok || !(await isUsernameFree(candidate, currentUserId))) continue;
+    if (!validateUsername(candidate).ok || !(await isUsernameFree(candidate, currentUserId)))
+      continue;
     found.add(candidate);
   }
   return [...found];
@@ -142,7 +144,7 @@ export function safeHttpsUrl(value: string | null | undefined) {
 export type OnboardingProfile = ProfileRecord & {
   username: string | null;
   socials: SocialLinks | null;
-  account_type: "individual" | "company" | "unknown";
+  account_type: "individual" | "company" | "official" | "unknown";
   onboarded_at: string | null;
 };
 
@@ -155,6 +157,17 @@ export async function readProfile(userId: string): Promise<OnboardingProfile | n
 
 /** Saves only the Cloudinary delivery URL; image bytes never enter Firestore. */
 export async function saveProfilePhoto(userId: string, photoUrl: string) {
+  if (isPresetAvatarUrl(photoUrl)) {
+    const db = getFirestoreDb();
+    await db
+      .collection("profiles")
+      .doc(userId)
+      .set(
+        { id: userId, photo_url: photoUrl, updated_at: new Date().toISOString() },
+        { merge: true },
+      );
+    return { photoUrl };
+  }
   const url = new URL(photoUrl);
   if (url.protocol !== "https:" || url.hostname !== "res.cloudinary.com") {
     throw new Error("Choose a valid Cloudinary image.");
@@ -267,16 +280,21 @@ export async function claimUsername(
           banned: previous?.banned ?? false,
           account_type: previous?.account_type ?? "unknown",
           subscription_tier: previous?.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
-          subscription_status: previous?.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
-          subscription_provider: previous?.subscription_provider ?? DEFAULT_MEMBERSHIP.subscription_provider,
-          subscription_started_at: previous?.subscription_started_at ?? DEFAULT_MEMBERSHIP.subscription_started_at,
-          subscription_period_ends_at: previous?.subscription_period_ends_at ?? DEFAULT_MEMBERSHIP.subscription_period_ends_at,
+          subscription_status:
+            previous?.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
+          subscription_provider:
+            previous?.subscription_provider ?? DEFAULT_MEMBERSHIP.subscription_provider,
+          subscription_started_at:
+            previous?.subscription_started_at ?? DEFAULT_MEMBERSHIP.subscription_started_at,
+          subscription_period_ends_at:
+            previous?.subscription_period_ends_at ?? DEFAULT_MEMBERSHIP.subscription_period_ends_at,
           subscription_source:
             previous?.subscription_source ??
             (previous?.subscription_tier && previous.subscription_tier !== "basic"
               ? "manual"
               : DEFAULT_MEMBERSHIP.subscription_source),
-          subscription_version: previous?.subscription_version ?? DEFAULT_MEMBERSHIP.subscription_version,
+          subscription_version:
+            previous?.subscription_version ?? DEFAULT_MEMBERSHIP.subscription_version,
           created_at: previous?.created_at ?? now,
           onboarded_at: previous?.onboarded_at ?? now,
         },
@@ -292,6 +310,112 @@ export async function claimUsername(
 
   const profile = await readProfile(userId);
   return { ok: true, ...(profile ? { profile } : {}) };
+}
+
+/** Link the reserved official Candid handle to its verified owner login. */
+export async function claimOfficialCandidAccount(userId: string, email: string) {
+  if (email.trim().toLowerCase() !== "karimiarrison@gmail.com") {
+    throw new Error("This login is not authorized to claim the Candid account.");
+  }
+
+  const db = getFirestoreDb();
+  const now = new Date().toISOString();
+  const profileRef = db.collection("profiles").doc(userId);
+  const verificationRef = db.collection("account_verifications").doc(userId);
+  const candidUsernameRef = db.collection("usernames").doc("candid");
+  const officialAccountRef = db.collection("app_config").doc("official-candid-account");
+  const legacyProfileRef = db.collection("profiles").doc("candid-official");
+  const legacyVerificationRef = db.collection("account_verifications").doc("candid-official");
+
+  await db.runTransaction(async (tx) => {
+    const [profileSnap, usernameSnap, legacyProfileSnap] = await Promise.all([
+      tx.get(profileRef),
+      tx.get(candidUsernameRef),
+      tx.get(legacyProfileRef),
+    ]);
+    const profile = profileSnap.data() as
+      (ProfileRecord & { username?: string | null }) | undefined;
+    const usernameOwner = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
+    if (usernameSnap.exists && usernameOwner !== userId && usernameOwner !== "candid-official") {
+      throw new Error("The @candid username is already assigned to another account.");
+    }
+
+    const previousUsername = profile?.username?.trim().toLowerCase();
+    if (previousUsername && previousUsername !== "candid") {
+      const previousUsernameRef = db.collection("usernames").doc(previousUsername);
+      const previousUsernameSnap = await tx.get(previousUsernameRef);
+      const previousOwner = (previousUsernameSnap.data() as { user_id?: string } | undefined)
+        ?.user_id;
+      if (previousUsernameSnap.exists && previousOwner === userId) tx.delete(previousUsernameRef);
+    }
+
+    tx.set(candidUsernameRef, { username: "candid", user_id: userId, created_at: now });
+    tx.set(
+      profileRef,
+      {
+        id: userId,
+        username: "candid",
+        handle: "candid",
+        role_label: "Candid team",
+        account_type: "official",
+        verified: true,
+        official_account_claimed_at: now,
+      },
+      { merge: true },
+    );
+    tx.set(
+      verificationRef,
+      {
+        id: userId,
+        user_id: userId,
+        account_type: "official",
+        company_id: null,
+        company_name: null,
+        company_slug: null,
+        owner_override: "official",
+        badge_status: "claimed",
+        owner_verified: true,
+        approval_status: "approved",
+        claimed_at: now,
+        checked_at: now,
+      },
+      { merge: true },
+    );
+    tx.set(
+      officialAccountRef,
+      { user_id: userId, email: "karimiarrison@gmail.com", linked_at: now },
+      { merge: true },
+    );
+
+    // Retain the old system profile for its historical references, but release
+    // the public handle so the authenticated account can own @candid.
+    if (legacyProfileSnap.exists && userId !== "candid-official") {
+      tx.set(
+        legacyProfileRef,
+        {
+          username: "candid_archive",
+          handle: "candid_archive",
+          account_type: "unknown",
+          verified: false,
+          migrated_to: userId,
+        },
+        { merge: true },
+      );
+      tx.set(
+        legacyVerificationRef,
+        {
+          account_type: "unknown",
+          owner_override: null,
+          badge_status: "none",
+          owner_verified: false,
+          approval_status: "none",
+        },
+        { merge: true },
+      );
+    }
+  });
+
+  return { ok: true as const, username: "candid" as const };
 }
 
 /** Records a self-declared account type for accounts we could not classify. */

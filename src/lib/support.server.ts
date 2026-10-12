@@ -1,4 +1,5 @@
 import { getFirestoreDb } from "./firebase.server";
+import { getCandidAccountId } from "./messaging.server";
 
 type TicketInput = {
   full_name: string;
@@ -69,24 +70,33 @@ export async function readSupportConversation(userId: string) {
 
 export async function writeSupportMessage(userId: string, body: string) {
   const db = getFirestoreDb();
+  const candidUserId = await getCandidAccountId();
   const ref = await ensureConversation(userId);
   const conversation = await ref.get();
-  const existing = await db.collection("support_messages").where("conversation_id", "==", ref.id).get();
+  const existing = await db
+    .collection("support_messages")
+    .where("conversation_id", "==", ref.id)
+    .get();
   const history = existing.docs
     .map((doc) => doc.data() as { sender_type?: string; body?: string; created_at?: string })
     .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
     .slice(-10)
-    .map((message) => ({ sender: message.sender_type === "user" ? "user" as const : "candid" as const, body: String(message.body || "") }));
+    .map((message) => ({
+      sender: message.sender_type === "user" ? ("user" as const) : ("candid" as const),
+      body: String(message.body || ""),
+    }));
   const { answerSupportMessage } = await import("./ai.server");
   const response = await answerSupportMessage({ messages: [...history, { sender: "user", body }] });
   const userMessageRef = db.collection("support_messages").doc();
   const aiMessageRef = db.collection("support_messages").doc();
   const createdAt = now();
   const answeredAt = new Date(Date.now() + 1).toISOString();
-  const needsOwner = response.disposition === "escalate" || Boolean(conversation.data()?.needs_owner);
-  const escalationReason = response.disposition === "escalate"
-    ? response.escalation_reason
-    : conversation.data()?.escalation_reason ?? null;
+  const needsOwner =
+    response.disposition === "escalate" || Boolean(conversation.data()?.needs_owner);
+  const escalationReason =
+    response.disposition === "escalate"
+      ? response.escalation_reason
+      : (conversation.data()?.escalation_reason ?? null);
   const userIdOnly = conversation.data()?.user_id || userId;
   const notificationRef = needsOwner ? db.collection("notifications").doc() : null;
   const auditRef = db.collection("owner_audit_log").doc();
@@ -103,7 +113,7 @@ export async function writeSupportMessage(userId: string, body: string) {
     transaction.set(aiMessageRef, {
       id: aiMessageRef.id,
       conversation_id: ref.id,
-      sender_id: "candid-official",
+      sender_id: candidUserId,
       sender_type: "ai",
       body: response.reply,
       created_at: answeredAt,
@@ -124,16 +134,17 @@ export async function writeSupportMessage(userId: string, body: string) {
       },
       { merge: true },
     );
-    if (notificationRef) transaction.set(notificationRef, {
-      id: notificationRef.id,
-      user_id: userIdOnly,
-      kind: "info",
-      title: "Candid support is following up",
-      description: "Your question needs a closer look. The team will reply here.",
-      link: "/support",
-      created_at: answeredAt,
-      read_at: null,
-    });
+    if (notificationRef)
+      transaction.set(notificationRef, {
+        id: notificationRef.id,
+        user_id: userIdOnly,
+        kind: "info",
+        title: "Candid support is following up",
+        description: "Your question needs a closer look. The team will reply here.",
+        link: "/support",
+        created_at: answeredAt,
+        read_at: null,
+      });
     transaction.set(auditRef, {
       id: auditRef.id,
       action: needsOwner ? "support.ai_escalated" : "support.ai_replied",
@@ -143,5 +154,10 @@ export async function writeSupportMessage(userId: string, body: string) {
       created_at: answeredAt,
     });
   });
-  return { id: userMessageRef.id, created_at: createdAt, reply: response.reply, escalated: needsOwner };
+  return {
+    id: userMessageRef.id,
+    created_at: createdAt,
+    reply: response.reply,
+    escalated: needsOwner,
+  };
 }

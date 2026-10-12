@@ -1,21 +1,23 @@
 import { useEffect, useState } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
-import { Download, Flame, X } from "lucide-react";
+import { useRouterState } from "@tanstack/react-router";
+import { Download, Flame, Share, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 const DISMISS_KEY = "candid-install-banner-dismissed-at";
 const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
 
-function isAndroidPhone() {
-  return /android/i.test(navigator.userAgent) && /mobile/i.test(navigator.userAgent);
-}
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
+};
 
 function isPreviewOrLocal() {
   const host = window.location.hostname;
@@ -37,28 +39,62 @@ function isInstalled() {
   );
 }
 
-/**
- * Android-only install banner with a 7-day dismiss cooldown.
- * Never shows in the Lovable preview, in development, or when already installed.
- */
+function isIosBrowser() {
+  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !isInstalled();
+}
+
+/** A first-visit install invitation, backed by the browser's real PWA prompt. */
 export function InstallBanner() {
-  const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const [visible, setVisible] = useState(false);
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
   const [open, setOpen] = useState(false);
+  const [iosInstructions, setIosInstructions] = useState(false);
+  const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
 
   useEffect(() => {
-    setVisible(false);
-    if (pathname !== "/" || !isAndroidPhone() || isPreviewOrLocal() || isInstalled()) return;
+    const capturePrompt = (event: Event) => {
+      event.preventDefault();
+      setPromptEvent(event as InstallPromptEvent);
+    };
+    const installed = () => {
+      setOpen(false);
+      setPromptEvent(null);
+    };
+    window.addEventListener("beforeinstallprompt", capturePrompt);
+    window.addEventListener("appinstalled", installed);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", capturePrompt);
+      window.removeEventListener("appinstalled", installed);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isPreviewOrLocal() || !("serviceWorker" in navigator)) return;
+    void navigator.serviceWorker.register("/sw.js").catch((error: unknown) => {
+      console.warn("[PWA] Service worker registration failed", error);
+    });
+  }, []);
+
+  useEffect(() => {
+    if (pathname !== "/") {
+      setOpen(false);
+      return;
+    }
+    if (isPreviewOrLocal() || isInstalled()) return;
     try {
       const dismissedAt = Number(localStorage.getItem(DISMISS_KEY) ?? 0);
       if (dismissedAt && Date.now() - dismissedAt < COOLDOWN_MS) return;
     } catch {
-      // localStorage unavailable — still show the banner.
+      // Browser storage can be disabled; the invite may still be shown.
     }
-    setVisible(true);
-  }, [pathname]);
 
-  if (!visible) return null;
+    const timer = window.setTimeout(() => {
+      if (promptEvent || isIosBrowser()) {
+        setIosInstructions(!promptEvent && isIosBrowser());
+        setOpen(true);
+      }
+    }, 1600);
+    return () => window.clearTimeout(timer);
+  }, [pathname, promptEvent]);
 
   function dismiss() {
     try {
@@ -66,42 +102,51 @@ export function InstallBanner() {
     } catch {
       // ignore
     }
-    setVisible(false);
+    setOpen(false);
+  }
+
+  async function install() {
+    if (!promptEvent) return;
+    try {
+      await promptEvent.prompt();
+      const choice = await promptEvent.userChoice;
+      if (choice.outcome === "accepted") setOpen(false);
+      setPromptEvent(null);
+    } finally {
+      dismiss();
+    }
   }
 
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Learn how to install Candid"
-        className="fixed bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] left-4 z-[38] flex size-11 items-center justify-center rounded-full border border-border bg-card text-primary shadow-lg transition-transform active:scale-95 md:hidden"
-      >
-        <Download className="size-5" />
-      </button>
-      <Drawer open={open} onOpenChange={setOpen}>
-        <DrawerContent className="max-h-[72dvh] rounded-t-[2rem] border-border bg-card px-1 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden">
-          <DrawerHeader className="px-6 pb-2 pt-5 text-left">
-            <span className="mb-2 flex size-12 items-center justify-center rounded-2xl bg-primary/15 text-primary">
-              <Flame className="size-6" />
-            </span>
-            <DrawerTitle className="font-display text-2xl">Take Candid with you</DrawerTitle>
-            <DrawerDescription className="text-sm leading-6">
-              Install Candid for a full-screen experience and quick access from your home screen.
-            </DrawerDescription>
-          </DrawerHeader>
-          <div className="flex gap-3 px-6 pb-4 pt-3">
-            <Button variant="outline" className="flex-1" onClick={dismiss}>
-              <X className="size-4" /> Not now
+    <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : dismiss())}>
+      <DialogContent className="max-w-sm rounded-3xl">
+        <DialogHeader className="text-left">
+          <span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+            <Flame className="size-6" />
+          </span>
+          <DialogTitle className="font-display text-2xl">Install Candid?</DialogTitle>
+          <DialogDescription>
+            Keep workplace stories one tap away with Candid on your home screen.
+          </DialogDescription>
+        </DialogHeader>
+        {iosInstructions ? (
+          <p className="rounded-2xl bg-secondary/60 p-4 text-sm leading-6 text-muted-foreground">
+            Tap <Share className="mx-1 inline size-4 align-[-3px]" aria-label="Share" /> Share in
+            your browser, then choose{" "}
+            <strong className="text-foreground">Add to Home Screen</strong>.
+          </p>
+        ) : null}
+        <DialogFooter className="gap-2 sm:flex-row sm:justify-end">
+          <Button variant="ghost" onClick={dismiss}>
+            <X className="size-4" /> Not now
+          </Button>
+          {promptEvent ? (
+            <Button onClick={() => void install()} className="glow-primary">
+              <Download className="size-4" /> Install app
             </Button>
-            <Button asChild className="flex-1 glow-primary">
-              <Link to="/download" onClick={() => setOpen(false)}>
-                <Download className="size-4" /> Install app
-              </Link>
-            </Button>
-          </div>
-        </DrawerContent>
-      </Drawer>
-    </>
+          ) : null}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

@@ -4,24 +4,18 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import type { User } from "firebase/auth";
-import {
-  EmailAuthProvider,
-  linkWithCredential,
-} from "firebase/auth";
+import { EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import {
   ArrowLeft,
-  Bell,
   BookOpen,
   Fingerprint,
   Gauge,
   Headset,
   Moon,
-  RefreshCw,
   ScrollText,
   Settings2,
   ShieldCheck,
   Sun,
-  Trash2,
   DatabaseZap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -29,7 +23,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { PrivacySettings } from "@/components/site/privacy-settings";
 import { useAuth } from "@/hooks/useAuth";
-import { notify, openNotifications } from "@/lib/notifications-store";
+import { notify } from "@/lib/notifications-store";
 import { setPreference, usePreferences } from "@/lib/preferences";
 import { clearPersistedQueries } from "@/lib/query-persist";
 import { storageService } from "@/lib/storage";
@@ -43,7 +37,7 @@ import {
 import { cn } from "@/lib/utils";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { firebaseAuth } from "@/integrations/firebase/client";
-import { getOnboardingState } from "@/lib/onboarding.functions";
+import { claimOfficialCandidAccount, getOnboardingState } from "@/lib/onboarding.functions";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
 import { clearDevelopmentFirestore, RESET_CONFIRMATION } from "@/lib/developer.functions";
 import {
@@ -78,7 +72,9 @@ function SettingsPage() {
   const [developerResetOpen, setDeveloperResetOpen] = useState(false);
   const [developerResetText, setDeveloperResetText] = useState("");
   const [developerResetting, setDeveloperResetting] = useState(false);
+  const [claimingCandid, setClaimingCandid] = useState(false);
   const fetchProfile = useServerFn(getOnboardingState);
+  const claimCandidAccount = useServerFn(claimOfficialCandidAccount);
   const resetFirestore = useServerFn(clearDevelopmentFirestore);
   const developerMode = import.meta.env.DEV || import.meta.env["VITE_DEVELOPER_MODE"] === "true";
   const profile = useQuery({
@@ -228,11 +224,58 @@ function SettingsPage() {
               </SettingsGroup>
             ) : null}
 
+            {user?.email?.trim().toLowerCase() === "karimiarrison@gmail.com" &&
+            profile.data?.accountType !== "official" ? (
+              <SettingsGroup title="Official Candid account">
+                <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-medium">Use this login for @candid</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      This verified account will become Candid’s official profile.
+                    </p>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    className="shrink-0 rounded-xl"
+                    disabled={claimingCandid}
+                    onClick={() => {
+                      setClaimingCandid(true);
+                      void claimCandidAccount({ data: undefined })
+                        .then(async () => {
+                          await queryClient.invalidateQueries({
+                            queryKey: ["onboarding-state", user.uid],
+                          });
+                          notify.success("This login is now the official @candid account.");
+                        })
+                        .catch((error: unknown) => {
+                          notify.error(
+                            error instanceof Error
+                              ? error.message
+                              : "Could not link the official Candid account.",
+                          );
+                        })
+                        .finally(() => setClaimingCandid(false));
+                    }}
+                  >
+                    {claimingCandid ? "Linking account…" : "Make this @candid"}
+                  </Button>
+                </div>
+              </SettingsGroup>
+            ) : null}
+
             {user ? (
               <SettingsGroup title="Membership">
                 <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="font-medium">{profile.data?.membership?.tier === "gold" ? "Gold" : profile.data?.membership?.tier === "premium" ? "Premium" : "Basic"} plan</p>
+                    <p className="font-medium">
+                      {profile.data?.membership?.tier === "gold"
+                        ? "Gold"
+                        : profile.data?.membership?.tier === "premium"
+                          ? "Premium"
+                          : "Basic"}{" "}
+                      plan
+                    </p>
                   </div>
                   <Button asChild variant="outline" size="sm" className="shrink-0 rounded-xl">
                     <Link to="/billing">View billing &amp; packages</Link>
@@ -255,12 +298,6 @@ function SettingsPage() {
                     className="block py-2 text-sm text-muted-foreground hover:text-foreground"
                   >
                     Appearance
-                  </a>
-                  <a
-                    href="#notifications"
-                    className="block py-2 text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Notifications & data
                   </a>
                   <a
                     href="#privacy"
@@ -336,39 +373,6 @@ function SettingsPage() {
                   </SettingsGroup>
                 </div>
 
-                <div id="notifications">
-                  <SettingsGroup title="Notifications & data">
-                    <ActionRow
-                      icon={<Bell className="size-4" />}
-                      title="Notification centre"
-                      description="Review your recent Candid activity."
-                      actionLabel="Open"
-                      onClick={openNotifications}
-                    />
-                    <ActionRow
-                      icon={<RefreshCw className="size-4" />}
-                      title="Refresh cached content"
-                      description="Fetch the newest stories, companies and salary data."
-                      actionLabel="Refresh"
-                      onClick={() => {
-                        void queryClient.invalidateQueries();
-                      }}
-                    />
-                    <ActionRow
-                      icon={<Trash2 className="size-4" />}
-                      title="Clear offline cache"
-                      description="Remove locally saved content. It will reload on your next visit."
-                      actionLabel="Clear"
-                      destructive
-                      onClick={() => {
-                        clearPersistedQueries();
-                        storageService.clearCache();
-                        queryClient.clear();
-                      }}
-                    />
-                  </SettingsGroup>
-                </div>
-
                 <div id="privacy">
                   <PrivacySettings />
                 </div>
@@ -436,8 +440,8 @@ function SettingsPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Clear all Firestore development data?</AlertDialogTitle>
             <AlertDialogDescription>
-              This permanently removes every Firestore document. Firebase Authentication accounts and
-              Cloudinary uploads are not included. Type <strong>{RESET_CONFIRMATION}</strong> to
+              This permanently removes every Firestore document. Firebase Authentication accounts
+              and Cloudinary uploads are not included. Type <strong>{RESET_CONFIRMATION}</strong> to
               continue.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -471,15 +475,25 @@ function SignInMethods({ user }: { user: User | null }) {
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [passwordLinked, setPasswordLinked] = useState(() =>
-    Boolean(user?.providerData.some((provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID)),
+    Boolean(
+      user?.providerData.some((provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID),
+    ),
   );
   const accountEmail = user?.email ?? null;
 
   useEffect(() => {
     setPasswordLinked(
-      Boolean(user?.providerData.some((provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID)),
+      Boolean(
+        user?.providerData.some(
+          (provider) => provider.providerId === EmailAuthProvider.PROVIDER_ID,
+        ),
+      ),
     );
   }, [user]);
+
+  // Keep the password setup available to legacy accounts without a password;
+  // accounts already using email/password do not need a redundant settings panel.
+  if (!user || passwordLinked) return null;
 
   async function addPassword(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -488,7 +502,9 @@ function SignInMethods({ user }: { user: User | null }) {
     try {
       const credential = EmailAuthProvider.credential(accountEmail, password);
       const result = await linkWithCredential(user, credential);
-      if (!result.user.providerData.some((item) => item.providerId === EmailAuthProvider.PROVIDER_ID)) {
+      if (
+        !result.user.providerData.some((item) => item.providerId === EmailAuthProvider.PROVIDER_ID)
+      ) {
         throw new Error("Could not enable email and password sign-in for this account.");
       }
       setPasswordLinked(true);
@@ -534,7 +550,8 @@ function SignInMethods({ user }: { user: User | null }) {
               </form>
             ) : (
               <p className="mt-1 text-xs text-muted-foreground">
-                This account has no email address. Contact Candid support to update it before setting a password.
+                This account has no email address. Contact Candid support to update it before
+                setting a password.
               </p>
             )}
           </div>

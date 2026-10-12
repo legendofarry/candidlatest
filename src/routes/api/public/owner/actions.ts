@@ -1,9 +1,14 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import { generateId, readCollection, readDocument, type CommentRecord } from "@/lib/firebase-data.server";
+import {
+  generateId,
+  readCollection,
+  readDocument,
+  type CommentRecord,
+} from "@/lib/firebase-data.server";
 import { FieldValue } from "@/lib/firestore-rest.server";
 import { auditOwnerAction, getAdmin, json, verifyOwnerKey } from "@/lib/owner-api.server";
-import { CANDID_USER_ID, CANDID_USERNAME, ensureCandidAccount } from "@/lib/messaging.server";
+import { CANDID_USERNAME, ensureCandidAccount } from "@/lib/messaging.server";
 
 const documentId = z
   .string()
@@ -39,14 +44,21 @@ const ActionInput = z.discriminatedUnion("entity", [
     address: z.string().max(300).nullable().optional(),
     verified: z.boolean().optional(),
     is_public: z.boolean().optional(),
-    location: z.object({
-      label: z.string().max(300).nullable(),
-      map_url: z.string().url().max(500).nullable(),
-      lat: z.number().min(-90).max(90).nullable(),
-      lng: z.number().min(-180).max(180).nullable(),
-    }).optional(),
+    location: z
+      .object({
+        label: z.string().max(300).nullable(),
+        map_url: z.string().url().max(500).nullable(),
+        lat: z.number().min(-90).max(90).nullable(),
+        lng: z.number().min(-180).max(180).nullable(),
+      })
+      .optional(),
   }),
-  z.object({ entity: z.literal("company_claim"), id: documentId, user_id: documentId, approve: z.boolean() }),
+  z.object({
+    entity: z.literal("company_claim"),
+    id: documentId,
+    user_id: documentId,
+    approve: z.boolean(),
+  }),
   z.object({
     entity: z.literal("official_comment"),
     story_id: documentId,
@@ -69,7 +81,7 @@ export const Route = createFileRoute("/api/public/owner/actions")({
         const timestamp = new Date().toISOString();
 
         if (input.entity === "official_comment") {
-          await ensureCandidAccount();
+          const candidUserId = await ensureCandidAccount();
           const story = await readDocument("stories", input.story_id);
           if (!story || story["status"] !== "published") {
             return json({ error: "Published story not found" }, 404);
@@ -77,7 +89,11 @@ export const Route = createFileRoute("/api/public/owner/actions")({
           const parentId = input.parent_id ?? null;
           if (parentId) {
             const parent = await readDocument("comments", parentId);
-            if (!parent || parent["story_id"] !== input.story_id || parent["status"] !== "published") {
+            if (
+              !parent ||
+              parent["story_id"] !== input.story_id ||
+              parent["status"] !== "published"
+            ) {
               return json({ error: "Parent comment not found" }, 400);
             }
           }
@@ -88,7 +104,7 @@ export const Route = createFileRoute("/api/public/owner/actions")({
             parent_id: parentId,
             body: input.body,
             status: "published",
-            author_id: CANDID_USER_ID,
+            author_id: candidUserId,
             author_handle: "Candid team",
             author_username: CANDID_USERNAME,
             author_verified: true,
@@ -97,9 +113,12 @@ export const Route = createFileRoute("/api/public/owner/actions")({
             is_deleted: false,
             created_at: timestamp,
           });
-          await db.collection("stories").doc(input.story_id).update({
-            comment_count: FieldValue.increment(1),
-          });
+          await db
+            .collection("stories")
+            .doc(input.story_id)
+            .update({
+              comment_count: FieldValue.increment(1),
+            });
           await auditOwnerAction({
             action: "official.comment_published",
             targetType: "comment",
@@ -113,21 +132,26 @@ export const Route = createFileRoute("/api/public/owner/actions")({
           const previousStatus = String(story["status"] ?? "pending");
           const storyRef = db.collection("stories").doc(input.id);
           const storyPatch = {
-              status: input.status,
-              moderation_note:
-                input.moderation_note === undefined
-                  ? input.status === "published"
-                    ? null
-                    : (story["moderation_note"] ?? null)
-                  : input.moderation_note,
-              moderated_at: timestamp,
-            };
+            status: input.status,
+            moderation_note:
+              input.moderation_note === undefined
+                ? input.status === "published"
+                  ? null
+                  : (story["moderation_note"] ?? null)
+                : input.moderation_note,
+            moderated_at: timestamp,
+          };
           if (input.status === "published" && typeof story["company_id"] === "string") {
             const companyRef = db.collection("companies").doc(String(story["company_id"]));
             const companySnap = await companyRef.get();
             const batch = db.batch();
             batch.update(storyRef, storyPatch);
-            if (companySnap.exists) batch.update(companyRef, { is_public: true }, companySnap.updateTime ? { updateTime: companySnap.updateTime } : undefined);
+            if (companySnap.exists)
+              batch.update(
+                companyRef,
+                { is_public: true },
+                companySnap.updateTime ? { updateTime: companySnap.updateTime } : undefined,
+              );
             await batch.commit();
           } else {
             await storyRef.update(storyPatch);
@@ -138,7 +162,10 @@ export const Route = createFileRoute("/api/public/owner/actions")({
             targetId: input.id,
             payload: { moderation_note: input.moderation_note ?? null },
           });
-          if (previousStatus !== input.status && (input.status === "published" || input.status === "hidden")) {
+          if (
+            previousStatus !== input.status &&
+            (input.status === "published" || input.status === "hidden")
+          ) {
             const authorId = typeof story["author_id"] === "string" ? story["author_id"] : "";
             if (authorId) {
               const { pushServerNotification } = await import("@/lib/notifications.server");
@@ -147,8 +174,17 @@ export const Route = createFileRoute("/api/public/owner/actions")({
                 await pushServerNotification({
                   userId: authorId,
                   kind: input.status === "published" ? "success" : "warning",
-                  title: input.status === "published" ? "Your story is approved" : rejected ? "Your story was not approved" : "Your story is no longer published",
-                  description: input.moderation_note?.trim() || (input.status === "published" ? "Your story is now visible on Candid." : "Open your story status to see the moderation decision."),
+                  title:
+                    input.status === "published"
+                      ? "Your story is approved"
+                      : rejected
+                        ? "Your story was not approved"
+                        : "Your story is no longer published",
+                  description:
+                    input.moderation_note?.trim() ||
+                    (input.status === "published"
+                      ? "Your story is now visible on Candid."
+                      : "Open your story status to see the moderation decision."),
                   link: "/profile",
                 });
               } catch (error) {
@@ -159,17 +195,25 @@ export const Route = createFileRoute("/api/public/owner/actions")({
               try {
                 const [{ pushServerNotification }, companyOwners] = await Promise.all([
                   import("@/lib/notifications.server"),
-                  db.collection("account_verifications").where("company_id", "==", story["company_id"]).get(),
+                  db
+                    .collection("account_verifications")
+                    .where("company_id", "==", story["company_id"])
+                    .get(),
                 ]);
-                await Promise.all(companyOwners.docs
-                  .filter((doc) => doc.id !== authorId)
-                  .map((doc) => pushServerNotification({
-                    userId: doc.id,
-                    kind: "info",
-                    title: "Your company was mentioned in a story",
-                    description: "An approved story mentioning your company is now visible on Candid.",
-                    link: `/stories/${encodeURIComponent(input.id)}`,
-                  })));
+                await Promise.all(
+                  companyOwners.docs
+                    .filter((doc) => doc.id !== authorId)
+                    .map((doc) =>
+                      pushServerNotification({
+                        userId: doc.id,
+                        kind: "info",
+                        title: "Your company was mentioned in a story",
+                        description:
+                          "An approved story mentioning your company is now visible on Candid.",
+                        link: `/stories/${encodeURIComponent(input.id)}`,
+                      }),
+                    ),
+                );
               } catch (error) {
                 console.error("Could not notify company account about approved story", error);
               }
@@ -249,12 +293,17 @@ export const Route = createFileRoute("/api/public/owner/actions")({
           });
         } else if (input.entity === "company") {
           const existingCompany = await readDocument("companies", input.id);
-          if (!existingCompany)
-            return json({ error: "Company not found" }, 404);
-          const aliases = Array.isArray(existingCompany["aliases"]) ? [...existingCompany["aliases"] as string[]] : [];
-          if (input.name && input.name.toLowerCase() !== String(existingCompany["name"] ?? "").toLowerCase()) {
+          if (!existingCompany) return json({ error: "Company not found" }, 404);
+          const aliases = Array.isArray(existingCompany["aliases"])
+            ? [...(existingCompany["aliases"] as string[])]
+            : [];
+          if (
+            input.name &&
+            input.name.toLowerCase() !== String(existingCompany["name"] ?? "").toLowerCase()
+          ) {
             const oldName = String(existingCompany["name"] ?? "").trim();
-            if (oldName && !aliases.some((alias) => alias.toLowerCase() === oldName.toLowerCase())) aliases.push(oldName);
+            if (oldName && !aliases.some((alias) => alias.toLowerCase() === oldName.toLowerCase()))
+              aliases.push(oldName);
           }
           const patch: Record<string, unknown> = Object.fromEntries(
             Object.entries({
@@ -271,7 +320,8 @@ export const Route = createFileRoute("/api/public/owner/actions")({
           if (input.name && aliases.length) patch["aliases"] = aliases;
           if (Object.keys(patch).length === 0 && !input.location)
             return json({ error: "No company changes supplied" }, 400);
-          if (Object.keys(patch).length) await db.collection("companies").doc(input.id).update(patch);
+          if (Object.keys(patch).length)
+            await db.collection("companies").doc(input.id).update(patch);
           if (input.location) {
             await db.collection("company_locations").doc(input.id).set({
               id: input.id,
@@ -298,40 +348,71 @@ export const Route = createFileRoute("/api/public/owner/actions")({
           const companyRef = db.collection("companies").doc(input.id);
           const companySnap = await companyRef.get();
           const currentCompany = companySnap.data() as { claimed_by?: string | null } | undefined;
-          if (input.approve && currentCompany?.claimed_by && currentCompany.claimed_by !== input.user_id) {
+          if (
+            input.approve &&
+            currentCompany?.claimed_by &&
+            currentCompany.claimed_by !== input.user_id
+          ) {
             return json({ error: "This company is already claimed by another account" }, 409);
           }
-          if (!input.approve && currentCompany?.claimed_by && currentCompany.claimed_by !== input.user_id) {
+          if (
+            !input.approve &&
+            currentCompany?.claimed_by &&
+            currentCompany.claimed_by !== input.user_id
+          ) {
             return json({ error: "This company is claimed by a different account" }, 409);
           }
           const verificationRef = db.collection("account_verifications").doc(input.user_id);
           const verificationSnap = await verificationRef.get();
           const claimTime = new Date().toISOString();
           const batch = db.batch();
-          batch.update(companyRef, {
-            claimed_by: input.approve ? input.user_id : null,
-            verified: input.approve,
-            ...(input.approve ? { is_public: true } : {}),
-          }, companySnap.updateTime ? { updateTime: companySnap.updateTime } : undefined);
+          batch.update(
+            companyRef,
+            {
+              claimed_by: input.approve ? input.user_id : null,
+              verified: input.approve,
+              ...(input.approve ? { is_public: true } : {}),
+            },
+            companySnap.updateTime ? { updateTime: companySnap.updateTime } : undefined,
+          );
           if (input.approve) {
-            batch.set(verificationRef, {
-              id: input.user_id,
-              user_id: input.user_id,
-              account_type: "company",
-              owner_override: "company",
-              company_id: input.id,
-              company_name: company["name"] ?? null,
-              company_slug: company["slug"] ?? null,
-              owner_verified: true,
-              badge_status: "claimed",
-              approval_status: "approved",
-              claimed_at: claimTime,
-              checked_at: claimTime,
-            }, { merge: true });
-            batch.set(db.collection("profiles").doc(input.user_id), { account_type: "company", company_id: input.id, verified: true }, { merge: true });
+            batch.set(
+              verificationRef,
+              {
+                id: input.user_id,
+                user_id: input.user_id,
+                account_type: "company",
+                owner_override: "company",
+                company_id: input.id,
+                company_name: company["name"] ?? null,
+                company_slug: company["slug"] ?? null,
+                owner_verified: true,
+                badge_status: "claimed",
+                approval_status: "approved",
+                claimed_at: claimTime,
+                checked_at: claimTime,
+              },
+              { merge: true },
+            );
+            batch.set(
+              db.collection("profiles").doc(input.user_id),
+              { account_type: "company", company_id: input.id, verified: true },
+              { merge: true },
+            );
           } else {
-            if (verificationSnap.exists) batch.update(verificationRef, { owner_verified: false, owner_override: null, badge_status: "none", approval_status: "none", claimed_at: null });
-            batch.set(db.collection("profiles").doc(input.user_id), { account_type: "individual", company_id: null, verified: false }, { merge: true });
+            if (verificationSnap.exists)
+              batch.update(verificationRef, {
+                owner_verified: false,
+                owner_override: null,
+                badge_status: "none",
+                approval_status: "none",
+                claimed_at: null,
+              });
+            batch.set(
+              db.collection("profiles").doc(input.user_id),
+              { account_type: "individual", company_id: null, verified: false },
+              { merge: true },
+            );
           }
           await batch.commit();
           await auditOwnerAction({

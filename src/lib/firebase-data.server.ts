@@ -74,7 +74,8 @@ export type ProfileRecord = {
   subscription_changed_at?: string | null;
   subscription_change_id?: string | null;
   subscription_version?: number;
-  investigation_hold?: boolean | { active?: boolean; started_at?: string | null; updated_at?: string | null } | null;
+  investigation_hold?:
+    boolean | { active?: boolean; started_at?: string | null; updated_at?: string | null } | null;
 };
 
 function membershipBadgeTier(profile: ProfileRecord | undefined): "basic" | "premium" | "gold" {
@@ -128,6 +129,7 @@ export type StoryRecord = {
   evidence_status?: "pending_review" | "reviewed" | null;
   upvotes: number;
   likes?: number;
+  follower_count?: number;
   metoo: number;
   comment_count: number;
   created_at: string;
@@ -324,57 +326,62 @@ export async function buildCompanyScores() {
     profiles.map((profile) => [profile.company_id, profile] as const),
   );
 
-  return companies.filter(isPublicCompany).map<CompanyScoreRecord>((company) => {
-    const companyStories = storiesByCompany.get(company.id) ?? [];
-    const companyRatings = ratingsByCompany.get(company.id) ?? [];
+  // A published story is itself a public reference to its employer. This also
+  // repairs older approval flows that published the story without flipping the
+  // company's is_public flag.
+  return companies
+    .filter((company) => isPublicCompany(company) || storiesByCompany.has(company.id))
+    .map<CompanyScoreRecord>((company) => {
+      const companyStories = storiesByCompany.get(company.id) ?? [];
+      const companyRatings = ratingsByCompany.get(company.id) ?? [];
 
-    const metricFields: Array<
-      keyof Pick<
-        CompanyRatingRecord,
-        "pay_on_time" | "compliance" | "respect" | "workload" | "growth"
-      >
-    > = ["pay_on_time", "compliance", "respect", "workload", "growth"];
+      const metricFields: Array<
+        keyof Pick<
+          CompanyRatingRecord,
+          "pay_on_time" | "compliance" | "respect" | "workload" | "growth"
+        >
+      > = ["pay_on_time", "compliance", "respect", "workload", "growth"];
 
-    const metricAverages = Object.fromEntries(
-      metricFields.map((field) => [
-        field,
-        average(companyRatings.map((rating) => Number(rating[field]))),
-      ]),
-    ) as Record<(typeof metricFields)[number], number | null>;
+      const metricAverages = Object.fromEntries(
+        metricFields.map((field) => [
+          field,
+          average(companyRatings.map((rating) => Number(rating[field]))),
+        ]),
+      ) as Record<(typeof metricFields)[number], number | null>;
 
-    const overall = average(
-      metricFields
-        .map((field) => metricAverages[field])
-        .filter((value): value is number => typeof value === "number"),
-    );
-    const wouldWorkAgainPct =
-      companyRatings.length === 0
-        ? null
-        : (companyRatings.filter((rating) => rating.would_work_again).length /
-            companyRatings.length) *
-          100;
+      const overall = average(
+        metricFields
+          .map((field) => metricAverages[field])
+          .filter((value): value is number => typeof value === "number"),
+      );
+      const wouldWorkAgainPct =
+        companyRatings.length === 0
+          ? null
+          : (companyRatings.filter((rating) => rating.would_work_again).length /
+              companyRatings.length) *
+            100;
 
-    const profile = profileByCompany.get(company.id);
+      const profile = profileByCompany.get(company.id);
 
-    return {
-      company_id: company.id,
-      name: company.name,
-      slug: company.slug,
-      verified: Boolean(company.verified),
-      industry: company.industry,
-      county: company.county,
-      story_count: companyStories.length,
-      rating_count: companyRatings.length,
-      pay_on_time: metricAverages.pay_on_time,
-      compliance: metricAverages.compliance,
-      respect: metricAverages.respect,
-      workload: metricAverages.workload,
-      growth: metricAverages.growth,
-      overall,
-      would_work_again_pct: wouldWorkAgainPct,
-      descriptor: profile?.descriptor ?? null,
-    } as CompanyScoreRecord & { descriptor: string | null };
-  });
+      return {
+        company_id: company.id,
+        name: company.name,
+        slug: company.slug,
+        verified: Boolean(company.verified),
+        industry: company.industry,
+        county: company.county,
+        story_count: companyStories.length,
+        rating_count: companyRatings.length,
+        pay_on_time: metricAverages.pay_on_time,
+        compliance: metricAverages.compliance,
+        respect: metricAverages.respect,
+        workload: metricAverages.workload,
+        growth: metricAverages.growth,
+        overall,
+        would_work_again_pct: wouldWorkAgainPct,
+        descriptor: profile?.descriptor ?? null,
+      } as CompanyScoreRecord & { descriptor: string | null };
+    });
 }
 
 export async function buildSalaryAggregates() {
@@ -523,7 +530,28 @@ export async function buildCompanySalaryDetail(slug: string) {
   };
 }
 
-export type PublicStoryRecord = Omit<StoryRecord, "status" | "moderation_note" | "body" | "created_at" | "id" | "company_id" | "reasons" | "company_name" | "company_slug" | "company_verified" | "comment_count" | "metoo" | "upvotes" | "likes" | "would_work_again" | "author_username" | "author_membership_tier" | "area" | "company_location_suggestion"> & {
+export type PublicStoryRecord = Omit<
+  StoryRecord,
+  | "status"
+  | "moderation_note"
+  | "body"
+  | "created_at"
+  | "id"
+  | "company_id"
+  | "reasons"
+  | "company_name"
+  | "company_slug"
+  | "company_verified"
+  | "comment_count"
+  | "metoo"
+  | "upvotes"
+  | "likes"
+  | "would_work_again"
+  | "author_username"
+  | "author_membership_tier"
+  | "area"
+  | "company_location_suggestion"
+> & {
   body: string | null;
   created_at: string | null;
   id: string | null;
@@ -536,6 +564,7 @@ export type PublicStoryRecord = Omit<StoryRecord, "status" | "moderation_note" |
   metoo: number | null;
   upvotes: number | null;
   likes: number | null;
+  follower_count: number;
   would_work_again: boolean | null;
   author_username: string | null;
   author_membership_tier: "basic" | "premium" | "gold";
@@ -577,14 +606,21 @@ export async function getPublicStories(input: {
   companySlug?: string | null;
   limit?: number;
 }) {
-  const [companies, stories, authorUsernames, authorMembershipTiers] = await Promise.all([
-    readCollection<CompanyRecord>("companies"),
-    readCollection<StoryRecord>("stories"),
-    readAuthorUsernames(),
-    readAuthorMembershipTiers(),
-  ]);
+  const [companies, stories, storyFollows, authorUsernames, authorMembershipTiers] =
+    await Promise.all([
+      readCollection<CompanyRecord>("companies"),
+      readCollection<StoryRecord>("stories"),
+      readCollection<{ story_id: string }>("story_follows"),
+      readAuthorUsernames(),
+      readAuthorMembershipTiers(),
+    ]);
 
   const companiesById = new Map(companies.map((company) => [company.id, company] as const));
+  const followsByStory = new Map<string, number>();
+  for (const follow of storyFollows) {
+    if (follow.story_id)
+      followsByStory.set(follow.story_id, (followsByStory.get(follow.story_id) ?? 0) + 1);
+  }
   const publicStories = stories
     .filter((story) => story.status === "published")
     .filter((story) => (input.industry ? story.industry === input.industry : true))
@@ -606,6 +642,7 @@ export async function getPublicStories(input: {
         company_verified: Boolean(company?.verified),
         area: story.area ?? null,
         likes: Number(story.likes ?? 0),
+        follower_count: followsByStory.get(story.id) ?? 0,
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
         metoo: story.metoo,
@@ -614,7 +651,9 @@ export async function getPublicStories(input: {
         author_username:
           story.author_username ??
           (story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null),
-        author_membership_tier: story.author_id ? (authorMembershipTiers.get(story.author_id) ?? "basic") : "basic",
+        author_membership_tier: story.author_id
+          ? (authorMembershipTiers.get(story.author_id) ?? "basic")
+          : "basic",
       };
     });
 
@@ -631,17 +670,32 @@ export async function getPublicStories(input: {
 }
 
 export async function getCompanyView(slug: string) {
-  const companies = await readCollection<CompanyRecord>("companies");
-  const company = companies.find((entry) => entry.slug === slug && isPublicCompany(entry)) ?? null;
+  const [companies, stories] = await Promise.all([
+    readCollection<CompanyRecord>("companies"),
+    readCollection<StoryRecord>("stories"),
+  ]);
+  const company = companies.find((entry) => entry.slug === slug) ?? null;
   if (!company) return null;
 
-  const [scores, profile, stories, authorUsernames, authorMembershipTiers] = await Promise.all([
-    buildCompanyScores(),
-    readDocument<CompanyAIProfileRecord>("company_ai_profiles", company.id),
-    readCollection<StoryRecord>("stories"),
-    readAuthorUsernames(),
-    readAuthorMembershipTiers(),
-  ]);
+  const hasPublishedStory = stories.some(
+    (story) => story.company_id === company.id && story.status === "published",
+  );
+  if (!isPublicCompany(company) && !hasPublishedStory) return null;
+
+  const [scores, profile, storyFollows, authorUsernames, authorMembershipTiers] = await Promise.all(
+    [
+      buildCompanyScores(),
+      readDocument<CompanyAIProfileRecord>("company_ai_profiles", company.id),
+      readCollection<{ story_id: string }>("story_follows"),
+      readAuthorUsernames(),
+      readAuthorMembershipTiers(),
+    ],
+  );
+  const followsByStory = new Map<string, number>();
+  for (const follow of storyFollows) {
+    if (follow.story_id)
+      followsByStory.set(follow.story_id, (followsByStory.get(follow.story_id) ?? 0) + 1);
+  }
 
   return {
     company,
@@ -663,11 +717,14 @@ export async function getCompanyView(slug: string) {
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
         likes: Number(story.likes ?? 0),
+        follower_count: followsByStory.get(story.id) ?? 0,
         metoo: story.metoo,
         upvotes: story.upvotes,
         would_work_again: story.would_work_again,
         author_username: story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null,
-        author_membership_tier: story.author_id ? (authorMembershipTiers.get(story.author_id) ?? "basic") : "basic",
+        author_membership_tier: story.author_id
+          ? (authorMembershipTiers.get(story.author_id) ?? "basic")
+          : "basic",
       })),
   };
 }
@@ -686,6 +743,10 @@ export async function getStoryView(id: string) {
     .collection("comments")
     .where("story_id", "==", id)
     .limit(1000)
+    .get();
+  const storyFollowSnapshot = await getFirestoreDb()
+    .collection("story_follows")
+    .where("story_id", "==", id)
     .get();
   // Filter and sort after the indexed story_id lookup. Combining the status
   // filter and created_at ordering here requires a composite Firestore index;
@@ -777,6 +838,7 @@ export async function getStoryView(id: string) {
       company_verified: Boolean(company?.verified),
       area: story.area ?? null,
       likes: Number(story.likes ?? 0),
+      follower_count: Math.max(storyFollowSnapshot.size, Number(story.follower_count ?? 0)),
       reasons: story.reasons ?? [],
       comment_count: story.comment_count,
       metoo: story.metoo,
@@ -801,7 +863,8 @@ export async function searchData(queryText: string) {
     readAuthorMembershipTiers(),
   ]);
 
-  const companyMatches = companies.filter(isPublicCompany)
+  const companyMatches = companies
+    .filter(isPublicCompany)
     .filter((company) =>
       [company.name, company.industry ?? "", company.county ?? ""]
         .join(" ")
@@ -834,13 +897,16 @@ export async function searchData(queryText: string) {
         company_verified: Boolean(company?.verified),
         area: story.area ?? null,
         likes: Number(story.likes ?? 0),
+        follower_count: Number(story.follower_count ?? 0),
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
         metoo: story.metoo,
         upvotes: story.upvotes,
         would_work_again: story.would_work_again,
         author_username: story.author_id ? (authorUsernames.get(story.author_id) ?? null) : null,
-        author_membership_tier: story.author_id ? (authorMembershipTiers.get(story.author_id) ?? "basic") : "basic",
+        author_membership_tier: story.author_id
+          ? (authorMembershipTiers.get(story.author_id) ?? "basic")
+          : "basic",
       };
     });
 

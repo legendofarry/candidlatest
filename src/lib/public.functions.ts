@@ -93,7 +93,7 @@ export const getCompany = createServerFn({ method: "GET" })
     } catch (error) {
       if (!isFirebaseReadUnavailable(error)) throw error;
       console.warn("[getCompany] Firebase public read unavailable", error);
-      return null;
+      throw new Error("Company information is temporarily unavailable. Please try again.");
     }
   });
 

@@ -20,6 +20,7 @@ export type PublicStory = {
   industry: string | null;
   upvotes: number | null;
   likes?: number | null;
+  follower_count?: number;
   metoo: number | null;
   comment_count: number | null;
   created_at: string | null;
@@ -71,13 +72,13 @@ export function StoryCard({
             to="/companies/$slug"
             params={{ slug: story.company_slug }}
             onClick={(event) => event.stopPropagation()}
-            className="relative z-10 font-semibold text-foreground hover:text-primary"
+            className="relative z-10 inline-flex items-center gap-0.5 font-semibold leading-none text-foreground hover:text-primary"
           >
             {story.company_name}
             {story.company_verified ? <CompanyVerifiedBadge /> : null}
           </Link>
         ) : (
-          <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+          <span className="inline-flex items-center gap-1 font-semibold leading-none text-foreground">
             {story.company_name}
             {story.company_verified ? <CompanyVerifiedBadge /> : null}
           </span>
@@ -127,8 +128,10 @@ export function StoryCard({
               </Link>
               <MembershipBadge tier={story.author_membership_tier} />
             </>
-          ) : "Candid member"} ·{" "}
-          {formatDate(story.created_at)}
+          ) : (
+            "Candid member"
+          )}{" "}
+          · {formatDate(story.created_at)}
         </span>
       </div>
 
@@ -139,6 +142,7 @@ export function StoryCard({
           metoo={story.metoo ?? 0}
           commentCount={story.comment_count ?? 0}
           likes={story.likes ?? 0}
+          followers={story.follower_count ?? 0}
           discussionOpen={discussionOpen}
           onToggleDiscussion={onToggleDiscussion}
         />

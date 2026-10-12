@@ -78,7 +78,8 @@ export async function toggleStoryLike(storyId: string, userId: string) {
   const ref = db.collection("story_likes").doc(`${storyId}:${userId}`);
   const storyRef = db.collection("stories").doc(storyId);
   const [snap, storySnap] = await Promise.all([ref.get(), storyRef.get()]);
-  const story = storySnap.data() as { likes?: number; author_id?: string | null; title?: string } | undefined;
+  const story = storySnap.data() as
+    { likes?: number; author_id?: string | null; title?: string } | undefined;
   const current = Number(story?.likes ?? 0);
 
   if (snap.exists) {
@@ -122,36 +123,53 @@ export async function toggleStoryLike(storyId: string, userId: string) {
 export async function toggleStoryFollow(storyId: string, userId: string) {
   const db = getFirestoreDb();
   const ref = db.collection("story_follows").doc(`${storyId}:${userId}`);
-  const snap = await ref.get();
+  const storyRef = db.collection("stories").doc(storyId);
+  const legacyFollowerCount = (
+    await db.collection("story_follows").where("story_id", "==", storyId).get()
+  ).size;
+  return db.runTransaction(async (transaction) => {
+    const [snap, storySnap] = await Promise.all([transaction.get(ref), transaction.get(storyRef)]);
+    const existingCount = Math.max(
+      legacyFollowerCount,
+      Number((storySnap.data() as { follower_count?: number } | undefined)?.follower_count ?? 0),
+    );
+    const followers = Math.max(0, existingCount + (snap.exists ? -1 : 1));
+    if (snap.exists) {
+      transaction.delete(ref);
+      if (storySnap.exists) transaction.update(storyRef, { follower_count: followers });
+      return { following: false, followers };
+    }
 
-  if (snap.exists) {
-    await ref.delete();
-    return { following: false };
-  }
-
-  const record: StoryFollowRecord = {
-    id: ref.id,
-    story_id: storyId,
-    user_id: userId,
-    created_at: now(),
-    last_seen_at: now(),
-  };
-  await ref.set(record);
-  return { following: true };
+    const timestamp = now();
+    transaction.set(ref, {
+      id: ref.id,
+      story_id: storyId,
+      user_id: userId,
+      created_at: timestamp,
+      last_seen_at: timestamp,
+    } satisfies StoryFollowRecord);
+    if (storySnap.exists) transaction.update(storyRef, { follower_count: followers });
+    return { following: true, followers };
+  });
 }
 
 /** Everything the viewer has engaged with on a story. */
 export async function readStoryEngagement(storyId: string, userId: string) {
   const db = getFirestoreDb();
-  const [like, follow, story] = await Promise.all([
+  const [like, follow, story, followers] = await Promise.all([
     db.collection("story_likes").doc(`${storyId}:${userId}`).get(),
     db.collection("story_follows").doc(`${storyId}:${userId}`).get(),
     db.collection("stories").doc(storyId).get(),
+    db.collection("story_follows").where("story_id", "==", storyId).get(),
   ]);
   return {
     liked: like.exists,
     following: follow.exists,
     likes: Number((story.data() as { likes?: number } | undefined)?.likes ?? 0),
+    followers: Math.max(
+      followers.size,
+      Number((story.data() as { follower_count?: number } | undefined)?.follower_count ?? 0),
+    ),
   };
 }
 
@@ -231,10 +249,10 @@ export async function buildStoryCatchUp(storyId: string, userId: string) {
   const { summarizeStoryActivity } = await import("./ai.server");
   const summary = timeline.length
     ? await summarizeStoryActivity({
-    title: story?.title ?? "This story",
-    body: story?.body ?? "",
-    comments: timeline.slice(-40).map((comment) => comment.body),
-  })
+        title: story?.title ?? "This story",
+        body: story?.body ?? "",
+        comments: timeline.slice(-40).map((comment) => comment.body),
+      })
     : "The story has been shared, and there are no published replies yet.";
 
   return {

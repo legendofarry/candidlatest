@@ -25,6 +25,7 @@ export function StoryActions({
   metoo,
   commentCount,
   likes,
+  followers,
   discussionOpen = false,
   onToggleDiscussion,
 }: {
@@ -33,6 +34,7 @@ export function StoryActions({
   metoo: number;
   commentCount: number;
   likes?: number;
+  followers?: number;
   discussionOpen?: boolean;
   onToggleDiscussion?: (() => void) | undefined;
 }) {
@@ -118,7 +120,12 @@ export function StoryActions({
             }
           }}
         />
-        <StorySocial storyId={storyId} likes={likes ?? 0} className="contents sm:flex" />
+        <StorySocial
+          storyId={storyId}
+          likes={likes ?? 0}
+          followers={followers ?? 0}
+          className="contents sm:flex"
+        />
 
         <ActionChip
           icon={<Flag className="size-4" />}
@@ -190,7 +197,10 @@ export function StoryActions({
                         </Link>
                         <MembershipBadge tier={item.author_membership_tier} />
                       </>
-                    ) : item.author_handle} · {formatDate(item.created_at)}
+                    ) : (
+                      item.author_handle
+                    )}{" "}
+                    · {formatDate(item.created_at)}
                   </p>
                   <p className="mt-1 text-sm">{item.body}</p>
                 </li>

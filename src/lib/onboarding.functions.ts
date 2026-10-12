@@ -63,7 +63,11 @@ export const getOnboardingState = createServerFn({ method: "POST" })
         tier: getEffectiveMembershipTier(profile),
         assignedTier: profile?.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
         status: profile?.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
-        source: profile?.subscription_source ?? (profile?.subscription_tier && profile.subscription_tier !== "basic" ? "manual" : "default"),
+        source:
+          profile?.subscription_source ??
+          (profile?.subscription_tier && profile.subscription_tier !== "basic"
+            ? "manual"
+            : "default"),
         provider: profile?.subscription_provider ?? null,
         startedAt: profile?.subscription_started_at ?? null,
         periodEndsAt: profile?.subscription_period_ends_at ?? null,
@@ -84,10 +88,12 @@ export const checkUsername = createServerFn({ method: "POST" })
 export const getUsernameSuggestions = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({
-      seed: z.string().max(40).default("candid"),
-      ageRange: z.enum(["18-24", "25-34", "35-44", "45+", "skip"]).optional(),
-    }).parse(input ?? {}),
+    z
+      .object({
+        seed: z.string().max(40).default("candid"),
+        ageRange: z.enum(["18-24", "25-34", "35-44", "45+", "skip"]).optional(),
+      })
+      .parse(input ?? {}),
   )
   .handler(async ({ data, context }) => {
     const { suggestUsernames } = await import("./onboarding.server");
@@ -110,10 +116,19 @@ export const completeOnboarding = createServerFn({ method: "POST" })
     return claimUsername(context.userId, data.username, data.socials, data.candidLens);
   });
 
+/** One-time, verified-email action that links the owner's login to @candid. */
+export const claimOfficialCandidAccount = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .handler(async ({ context }) => {
+    const email = String(context.claims.email ?? "");
+    const { claimOfficialCandidAccount: claim } = await import("./onboarding.server");
+    return claim(context.userId, email);
+  });
+
 export const saveMyProfilePhoto = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ photoUrl: z.string().url().max(2048) }).parse(input),
+    z.object({ photoUrl: z.string().min(1).max(2048) }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const { saveProfilePhoto } = await import("./onboarding.server");

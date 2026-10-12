@@ -12,12 +12,12 @@ export function MembershipBadge({
   if (!tier || tier === "basic") return null;
 
   return (
-    <span title="Candid badge" className="inline-flex">
-    <BadgeCheck
-      aria-label="Candid badge"
-      role="img"
-      className={`inline-block size-4 shrink-0 text-primary ${className ?? ""}`}
-    />
+    <span title="Candid badge" className="ml-1 inline-flex translate-y-[0.04em] align-middle">
+      <BadgeCheck
+        aria-label="Candid badge"
+        role="img"
+        className={`inline-block size-4 shrink-0 text-primary ${className ?? ""}`}
+      />
     </span>
   );
 }

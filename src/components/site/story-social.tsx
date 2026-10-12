@@ -8,7 +8,17 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 /** Like + follow-this-story controls, shared by the feed card and the story page. */
-export function StorySocial({ storyId, likes = 0, className }: { storyId: string; likes?: number; className?: string }) {
+export function StorySocial({
+  storyId,
+  likes = 0,
+  followers = 0,
+  className,
+}: {
+  storyId: string;
+  likes?: number;
+  followers?: number;
+  className?: string;
+}) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const like = useServerFn(likeStory);
@@ -21,16 +31,22 @@ export function StorySocial({ storyId, likes = 0, className }: { storyId: string
     enabled: Boolean(user),
   });
   const [likeCount, setLikeCount] = useState(likes);
+  const [followerCount, setFollowerCount] = useState(followers);
   const [likedOverride, setLikedOverride] = useState<boolean | null>(null);
   const [followingOverride, setFollowingOverride] = useState<boolean | null>(null);
 
   useEffect(() => setLikeCount(engagement.data?.likes ?? likes), [engagement.data?.likes, likes]);
+  useEffect(
+    () => setFollowerCount(engagement.data?.followers ?? followers),
+    [engagement.data?.followers, followers],
+  );
   useEffect(() => setLikedOverride(null), [engagement.data?.liked]);
   useEffect(() => setFollowingOverride(null), [engagement.data?.following]);
 
   const invalidate = () => {
     void queryClient.invalidateQueries({ queryKey: ["story-engagement", storyId] });
     void queryClient.invalidateQueries({ queryKey: ["followed-stories"] });
+    void queryClient.invalidateQueries({ queryKey: ["stories"] });
   };
 
   const likeMutation = useMutation({
@@ -57,11 +73,17 @@ export function StorySocial({ storyId, likes = 0, className }: { storyId: string
     mutationFn: () => follow({ data: { story_id: storyId } }),
     onSuccess: (result) => {
       setFollowingOverride(result.following);
+      setFollowerCount(result.followers);
       invalidate();
     },
-    onMutate: () => setFollowingOverride(!following),
+    onMutate: () => {
+      const next = !following;
+      setFollowingOverride(next);
+      setFollowerCount((count) => Math.max(0, count + (next ? 1 : -1)));
+    },
     onError: (error: Error) => {
       setFollowingOverride(null);
+      setFollowerCount(engagement.data?.followers ?? followers);
       toast.error(error.message);
     },
   });
@@ -97,6 +119,7 @@ export function StorySocial({ storyId, likes = 0, className }: { storyId: string
         )}
       >
         <Bookmark className={cn("size-4", following && "fill-current")} />
+        <span aria-label={`${followerCount} followers`}>{followerCount}</span>
       </button>
     </div>
   );

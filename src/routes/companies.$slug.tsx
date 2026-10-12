@@ -41,7 +41,62 @@ export const Route = createFileRoute("/companies/$slug")({
     };
   },
   component: CompanyPage,
+  notFoundComponent: CompanyNotFound,
+  errorComponent: CompanyLoadError,
 });
+
+function CompanyNotFound() {
+  return (
+    <CompanyMessage
+      title="Company not found"
+      message="This company page may have moved or may not be public yet."
+    />
+  );
+}
+
+function CompanyLoadError({ reset }: { reset: () => void }) {
+  return (
+    <CompanyMessage
+      title="Company page unavailable"
+      message="We couldn’t load this company’s information. Try again, or return to the company directory."
+      retry={reset}
+    />
+  );
+}
+
+function CompanyMessage({
+  title,
+  message,
+  retry,
+}: {
+  title: string;
+  message: string;
+  retry?: (() => void) | undefined;
+}) {
+  return (
+    <section className="mx-auto max-w-xl rounded-3xl border border-border bg-card px-6 py-10 text-center sm:py-14">
+      <h1 className="font-display text-2xl font-semibold">{title}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">{message}</p>
+      <div className="mt-6 flex justify-center gap-3">
+        {retry ? (
+          <button
+            type="button"
+            onClick={retry}
+            className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
+          >
+            Try again
+          </button>
+        ) : null}
+        <Link
+          to="/companies"
+          className="rounded-xl border border-border px-4 py-2 text-sm font-medium"
+        >
+          Browse companies
+        </Link>
+      </div>
+    </section>
+  );
+}
 
 const METRICS = [
   ["pay_on_time", "Pay on time"],

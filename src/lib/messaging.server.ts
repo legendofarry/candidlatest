@@ -14,6 +14,13 @@ import { generateId } from "./firebase-data.server";
 export const CANDID_USER_ID = "candid-official";
 export const CANDID_USERNAME = "candid";
 
+export async function getCandidAccountId() {
+  const db = getFirestoreDb();
+  const linked = await db.collection("app_config").doc("official-candid-account").get();
+  const userId = (linked.data() as { user_id?: string } | undefined)?.user_id;
+  return userId || CANDID_USER_ID;
+}
+
 export type MessagePrivacy = "everyone" | "followers" | "nobody";
 
 export type PrivacySettings = {
@@ -128,7 +135,8 @@ export async function discardChatImageUpload(userId: string, ticketId: string) {
     throw new Error("Image upload not found.");
   }
   if (ticket["status"] === "discarded") return { ok: true as const };
-  if (ticket["status"] !== "issued") throw new Error("This image is already attached to a message.");
+  if (ticket["status"] !== "issued")
+    throw new Error("This image is already attached to a message.");
 
   const config = getCloudinaryEvidenceConfig();
   const timestamp = String(Math.floor(Date.now() / 1000));
@@ -157,7 +165,10 @@ export async function discardChatImageUpload(userId: string, ticketId: string) {
   if (!response.ok || !["ok", "not found"].includes(result.result ?? "")) {
     throw new Error(result.error?.message || "The image could not be removed. Please retry.");
   }
-  await ticketRef.update({ status: "discarded", discarded_at: now() }, ticketSnap.updateTime ? { updateTime: ticketSnap.updateTime } : undefined);
+  await ticketRef.update(
+    { status: "discarded", discarded_at: now() },
+    ticketSnap.updateTime ? { updateTime: ticketSnap.updateTime } : undefined,
+  );
   return { ok: true as const };
 }
 
@@ -179,51 +190,61 @@ export function conversationIdFor(a: string, b: string) {
 /** Creates the Candid owner profile once so it can message anyone. */
 export async function ensureCandidAccount() {
   const db = getFirestoreDb();
-  const ref = db.collection("profiles").doc(CANDID_USER_ID);
+  const candidUserId = await getCandidAccountId();
+  const ref = db.collection("profiles").doc(candidUserId);
   const snap = await ref.get();
   const timestamp = now();
   const existingProfile = snap.data() as Partial<ProfileRecord> | undefined;
-  await ref.set({
-    id: CANDID_USER_ID,
-    handle: CANDID_USERNAME,
-    county: null,
-    banned: false,
-    created_at: existingProfile?.created_at ?? timestamp,
-    role_label: "Candid team",
-    username: CANDID_USERNAME,
-    account_type: "official",
-    verified: true,
-    onboarded_at: existingProfile?.onboarded_at ?? timestamp,
-  }, { merge: true });
+  await ref.set(
+    {
+      id: CANDID_USER_ID,
+      handle: CANDID_USERNAME,
+      county: null,
+      banned: false,
+      created_at: existingProfile?.created_at ?? timestamp,
+      role_label: "Candid team",
+      username: CANDID_USERNAME,
+      account_type: "official",
+      verified: true,
+      onboarded_at: existingProfile?.onboarded_at ?? timestamp,
+    },
+    { merge: true },
+  );
   const usernameRef = db.collection("usernames").doc(CANDID_USERNAME);
-  if (!(await usernameRef.get()).exists) {
+  const usernameSnapshot = await usernameRef.get();
+  const usernameOwner = (usernameSnapshot.data() as { user_id?: string } | undefined)?.user_id;
+  if (!usernameSnapshot.exists || usernameOwner !== candidUserId) {
     await usernameRef.set({
       username: CANDID_USERNAME,
-      user_id: CANDID_USER_ID,
+      user_id: candidUserId,
       created_at: timestamp,
     });
   }
-  const verificationRef = db.collection("account_verifications").doc(CANDID_USER_ID);
+  const verificationRef = db.collection("account_verifications").doc(candidUserId);
   const verificationSnapshot = await verificationRef.get();
   const existingVerification = verificationSnapshot.data() as { claimed_at?: string } | undefined;
-  await verificationRef.set({
-    user_id: CANDID_USER_ID,
-    account_type: "official",
-    company_id: null,
-    company_name: null,
-    company_slug: null,
-    owner_override: "official",
-    badge_status: "claimed",
-    owner_verified: true,
-    approval_status: "approved",
-    claimed_at: existingVerification?.claimed_at ?? timestamp,
-    checked_at: timestamp,
-  }, { merge: true });
-  return CANDID_USER_ID;
+  await verificationRef.set(
+    {
+      user_id: CANDID_USER_ID,
+      account_type: "official",
+      company_id: null,
+      company_name: null,
+      company_slug: null,
+      owner_override: "official",
+      badge_status: "claimed",
+      owner_verified: true,
+      approval_status: "approved",
+      claimed_at: existingVerification?.claimed_at ?? timestamp,
+      checked_at: timestamp,
+    },
+    { merge: true },
+  );
+  return candidUserId;
 }
 
 async function readParticipants(ids: string[]): Promise<Map<string, ChatParticipant>> {
   const db = getFirestoreDb();
+  const candidUserId = await getCandidAccountId();
   const unique = [...new Set(ids)].filter(Boolean);
   const map = new Map<string, ChatParticipant>();
   await Promise.all(
@@ -240,8 +261,12 @@ async function readParticipants(ids: string[]): Promise<Map<string, ChatParticip
         id,
         username: profile?.username ?? profile?.handle ?? "member",
         photo_url: profile?.photo_url ?? null,
-        verified: id === CANDID_USER_ID || profile?.verified === true || verification?.badge_status === "claimed" || Boolean(verification?.owner_verified),
-        official: id === CANDID_USER_ID || profile?.account_type === "official",
+        verified:
+          id === candidUserId ||
+          profile?.verified === true ||
+          verification?.badge_status === "claimed" ||
+          Boolean(verification?.owner_verified),
+        official: id === candidUserId || profile?.account_type === "official",
         membership_tier: getEffectiveMembershipTier(profile),
       });
     }),
@@ -275,7 +300,7 @@ export async function isBlocked(blockerId: string, blockedId: string) {
 
 export async function toggleBlock(blockerId: string, blockedId: string) {
   if (blockerId === blockedId) throw new Error("You cannot block yourself.");
-  if (blockedId === CANDID_USER_ID) throw new Error("Candid cannot be blocked.");
+  if (blockedId === (await getCandidAccountId())) throw new Error("Candid cannot be blocked.");
   const db = getFirestoreDb();
   const profile = await db.collection("profiles").doc(blockedId).get();
   if (!profile.exists || (profile.data() as ProfileRecord).banned) {
@@ -320,7 +345,7 @@ export async function canMessage(senderId: string, recipientId: string) {
   const recipient = recipientSnap.data() as ProfileRecord | undefined;
   if (!recipientSnap.exists || recipient?.banned)
     return { allowed: false as const, reason: "This account is unavailable." };
-  if (senderId === CANDID_USER_ID) return { allowed: true as const };
+  if (senderId === (await getCandidAccountId())) return { allowed: true as const };
 
   if (blockedByYou) return { allowed: false as const, reason: "You blocked this account." };
   if (blockedByThem)
@@ -568,14 +593,21 @@ export async function deleteMessage(userId: string, messageId: string) {
     throw new Error("Not your conversation.");
   }
   const batch = db.batch();
-  batch.update(messageRef, {
-    body: "",
-    image: null,
-    reactions: {},
-    is_deleted: true,
-    deleted_at: now(),
-  }, messageSnap.updateTime ? { updateTime: messageSnap.updateTime } : undefined);
-  if (conversation.last_message_at === message.created_at && conversation.last_sender_id === userId) {
+  batch.update(
+    messageRef,
+    {
+      body: "",
+      image: null,
+      reactions: {},
+      is_deleted: true,
+      deleted_at: now(),
+    },
+    messageSnap.updateTime ? { updateTime: messageSnap.updateTime } : undefined,
+  );
+  if (
+    conversation.last_message_at === message.created_at &&
+    conversation.last_sender_id === userId
+  ) {
     batch.update(conversationRef, { last_message: "Message deleted" });
   }
   await batch.commit();
@@ -583,7 +615,12 @@ export async function deleteMessage(userId: string, messageId: string) {
     try {
       const config = getCloudinaryEvidenceConfig();
       const timestamp = String(Math.floor(Date.now() / 1000));
-      const params = { invalidate: "true", public_id: message.image.public_id, timestamp, type: "authenticated" };
+      const params = {
+        invalidate: "true",
+        public_id: message.image.public_id,
+        timestamp,
+        type: "authenticated",
+      };
       const signature = await signCloudinaryParams(params, config.apiSecret);
       const form = new FormData();
       form.set("api_key", config.apiKey);
@@ -592,10 +629,16 @@ export async function deleteMessage(userId: string, messageId: string) {
       form.set("type", params.type);
       form.set("invalidate", params.invalidate);
       form.set("signature", signature);
-      const response = await fetch(`https://api.cloudinary.com/v1_1/${encodeURIComponent(config.cloudName)}/image/destroy`, { method: "POST", body: form });
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(config.cloudName)}/image/destroy`,
+        { method: "POST", body: form },
+      );
       const result = (await response.json().catch(() => ({}))) as { result?: string };
       if (!response.ok || !["ok", "not found"].includes(result.result ?? "")) {
-        console.error("Deleted chat message image could not be removed from Cloudinary", message.image.public_id);
+        console.error(
+          "Deleted chat message image could not be removed from Cloudinary",
+          message.image.public_id,
+        );
       }
     } catch (error) {
       console.error("Deleted chat message image cleanup failed", error);

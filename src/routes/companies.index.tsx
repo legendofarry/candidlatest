@@ -11,10 +11,11 @@ import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 const companiesQuery = queryOptions({
   queryKey: ["company-scores"],
   queryFn: () => listCompanyScores(),
+  staleTime: 0,
 });
 
 export const Route = createFileRoute("/companies/")({
-  loader: ({ context }) => context.queryClient.ensureQueryData(companiesQuery),
+  loader: ({ context }) => context.queryClient.fetchQuery(companiesQuery),
   head: () => ({
     meta: [
       { title: "Kenyan company directory — culture scores & red flags | Candid" },

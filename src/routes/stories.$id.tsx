@@ -125,8 +125,10 @@ function StoryPage() {
               </Link>
               <MembershipBadge tier={story.author_membership_tier} />
             </>
-          ) : "Candid member"} ·{" "}
-          {formatDate(story.created_at)}
+          ) : (
+            "Candid member"
+          )}{" "}
+          · {formatDate(story.created_at)}
         </p>
       </div>
 
@@ -165,7 +167,7 @@ function StoryPage() {
         >
           <Users className="size-4" /> This happened to me too {story.metoo ?? 0}
         </Button>
-        <StorySocial storyId={id} likes={story.likes ?? 0} />
+        <StorySocial storyId={id} likes={story.likes ?? 0} followers={story.follower_count ?? 0} />
         <Button
           variant="ghost"
           className="ml-auto text-danger"
