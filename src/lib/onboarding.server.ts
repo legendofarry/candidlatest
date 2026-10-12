@@ -309,6 +309,12 @@ export async function claimUsername(
   }
 
   const profile = await readProfile(userId);
+  try {
+    const { ensureWelcomeMessage } = await import("./messaging.server");
+    await ensureWelcomeMessage(userId);
+  } catch (error) {
+    console.error("[welcome message] delivery deferred after onboarding", error);
+  }
   return { ok: true, ...(profile ? { profile } : {}) };
 }
 

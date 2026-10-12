@@ -28,6 +28,7 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as BillingCheckoutRouteImport } from './routes/billing.checkout'
 import { Route as CompaniesIndexRouteImport } from './routes/companies.index'
 import { Route as CompaniesSlugRouteImport } from './routes/companies.$slug'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
@@ -141,6 +142,11 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
   path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BillingCheckoutRoute = BillingCheckoutRouteImport.update({
+  id: '/checkout',
+  path: '/checkout',
+  getParentRoute: () => BillingRoute,
+} as any)
 const CompaniesIndexRoute = CompaniesIndexRouteImport.update({
   id: '/companies/',
   path: '/companies/',
@@ -231,7 +237,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
-  '/billing': typeof BillingRoute
+  '/billing': typeof BillingRouteWithChildren
   '/download': typeof DownloadRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
@@ -247,6 +253,7 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
@@ -269,7 +276,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
-  '/billing': typeof BillingRoute
+  '/billing': typeof BillingRouteWithChildren
   '/download': typeof DownloadRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
@@ -284,6 +291,7 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
@@ -307,7 +315,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
-  '/billing': typeof BillingRoute
+  '/billing': typeof BillingRouteWithChildren
   '/download': typeof DownloadRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
@@ -323,6 +331,7 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
@@ -363,6 +372,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/verify-email'
+    | '/billing/checkout'
     | '/companies/$slug'
     | '/messages/$id'
     | '/salaries/$slug'
@@ -400,6 +410,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/verify-email'
+    | '/billing/checkout'
     | '/companies/$slug'
     | '/messages/$id'
     | '/salaries/$slug'
@@ -438,6 +449,7 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/verify-email'
+    | '/billing/checkout'
     | '/companies/$slug'
     | '/messages/$id'
     | '/salaries/$slug'
@@ -461,7 +473,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
-  BillingRoute: typeof BillingRoute
+  BillingRoute: typeof BillingRouteWithChildren
   DownloadRoute: typeof DownloadRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   GuidelinesRoute: typeof GuidelinesRoute
@@ -629,6 +641,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/billing/checkout': {
+      id: '/billing/checkout'
+      path: '/checkout'
+      fullPath: '/billing/checkout'
+      preLoaderRoute: typeof BillingCheckoutRouteImport
+      parentRoute: typeof BillingRoute
+    }
     '/companies/': {
       id: '/companies/'
       path: '/companies'
@@ -751,6 +770,17 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface BillingRouteChildren {
+  BillingCheckoutRoute: typeof BillingCheckoutRoute
+}
+
+const BillingRouteChildren: BillingRouteChildren = {
+  BillingCheckoutRoute: BillingCheckoutRoute,
+}
+
+const BillingRouteWithChildren =
+  BillingRoute._addFileChildren(BillingRouteChildren)
+
 interface SalariesRouteChildren {
   SalariesSlugRoute: typeof SalariesSlugRoute
   SalariesIndexRoute: typeof SalariesIndexRoute
@@ -769,7 +799,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
-  BillingRoute: BillingRoute,
+  BillingRoute: BillingRouteWithChildren,
   DownloadRoute: DownloadRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   GuidelinesRoute: GuidelinesRoute,

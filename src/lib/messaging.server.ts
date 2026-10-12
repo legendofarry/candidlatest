@@ -1,4 +1,5 @@
 import { getFirestoreDb } from "./firebase.server";
+import { createHash } from "node:crypto";
 import { FieldValue, type DocumentReference } from "./firestore-rest.server";
 import type { CommentRecord, ProfileRecord, StoryRecord } from "./firebase-data.server";
 import { getEffectiveMembershipTier } from "./membership";
@@ -13,6 +14,7 @@ import { generateId } from "./firebase-data.server";
 /** The seeded owner account. Candid can always reach every user. */
 export const CANDID_USER_ID = "candid-official";
 export const CANDID_USERNAME = "candid";
+export const CANDID_WELCOME_MESSAGE = "Welcome to Candid 👋\n\nExplore workplace stories, follow discussions and share your experience using your Candid alias. Your email and legal name are not shown with your stories. Please avoid details that could identify you or another person.\n\nWe’re glad you’re here.\nCandid Team";
 
 export async function getCandidAccountId() {
   const db = getFirestoreDb();
@@ -197,15 +199,20 @@ export async function ensureCandidAccount() {
   const existingProfile = snap.data() as Partial<ProfileRecord> | undefined;
   await ref.set(
     {
-      id: CANDID_USER_ID,
+      id: candidUserId,
       handle: CANDID_USERNAME,
       county: null,
       banned: false,
       created_at: existingProfile?.created_at ?? timestamp,
-      role_label: "Candid team",
+      display_name: "Candid",
+      role_label: "Candid",
       username: CANDID_USERNAME,
       account_type: "official",
       verified: true,
+      subscription_tier: "gold",
+      subscription_status: "active",
+      subscription_source: "complimentary",
+      subscription_period_ends_at: null,
       onboarded_at: existingProfile?.onboarded_at ?? timestamp,
     },
     { merge: true },
@@ -239,7 +246,118 @@ export async function ensureCandidAccount() {
     },
     { merge: true },
   );
+  if (candidUserId !== CANDID_USER_ID) {
+    const legacyProfileRef = db.collection("profiles").doc(CANDID_USER_ID);
+    const legacyProfile = await legacyProfileRef.get();
+    if (legacyProfile.exists) {
+      await legacyProfileRef.set({
+        display_name: "Candid Team",
+        role_label: "Candid Team",
+        account_type: "unknown",
+        verified: false,
+        migrated_to: candidUserId,
+      }, { merge: true });
+      await db.collection("account_verifications").doc(CANDID_USER_ID).set({
+        account_type: "unknown", owner_override: null, badge_status: "none", owner_verified: false,
+        approval_status: "none",
+      }, { merge: true });
+    }
+  }
   return candidUserId;
+}
+
+export async function ensureWelcomeMessage(userId: string) {
+  const db = getFirestoreDb();
+  const candidUserId = await getCandidAccountId();
+  if (!userId || userId === candidUserId) return { sent: false };
+  const messageId = `system-welcome-${createHash("sha256").update(userId).digest("hex").slice(0, 32)}`;
+  const markerRef = db.collection("system_message_deliveries").doc(messageId);
+  const messageRef = db.collection("messages").doc(messageId);
+  const conversationId = conversationIdFor(candidUserId, userId);
+  const conversationRef = db.collection("conversations").doc(conversationId);
+
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    const [markerSnapshot, messageSnapshot, conversationSnapshot] = await Promise.all([
+      markerRef.get(), messageRef.get(), conversationRef.get(),
+    ]);
+    if (markerSnapshot.exists || messageSnapshot.exists) return { sent: false };
+    const timestamp = now();
+    const message: MessageRecord = {
+      id: messageId,
+      conversation_id: conversationId,
+      sender_id: candidUserId,
+      body: CANDID_WELCOME_MESSAGE,
+      created_at: timestamp,
+      read_at: null,
+      reactions: {},
+      image: null,
+      is_deleted: false,
+    };
+    const batch = db.batch();
+    batch.create(markerRef, { id: messageId, user_id: userId, message_id: messageId, type: "welcome", created_at: timestamp });
+    batch.create(messageRef, message);
+    if (conversationSnapshot.exists) {
+      const conversation = conversationSnapshot.data() as ConversationRecord;
+      if (!conversation.participant_ids?.includes(candidUserId) || !conversation.participant_ids.includes(userId)) {
+        throw new Error("Candid welcome conversation has invalid participants.");
+      }
+      batch.update(conversationRef, {
+        last_message: CANDID_WELCOME_MESSAGE,
+        last_message_at: timestamp,
+        last_sender_id: candidUserId,
+        [`unread.${userId}`]: FieldValue.increment(1),
+      }, conversationSnapshot.updateTime ? { updateTime: conversationSnapshot.updateTime } : undefined);
+    } else {
+      const conversation: ConversationRecord = {
+        id: conversationId,
+        participant_ids: [candidUserId, userId].sort(),
+        created_at: timestamp,
+        last_message_at: timestamp,
+        last_message: CANDID_WELCOME_MESSAGE,
+        last_sender_id: candidUserId,
+        unread: { [candidUserId]: 0, [userId]: 1 },
+      };
+      batch.create(conversationRef, conversation);
+    }
+    try {
+      await batch.commit();
+      return { sent: true };
+    } catch (error) {
+      if (error instanceof Error && /\[(409|412)\]/.test(error.message)) {
+        const [latestMarker, latestMessage] = await Promise.all([markerRef.get(), messageRef.get()]);
+        if (latestMarker.exists || latestMessage.exists) return { sent: false };
+        if (attempt < 2) continue;
+      }
+      throw error;
+    }
+  }
+  return { sent: false };
+}
+
+/** One-time/idempotent backfill for existing member accounts. */
+export async function sendWelcomeMessagesToExistingMembers() {
+  const db = getFirestoreDb();
+  await ensureCandidAccount();
+  const candidUserId = await getCandidAccountId();
+  const profiles = await db.collection("profiles").get();
+  let sent = 0;
+  let skipped = 0;
+  const failures: string[] = [];
+  for (const profile of profiles.docs) {
+    const data = profile.data() as Partial<ProfileRecord>;
+    if (profile.id === candidUserId || data.account_type === "official" || !(data.username || data.handle)) {
+      skipped += 1;
+      continue;
+    }
+    try {
+      const result = await ensureWelcomeMessage(profile.id);
+      if (result.sent) sent += 1;
+      else skipped += 1;
+    } catch {
+      failures.push(profile.id);
+    }
+  }
+  return { sent, skipped, failed: failures.length, failedUserIds: failures };
 }
 
 async function readParticipants(ids: string[]): Promise<Map<string, ChatParticipant>> {
@@ -259,7 +377,7 @@ async function readParticipants(ids: string[]): Promise<Map<string, ChatParticip
         { badge_status?: string; owner_verified?: boolean } | undefined;
       map.set(id, {
         id,
-        username: profile?.username ?? profile?.handle ?? "member",
+        username: profile?.display_name ?? profile?.username ?? profile?.handle ?? "member",
         photo_url: profile?.photo_url ?? null,
         verified:
           id === candidUserId ||

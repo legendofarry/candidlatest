@@ -152,7 +152,7 @@ function SupportPage() {
                   <h2 className="mt-3 font-semibold">Email us</h2>
                 </a>
                 <a
-                  href="https://wa.me/254715198636?text=Hi%20Candid%20team%2C%20I%20need%20help%20with%20…"
+                  href="https://wa.me/254715938110?text=Hi%20Candid%20team%2C%20I%20need%20help%20with%20…"
                   target="_blank"
                   rel="noreferrer"
                   className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/50"

@@ -3,6 +3,8 @@ import { getRequest } from "@tanstack/react-start/server";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase.server";
 import { DEFAULT_MEMBERSHIP } from "@/lib/membership";
 
+const welcomedUsers = new Set<string>();
+
 export const requireFirebaseAuth = createMiddleware({ type: "function" }).server(
   async ({ next }) => {
     const request = getRequest();
@@ -57,6 +59,16 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
             : DEFAULT_MEMBERSHIP.subscription_source),
         subscription_version: profileData?.subscription_version ?? 0,
       }, { merge: true });
+    }
+
+    if (profileData?.username && !welcomedUsers.has(decoded.uid)) {
+      try {
+        const { ensureWelcomeMessage } = await import("@/lib/messaging.server");
+        await ensureWelcomeMessage(decoded.uid);
+        welcomedUsers.add(decoded.uid);
+      } catch (error) {
+        console.error("[welcome message] delivery deferred", error);
+      }
     }
 
     return next({

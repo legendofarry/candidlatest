@@ -13,6 +13,7 @@ export type ServerNotificationRecord = {
 
 /** Durable cross-device notification stored in Firestore. */
 export async function pushServerNotification(input: {
+  id?: string;
   userId: string;
   kind: ServerNotificationRecord["kind"];
   title: string;
@@ -21,7 +22,7 @@ export async function pushServerNotification(input: {
 }) {
   const db = getFirestoreDb();
   const record: ServerNotificationRecord = {
-    id: generateId(),
+    id: input.id ?? generateId(),
     user_id: input.userId,
     kind: input.kind,
     title: input.title.slice(0, 140),

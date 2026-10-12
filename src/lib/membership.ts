@@ -71,7 +71,7 @@ export function getMembershipBadgeTier(
   const currentStatus = status ?? "active";
   const periodEnd = periodEndsAt ? new Date(periodEndsAt).getTime() : NaN;
   const active =
-    currentStatus === "active" ||
+    (currentStatus === "active" && (source !== "paid" || !periodEndsAt || periodEnd > now)) ||
     (currentStatus === "cancelled" && source === "paid" && periodEnd > now);
   return active ? currentTier : "basic";
 }
