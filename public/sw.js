@@ -2,11 +2,12 @@ importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js
 importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-messaging-compat.js");
 
 const fallbackFirebaseConfig = {
-  apiKey: "AIzaSyBHbdPGXQddWpgbwAm6_w1kxlg22XCCyf8",
-  authDomain: "candid-431db.firebaseapp.com",
-  projectId: "candid-431db",
-  messagingSenderId: "684808500794",
-  appId: "1:684808500794:web:0f6bd196f828164fd3a703",
+  apiKey: "AIzaSyAfuu1wA9oXJvNV5omY1Wg6RD-ncahsDgg",
+  authDomain: "candid-bbef5.firebaseapp.com",
+  projectId: "candid-bbef5",
+  storageBucket: "candid-bbef5.firebasestorage.app",
+  messagingSenderId: "524579606484",
+  appId: "1:524579606484:web:3c22f4436aab4d5ff0d041",
 };
 let firebaseConfig = fallbackFirebaseConfig;
 try {

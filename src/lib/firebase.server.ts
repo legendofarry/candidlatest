@@ -39,7 +39,7 @@ function parseServiceAccount(): ServiceAccountInput {
     }
   }
 
-  const projectId = process.env["FIREBASE_PROJECT_ID"] ?? "candid-431db";
+  const projectId = process.env["FIREBASE_PROJECT_ID"] ?? "candid-bbef5";
   const clientEmail = process.env["FIREBASE_CLIENT_EMAIL"];
   const privateKey = process.env["FIREBASE_PRIVATE_KEY"];
   if (!clientEmail || !looksLikeKey(privateKey)) {
@@ -99,7 +99,7 @@ let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 export function getFirebaseAuth() {
   return {
     async verifyIdToken(token: string) {
-      const projectId = process.env["FIREBASE_PROJECT_ID"] ?? "candid-431db";
+      const projectId = process.env["FIREBASE_PROJECT_ID"] ?? "candid-bbef5";
       jwks ??= createRemoteJWKSet(
         new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
       );
