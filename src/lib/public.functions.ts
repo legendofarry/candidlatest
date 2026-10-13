@@ -13,9 +13,7 @@ import {
 function isFirebaseReadUnavailable(error: unknown) {
   return (
     error instanceof Error &&
-    /PERMISSION_DENIED|Firestore API|Missing Firebase admin|Failed to parse private key|FIREBASE_SERVICE_ACCOUNT_JSON/.test(
-      error.message,
-    )
+    /PERMISSION_DENIED|RESOURCE_EXHAUSTED|Quota exceeded|Firestore request failed \[429\]|Firestore API|Missing Firebase admin|Failed to parse private key|FIREBASE_SERVICE_ACCOUNT_JSON/.test(error.message)
   );
 }
 
