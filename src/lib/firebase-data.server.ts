@@ -2,6 +2,7 @@ const randomUUID = () => crypto.randomUUID();
 import type { DocumentData, QueryDocumentSnapshot } from "./firestore-rest.server";
 import { getFirestoreDb } from "./firebase.server";
 import { getEffectiveMembershipTier, type MembershipSource } from "./membership";
+import { allKenyaAreas, areasForCounty } from "./kenya-locations";
 
 export type CompanyRecord = {
   id: string;
@@ -619,17 +620,52 @@ export async function getFilterOptionsData() {
     ...new Set(companies.map((company) => company.industry).filter(Boolean)),
   ].sort() as string[];
   const counties = [
-    ...new Set(companies.map((company) => company.county).filter(Boolean)),
-  ].sort() as string[];
-  const areas = [
-    ...new Set(
-      stories
-        .filter((story) => story.status === "published")
+    "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", "Homa Bay",
+    "Isiolo", "Kajiado", "Kakamega", "Kericho", "Kiambu", "Kilifi", "Kirinyaga", "Kisii",
+    "Kisumu", "Kitui", "Kwale", "Laikipia", "Lamu", "Machakos", "Makueni", "Mandera",
+    "Marsabit", "Meru", "Migori", "Mombasa", "Murang’a", "Nairobi", "Nakuru", "Nandi",
+    "Narok", "Nyamira", "Nyandarua", "Nyeri", "Samburu", "Siaya", "Taita-Taveta", "Tana River",
+    "Tharaka-Nithi", "Trans Nzoia", "Turkana", "Uasin Gishu", "Vihiga", "Wajir", "West Pokot",
+  ];
+  const publishedStories = stories.filter((story) => story.status === "published");
+  const areasByCounty = Object.fromEntries(
+    counties.map((county) => {
+      const customAreas = publishedStories
+        .filter((story) => normalizeCountyFilter(story.county) === normalizeCountyFilter(county))
         .map((story) => story.area?.trim())
-        .filter((area): area is string => Boolean(area)),
-    ),
-  ].sort((a, b) => a.localeCompare(b));
-  return { companies, industries, counties, areas };
+        .filter((area): area is string => Boolean(area));
+      const byNormalizedArea = new Map<string, string>();
+      for (const area of [...areasForCounty(county), ...customAreas]) {
+        const cleaned = area.trim().replace(/\s+/g, " ");
+        if (cleaned && !byNormalizedArea.has(cleaned.toLocaleLowerCase())) {
+          byNormalizedArea.set(cleaned.toLocaleLowerCase(), cleaned);
+        }
+      }
+      return [county, [...byNormalizedArea.values()].sort((a, b) => a.localeCompare(b))];
+    }),
+  ) as Record<string, string[]>;
+  const areaLabels = new Map<string, string>();
+  for (const area of [
+    ...allKenyaAreas(),
+    ...publishedStories
+      .map((story) => story.area?.trim())
+      .filter((area): area is string => Boolean(area)),
+  ]) {
+    const cleaned = area.trim().replace(/\s+/g, " ");
+    if (cleaned && !areaLabels.has(cleaned.toLocaleLowerCase())) {
+      areaLabels.set(cleaned.toLocaleLowerCase(), cleaned);
+    }
+  }
+  const areas = [...areaLabels.values()].sort((a, b) => a.localeCompare(b));
+  return { companies, industries, counties, areas, areasByCounty };
+}
+
+function normalizeCountyFilter(value: string | null | undefined) {
+  return (value ?? "")
+    .trim()
+    .toLocaleLowerCase()
+    .replace(/[’‘]/g, "'")
+    .replace(/\s+(city\s+)?county$/i, "");
 }
 
 export async function getPublicStories(input: {
@@ -659,8 +695,15 @@ export async function getPublicStories(input: {
   const publicStories = stories
     .filter((story) => story.status === "published")
     .filter((story) => (input.industry ? story.industry === input.industry : true))
-    .filter((story) => (input.county ? story.county === input.county : true))
-    .filter((story) => (input.area ? story.area?.trim() === input.area : true))
+    .filter((story) =>
+      input.county ? normalizeCountyFilter(story.county) === normalizeCountyFilter(input.county) : true,
+    )
+    .filter((story) =>
+      input.area
+        ? (story.area ?? "").trim().replace(/\s+/g, " ").toLocaleLowerCase() ===
+          input.area.trim().replace(/\s+/g, " ").toLocaleLowerCase()
+        : true,
+    )
     .filter((story) => (input.companySlug ? story.company_slug === input.companySlug : true))
     .filter((story) => (input.reason ? (story.reasons ?? []).includes(input.reason) : true))
     .map<PublicStoryRecord>((story) => {

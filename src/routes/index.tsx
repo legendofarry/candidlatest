@@ -84,6 +84,7 @@ function FeedPage() {
     queryFn: () => listStories({ data: { sort, industry, county, area } }),
     ...(isDefaultView ? { initialData: initialFeed } : {}),
   });
+  const areaOptions = county ? (filters.areasByCounty[county] ?? []) : filters.areas;
 
   const needle = q.trim().toLowerCase();
   const stories = (data?.stories ?? []).filter((story) =>
@@ -219,7 +220,7 @@ function FeedPage() {
               setArea(null);
               setSort("new");
             }}
-            centerFiltersOnMobile
+            collapsibleFilters
             filters={[
               {
                 id: "sort",
@@ -242,13 +243,16 @@ function FeedPage() {
                 label: "County",
                 value: county,
                 options: filters.counties,
-                onChange: setCounty,
+                onChange: (next) => {
+                  setCounty(next);
+                  setArea(null);
+                },
               },
               {
                 id: "area",
                 label: "Area",
                 value: area,
-                options: filters.areas,
+                options: areaOptions,
                 onChange: setArea,
               },
             ]}

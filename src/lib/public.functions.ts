@@ -68,7 +68,7 @@ export const getFilterOptions = createServerFn({ method: "GET" }).handler(async 
     console.error("[getFilterOptions] Full error:", error);
     if (!isFirebaseReadUnavailable(error)) throw error;
     console.warn("[getFilterOptions] Firebase public read unavailable", error);
-    return { companies: [], industries: [], counties: [], areas: [] };
+    return { companies: [], industries: [], counties: [], areas: [], areasByCounty: {} };
   }
 });
 

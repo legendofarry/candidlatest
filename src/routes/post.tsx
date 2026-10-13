@@ -12,6 +12,7 @@ import {
   Image as ImageIcon,
   Lock,
   LoaderCircle,
+  MapPin,
   Paperclip,
   Save,
   ShieldCheck,
@@ -42,6 +43,7 @@ import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { cn } from "@/lib/utils";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { allKenyaAreas, areasForCounty } from "@/lib/kenya-locations";
 
 const filtersQuery = queryOptions({ queryKey: ["filters"], queryFn: () => getFilterOptions() });
 
@@ -146,6 +148,7 @@ function PostPage() {
   const [county, setCounty] = useState("");
   const [area, setArea] = useState("");
   const [companyMapUrl, setCompanyMapUrl] = useState("");
+  const [pinningLocation, setPinningLocation] = useState(false);
   const [reasons, setReasons] = useState<string[]>([]);
   const [customReason, setCustomReason] = useState("");
   const [tenure, setTenure] = useState("");
@@ -415,6 +418,28 @@ function PostPage() {
   const steps = ["Employer", "What happened", "Your role", "Your story", "Review"];
 
   const matches = findCompanyMatches(companyName, filters.companies, 5);
+  const areaSuggestions = county ? areasForCounty(county) : allKenyaAreas();
+
+  function pinCurrentLocation() {
+    if (!navigator.geolocation) {
+      toast.error("Location pinning is not available in this browser.");
+      return;
+    }
+    setPinningLocation(true);
+    navigator.geolocation.getCurrentPosition(
+      ({ coords }) => {
+        const coordinates = `${coords.latitude.toFixed(5)},${coords.longitude.toFixed(5)}`;
+        setCompanyMapUrl(`https://maps.google.com/?q=${coordinates}`);
+        setPinningLocation(false);
+        toast.success("Private location pin added to your story.");
+      },
+      () => {
+        setPinningLocation(false);
+        toast.error("Could not get your location. Check your browser permission and try again.");
+      },
+      { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 },
+    );
+  }
   const exactMatch = matches.some((m) => m.name.toLowerCase() === companyName.trim().toLowerCase());
 
   function saveDraft() {
@@ -770,25 +795,46 @@ function PostPage() {
                           id="work-area"
                           value={area}
                           onChange={(event) => setArea(event.target.value)}
+                          list="candid-work-areas"
                           maxLength={100}
-                          placeholder="e.g. Westlands, Industrial Area"
+                          placeholder="Choose a suggestion or type an area"
                         />
+                        <datalist id="candid-work-areas">
+                          {areaSuggestions.map((suggestion) => (
+                            <option key={suggestion} value={suggestion} />
+                          ))}
+                        </datalist>
                         <p className="text-xs text-muted-foreground">
-                          Leave this blank if it could identify you.
+                          Suggestions follow your county. You can enter another area or leave it blank.
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="company-map">Google Maps link (optional)</Label>
-                        <Input
-                          id="company-map"
-                          value={companyMapUrl}
-                          onChange={(event) => setCompanyMapUrl(event.target.value)}
-                          maxLength={500}
-                          placeholder="https://maps.google.com/..."
-                        />
+                        <Label htmlFor="company-map">Company map pin (optional)</Label>
+                        <div className="flex gap-2">
+                          <Input
+                            id="company-map"
+                            value={companyMapUrl}
+                            onChange={(event) => setCompanyMapUrl(event.target.value)}
+                            maxLength={500}
+                            placeholder="Paste a Google Maps link"
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={pinningLocation}
+                            onClick={pinCurrentLocation}
+                            className="shrink-0"
+                          >
+                            {pinningLocation ? (
+                              <LoaderCircle className="size-4 animate-spin" />
+                            ) : (
+                              <MapPin className="size-4" />
+                            )}
+                            <span className="hidden sm:inline">Use location</span>
+                          </Button>
+                        </div>
                         <p className="text-xs text-muted-foreground">
-                          This is a location suggestion for Candid to review. It does not change the
-                          public company location by itself.
+                          The pin is a private suggestion and is not shown on your public story.
                         </p>
                       </div>
                     </>
