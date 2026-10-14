@@ -62,7 +62,7 @@ function BillingPage() {
   return (
     <>
     <main className="min-h-screen bg-background pb-16">
-      <div className="mx-auto w-full max-w-6xl px-5 pt-8 sm:px-8 md:px-12 md:pt-12">
+      <div className="mx-auto w-full max-w-6xl px-2 pt-8 sm:px-6 md:px-12 md:pt-12">
         <header className="max-w-3xl">
           <div className="flex items-center gap-2 text-sm font-medium text-primary"><WalletCards className="size-4" /> Billing &amp; packages</div>
           <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl">{isOfficial ? "Official Candid access" : "Your membership"}</h1>
