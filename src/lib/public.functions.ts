@@ -13,7 +13,9 @@ import {
 function isFirebaseReadUnavailable(error: unknown) {
   return (
     error instanceof Error &&
-    /PERMISSION_DENIED|RESOURCE_EXHAUSTED|Quota exceeded|Firestore request failed \[429\]|Firestore API|Missing Firebase admin|Failed to parse private key|FIREBASE_SERVICE_ACCOUNT_JSON|fetch failed|ETIMEDOUT|ECONNRESET|EAI_AGAIN/.test(error.message)
+    /PERMISSION_DENIED|RESOURCE_EXHAUSTED|Quota exceeded|Firestore request failed \[429\]|Firestore API|Missing Firebase admin|Failed to parse private key|FIREBASE_SERVICE_ACCOUNT_JSON|fetch failed|ETIMEDOUT|ECONNRESET|EAI_AGAIN/.test(
+      error.message,
+    )
   );
 }
 
@@ -78,11 +80,12 @@ export const listCompanyScores = createServerFn({ method: "GET" }).handler(async
         ...company,
         descriptor: company.descriptor ?? null,
       })),
+      error: null as string | null,
     };
   } catch (error) {
     if (!isFirebaseReadUnavailable(error)) throw error;
     console.warn("[listCompanyScores] Firebase public read unavailable", error);
-    return { companies: [] };
+    return { companies: [], error: "Employer information is temporarily unavailable." };
   }
 });
 
@@ -147,11 +150,11 @@ export const getSalaryAggregates = createServerFn({ method: "GET" }).handler(asy
 export const getSalaryCompanies = createServerFn({ method: "GET" }).handler(async () => {
   try {
     const { buildCompanySalaryDirectory } = await import("./firebase-data.server");
-    return { companies: await buildCompanySalaryDirectory() };
+    return { companies: await buildCompanySalaryDirectory(), error: null as string | null };
   } catch (error) {
     if (!isFirebaseReadUnavailable(error)) throw error;
     console.warn("[getSalaryCompanies] Firebase public read unavailable", error);
-    return { companies: [] };
+    return { companies: [], error: "Salary information is temporarily unavailable." };
   }
 });
 

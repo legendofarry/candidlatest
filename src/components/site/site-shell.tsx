@@ -11,6 +11,7 @@ import {
   Loader2,
   MessagesSquare,
   PenLine,
+  Scale,
   Search,
   Settings,
   ShieldAlert,
@@ -77,6 +78,7 @@ const primaryNav = [
 
 const exploreNav = [
   { to: "/salaries", label: "Salary insights", icon: Wallet },
+  { to: "/compare", label: "Compare employers", icon: Scale },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy },
 ] as const;
 
@@ -104,6 +106,7 @@ function nestedTitle(pathname: string) {
       "/rights": "Safety & your rights",
       "/privacy": "Privacy & disclaimer",
       "/leaderboards": "Leaderboards",
+      "/compare": "Compare employers",
       "/messages": "Messages",
     }[pathname] ?? "Back"
   );
@@ -172,7 +175,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/verify-email",
     "/forgot-password",
   ].includes(pathname);
-  const fullscreenRoute = ["/auth", "/onboarding", "/download", "/verify-email", "/forgot-password"].includes(pathname);
+  const fullscreenRoute = [
+    "/auth",
+    "/onboarding",
+    "/download",
+    "/verify-email",
+    "/forgot-password",
+  ].includes(pathname);
   const directConversationRoute = /^\/messages\/[^/]+$/.test(pathname);
   const headerBack =
     (nested && (!standaloneDesktopRoute || pathname === "/support" || pathname === "/settings")) ||
@@ -180,11 +189,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     pathname === "/post";
 
   useEffect(() => {
-    if (
-      !needsEmailVerification ||
-      pathname === "/verify-email" ||
-      pathname === "/auth"
-    ) return;
+    if (!needsEmailVerification || pathname === "/verify-email" || pathname === "/auth") return;
     void navigate({ to: "/verify-email", replace: true });
   }, [needsEmailVerification, pathname, navigate]);
 
@@ -286,10 +291,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           <div className="mx-auto mb-8 flex size-16 items-center justify-center rounded-[1.4rem] border border-primary/25 bg-primary/10 text-primary shadow-lg shadow-primary/10">
             <ShieldAlert className="size-8" strokeWidth={1.7} />
           </div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">Candid account review</p>
-          <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl">Access is paused for now.</h1>
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
+            Candid account review
+          </p>
+          <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
+            Access is paused for now.
+          </h1>
           <p className="mx-auto mt-4 max-w-md text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Your account is under investigation. You can’t use Candid while the review is in progress.
+            Your account is under investigation. You can’t use Candid while the review is in
+            progress.
           </p>
           <button
             type="button"
@@ -307,11 +317,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (
-    needsEmailVerification &&
-    pathname !== "/verify-email" &&
-    pathname !== "/auth"
-  ) {
+  if (needsEmailVerification && pathname !== "/verify-email" && pathname !== "/auth") {
     return (
       <main className="flex min-h-dvh w-full items-center justify-center bg-background px-6 text-foreground">
         <Loader2 className="mr-3 size-5 animate-spin text-primary" />

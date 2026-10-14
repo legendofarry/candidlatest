@@ -1,19 +1,19 @@
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
-import { Download, Flame, Share, X } from "lucide-react";
+import { motion } from "motion/react";
+import { ArrowDownToLine, Check, Flame, Share, Smartphone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { registerFirebaseServiceWorker } from "@/integrations/firebase/client";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
-  DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
 
 const DISMISS_KEY = "candid-install-banner-dismissed-at";
-const COOLDOWN_MS = 7 * 24 * 60 * 60 * 1000;
+const INSTALLED_KEY = "candid-pwa-installed";
+const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -34,6 +34,11 @@ function isPreviewOrLocal() {
 }
 
 function isInstalled() {
+  try {
+    if (localStorage.getItem(INSTALLED_KEY) === "true") return true;
+  } catch {
+    // The browser's display mode check below still works without storage.
+  }
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
     ("standalone" in navigator && navigator.standalone === true)
@@ -50,6 +55,7 @@ export function InstallBanner() {
   const [open, setOpen] = useState(false);
   const [iosInstructions, setIosInstructions] = useState(false);
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
+  const [installError, setInstallError] = useState(false);
 
   useEffect(() => {
     const capturePrompt = (event: Event) => {
@@ -57,6 +63,11 @@ export function InstallBanner() {
       setPromptEvent(event as InstallPromptEvent);
     };
     const installed = () => {
+      try {
+        localStorage.setItem(INSTALLED_KEY, "true");
+      } catch {
+        // The browser's standalone display mode remains the source of truth.
+      }
       setOpen(false);
       setPromptEvent(null);
     };
@@ -108,45 +119,125 @@ export function InstallBanner() {
 
   async function install() {
     if (!promptEvent) return;
+    setInstallError(false);
     try {
       await promptEvent.prompt();
       const choice = await promptEvent.userChoice;
-      if (choice.outcome === "accepted") setOpen(false);
-      setPromptEvent(null);
+      if (choice.outcome === "accepted") {
+        try {
+          localStorage.setItem(INSTALLED_KEY, "true");
+        } catch {
+          // The browser's display mode remains the source of truth.
+        }
+        setOpen(false);
+      } else {
+        dismiss();
+      }
+    } catch (error) {
+      console.warn("[PWA] Install prompt failed", error);
+      setInstallError(true);
     } finally {
-      dismiss();
+      setPromptEvent(null);
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : dismiss())}>
-      <DialogContent className="max-w-sm rounded-3xl">
-        <DialogHeader className="text-left">
-          <span className="mb-1 flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-            <Flame className="size-6" />
-          </span>
-          <DialogTitle className="font-display text-2xl">Install Candid?</DialogTitle>
-          <DialogDescription>
-            Keep workplace stories one tap away with Candid on your home screen.
-          </DialogDescription>
-        </DialogHeader>
-        {iosInstructions ? (
-          <p className="rounded-2xl bg-secondary/60 p-4 text-sm leading-6 text-muted-foreground">
-            Tap <Share className="mx-1 inline size-4 align-[-3px]" aria-label="Share" /> Share in
-            your browser, then choose{" "}
-            <strong className="text-foreground">Add to Home Screen</strong>.
-          </p>
-        ) : null}
-        <DialogFooter className="gap-2 sm:flex-row sm:justify-end">
-          <Button variant="ghost" onClick={dismiss}>
-            <X className="size-4" /> Not now
-          </Button>
-          {promptEvent ? (
-            <Button onClick={() => void install()} className="glow-primary">
-              <Download className="size-4" /> Install app
-            </Button>
-          ) : null}
-        </DialogFooter>
+      <DialogContent
+        aria-describedby="install-candid-description"
+        className="fixed inset-x-0 bottom-0 top-auto left-0 z-[100] grid max-h-[calc(100dvh-0.5rem)] w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-t-[2rem] border-border/70 bg-background p-0 shadow-[0_-24px_80px_-24px_rgba(0,0,0,0.45)] duration-300 data-[state=closed]:slide-out-to-bottom-5 data-[state=open]:slide-in-from-bottom-5 sm:inset-auto sm:left-[50%] sm:top-[50%] sm:bottom-auto sm:max-h-[90vh] sm:max-w-[460px] sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-[2rem] sm:data-[state=closed]:zoom-out-95 sm:data-[state=open]:zoom-in-95"
+        hideCloseButton
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 28, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ type: "spring", stiffness: 340, damping: 30 }}
+          className="relative max-h-[calc(100dvh-0.5rem)] overflow-y-auto overscroll-contain sm:max-h-[90vh]"
+        >
+          <div className="pointer-events-none absolute -right-20 -top-24 size-64 rounded-full bg-primary/15 blur-3xl" />
+          <div className="pointer-events-none absolute -left-24 top-28 size-52 rounded-full bg-cyan-400/10 blur-3xl" />
+
+          <div className="relative px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:p-7">
+            <div className="mx-auto mb-5 h-1.5 w-11 rounded-full bg-muted-foreground/25 sm:hidden" />
+
+            <div className="mb-6 flex items-start justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <img
+                  src="/icons/icon-192.png"
+                  alt=""
+                  className="size-14 rounded-[1.15rem] shadow-lg shadow-primary/10 ring-1 ring-border/60"
+                />
+                <div>
+                  <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                    <Flame className="size-3.5" /> Candid, one tap away
+                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">A little more at home.</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={dismiss}
+                aria-label="Not now"
+                className="-mr-2 -mt-1 inline-flex size-10 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-muted hover:text-foreground"
+              >
+                <X className="size-5" />
+              </button>
+            </div>
+
+            <div className="mb-6">
+              <DialogTitle className="font-display text-[1.65rem] font-bold tracking-tight sm:text-3xl">
+                Install Candid
+              </DialogTitle>
+              <DialogDescription id="install-candid-description" className="mt-2 max-w-sm text-sm leading-6">
+                Open workplace stories from your home screen, with a faster app-like experience.
+              </DialogDescription>
+            </div>
+
+            {iosInstructions ? (
+              <div className="mb-5 rounded-2xl border border-border/70 bg-muted/50 p-4">
+                <div className="mb-2 flex items-center gap-2 font-semibold">
+                  <Smartphone className="size-4 text-primary" /> Add Candid to your home screen
+                </div>
+                <p className="text-sm leading-6 text-muted-foreground">
+                  Tap <Share className="mx-1 inline size-4 align-[-3px]" aria-label="Share" />
+                  Share in your browser, then choose{" "}
+                  <strong className="text-foreground">Add to Home Screen</strong>.
+                </p>
+              </div>
+            ) : (
+              <div className="mb-5 flex items-center gap-3 rounded-2xl border border-border/70 bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <Check className="size-4" />
+                </span>
+                <span>Free to install. Remove it any time.</span>
+              </div>
+            )}
+
+            {installError ? (
+              <p role="status" className="mb-4 text-sm text-destructive">
+                Your browser couldn’t open the install prompt. You can try again later from the browser menu.
+              </p>
+            ) : null}
+
+            <div className="flex flex-col gap-2 sm:flex-row-reverse">
+              {promptEvent ? (
+                <Button onClick={() => void install()} className="h-12 flex-1 rounded-2xl text-base glow-primary">
+                  <ArrowDownToLine className="size-4" /> Add to home screen
+                </Button>
+              ) : iosInstructions ? (
+                <Button onClick={dismiss} className="h-12 flex-1 rounded-2xl text-base glow-primary">
+                  Got it
+                </Button>
+              ) : null}
+              <Button variant="ghost" onClick={dismiss} className="h-12 rounded-2xl text-muted-foreground">
+                Not now
+              </Button>
+            </div>
+            <p className="mt-4 text-center text-xs text-muted-foreground/75">
+              {"We’ll remember your choice for 30 days."}
+            </p>
+          </div>
+        </motion.div>
       </DialogContent>
     </Dialog>
   );

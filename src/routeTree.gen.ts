@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as BillingRouteImport } from './routes/billing'
+import { Route as CompareRouteImport } from './routes/compare'
 import { Route as DownloadRouteImport } from './routes/download'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as GuidelinesRouteImport } from './routes/guidelines'
@@ -65,6 +66,11 @@ const AuthRoute = AuthRouteImport.update({
 const BillingRoute = BillingRouteImport.update({
   id: '/billing',
   path: '/billing',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompareRoute = CompareRouteImport.update({
+  id: '/compare',
+  path: '/compare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DownloadRoute = DownloadRouteImport.update({
@@ -238,6 +244,7 @@ export interface FileRoutesByFullPath {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/billing': typeof BillingRouteWithChildren
+  '/compare': typeof CompareRoute
   '/download': typeof DownloadRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
@@ -277,6 +284,7 @@ export interface FileRoutesByTo {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/billing': typeof BillingRouteWithChildren
+  '/compare': typeof CompareRoute
   '/download': typeof DownloadRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
@@ -316,6 +324,7 @@ export interface FileRoutesById {
   '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/billing': typeof BillingRouteWithChildren
+  '/compare': typeof CompareRoute
   '/download': typeof DownloadRoute
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
@@ -357,6 +366,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/billing'
+    | '/compare'
     | '/download'
     | '/forgot-password'
     | '/guidelines'
@@ -396,6 +406,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/billing'
+    | '/compare'
     | '/download'
     | '/forgot-password'
     | '/guidelines'
@@ -434,6 +445,7 @@ export interface FileRouteTypes {
     | '/about'
     | '/auth'
     | '/billing'
+    | '/compare'
     | '/download'
     | '/forgot-password'
     | '/guidelines'
@@ -474,6 +486,7 @@ export interface RootRouteChildren {
   AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
   BillingRoute: typeof BillingRouteWithChildren
+  CompareRoute: typeof CompareRoute
   DownloadRoute: typeof DownloadRoute
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   GuidelinesRoute: typeof GuidelinesRoute
@@ -534,6 +547,13 @@ declare module '@tanstack/react-router' {
       path: '/billing'
       fullPath: '/billing'
       preLoaderRoute: typeof BillingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/compare': {
+      id: '/compare'
+      path: '/compare'
+      fullPath: '/compare'
+      preLoaderRoute: typeof CompareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/download': {
@@ -800,6 +820,7 @@ const rootRouteChildren: RootRouteChildren = {
   AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
   BillingRoute: BillingRouteWithChildren,
+  CompareRoute: CompareRoute,
   DownloadRoute: DownloadRoute,
   ForgotPasswordRoute: ForgotPasswordRoute,
   GuidelinesRoute: GuidelinesRoute,

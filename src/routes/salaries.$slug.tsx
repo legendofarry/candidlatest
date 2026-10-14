@@ -117,6 +117,11 @@ function CompanySalaryPage() {
         >
           See stories and culture score →
         </Link>
+        <p className="mt-3 max-w-3xl rounded-xl border border-border bg-secondary/30 p-3 text-xs leading-5 text-muted-foreground">
+          These are member-reported figures in KES, grouped by role title. Reports don’t currently
+          record experience level, gross/net status or pay period, so figures may not be directly
+          comparable between people or employers.
+        </p>
       </header>
 
       <div className="overflow-hidden rounded-2xl border border-border">

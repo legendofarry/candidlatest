@@ -9,6 +9,7 @@ import {
   MessagesSquare,
   PenLine,
   Search,
+  Scale,
   Settings,
   Trophy,
   UserRound,
@@ -29,6 +30,12 @@ type DockSheet = "you" | null;
 
 const moreLinks = [
   { to: "/search", label: "Search", icon: Search, hint: "Find a story or employer" },
+  {
+    to: "/compare",
+    label: "Compare employers",
+    icon: Scale,
+    hint: "Review employers side by side",
+  },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy, hint: "Most discussed workplaces" },
   { to: "/support", label: "Help & support", icon: Headset, hint: "FAQs, email and WhatsApp" },
 ] as const;

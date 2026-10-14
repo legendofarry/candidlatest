@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Building2, Search } from "lucide-react";
+import { Building2, Scale, Search } from "lucide-react";
 import { listCompanyScores } from "@/lib/public.functions";
 import { FilterBar } from "@/components/site/filter-bar";
 import { cn } from "@/lib/utils";
@@ -68,11 +68,20 @@ function CompaniesPage() {
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-3xl font-semibold md:text-4xl">Company directory</h1>
-        <p className="mt-2 max-w-2xl text-muted-foreground">
-          Every employer Kenyans have tagged here, with culture scores from member ratings and
-          AI-researched background.
-        </p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-semibold md:text-4xl">Company directory</h1>
+            <p className="mt-2 max-w-2xl text-muted-foreground">
+              Every employer Kenyans have tagged here, with culture scores from member ratings and
+              AI-researched background.
+            </p>
+          </div>
+          <Button asChild variant="outline" className="shrink-0">
+            <Link to="/compare">
+              <Scale className="size-4" /> Compare employers
+            </Link>
+          </Button>
+        </div>
       </header>
 
       <FilterBar
