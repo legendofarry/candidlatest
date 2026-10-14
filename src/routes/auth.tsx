@@ -16,7 +16,12 @@ import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { useAuth } from "@/hooks/useAuth";
-import { requiresEmailVerification, verificationActionSettings } from "@/lib/email-verification";
+import {
+  firebaseAuthErrorCode,
+  requiresEmailVerification,
+  verificationActionSettings,
+  verificationEmailErrorMessage,
+} from "@/lib/email-verification";
 
 export const Route = createFileRoute("/auth")({
   head: () => ({
@@ -180,9 +185,15 @@ function AuthPage() {
           await sendEmailVerification(credential.user, verificationActionSettings());
           window.sessionStorage.setItem("candid:verification-email", "sent");
         } catch (error) {
-          window.sessionStorage.setItem("candid:verification-email", "failed");
-          console.error("Could not send email verification", error);
-          toast.error("Your account is ready, but we couldn’t send the email yet. You can retry on the verification screen.");
+          const code = firebaseAuthErrorCode(error);
+          window.sessionStorage.setItem(
+            "candid:verification-email",
+            code ? `failed:${code}` : "failed",
+          );
+          console.error("Could not send email verification", code || error);
+          toast.error("Your account is ready, but the verification email could not be requested.", {
+            description: verificationEmailErrorMessage(error),
+          });
         }
         navigate({ to: "/verify-email" });
         return;
