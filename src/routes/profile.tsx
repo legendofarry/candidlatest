@@ -7,12 +7,13 @@ import {
   BadgeCheck,
   ChevronRight,
   Clock3,
+  Link2,
   LogOut,
   MessageSquare,
   PenLine,
   Settings,
   ShieldCheck,
-  UserRound,
+  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,9 +34,10 @@ import { FollowedStories } from "@/components/site/followed-stories";
 import { useAuth } from "@/hooks/useAuth";
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
-import { ProfileAvatar, ProfilePhotoPicker } from "@/components/site/profile-photo";
+import { ProfileAvatar, ProfileCoverPicker, ProfilePhotoPicker } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { getMyContributions } from "@/lib/social.functions";
+import { getPublicProfile } from "@/lib/messaging.functions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/profile")({
@@ -72,6 +74,12 @@ function ProfilePage() {
     queryKey: ["my-contributions", user?.uid ?? null],
     queryFn: () => fetchContributions(),
     enabled: Boolean(user),
+  });
+  const fetchPublicProfile = useServerFn(getPublicProfile);
+  const publicProfile = useQuery({
+    queryKey: ["my-public-profile", user?.uid ?? null, onboarding.data?.username ?? null],
+    queryFn: () => fetchPublicProfile({ data: { username: onboarding.data?.username ?? "" } }),
+    enabled: Boolean(user && onboarding.data?.username),
   });
 
   // Some accounts never got classified at signup. After a week we ask directly,
@@ -143,65 +151,54 @@ function ProfilePage() {
     : null;
 
   return (
-    <div className="min-h-screen bg-background md:h-dvh md:overflow-hidden">
+    <div className="min-h-screen bg-background">
       <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
-      <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-2">
-        <section className="relative hidden overflow-hidden border-r border-border bg-[linear-gradient(145deg,#18312d_0%,#18272c_58%,#292c24_100%)] px-12 py-20 text-white md:flex md:h-dvh md:items-center">
-          <motion.div
-            initial={{ opacity: 0, x: -18 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ duration: 0.5, ease: "easeOut" }}
-            className="mx-auto w-full max-w-lg"
-          >
-            <div className="flex items-center gap-2 text-sm font-medium text-emerald-200">
-              <ShieldCheck className="size-4" /> Member identity
-            </div>
-            <h2 className="mt-5 max-w-md text-4xl font-semibold leading-tight">
-              Your voice stays private. Your impact stays visible.
-            </h2>
-            <p className="mt-3 max-w-md text-base leading-7 text-white/70">
-              Keep track of the stories you follow and manage the public details people can see.
-            </p>
-            <div className="relative mt-14 flex h-64 items-center justify-center">
-              <motion.div
-                className="absolute flex size-48 items-center justify-center rounded-full border border-emerald-200/20"
-                animate={{ rotate: 360 }}
-                transition={{ duration: 28, repeat: Infinity, ease: "linear" }}
-              >
-                <span className="absolute left-5 top-6 size-3 rounded-full bg-emerald-300" />
-                <span className="absolute bottom-5 right-7 size-2 rounded-full bg-amber-200" />
-              </motion.div>
-              <motion.div
-                className="relative flex size-32 items-center justify-center rounded-3xl border border-white/15 bg-white/[0.08] text-emerald-200 shadow-2xl backdrop-blur"
-                animate={{ y: [0, -8, 0] }}
-                transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <UserRound className="size-14" />
-                <span className="absolute -bottom-3 -right-3 flex size-11 items-center justify-center rounded-xl border border-white/15 bg-[#1a2927] text-amber-200">
-                  <ShieldCheck className="size-5" />
-                </span>
-              </motion.div>
-            </div>
-          </motion.div>
-        </section>
-        <section className="min-h-screen overflow-y-auto px-5 py-5 md:flex md:h-dvh md:min-h-0 md:flex-col md:px-10 md:py-10">
+      <section className="min-h-screen px-3 py-4 sm:px-5 md:px-8 md:py-8">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.45, ease: "easeOut" }}
-            className="my-auto mx-auto w-full max-w-3xl space-y-5 pb-6 md:space-y-6"
+            className="mx-auto w-full max-w-5xl space-y-4 pb-8 md:space-y-6"
           >
             <motion.section
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.06, ease: "easeOut" }}
-              className="border-b border-border pb-5 md:glass-card md:rounded-2xl md:border md:border-border md:p-6"
+              className="relative overflow-hidden rounded-3xl border border-border bg-card pb-4 shadow-sm md:glass-card md:p-0"
             >
-              <div className="flex items-center gap-4">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ duration: 0.5 }}
+                className="relative h-36 overflow-hidden sm:h-48 md:h-64"
+              >
+                <ProfileCoverPicker
+                  coverUrl={onboarding.data?.coverUrl}
+                  editable={Boolean(user)}
+                  onSaved={(coverUrl) => {
+                    queryClient.setQueryData(
+                      ["onboarding-state", user?.uid ?? null],
+                      (previous: unknown) =>
+                        previous && typeof previous === "object"
+                          ? { ...previous, coverUrl }
+                          : previous,
+                    );
+                    void queryClient.invalidateQueries({ queryKey: ["public-profile"] });
+                  }}
+                />
+              </motion.div>
+              <div className="relative px-4 pb-4 sm:px-6 md:px-8 md:pb-6">
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, delay: 0.08 }}
+                className="-mt-10 flex flex-wrap items-end gap-3 sm:-mt-12 sm:flex-nowrap sm:gap-4"
+              >
                 {user ? (
                   <ProfilePhotoPicker
                     compact
                     avatarOnly
+                    avatarClassName="size-16 border-4 border-card shadow-lg md:size-20"
                     photoUrl={onboarding.data?.photoUrl}
                     initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
                     onSaved={(photoUrl) => {
@@ -212,13 +209,14 @@ function ProfilePage() {
                             ? { ...previous, photoUrl }
                             : previous,
                       );
+                      void queryClient.invalidateQueries({ queryKey: ["public-profile"] });
                     }}
                   />
                 ) : (
                   <ProfileAvatar
                     photoUrl={onboarding.data?.photoUrl}
                     initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
-                    className="size-14 shrink-0 md:size-16"
+                    className="size-16 shrink-0 border-4 border-card shadow-lg md:size-20"
                   />
                 )}
                 <div className="min-w-0">
@@ -249,7 +247,7 @@ function ProfilePage() {
                     {loading
                       ? "Checking your session…"
                       : user
-                        ? "Signed in · your identity is never shown publicly"
+                        ? "Your Candid identity"
                         : "Not signed in"}
                   </p>
                 </div>
@@ -265,7 +263,7 @@ function ProfilePage() {
                     <Link to="/auth">Sign in</Link>
                   </Button>
                 ) : null}
-              </div>
+              </motion.div>
               {user ? (
                 <div className="mt-4 space-y-4 border-t border-border pt-4">
                   {onboarding.data?.username ? (
@@ -295,18 +293,6 @@ function ProfilePage() {
                   ) : null}
                 </div>
               ) : null}
-              {socialLinks.length > 0 ? (
-                <div className="mt-4 flex flex-wrap gap-2">
-                  {socialLinks.map(([key, value]) => (
-                    <span
-                      key={key}
-                      className="rounded-full border border-border px-3 py-1 text-xs text-muted-foreground"
-                    >
-                      <span className="capitalize text-foreground">{key}</span> · {value}
-                    </span>
-                  ))}
-                </div>
-              ) : null}
               {verification.data?.canClaim ? (
                 <div className="mt-4 flex flex-wrap items-center gap-3 border-l-2 border-primary/40 py-2 pl-3 md:rounded-xl md:border md:border-primary/30 md:bg-primary/5 md:p-3">
                   <BadgeCheck className="size-5 shrink-0 text-primary" />
@@ -333,11 +319,60 @@ function ProfilePage() {
               <div className="mt-4 flex items-start gap-3 border-l-2 border-verified/35 py-2 pl-3 md:mt-5 md:rounded-xl md:border md:border-verified/15 md:bg-verified/5 md:p-4">
                 <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verified" />
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Your email is only used to sign in. Your Candid handle appears on stories and
-                  comments; individual votes are never shown.
+                  Your email is only used to sign in. Your Candid handle, profile photo, and cover
+                  image are public; avoid images that could identify you. Individual votes are
+                  never shown.
                 </p>
               </div>
+              </div>
             </motion.section>
+
+            {user ? (
+              <motion.section
+                initial={{ opacity: 0, y: 12 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4, delay: 0.12 }}
+                className="grid grid-cols-3 gap-2 sm:gap-3"
+              >
+                <ProfileStat
+                  icon={<Users className="size-4 text-primary" />}
+                  value={publicProfile.data?.followers ?? (publicProfile.isLoading ? "—" : 0)}
+                  label="Followers"
+                />
+                <ProfileStat
+                  icon={<Users className="size-4 text-primary" />}
+                  value={publicProfile.data?.following ?? (publicProfile.isLoading ? "—" : 0)}
+                  label="Following"
+                />
+                <ProfileStat
+                  icon={<MessageSquare className="size-4 text-primary" />}
+                  value={contributions.data?.active.stories.length ?? (contributions.isLoading ? "—" : 0)}
+                  label="Stories"
+                />
+              </motion.section>
+            ) : null}
+
+            {socialLinks.length > 0 ? (
+              <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+                <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                  Links
+                </h2>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {socialLinks.map(([key, value]) => (
+                    <a
+                      key={key}
+                      href={value ?? undefined}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center gap-2 rounded-full bg-secondary/70 px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+                    >
+                      <Link2 className="size-3.5" />
+                      <span className="capitalize">{key}</span>
+                    </a>
+                  ))}
+                </div>
+              </section>
+            ) : null}
 
             <FollowedStories />
 
@@ -443,7 +478,6 @@ function ProfilePage() {
             </AlertDialog>
           </motion.div>
         </section>
-      </div>
     </div>
   );
 }
@@ -458,6 +492,23 @@ function SettingsGroup({ title, children }: { title: string; children: React.Rea
         {children}
       </div>
     </section>
+  );
+}
+
+function ProfileStat({
+  icon,
+  value,
+  label,
+}: {
+  icon: React.ReactNode;
+  value: number | string;
+  label: string;
+}) {
+  return (
+    <div className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
+      <div className="flex items-center gap-2">{icon}<span className="text-xl font-semibold tabular-nums sm:text-2xl">{value}</span></div>
+      <p className="mt-1 text-[11px] text-muted-foreground sm:text-sm">{label}</p>
+    </div>
   );
 }
 

@@ -69,9 +69,9 @@ function SupportPage() {
   const update = (key: keyof typeof form, value: string) =>
     setForm((current) => ({ ...current, [key]: value }));
   return (
-    <div className="min-h-screen w-full bg-[radial-gradient(circle_at_top_left,_rgba(96,165,250,0.18),_transparent_24%),radial-gradient(circle_at_bottom_right,_rgba(168,85,247,0.14),_transparent_28%),hsl(var(--background))] md:h-dvh md:overflow-hidden">
-      <div className="relative min-h-screen w-full overflow-hidden border-0 bg-card/85 shadow-2xl backdrop-blur-xl md:h-dvh md:min-h-0">
-        <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
+    <div className="min-h-dvh w-full bg-background md:h-dvh md:overflow-hidden">
+      <div className="relative min-h-dvh w-full overflow-hidden bg-background md:h-dvh md:min-h-0 md:bg-card/85 md:shadow-2xl md:backdrop-blur-xl">
+        <div className="grid min-h-dvh md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(140deg,#182c31_0%,#20272d_55%,#29251f_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, x: -18 }}
@@ -114,24 +114,27 @@ function SupportPage() {
             </motion.div>
           </div>
 
-          <div className="overflow-y-auto p-5 md:h-dvh md:min-h-0 md:p-8">
-            <div className="mx-auto max-w-3xl py-10 md:py-12">
-              <header className="rounded-3xl bg-secondary/70 p-7 md:p-10">
-                <Headset className="size-8 text-primary" />
-                <h1 className="mt-4 font-display text-3xl font-semibold tracking-tight md:text-4xl">
-                  Help & support
-                </h1>
-                <p className="mt-2 max-w-xl text-muted-foreground">
-                  Questions, corrections, a concern about a story, or help with your account — we’re
-                  here.
-                </p>
+          <div className="overflow-y-auto px-4 py-4 md:h-dvh md:min-h-0 md:p-8">
+            <div className="mx-auto max-w-3xl py-1 md:py-4">
+              <header className="flex items-center gap-3 rounded-2xl bg-secondary/60 p-4 sm:p-5 md:rounded-3xl md:p-10">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10">
+                  <Headset className="size-5 text-primary" />
+                </span>
+                <div>
+                  <h1 className="font-display text-xl font-semibold tracking-tight md:text-4xl">
+                    Help & support
+                  </h1>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Questions about your account, a story, or privacy? We’re here.
+                  </p>
+                </div>
               </header>
-              <section className="mt-8">
-                <h2 className="font-display text-2xl font-semibold">Common questions</h2>
+              <section className="mt-5 md:mt-8">
+                <h2 className="font-display text-lg font-semibold md:text-2xl">Common questions</h2>
                 <Accordion
                   type="single"
                   collapsible
-                  className="mt-3 rounded-2xl border border-border px-4"
+                  className="mt-2 rounded-2xl border border-border px-3 sm:px-4"
                 >
                   {faqs.map(({ question, answer }) => (
                     <AccordionItem value={question} key={question}>
@@ -143,44 +146,44 @@ function SupportPage() {
                   ))}
                 </Accordion>
               </section>
-              <section className="mt-8 grid gap-3 sm:grid-cols-2">
+              <section className="mt-4 grid grid-cols-2 gap-2 md:mt-8 md:gap-3">
                 <a
                   href="mailto:moderation.mails.go@gmail.com"
-                  className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/50"
+                  className="flex items-center gap-2 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/50 md:rounded-2xl md:p-5"
                 >
-                  <Mail className="size-5 text-primary" />
-                  <h2 className="mt-3 font-semibold">Email us</h2>
+                  <Mail className="size-4 shrink-0 text-primary" />
+                  <h2 className="text-sm font-semibold">Email us</h2>
                 </a>
                 <a
                   href="https://wa.me/254715938110?text=Hi%20Candid%20team%2C%20I%20need%20help%20with%20…"
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-2xl border border-border bg-card p-5 transition-colors hover:border-primary/50"
+                  className="flex items-center gap-2 rounded-xl border border-border bg-card p-3 transition-colors hover:border-primary/50 md:rounded-2xl md:p-5"
                 >
-                  <MessageCircle className="size-5 text-primary" />
-                  <h2 className="mt-3 font-semibold">WhatsApp</h2>
+                  <MessageCircle className="size-4 shrink-0 text-primary" />
+                  <h2 className="text-sm font-semibold">WhatsApp</h2>
                 </a>
               </section>
-              <section className="mt-8 border-0 bg-transparent p-0 md:rounded-3xl md:border md:border-border md:bg-card md:p-7">
-                <h2 className="font-display text-2xl font-semibold">Send a support ticket</h2>
+              <section className="mt-4 rounded-2xl border border-border bg-card p-4 md:mt-8 md:rounded-3xl md:p-7">
+                <h2 className="font-display text-lg font-semibold md:text-2xl">Send a support ticket</h2>
                 {mutation.isSuccess ? (
                   <p className="mt-5 rounded-xl bg-primary/10 p-4 text-sm text-foreground">
                     Thanks — your ticket is with the team. We’ll get back to you as soon as we can.
                   </p>
                 ) : (
                   <form
-                    className="mt-5 grid gap-4"
+                    className="mt-3 grid gap-3 md:mt-5 md:gap-4"
                     onSubmit={(event) => {
                       event.preventDefault();
                       mutation.mutate();
                     }}
                   >
-                    <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4">
                       <label>
                         <Label htmlFor="support-name">Full name</Label>
                         <Input
                           id="support-name"
-                          className="mt-1.5"
+                          className="mt-1 h-10"
                           required
                           minLength={2}
                           value={form.full_name}
@@ -191,7 +194,7 @@ function SupportPage() {
                         <Label htmlFor="support-contact">Email or phone</Label>
                         <Input
                           id="support-contact"
-                          className="mt-1.5"
+                          className="mt-1 h-10"
                           required
                           value={form.contact}
                           onChange={(e) => update("contact", e.target.value)}
@@ -204,7 +207,7 @@ function SupportPage() {
                         id="support-category"
                         value={form.category}
                         onChange={(e) => update("category", e.target.value)}
-                        className="mt-1.5 flex h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
+                        className="mt-1 flex h-10 w-full rounded-md border border-input bg-transparent px-3 text-sm"
                       >
                         <option value="story">A story or report</option>
                         <option value="account">My account</option>
@@ -218,7 +221,7 @@ function SupportPage() {
                       <Label htmlFor="support-message">Message</Label>
                       <Textarea
                         id="support-message"
-                        className="mt-1.5 min-h-32"
+                        className="mt-1 min-h-24"
                         required
                         minLength={10}
                         maxLength={4000}
@@ -238,7 +241,7 @@ function SupportPage() {
                   </form>
                 )}
               </section>
-              <p className="mt-6 text-center text-sm text-muted-foreground">
+              <p className="mt-4 pb-2 text-center text-xs text-muted-foreground md:mt-6 md:text-sm">
                 Prefer a conversation? Open the chat bubble — we usually reply within a day.
               </p>
             </div>

@@ -825,6 +825,16 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     ]);
   const profile = profileSnap.data() as ProfileRecord | undefined;
   if (!profileSnap.exists || profile?.banned) return null;
+  const followerPreview = await Promise.all(
+    followers.docs.slice(0, 8).map(async (doc) => {
+      const followerId = (doc.data() as { follower_id: string }).follower_id;
+      const followerSnap = await db.collection("profiles").doc(followerId).get();
+      const follower = followerSnap.data() as ProfileRecord | undefined;
+      return follower?.username && !follower.banned
+        ? { id: followerId, username: follower.username, photo_url: follower.photo_url ?? null }
+        : null;
+    }),
+  );
   const messaging =
     viewerId && viewerId !== userId
       ? await canMessage(viewerId, userId)
@@ -835,10 +845,14 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     role_label: profile?.role_label ?? null,
     account_type: profile?.account_type ?? "unknown",
     photo_url: profile?.photo_url ?? null,
+    cover_url: profile?.cover_url ?? null,
     county: profile?.county ?? null,
     socials: profile?.socials ?? null,
     followers: followers.size,
     following: following.size,
+    follower_preview: followerPreview.filter(
+      (entry): entry is NonNullable<typeof entry> => Boolean(entry),
+    ),
     contributions: {
       stories: stories.docs.filter((doc) => (doc.data() as StoryRecord).status === "published")
         .length,
@@ -846,6 +860,22 @@ export async function readPublicProfile(username: string, viewerId: string | nul
         .length,
       joined_at: profile?.onboarded_at ?? profile?.created_at ?? null,
     },
+    stories: stories.docs
+      .map((doc) => doc.data() as StoryRecord)
+      .filter((story) => story.status === "published")
+      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
+      .slice(0, 30)
+      .map((story) => ({
+        id: story.id,
+        title: story.title,
+        body: story.body,
+        company_name: story.company_name,
+        county: story.county,
+        area: story.area ?? null,
+        created_at: story.created_at,
+        comment_count: story.comment_count,
+        likes: story.likes ?? 0,
+      })),
     isFollowing: viewerId
       ? followers.docs.some(
           (doc) => (doc.data() as { follower_id: string }).follower_id === viewerId,

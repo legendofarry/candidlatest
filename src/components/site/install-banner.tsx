@@ -3,17 +3,14 @@ import { useRouterState } from "@tanstack/react-router";
 import { motion } from "motion/react";
 import { ArrowDownToLine, Check, Flame, Share, Smartphone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/useAuth";
 import { registerFirebaseServiceWorker } from "@/integrations/firebase/client";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 const DISMISS_KEY = "candid-install-banner-dismissed-at";
+const LOGIN_SESSION_KEY = "candid-install-prompt-login-session";
 const INSTALLED_KEY = "candid-pwa-installed";
-const COOLDOWN_MS = 30 * 24 * 60 * 60 * 1000;
+const COOLDOWN_MS = 2 * 60 * 1000;
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -49,13 +46,37 @@ function isIosBrowser() {
   return /iphone|ipad|ipod/i.test(navigator.userAgent) && !isInstalled();
 }
 
-/** A first-visit install invitation, backed by the browser's real PWA prompt. */
+/** A recurring install invitation, backed by the browser's real PWA prompt. */
 export function InstallBanner() {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const { user, loading: authLoading } = useAuth();
   const [open, setOpen] = useState(false);
   const [iosInstructions, setIosInstructions] = useState(false);
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
   const [installError, setInstallError] = useState(false);
+  const [loginAt, setLoginAt] = useState(0);
+  const [dismissCycle, setDismissCycle] = useState(0);
+
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      try {
+        sessionStorage.removeItem(LOGIN_SESSION_KEY);
+      } catch {
+        // The two-minute local cooldown still applies if session storage is unavailable.
+      }
+      return;
+    }
+
+    try {
+      if (sessionStorage.getItem(LOGIN_SESSION_KEY) === user.uid) return;
+      sessionStorage.setItem(LOGIN_SESSION_KEY, user.uid);
+      localStorage.removeItem(DISMISS_KEY);
+    } catch {
+      // Login state below still makes the prompt eligible again.
+    }
+    setLoginAt(Date.now());
+  }, [authLoading, user?.uid]);
 
   useEffect(() => {
     const capturePrompt = (event: Event) => {
@@ -94,7 +115,14 @@ export function InstallBanner() {
     if (isPreviewOrLocal() || isInstalled()) return;
     try {
       const dismissedAt = Number(localStorage.getItem(DISMISS_KEY) ?? 0);
-      if (dismissedAt && Date.now() - dismissedAt < COOLDOWN_MS) return;
+      const elapsed = Date.now() - dismissedAt;
+      if (dismissedAt > loginAt && elapsed >= 0 && elapsed < COOLDOWN_MS) {
+        const cooldownTimer = window.setTimeout(
+          () => setDismissCycle((cycle) => cycle + 1),
+          COOLDOWN_MS - elapsed,
+        );
+        return () => window.clearTimeout(cooldownTimer);
+      }
     } catch {
       // Browser storage can be disabled; the invite may still be shown.
     }
@@ -106,7 +134,7 @@ export function InstallBanner() {
       }
     }, 1600);
     return () => window.clearTimeout(timer);
-  }, [pathname, promptEvent]);
+  }, [pathname, promptEvent, loginAt, dismissCycle]);
 
   function dismiss() {
     try {
@@ -115,6 +143,7 @@ export function InstallBanner() {
       // ignore
     }
     setOpen(false);
+    setDismissCycle((cycle) => cycle + 1);
   }
 
   async function install() {
@@ -188,7 +217,10 @@ export function InstallBanner() {
               <DialogTitle className="font-display text-[1.65rem] font-bold tracking-tight sm:text-3xl">
                 Install Candid
               </DialogTitle>
-              <DialogDescription id="install-candid-description" className="mt-2 max-w-sm text-sm leading-6">
+              <DialogDescription
+                id="install-candid-description"
+                className="mt-2 max-w-sm text-sm leading-6"
+              >
                 Open workplace stories from your home screen, with a faster app-like experience.
               </DialogDescription>
             </div>
@@ -196,12 +228,12 @@ export function InstallBanner() {
             {iosInstructions ? (
               <div className="mb-5 rounded-2xl border border-border/70 bg-muted/50 p-4">
                 <div className="mb-2 flex items-center gap-2 font-semibold">
-                  <Smartphone className="size-4 text-primary" /> Add Candid to your home screen
+                  <Smartphone className="size-4 text-primary" /> Add Candid
                 </div>
                 <p className="text-sm leading-6 text-muted-foreground">
                   Tap <Share className="mx-1 inline size-4 align-[-3px]" aria-label="Share" />
                   Share in your browser, then choose{" "}
-                  <strong className="text-foreground">Add to Home Screen</strong>.
+                  <strong className="text-foreground">Install</strong>.
                 </p>
               </div>
             ) : (
@@ -209,32 +241,44 @@ export function InstallBanner() {
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
                   <Check className="size-4" />
                 </span>
-                <span>Free to install. Remove it any time.</span>
+                <span>Remove it any time.</span>
               </div>
             )}
 
             {installError ? (
               <p role="status" className="mb-4 text-sm text-destructive">
-                Your browser couldn’t open the install prompt. You can try again later from the browser menu.
+                Your browser couldn’t open the install prompt. You can try again later from the
+                browser menu.
               </p>
             ) : null}
 
             <div className="flex flex-col gap-2 sm:flex-row-reverse">
               {promptEvent ? (
-                <Button onClick={() => void install()} className="h-12 flex-1 rounded-2xl text-base glow-primary">
-                  <ArrowDownToLine className="size-4" /> Add to home screen
+                <Button
+                  onClick={() => void install()}
+                  className="h-12 flex-1 rounded-2xl text-base glow-primary"
+                >
+                  <ArrowDownToLine className="size-4" />
+                  Install
                 </Button>
               ) : iosInstructions ? (
-                <Button onClick={dismiss} className="h-12 flex-1 rounded-2xl text-base glow-primary">
+                <Button
+                  onClick={dismiss}
+                  className="h-12 flex-1 rounded-2xl text-base glow-primary"
+                >
                   Got it
                 </Button>
               ) : null}
-              <Button variant="ghost" onClick={dismiss} className="h-12 rounded-2xl text-muted-foreground">
+              <Button
+                variant="ghost"
+                onClick={dismiss}
+                className="h-12 rounded-2xl text-muted-foreground"
+              >
                 Not now
               </Button>
             </div>
             <p className="mt-4 text-center text-xs text-muted-foreground/75">
-              {"We’ll remember your choice for 30 days."}
+              We’ll ask again in two minutes or after your next login.
             </p>
           </div>
         </motion.div>

@@ -373,25 +373,25 @@ function LiveMemberCounter() {
     <div
       aria-label={count === null ? "Candid member count unavailable" : `${count} members on Candid`}
       aria-live="polite"
-      className="relative mb-2 flex h-11 items-center justify-between overflow-visible text-cyan-950 sm:mb-3 sm:h-auto sm:min-h-32"
+      className="relative mb-2 flex h-11 items-center justify-between overflow-visible text-foreground sm:mb-3 sm:h-auto sm:min-h-32"
     >
       <div className="relative z-10 max-w-[58%]">
-        <div className="flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-cyan-950/65 sm:text-[10px]">
-          <Users className="size-3.5 text-cyan-700 sm:size-4" />
+        <div className="flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:text-[10px]">
+          <Users className="size-3.5 text-primary sm:size-4" />
           The Candid community
         </div>
-        <p className="mt-2 hidden text-lg font-semibold leading-tight tracking-tight text-slate-950 sm:block sm:text-xl md:text-2xl">
+        <p className="mt-2 hidden text-lg font-semibold leading-tight tracking-tight text-foreground sm:block sm:text-xl md:text-2xl">
           Real people.<br />A growing voice.
         </p>
-        <p className="mt-1.5 hidden text-[10px] text-slate-700/75 sm:block sm:text-xs">
+        <p className="mt-1.5 hidden text-[10px] text-muted-foreground sm:block sm:text-xs">
           Every story starts with someone.
         </p>
       </div>
 
       <div className="pointer-events-none absolute inset-y-0 right-0 flex w-[45%] items-center justify-end" aria-hidden="true">
-        <span className="absolute inset-x-0 top-[28%] h-px bg-cyan-900/10" />
-        <span className="absolute inset-x-0 top-1/2 h-px bg-cyan-900/10" />
-        <span className="absolute inset-x-0 top-[72%] h-px bg-cyan-900/10" />
+        <span className="absolute inset-x-0 top-[28%] h-px bg-foreground/10" />
+        <span className="absolute inset-x-0 top-1/2 h-px bg-foreground/10" />
+        <span className="absolute inset-x-0 top-[72%] h-px bg-foreground/10" />
         <AnimatePresence initial={false} mode="popLayout">
           <motion.span
             key={displayCount}
@@ -401,11 +401,11 @@ function LiveMemberCounter() {
             transition={{ duration: 0.4, ease: "easeOut" }}
             className="relative z-10 whitespace-nowrap text-4xl font-black leading-none tracking-[-0.025em] tabular-nums sm:text-8xl md:text-8xl lg:text-9xl"
           >
-            <span className="font-normal text-cyan-950/20">{leadingDigits}</span>
-            <span className="font-black text-slate-950 drop-shadow-[3px_3px_0_rgba(163,208,0,0.55)]">{finalDigit}</span>
+            <span className="font-normal text-foreground/20">{leadingDigits}</span>
+            <span className="font-black text-foreground drop-shadow-[3px_3px_0_rgba(163,208,0,0.55)]">{finalDigit}</span>
           </motion.span>
         </AnimatePresence>
-        <span className="absolute -bottom-1 right-0 flex items-center gap-1.5 whitespace-nowrap text-[9px] text-slate-700/70 sm:text-[10px]">
+        <span className="absolute -bottom-1 right-0 flex items-center gap-1.5 whitespace-nowrap text-[9px] text-muted-foreground sm:text-[10px]">
           <span className="relative flex size-1.5">
             <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500/60" />
             <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />

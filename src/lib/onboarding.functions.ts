@@ -55,6 +55,7 @@ export const getOnboardingState = createServerFn({ method: "POST" })
       needsOnboarding: !profile?.username,
       username: profile?.username ?? null,
       photoUrl: profile?.photo_url ?? null,
+      coverUrl: profile?.cover_url ?? null,
       candidLens: profile?.candid_lens ?? null,
       usernameChangedAt: profile?.username_changed_at ?? null,
       socials: profile?.socials ?? null,
@@ -128,11 +129,11 @@ export const claimOfficialCandidAccount = createServerFn({ method: "POST" })
 export const saveMyProfilePhoto = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ photoUrl: z.string().min(1).max(2048) }).parse(input),
+    z.object({ photoUrl: z.string().min(1).max(2048), kind: z.enum(["avatar", "cover"]).default("avatar") }).parse(input),
   )
   .handler(async ({ data, context }) => {
     const { saveProfilePhoto } = await import("./onboarding.server");
-    return saveProfilePhoto(context.userId, data.photoUrl);
+    return saveProfilePhoto(context.userId, data.photoUrl, data.kind);
   });
 
 export const updateMyUsername = createServerFn({ method: "POST" })

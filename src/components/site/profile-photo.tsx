@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Camera, Eye, Loader2, RotateCcw, Upload, X } from "lucide-react";
+import { Camera, Eye, ImagePlus, Loader2, RotateCcw, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +19,24 @@ function avatarDeliveryUrl(url: string) {
   return url.startsWith("/")
     ? url
     : url.replace("/upload/", "/upload/c_fill,g_face,ar_1:1,w_512,h_512,q_auto,f_auto/");
+}
+
+async function compressCoverImage(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  const context = canvas.getContext("2d");
+  if (!context) {
+    bitmap.close();
+    throw new Error("This browser could not process the cover image.");
+  }
+  context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.84));
+  if (!blob) throw new Error("This browser could not process the cover image.");
+  return blob;
 }
 
 export function ProfileAvatar({
@@ -51,18 +69,123 @@ export function ProfileAvatar({
   );
 }
 
+export function ProfileCoverPicker({
+  coverUrl,
+  onSaved,
+  editable = true,
+}: {
+  coverUrl?: string | null;
+  onSaved: (coverUrl: string) => void;
+  editable?: boolean;
+}) {
+  const savePhoto = useServerFn(saveMyProfilePhoto);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function upload(file?: File) {
+    setError(null);
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setError("Choose an image file.");
+      return;
+    }
+    if (file.size > MAX_FILE_SIZE) {
+      setError("Choose an image smaller than 20 MB.");
+      return;
+    }
+    const cloudName = import.meta.env["VITE_CLOUDINARY_CLOUD_NAME"]?.trim();
+    const uploadPreset = import.meta.env["VITE_CLOUDINARY_UPLOAD_PRESET"]?.trim();
+    if (!cloudName || !uploadPreset) {
+      setError("Cover photo uploads are not configured yet.");
+      return;
+    }
+    setUploading(true);
+    try {
+      const body = new FormData();
+      const image =
+        typeof createImageBitmap === "function" ? await compressCoverImage(file) : file;
+      body.append("file", image, "cover.jpg");
+      body.append("upload_preset", uploadPreset);
+      const response = await fetch(
+        `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`,
+        { method: "POST", body },
+      );
+      const result = (await response.json()) as { secure_url?: string; error?: { message?: string } };
+      if (!response.ok || !result.secure_url) {
+        throw new Error(result.error?.message || "Could not upload that cover image.");
+      }
+      const saved = await savePhoto({ data: { photoUrl: result.secure_url, kind: "cover" } });
+      onSaved(saved.photoUrl);
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : "Upload failed. Try again.");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  const imageUrl = coverUrl?.replace(
+    "/upload/",
+    "/upload/c_fill,ar_16:6,w_1600,q_auto,f_auto/",
+  );
+
+  return (
+    <div className="absolute inset-0">
+      {imageUrl ? (
+        <img src={imageUrl} alt="" className="size-full object-cover" />
+      ) : (
+        <div className="size-full bg-[radial-gradient(circle_at_18%_20%,rgba(190,242,100,0.4),transparent_30%),radial-gradient(circle_at_85%_10%,rgba(34,211,238,0.22),transparent_35%),linear-gradient(130deg,hsl(var(--secondary)),hsl(var(--background)))]" />
+      )}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+      {editable ? (
+        <>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={(event) => {
+              void upload(event.target.files?.[0]);
+              event.currentTarget.value = "";
+            }}
+          />
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            disabled={uploading}
+            onClick={() => inputRef.current?.click()}
+            aria-label={coverUrl ? "Change cover photo" : "Add cover photo"}
+            className="absolute bottom-3 right-3 h-9 rounded-full border border-white/20 bg-background/90 px-3 shadow-lg backdrop-blur"
+          >
+            {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+            <span className="hidden sm:inline">{coverUrl ? "Edit cover" : "Add cover"}</span>
+          </Button>
+        </>
+      ) : null}
+      {error ? (
+        <p role="alert" className="absolute bottom-14 right-3 max-w-[80%] rounded-lg bg-destructive px-3 py-2 text-xs text-destructive-foreground shadow-lg">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ProfilePhotoPicker({
   photoUrl,
   initials,
   onSaved,
   compact = false,
   avatarOnly = false,
+  avatarClassName = "",
 }: {
   photoUrl?: string | null | undefined;
   initials: string;
   onSaved: (photoUrl: string) => void;
   compact?: boolean;
   avatarOnly?: boolean;
+  avatarClassName?: string;
 }) {
   const savePhoto = useServerFn(saveMyProfilePhoto);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -268,7 +391,7 @@ export function ProfilePhotoPicker({
           <ProfileAvatar
             photoUrl={previewUrl ?? photoUrl}
             initials={initials}
-            className={`${compact ? "size-14 border border-border" : "size-20 border-2 border-border"} transition-opacity group-hover:opacity-80`}
+            className={`${avatarClassName || (compact ? "size-14 border border-border" : "size-20 border-2 border-border")} transition-opacity group-hover:opacity-80`}
           />
           <span className="absolute bottom-0 right-0 grid size-6 place-items-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-sm">
             <Camera className="size-3" />

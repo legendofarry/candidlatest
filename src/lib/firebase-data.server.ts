@@ -57,6 +57,7 @@ export type ProfileRecord = {
   role_label: string | null;
   username?: string | null;
   photo_url?: string | null;
+  cover_url?: string | null;
   verified?: boolean;
   username_changed_at?: string | null;
   socials?: ProfileSocials | null;

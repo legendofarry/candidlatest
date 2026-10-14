@@ -156,14 +156,15 @@ export async function readProfile(userId: string): Promise<OnboardingProfile | n
 }
 
 /** Saves only the Cloudinary delivery URL; image bytes never enter Firestore. */
-export async function saveProfilePhoto(userId: string, photoUrl: string) {
+export async function saveProfilePhoto(userId: string, photoUrl: string, kind: "avatar" | "cover" = "avatar") {
+  const field = kind === "cover" ? "cover_url" : "photo_url";
   if (isPresetAvatarUrl(photoUrl)) {
     const db = getFirestoreDb();
     await db
       .collection("profiles")
       .doc(userId)
       .set(
-        { id: userId, photo_url: photoUrl, updated_at: new Date().toISOString() },
+        { id: userId, [field]: photoUrl, updated_at: new Date().toISOString() },
         { merge: true },
       );
     return { photoUrl };
@@ -177,7 +178,7 @@ export async function saveProfilePhoto(userId: string, photoUrl: string) {
     .collection("profiles")
     .doc(userId)
     .set(
-      { id: userId, photo_url: url.toString(), updated_at: new Date().toISOString() },
+      { id: userId, [field]: url.toString(), updated_at: new Date().toISOString() },
       { merge: true },
     );
   return { photoUrl: url.toString() };
