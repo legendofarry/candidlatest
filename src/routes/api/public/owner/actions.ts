@@ -34,6 +34,12 @@ const ActionInput = z.discriminatedUnion("entity", [
   }),
   z.object({ entity: z.literal("user"), id: documentId, banned: z.boolean() }),
   z.object({
+    entity: z.literal("payment"),
+    id: documentId,
+    decision: z.enum(["approve", "reject"]),
+    rejection_reason: z.string().trim().max(500).nullable().optional(),
+  }),
+  z.object({
     entity: z.literal("company"),
     id: documentId,
     name: z.string().trim().min(2).max(120).optional(),
@@ -291,6 +297,16 @@ export const Route = createFileRoute("/api/public/owner/actions")({
             targetType: "user",
             targetId: input.id,
           });
+        } else if (input.entity === "payment") {
+          const { reviewManualPaymentRequest } = await import("@/lib/billing.server");
+          const result = await reviewManualPaymentRequest(input.id, input.decision, input.rejection_reason);
+          await auditOwnerAction({
+            action: `payment.${input.decision === "approve" ? "approved" : "rejected"}`,
+            targetType: "payment_request",
+            targetId: input.id,
+            payload: { rejection_reason: input.rejection_reason ?? null },
+          });
+          return json({ ok: true, ...result });
         } else if (input.entity === "company") {
           const existingCompany = await readDocument("companies", input.id);
           if (!existingCompany) return json({ error: "Company not found" }, 404);

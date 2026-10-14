@@ -1,10 +1,10 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { BadgeCheck, CalendarClock, Check, ChevronRight, CreditCard, Flame, RefreshCw, Sparkles, WalletCards } from "lucide-react";
+import { BadgeCheck, Check, ChevronRight, CreditCard, Flame, RefreshCw, RotateCw, Sparkles, WalletCards } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { getMyBilling } from "@/lib/billing.functions";
-import { requestMyBasicDowngrade } from "@/lib/billing.functions";
+import { cancelMyPaymentRequest, getMyBilling, requestMyBasicDowngrade } from "@/lib/billing.functions";
 import { switchMyMembership } from "@/lib/membership.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
@@ -15,10 +15,13 @@ export const Route = createFileRoute("/billing")({
 });
 
 function BillingPage() {
+  const [membershipCardFlipped, setMembershipCardFlipped] = useState(false);
+  const isCheckout = useRouterState({ select: ({ location }) => location.pathname === "/billing/checkout" });
   const { user } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchBilling = useServerFn(getMyBilling);
+  const cancelPayment = useServerFn(cancelMyPaymentRequest);
   const downgrade = useServerFn(requestMyBasicDowngrade);
   const switchPackage = useServerFn(switchMyMembership);
   const billing = useQuery({
@@ -40,6 +43,11 @@ function BillingPage() {
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["billing"] }); },
     onError: (error) => window.alert(error instanceof Error ? error.message : "Could not update your package."),
   });
+  const cancelPaymentMutation = useMutation({
+    mutationFn: (paymentId: string) => cancelPayment({ data: { paymentId } }),
+    onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["billing"] }); },
+    onError: (error) => window.alert(error instanceof Error ? error.message : "Could not cancel this payment request."),
+  });
 
   const data = billing.data;
   const membership = data?.membership;
@@ -49,7 +57,10 @@ function BillingPage() {
   const awaiting = data?.payments.find((payment) => payment.status === "pending_verification" || payment.status === "awaiting_payment");
   const canRenewPremium = membership?.source === "paid" && membership.assignedTier === "premium";
 
+  if (isCheckout) return <Outlet />;
+
   return (
+    <>
     <main className="min-h-screen bg-background pb-16">
       <div className="mx-auto w-full max-w-6xl px-5 pt-8 sm:px-8 md:px-12 md:pt-12">
         <header className="max-w-3xl">
@@ -63,19 +74,42 @@ function BillingPage() {
 
         {data ? <>
           <section className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
-            <article className="rounded-[1.7rem] border bg-card p-6 shadow-sm sm:p-8">
-              <div className="flex flex-wrap items-start justify-between gap-5">
-                <div><p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">Current package</p><h2 className="mt-2 font-display text-3xl font-semibold">{capitalize(currentTier)}</h2></div>
-                <span className="rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary">{statusLabel(membership?.status, membership?.source)}</span>
+            <article className="rounded-[1.7rem] border bg-card p-4 shadow-sm sm:p-5">
+              <div className="mb-3 flex items-center justify-between px-1"><p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">Membership card</p><Button variant="ghost" size="icon" className="size-9 rounded-full" aria-label={membershipCardFlipped ? "Show card front" : "Show card details"} aria-pressed={membershipCardFlipped} onClick={() => setMembershipCardFlipped((value) => !value)}><RotateCw className="size-4" /></Button></div>
+              <div className="[perspective:1200px]">
+                <div className="relative min-h-[220px] transition-transform duration-700 ease-[cubic-bezier(.2,.8,.2,1)] [transform-style:preserve-3d] motion-reduce:transition-none" style={{ transform: membershipCardFlipped ? "rotateY(180deg)" : "rotateY(0deg)" }}>
+                  <div className="absolute inset-0 overflow-hidden rounded-[1.35rem] border border-white/10 bg-gradient-to-br from-[#192326] via-[#101719] to-[#080c0e] p-5 text-white shadow-xl [backface-visibility:hidden] sm:p-6">
+                    <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-20 size-56 rounded-full border border-lime-300/10 bg-lime-300/[0.04] shadow-[0_0_0_26px_rgba(190,242,100,0.025),0_0_0_54px_rgba(190,242,100,0.02)]" />
+                    <div className="relative flex items-start justify-between gap-3">
+                      <div className="flex items-center gap-2"><span className="flex size-8 items-center justify-center rounded-xl bg-lime-300 text-slate-950"><Flame className="size-4" /></span><span className="font-display text-sm font-semibold tracking-wide">Candid</span></div>
+                      <span className="rounded-full border border-lime-200/20 bg-lime-200/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[.16em] text-lime-200">{statusLabel(membership?.status, membership?.source)}</span>
+                    </div>
+                    <div className="relative mt-5 flex items-center gap-3">
+                      <div aria-hidden="true" className="grid size-10 grid-cols-2 overflow-hidden rounded-lg border border-amber-100/30 bg-gradient-to-br from-amber-100/90 to-amber-400/70 p-1"><span className="rounded-tl border-b border-r border-amber-900/25" /><span className="rounded-tr border-b border-amber-900/25" /><span className="rounded-bl border-r border-amber-900/25" /><span className="rounded-br" /></div>
+                      <CreditCard aria-hidden="true" className="size-5 text-white/50" />
+                    </div>
+                    <div className="relative mt-4 flex items-end justify-between gap-3">
+                      <div><p className="text-[10px] uppercase tracking-[.2em] text-white/50">Current package</p><p className="mt-1 font-display text-2xl font-semibold tracking-wide">{capitalize(currentTier)}</p></div>
+                      <p className="text-right text-xs font-medium text-lime-200">{membership?.source === "paid" ? "CANDID MEMBER" : "CANDID COMMUNITY"}</p>
+                    </div>
+                    {awaiting ? <div className="relative mt-3 flex items-center justify-between gap-2 border-t border-white/10 pt-2 text-[11px]"><span className="text-white/65">Payment awaiting verification · {awaiting.payment_reference}</span><span className="shrink-0 font-semibold text-amber-200">Pending</span></div> : null}
+                  </div>
+                  <div className="absolute inset-0 overflow-hidden rounded-[1.35rem] border border-white/10 bg-gradient-to-br from-[#182225] via-[#0e1416] to-[#080b0c] p-5 text-white shadow-xl [backface-visibility:hidden] [transform:rotateY(180deg)] sm:p-6">
+                    <div aria-hidden="true" className="-mx-5 mt-2 h-10 bg-[#050708] sm:-mx-6" />
+                    <div className="mt-5 grid grid-cols-2 gap-3">
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3"><p className="text-[10px] uppercase tracking-[.15em] text-white/50">Package started</p><p className="mt-2 text-sm font-semibold">{formatDate(membership?.startedAt)}</p></div>
+                      <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3"><p className="text-[10px] uppercase tracking-[.15em] text-white/50">{membership?.cancelAtPeriodEnd ? "Access expires" : "Package expires"}</p><p className="mt-2 text-sm font-semibold">{membership?.periodEndsAt ? formatDate(membership.periodEndsAt) : "No expiry"}</p></div>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between border-t border-white/10 pt-3"><p className="text-[10px] uppercase tracking-[.18em] text-white/45">Candid membership</p><span className="text-xs font-semibold text-lime-200">{capitalize(currentTier)} · {statusLabel(membership?.status, membership?.source)}</span></div>
+                  </div>
+                </div>
               </div>
-              {membership?.periodEndsAt ? <p className="mt-5 flex items-center gap-2 text-sm text-muted-foreground"><CalendarClock className="size-4" />{membership.cancelAtPeriodEnd ? "Access ends " : "Renews manually by "}{formatDate(membership.periodEndsAt)}</p> : null}
-              {awaiting ? <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4"><div><p className="font-semibold">Payment awaiting verification</p><p className="mt-1 text-sm text-muted-foreground">Ref {awaiting.payment_reference} · KSh {awaiting.expected_amount_kes.toLocaleString("en-KE")}</p></div><span className="text-xs font-medium text-amber-700">Pending</span></div> : null}
-              {membership?.status === "expired" ? <p className="mt-4 text-sm text-muted-foreground">Your previous paid period has ended. Renew to restore its benefits.</p> : null}
-              {!isOfficial && membership?.source === "paid" && membership.assignedTier === "premium" && !membership.cancelAtPeriodEnd ? <Button className="mt-6 rounded-xl" variant="outline" disabled={downgradeMutation.isPending} onClick={() => { if (window.confirm("Premium access will continue until the current period ends. Your account and content stay intact. Continue?")) downgradeMutation.mutate(); }}>Move to Basic at expiry</Button> : null}
+              {membership?.status === "expired" ? <p className="mt-3 px-1 text-sm text-muted-foreground">Your previous paid period has ended. Renew to restore its benefits.</p> : null}
+              {!isOfficial && membership?.source === "paid" && membership.assignedTier === "premium" && !membership.cancelAtPeriodEnd ? <Button className="mt-3 rounded-xl" variant="outline" disabled={downgradeMutation.isPending} onClick={() => { if (window.confirm("Premium access will continue until the current period ends. Your account and content stay intact. Continue?")) downgradeMutation.mutate(); }}>Move to Basic at expiry</Button> : null}
             </article>
             <article className="rounded-[1.7rem] border bg-card p-6 shadow-sm sm:p-8">
               <div className="flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary"><CreditCard className="size-5" /></span><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">Payments</p><h2 className="mt-1 font-display text-xl font-semibold">Manual M-Pesa</h2></div></div>
-              <p className="mt-4 text-sm leading-6 text-muted-foreground">Your package activates only after an administrator matches the transaction in M-Pesa records.</p>
+              <p className="mt-4 text-sm leading-6 text-muted-foreground">After you send payment proof, Candid reviews it. Your package activates once it’s confirmed.</p>
               <p className="mt-4 text-sm">{data.paymentConfigured ? "Checkout is available for enabled packages." : "Checkout is not configured yet."}</p>
             </article>
           </section>
@@ -88,8 +122,7 @@ function BillingPage() {
                 const renew = tier === membership?.assignedTier && canRenewPremium && membership?.status === "expired";
                 const pending = data.payments.some((payment) => payment.package_id === tier && ["awaiting_payment", "pending_verification"].includes(payment.status));
                 const paidActive = membership?.source === "paid" && membership.status === "active" && Boolean(membership.periodEndsAt);
-                const complimentarySwitch = membership?.canSelfSwitch === true && membership?.source !== "paid";
-                const available = tier === "basic" || plan.enabled || complimentarySwitch;
+                const available = tier === "basic" || plan.enabled;
                 const switching = downgradeMutation.isPending || switchMutation.isPending;
                 const handleChoose = () => {
                   if (tier === "basic") {
@@ -98,8 +131,6 @@ function BillingPage() {
                     } else {
                       switchMutation.mutate("basic");
                     }
-                  } else if (complimentarySwitch) {
-                    switchMutation.mutate(tier);
                   } else {
                     void navigate({ to: "/billing/checkout", search: { tier, renewal: renew || (tier === membership?.assignedTier && canRenewPremium) } });
                   }
@@ -110,7 +141,7 @@ function BillingPage() {
                   <p className="mt-6 font-display text-3xl font-semibold">{plan.price_kes === 0 ? "Free" : `KSh ${plan.price_kes.toLocaleString("en-KE")}`}<span className="ml-1 text-sm font-normal text-muted-foreground">{plan.price_kes > 0 ? "/ month" : ""}</span></p>
                   <ul className="mt-5 flex-1 space-y-2 border-t pt-5">{plan.benefits.map((benefit) => <li key={benefit} className="flex gap-2 text-sm text-muted-foreground"><Check className="mt-0.5 size-4 shrink-0 text-primary" />{benefit}</li>)}</ul>
                   <Button className="mt-6 w-full rounded-xl" variant={current ? "outline" : "default"} disabled={current || !available || pending || switching} onClick={handleChoose}>
-                    {current ? "Current package" : switching ? "Updating…" : pending ? "Payment in review" : !available ? "Unavailable" : tier === "basic" && paidActive ? membership?.cancelAtPeriodEnd ? "Basic scheduled" : "Move to Basic at expiry" : complimentarySwitch ? `Switch to ${plan.name}` : renew || (tier === membership?.assignedTier && canRenewPremium) ? "Renew Premium" : `Choose ${plan.name}`}<ChevronRight className="ml-auto size-4" />
+                    {current ? "Current package" : switching ? "Updating…" : pending ? "Payment in review" : !available ? "Unavailable" : tier === "basic" && paidActive ? membership?.cancelAtPeriodEnd ? "Basic scheduled" : "Move to Basic at expiry" : renew || (tier === membership?.assignedTier && canRenewPremium) ? "Renew Premium" : `Choose ${plan.name}`}<ChevronRight className="ml-auto size-4" />
                   </Button>
                 </article>;
               })}
@@ -119,11 +150,13 @@ function BillingPage() {
 
           <section className="mt-12">
             <div className="mb-4 flex items-end justify-between gap-4"><div><h2 className="font-display text-2xl font-semibold">Billing history</h2><p className="mt-1 text-sm text-muted-foreground">Payment reviews and subscription periods.</p></div><Button variant="ghost" size="sm" onClick={() => void billing.refetch()}><RefreshCw className="mr-2 size-4" />Refresh</Button></div>
-            {data.payments.length === 0 && data.history.length === 0 ? <div className="rounded-2xl border bg-card px-5 py-8 text-center text-sm text-muted-foreground">No billing activity yet.</div> : <div className="overflow-hidden rounded-2xl border bg-card">{data.payments.map((payment) => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4 last:border-0"><div><p className="font-medium">{payment.package_name} · KSh {payment.expected_amount_kes.toLocaleString("en-KE")}</p><p className="mt-1 text-xs text-muted-foreground">{payment.payment_reference} · {formatDate(payment.submitted_at || payment.created_at)}</p>{payment.rejection_reason ? <p className="mt-1 text-xs text-destructive">{payment.rejection_reason}</p> : null}</div><span className="text-sm capitalize text-muted-foreground">{payment.status.replaceAll("_", " ")}</span></div>)}{data.history.map((period) => <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4"><div><p className="font-medium">{String(period["package_name"] ?? "Premium")} subscription</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(String(period["starts_at"] ?? ""))} – {formatDate(String(period["ends_at"] ?? ""))}</p></div><span className="text-sm text-muted-foreground">KSh {Number(period["amount_kes"] ?? 0).toLocaleString("en-KE")} · M-Pesa</span></div>)}</div>}
+            {data.payments.length === 0 && data.history.length === 0 ? <div className="rounded-2xl border bg-card px-5 py-8 text-center text-sm text-muted-foreground">No billing activity yet.</div> : <div className="overflow-hidden rounded-2xl border bg-card">{data.payments.map((payment) => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4 last:border-0"><div><p className="font-medium">{payment.package_name} · KSh {payment.expected_amount_kes.toLocaleString("en-KE")}</p><p className="mt-1 text-xs text-muted-foreground">{payment.payment_reference} · {formatDate(payment.submitted_at || payment.created_at)}</p>{payment.rejection_reason ? <p className="mt-1 text-xs text-destructive">{payment.rejection_reason}</p> : null}</div><div className="flex items-center gap-3"><span className="text-sm capitalize text-muted-foreground">{payment.status.replaceAll("_", " ")}</span>{["awaiting_payment", "pending_verification"].includes(payment.status) ? <Button size="sm" variant="outline" disabled={cancelPaymentMutation.isPending} onClick={() => { if (window.confirm("Cancel this payment request? If you already sent money, cancelling the request will not reverse or refund the M-Pesa transfer.")) cancelPaymentMutation.mutate(payment.id); }}>Cancel request</Button> : null}</div></div>)}{data.history.map((period) => <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4"><div><p className="font-medium">{String(period["package_name"] ?? "Premium")} subscription</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(String(period["starts_at"] ?? ""))} – {formatDate(String(period["ends_at"] ?? ""))}</p></div><span className="text-sm text-muted-foreground">KSh {Number(period["amount_kes"] ?? 0).toLocaleString("en-KE")} · M-Pesa</span></div>)}</div>}
           </section>
         </> : null}
       </div>
     </main>
+    <Outlet />
+    </>
   );
 }
 
