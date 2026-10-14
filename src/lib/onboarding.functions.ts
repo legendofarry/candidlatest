@@ -10,31 +10,6 @@ import {
   requireVerifiedFirebaseAuth,
 } from "@/integrations/firebase/auth-middleware";
 
-const candidLensSchema = z
-  .object({
-    completed: z.boolean(),
-    skipped: z.boolean(),
-    answers: z.object({
-      scenario1: z.enum(["contract", "accept"]).optional(),
-      scenario2: z.enum(["breakdown", "wait"]).optional(),
-      scenario3: z.enum(["pushback", "doit"]).optional(),
-      scenario4: z.enum(["clarity", "continue"]).optional(),
-      scenario5: z.enum(["ask", "findout"]).optional(),
-    }),
-    interests: z.object({
-      payBenefits: z.number().int().min(0).max(5),
-      contracts: z.number().int().min(0).max(5),
-      management: z.number().int().min(0).max(5),
-      culture: z.number().int().min(0).max(5),
-      career: z.number().int().min(0).max(5),
-    }),
-  })
-  .refine(
-    (lens) =>
-      lens.skipped ? !lens.completed : lens.completed && Object.keys(lens.answers).length === 5,
-    "Complete the quick Candid Lens or skip it.",
-  );
-
 const socialSchema = z
   .object({
     x: z.string().max(200).nullable().default(null),
@@ -56,7 +31,6 @@ export const getOnboardingState = createServerFn({ method: "POST" })
       username: profile?.username ?? null,
       photoUrl: profile?.photo_url ?? null,
       coverUrl: profile?.cover_url ?? null,
-      candidLens: profile?.candid_lens ?? null,
       usernameChangedAt: profile?.username_changed_at ?? null,
       socials: profile?.socials ?? null,
       accountType: profile?.account_type ?? "unknown",
@@ -108,13 +82,12 @@ export const completeOnboarding = createServerFn({ method: "POST" })
       .object({
         username: z.string().max(40),
         socials: socialSchema,
-        candidLens: candidLensSchema.optional(),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { claimUsername } = await import("./onboarding.server");
-    return claimUsername(context.userId, data.username, data.socials, data.candidLens);
+    return claimUsername(context.userId, data.username, data.socials);
   });
 
 /** One-time, verified-email action that links the owner's login to @candid. */

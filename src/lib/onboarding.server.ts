@@ -1,6 +1,6 @@
 import { getFirestoreDb } from "./firebase.server";
 import { isPresetAvatarUrl } from "./preset-avatars";
-import type { CandidLensRecord, ProfileRecord } from "./firebase-data.server";
+import type { ProfileRecord } from "./firebase-data.server";
 import { DEFAULT_MEMBERSHIP } from "./membership";
 import { generateAliasCandidate, type AliasAgeRange } from "./alias-generator";
 
@@ -239,7 +239,6 @@ export async function claimUsername(
   userId: string,
   rawUsername: string,
   socials: SocialLinks,
-  candidLens?: CandidLensRecord,
 ): Promise<{ ok: boolean; reason?: string; profile?: OnboardingProfile }> {
   const username = normalizeUsername(rawUsername);
   const validity = validateUsername(username);
@@ -275,7 +274,6 @@ export async function claimUsername(
           username,
           handle: username,
           socials: safeSocials,
-          ...(candidLens ? { candid_lens: candidLens } : {}),
           county: previous?.county ?? null,
           role_label: previous?.role_label ?? null,
           banned: previous?.banned ?? false,

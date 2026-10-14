@@ -61,7 +61,6 @@ export type ProfileRecord = {
   verified?: boolean;
   username_changed_at?: string | null;
   socials?: ProfileSocials | null;
-  candid_lens?: CandidLensRecord | null;
   account_type?: "individual" | "company" | "official" | "unknown";
   onboarded_at?: string | null;
   subscription_tier?: "basic" | "premium" | "gold";
@@ -83,25 +82,6 @@ export type ProfileRecord = {
 function membershipBadgeTier(profile: ProfileRecord | undefined): "basic" | "premium" | "gold" {
   return getEffectiveMembershipTier(profile);
 }
-
-export type CandidLensRecord = {
-  completed: boolean;
-  skipped: boolean;
-  answers: {
-    scenario1?: string | undefined;
-    scenario2?: string | undefined;
-    scenario3?: string | undefined;
-    scenario4?: string | undefined;
-    scenario5?: string | undefined;
-  };
-  interests: {
-    payBenefits: number;
-    contracts: number;
-    management: number;
-    culture: number;
-    career: number;
-  };
-};
 
 export type StoryRecord = {
   id: string;

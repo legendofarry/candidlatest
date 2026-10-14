@@ -8,26 +8,19 @@ import {
   ArrowLeft,
   AlertCircle,
   AtSign,
-  BriefcaseBusiness,
-  Check,
-  Clock3,
-  Coins,
   Flame,
   Globe,
   Instagram,
   Linkedin,
   Loader2,
-  Megaphone,
   Music2,
+  Pencil,
   ShieldCheck,
   Sparkles,
-  UsersRound,
   X as XIcon,
 } from "lucide-react";
-import { useReducedMotion } from "motion/react";
 import { useAuth } from "@/hooks/useAuth";
 import { requiresEmailVerification } from "@/lib/email-verification";
-import { generateAliasCandidate, type AliasAgeRange } from "@/lib/alias-generator";
 import { notify as toast } from "@/lib/notifications-store";
 import { Button } from "@/components/ui/button";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
@@ -37,6 +30,7 @@ import {
   checkUsername,
   completeOnboarding,
   getOnboardingState,
+  getUsernameSuggestions,
   updateMyUsername,
 } from "@/lib/onboarding.functions";
 
@@ -76,197 +70,26 @@ const SOCIAL_FIELDS = [
 
 type SocialKey = (typeof SOCIAL_FIELDS)[number]["key"];
 
-type LensAnswer = {
-  scenario1?: "contract" | "accept";
-  scenario2?: "breakdown" | "wait";
-  scenario3?: "pushback" | "doit";
-  scenario4?: "clarity" | "continue";
-  scenario5?: "ask" | "findout";
-};
-
-type LensInterests = {
-  payBenefits: number;
-  contracts: number;
-  management: number;
-  culture: number;
-  career: number;
-};
-
-type CandidLensData = {
-  completed: boolean;
-  skipped: boolean;
-  answers: LensAnswer;
-  interests: LensInterests;
-};
-
-type LensScreen = "intro" | "scenario" | "transition" | "result" | "onboarding";
-
-type LensDraft = {
-  screen: LensScreen;
-  scenarioIndex: number;
-  answers: LensAnswer;
-  skipped: boolean;
-};
-
-const LENS_SCENARIOS = [
-  {
-    label: "THE OFFER",
-    icon: BriefcaseBusiness,
-    text: "You just got the job. HR says: ‘We’ll sort out the contract once you start.’",
-    choices: [
-      { value: "accept", label: "Accept — finally, a job" },
-      { value: "contract", label: "Ask for the contract first" },
-    ],
-  },
-  {
-    label: "PAYDAY",
-    icon: Coins,
-    text: "Your first payday arrives. Your payslip says KSh 45,000. Your M-Pesa receives KSh 32,000.",
-    choices: [
-      { value: "breakdown", label: "Ask HR for the breakdown" },
-      { value: "wait", label: "Wait and see what happens" },
-    ],
-  },
-  {
-    label: "THE MANAGER",
-    icon: Clock3,
-    text: "It’s Friday, 5:47 PM. Your manager says: ‘Need this before Monday morning.’",
-    choices: [
-      { value: "pushback", label: "Push back" },
-      { value: "doit", label: "Do it and move on" },
-    ],
-  },
-  {
-    label: "THE JOB AD",
-    icon: Megaphone,
-    text: "The advert says KSh 40k–60k. In the interview: ‘We’ll discuss salary after probation.’",
-    choices: [
-      { value: "clarity", label: "Ask for clarity" },
-      { value: "continue", label: "Keep the interview going" },
-    ],
-  },
-  {
-    label: "THE CULTURE",
-    icon: UsersRound,
-    text: "Someone quietly tells you: ‘People don’t usually stay here very long.’",
-    choices: [
-      { value: "ask", label: "Ask why" },
-      { value: "findout", label: "Take the job and find out" },
-    ],
-  },
-] as const;
-
-const LENS_INTEREST_LABELS: { key: keyof LensInterests; label: string }[] = [
-  { key: "payBenefits", label: "Pay & benefits" },
-  { key: "contracts", label: "Contracts & policies" },
-  { key: "management", label: "Management" },
-  { key: "culture", label: "Workplace culture" },
-  { key: "career", label: "Career decisions" },
-];
-
-const ALIAS_QUESTIONS = [
-  {
-    prompt: "When things get busy, what feels more like you?",
-    options: [
-      { label: "Take it steady", detail: "One step at a time.", token: "Steady" },
-      { label: "Go bold", detail: "Move first, adapt as you go.", token: "Bold" },
-    ],
-  },
-  {
-    prompt: "When do you feel most switched on?",
-    options: [
-      { label: "Early bird", detail: "I like getting a head start.", token: "Dawn" },
-      { label: "Night owl", detail: "My best ideas come later.", token: "Night" },
-    ],
-  },
-  {
-    prompt: "What kind of energy do you bring?",
-    options: [
-      { label: "Warm and grounded", detail: "Calm, welcoming, dependable.", token: "Cozy" },
-      { label: "Loud and lively", detail: "Curious, expressive, spontaneous.", token: "Wild" },
-    ],
-  },
-  {
-    prompt: "When something’s unclear, what do you do first?",
-    options: [
-      { label: "Read the room", detail: "Notice what others might miss.", token: "Sage" },
-      { label: "Find a way through", detail: "Explore until I find an answer.", token: "Scout" },
-    ],
-  },
-  {
-    prompt: "Which age range should your alias feel right for?",
-    options: [
-      { label: "18–24", detail: "Fresh, lively word choices.", token: "18-24" },
-      { label: "25–34", detail: "Modern, balanced word choices.", token: "25-34" },
-      { label: "35–44", detail: "Confident, timeless word choices.", token: "35-44" },
-      { label: "45+", detail: "Clear, classic word choices.", token: "45+" },
-      { label: "Prefer not to say", detail: "Use a mix of neutral words.", token: "skip" },
-    ],
-  },
-] as const;
-type AliasStage = "seed" | "questions" | "result";
-
-function getLensInterests(answers: LensAnswer): LensInterests {
-  const interests: LensInterests = {
-    payBenefits: 0,
-    contracts: 0,
-    management: 0,
-    culture: 0,
-    career: 0,
-  };
-  if (answers.scenario1 === "contract") interests.contracts += 2;
-  if (answers.scenario1 === "accept") interests.career += 1;
-  if (answers.scenario2 === "breakdown") interests.payBenefits += 2;
-  if (answers.scenario3 === "pushback") interests.management += 2;
-  if (answers.scenario3 === "doit") interests.management += 1;
-  if (answers.scenario4 === "clarity") {
-    interests.payBenefits += 1;
-    interests.contracts += 1;
-  }
-  if (answers.scenario4 === "continue") interests.career += 1;
-  if (answers.scenario5 === "ask") interests.culture += 2;
-  if (answers.scenario5 === "findout") {
-    interests.culture += 1;
-    interests.career += 1;
-  }
-  return interests;
-}
-
-function emptyLensData(skipped: boolean): CandidLensData {
-  return {
-    completed: false,
-    skipped,
-    answers: {},
-    interests: { payBenefits: 0, contracts: 0, management: 0, culture: 0, career: 0 },
-  };
-}
-
 function OnboardingPage() {
   const { editUsername } = Route.useSearch();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { user, loading } = useAuth();
-  const prefersReducedMotion = useReducedMotion();
   const check = useServerFn(checkUsername);
+  const getSuggestions = useServerFn(getUsernameSuggestions);
   const complete = useServerFn(completeOnboarding);
   const updateUsername = useServerFn(updateMyUsername);
   const state = useServerFn(getOnboardingState);
 
-  const [lensScreen, setLensScreen] = useState<LensScreen>("intro");
-  const [scenarioIndex, setScenarioIndex] = useState(0);
-  const [lensAnswers, setLensAnswers] = useState<LensAnswer>({});
-  const [lensSkipped, setLensSkipped] = useState(false);
-  const [lensHydrated, setLensHydrated] = useState(false);
-  const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const [usernameSeed, setUsernameSeed] = useState("");
   const [username, setUsername] = useState("");
-  const [aliasStage, setAliasStage] = useState<AliasStage>("seed");
-  const [aliasQuestionIndex, setAliasQuestionIndex] = useState(0);
-  const [aliasAnswers, setAliasAnswers] = useState<(number | null)[]>([null, null, null, null, null]);
-  const [aliasIdea, setAliasIdea] = useState("");
-  const [aliasRound, setAliasRound] = useState(0);
+  const [usernameAcknowledgementChecked, setUsernameAcknowledgementChecked] = useState(false);
+  const [usernameAcknowledged, setUsernameAcknowledged] = useState(false);
+  const [usernameChoice, setUsernameChoice] = useState<"own" | "generated" | null>(null);
+  const [usernameSuggestions, setUsernameSuggestions] = useState<string[]>([]);
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
   const [status, setStatus] = useState<Status>("idle");
   const [message, setMessage] = useState<string | null>(null);
   const [socials, setSocials] = useState<Record<SocialKey, string>>({
@@ -295,98 +118,38 @@ function OnboardingPage() {
         active = false;
       };
     }
-    const storageKey = `candid-onboarding-lens:${user.uid}`;
     void state({ data: undefined })
       .then((result) => {
         if (!active) return;
         setPhotoUrl(result.photoUrl);
-        if (!result.needsOnboarding && !editUsername) {
-          navigate({ to: "/" });
-          return;
-        }
-        if (editUsername) {
-          setLensScreen("onboarding");
-          setAliasStage("seed");
-          setStep(0);
-          setAliasQuestionIndex(0);
-          setAliasAnswers([null, null, null, null, null]);
-        }
-        if (!editUsername) {
-          try {
-            const rawDraft = window.localStorage.getItem(storageKey);
-            if (rawDraft) {
-              const draft = JSON.parse(rawDraft) as Partial<LensDraft>;
-              const validScreen = [
-                "intro",
-                "scenario",
-                "transition",
-                "result",
-                "onboarding",
-              ].includes(String(draft.screen));
-              if (validScreen) {
-                setLensScreen(draft.screen as LensScreen);
-                setScenarioIndex(Math.max(0, Math.min(4, Number(draft.scenarioIndex) || 0)));
-                setLensAnswers(
-                  draft.answers && typeof draft.answers === "object" ? draft.answers : {},
-                );
-                setLensSkipped(Boolean(draft.skipped));
-              }
-            }
-          } catch {
-            window.localStorage.removeItem(storageKey);
-          }
-        }
-        setLensHydrated(true);
+        if (!result.needsOnboarding && !editUsername) navigate({ to: "/" });
       })
       .catch((error: unknown) => {
         if (!active) return;
         toast.error(error instanceof Error ? error.message : "Could not load onboarding.");
-        setLensHydrated(true);
       });
     return () => {
       active = false;
     };
   }, [loading, user, navigate, state, editUsername]);
 
-  useEffect(() => {
-    if (!user || !lensHydrated) return;
-    const draft: LensDraft = {
-      screen: lensScreen,
-      scenarioIndex,
-      answers: lensAnswers,
-      skipped: lensSkipped,
-    };
+  async function generateAliases() {
+    setLoadingSuggestions(true);
+    setSuggestionError(null);
+    setUsername("");
+    setMessage(null);
     try {
-      window.localStorage.setItem(`candid-onboarding-lens:${user.uid}`, JSON.stringify(draft));
+      const result = await getSuggestions({ data: { seed: "Candid" } });
+      setUsernameSuggestions(result.suggestions);
+      if (!result.suggestions.length) {
+        setSuggestionError("We couldn’t find an available suggestion. Try again or choose your own.");
+      }
     } catch {
-      // The in-memory experience still works if browser storage is unavailable.
+      setUsernameSuggestions([]);
+      setSuggestionError("Could not generate usernames right now. Please try again.");
+    } finally {
+      setLoadingSuggestions(false);
     }
-  }, [user, lensHydrated, lensScreen, scenarioIndex, lensAnswers, lensSkipped]);
-
-  useEffect(() => {
-    if (lensScreen !== "transition") return;
-    const timer = window.setTimeout(
-      () => {
-        setSelectedChoice(null);
-        if (scenarioIndex >= LENS_SCENARIOS.length - 1) setLensScreen("result");
-        else {
-          setScenarioIndex((current) => current + 1);
-          setLensScreen("scenario");
-        }
-      },
-      prefersReducedMotion ? 0 : 420,
-    );
-    return () => window.clearTimeout(timer);
-  }, [lensScreen, scenarioIndex, prefersReducedMotion]);
-
-  function generateAlias() {
-    if (aliasAnswers.some((answer) => answer === null)) return;
-    const ageRange = ALIAS_QUESTIONS[4].options[aliasAnswers[4]!]!.token as AliasAgeRange;
-    const candidate = generateAliasCandidate(usernameSeed, aliasAnswers, ageRange, aliasRound);
-    setAliasIdea(candidate);
-    setUsername(candidate);
-    setAliasStage("result");
-    setAliasRound((round) => round + 1);
   }
 
   useEffect(() => {
@@ -453,14 +216,6 @@ function OnboardingPage() {
       const result = await complete({
         data: {
           username: username.trim().toLowerCase(),
-          candidLens: lensSkipped || !lensComplete
-            ? emptyLensData(true)
-            : {
-                completed: true,
-                skipped: false,
-                answers: lensAnswers,
-                interests: getLensInterests(lensAnswers),
-              },
           socials: {
             x: includeSocials ? socials.x.trim() || null : null,
             instagram: includeSocials ? socials.instagram.trim() || null : null,
@@ -476,13 +231,6 @@ function OnboardingPage() {
         setStep(0);
         return;
       }
-      if (user) {
-        try {
-          window.localStorage.removeItem(`candid-onboarding-lens:${user.uid}`);
-        } catch {
-          // A stored draft is harmless if browser storage cannot be cleared.
-        }
-      }
       navigate({ to: "/" });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Could not save your username";
@@ -497,42 +245,12 @@ function OnboardingPage() {
     }
   }
 
-  function answerScenario(value: string) {
-    if (selectedChoice) return;
-    setSelectedChoice(value);
-    const key = `scenario${scenarioIndex + 1}` as keyof LensAnswer;
-    setLensAnswers((current) => ({ ...current, [key]: value }));
-    setLensScreen("transition");
-  }
-
-  function skipLens() {
-    setLensAnswers({});
-    setLensSkipped(true);
-    setLensScreen("onboarding");
-  }
-
-  if (loading || !user || !lensHydrated) {
+  if (loading || !user) {
     return (
       <div className="flex min-h-[75dvh] items-center justify-center text-sm text-muted-foreground">
         <Loader2 className="mr-2 size-4 animate-spin" />
         Getting your onboarding ready…
       </div>
-    );
-  }
-
-  if (lensScreen !== "onboarding") {
-    return (
-      <CandidLensExperience
-        screen={lensScreen}
-        scenarioIndex={scenarioIndex}
-        selectedChoice={selectedChoice}
-        answers={lensAnswers}
-        onStart={() => setLensScreen("scenario")}
-        onAnswer={answerScenario}
-        onSkip={skipLens}
-        onContinue={() => setLensScreen("onboarding")}
-        reducedMotion={Boolean(prefersReducedMotion)}
-      />
     );
   }
 
@@ -558,26 +276,30 @@ function OnboardingPage() {
           className="mb-7"
         >
           <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
-            {editUsername ? "Create a new public alias" : `A few quick choices · ${step + 1} of 3`}
+            {editUsername ? "Update your public username" : `Account setup · ${step + 1} of 3`}
           </p>
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            {editUsername
-              ? aliasStage === "seed" ? "Choose a new alias" : aliasStage === "questions" ? "Shape your new alias" : "Your new Candid name"
-              : step === 0 ? aliasStage === "seed" ? "Choose your starting name" : aliasStage === "questions" ? "Make it yours" : "Your Candid name" : step === 1 ? "Add a profile photo" : "Add your links"}
+            {step === 0
+              ? !usernameAcknowledged
+                ? "Your username is public"
+                : !usernameChoice
+                  ? "How would you like to choose it?"
+                  : usernameChoice === "own"
+                    ? "Choose your username"
+                    : "Pick a suggested username"
+              : step === 1
+                ? "Add a profile photo"
+                : "Add your links"}
           </h1>
           <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
-            {editUsername
-              ? aliasStage === "seed"
-                ? "Choose a word or nickname to inspire a fresh alias. The word itself will never appear in the generated username."
-                : aliasStage === "questions"
-                  ? "Your answers and age range shape the style. The range is used for this step only and isn’t saved. Each alias is randomized and checked before you save it."
-                  : "Review your new public alias. Your current one stays active until you save this change."
-              : step === 0
-                ? aliasStage === "seed"
-                  ? "Start with a word or nickname. A few quick choices will shape it into the public alias you’ll use across Candid."
-                  : aliasStage === "questions"
-                    ? "Pick what feels more like you. We’ll use your starting name and these answers to make your alias."
-                    : "This is the name people will see on your posts and comments."
+            {step === 0
+              ? !usernameAcknowledged
+                ? "The username you choose can identify you to other members when you post a story or comment. Your email and legal name are not displayed, but avoid using your real name or details that could identify you."
+                : !usernameChoice
+                  ? "You can choose a unique username yourself, or let Candid suggest available options. You can change your mind before continuing."
+                  : usernameChoice === "own"
+                    ? "Choose a name you’re comfortable having shown on your stories and comments. We’ll check that it’s available."
+                    : "Choose one of these available names, or ask Candid for another set."
               : step === 1
                 ? "A photo is optional and visible on your profile. Choose an image that doesn’t identify you, or continue without one."
                 : "Social links are optional. Add any you want people to find on your profile."}
@@ -607,138 +329,53 @@ function OnboardingPage() {
               transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
               className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
             >
-              {aliasStage === "seed" ? (
-                <div className="space-y-4">
-                  <Label htmlFor="username-seed">Starting username</Label>
-                  <div className="flex items-center gap-2 rounded-xl border border-input px-3">
-                    <AtSign className="size-4 shrink-0 text-muted-foreground" />
-                    <Input
-                      id="username-seed"
-                      autoFocus
-                      autoComplete="off"
-                      spellCheck={false}
-                      maxLength={30}
-                      value={usernameSeed}
-                      onChange={(event) => setUsernameSeed(event.target.value)}
-                      placeholder="Choose a name to build from"
-                      className="border-0 bg-transparent px-0 focus-visible:ring-0"
-                    />
+              {!usernameAcknowledged ? (
+                <div className="space-y-5">
+                  <div className="rounded-2xl border border-sky-500/20 bg-sky-500/[0.06] p-5 sm:p-6">
+                    <span className="flex size-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400"><ShieldCheck className="size-6" /></span>
+                    <h2 className="mt-4 text-xl font-semibold tracking-tight">Your name, your choice</h2>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">Your username appears next to the stories and comments you share. Other members may recognize it, so choose a name you’re comfortable using publicly.</p>
+                    <p className="mt-3 text-sm leading-6 text-muted-foreground">Your email and legal name are not shown. Still, avoid usernames or story details that could identify you if you want to stay private.</p>
                   </div>
-                      <p className="text-xs leading-5 text-muted-foreground">This is inspiration only and won’t appear in your alias. Don’t enter your real name; choose a nickname or a word instead.</p>
-                  <Button className="w-full glow-primary" disabled={usernameSeed.trim().replace(/[^a-z0-9]/gi, "").length < 3} onClick={() => setAliasStage("questions")}>
-                    Next: answer a few questions <ArrowRight className="size-4" />
-                  </Button>
+                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background p-4 transition-colors hover:bg-secondary/40">
+                    <input type="checkbox" checked={usernameAcknowledgementChecked} onChange={(event) => setUsernameAcknowledgementChecked(event.target.checked)} className="mt-1 size-4 accent-primary" />
+                    <span className="text-sm leading-5">I understand that my username can be seen on my stories and comments.</span>
+                  </label>
+                  <Button className="w-full glow-primary" disabled={!usernameAcknowledgementChecked} onClick={() => setUsernameAcknowledged(true)}>Continue <ArrowRight className="size-4" /></Button>
                 </div>
-              ) : aliasStage === "questions" ? (
-                <div className="space-y-6">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-                        Question {aliasQuestionIndex + 1} of {ALIAS_QUESTIONS.length}
-                      </p>
-                      <div className="mt-2 flex gap-1.5" aria-label={`Question ${aliasQuestionIndex + 1} of ${ALIAS_QUESTIONS.length}`}>
-                        {ALIAS_QUESTIONS.map((question, index) => (
-                          <span
-                            key={question.prompt}
-                            className={`h-1.5 w-8 rounded-full transition-colors ${index <= aliasQuestionIndex ? "bg-primary" : "bg-secondary"}`}
-                          />
-                        ))}
-                      </div>
-                    </div>
-                    <span className="rounded-full border border-border bg-background px-3 py-1.5 text-xs text-muted-foreground">
-                      Your inspiration <strong className="ml-1 font-semibold text-foreground">isn’t shown</strong>
-                    </span>
-                  </div>
-
-                  <AnimatePresence mode="wait" initial={false}>
-                    <motion.div
-                      key={aliasQuestionIndex}
-                      initial={prefersReducedMotion ? false : { opacity: 0, x: 12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      {...(prefersReducedMotion ? {} : { exit: { opacity: 0, x: -12 } })}
-                      transition={{ duration: prefersReducedMotion ? 0 : 0.2 }}
-                      aria-live="polite"
-                    >
-                      <h2 className="max-w-xl font-display text-xl font-semibold leading-snug tracking-tight sm:text-2xl">
-                        {ALIAS_QUESTIONS[aliasQuestionIndex]!.prompt}
-                      </h2>
-                      <p className="mt-2 text-sm text-muted-foreground">Pick the answer that feels closer. There’s no wrong choice.</p>
-
-                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                        {ALIAS_QUESTIONS[aliasQuestionIndex]!.options.map((option, optionIndex) => {
-                          const selected = aliasAnswers[aliasQuestionIndex] === optionIndex;
-                          return (
-                            <button
-                              key={option.token}
-                              type="button"
-                              aria-pressed={selected}
-                              onClick={() => setAliasAnswers((answers) => answers.map((answer, index) => index === aliasQuestionIndex ? optionIndex : answer))}
-                              className={`group flex min-h-24 w-full items-center gap-3 rounded-2xl border p-4 text-left transition-all active:scale-[0.99] sm:min-h-28 sm:p-5 ${selected ? "border-primary bg-primary/10 ring-1 ring-primary/30" : "border-border bg-background hover:border-primary/50 hover:bg-secondary/40"}`}
-                            >
-                              <span className={`flex size-10 shrink-0 items-center justify-center rounded-xl text-sm font-semibold transition-colors ${selected ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground group-hover:text-foreground"}`}>
-                                {String.fromCharCode(65 + optionIndex)}
-                              </span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block text-sm font-semibold text-foreground sm:text-base">{option.label}</span>
-                                <span className="mt-1 block text-xs leading-5 text-muted-foreground">{option.detail}</span>
-                              </span>
-                              <span className={`flex size-5 shrink-0 items-center justify-center rounded-full border ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border text-transparent"}`}>
-                                {selected ? <Check className="size-3.5" /> : null}
-                              </span>
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </motion.div>
-                  </AnimatePresence>
-
-                  <div className="flex items-center justify-between gap-3 border-t border-border pt-4">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => aliasQuestionIndex === 0 ? setAliasStage("seed") : setAliasQuestionIndex((index) => index - 1)}
-                    >
-                      Back
-                    </Button>
-                    <Button
-                      className="glow-primary"
-                      disabled={aliasAnswers[aliasQuestionIndex] === null}
-                      onClick={() => aliasQuestionIndex === ALIAS_QUESTIONS.length - 1 ? generateAlias() : setAliasQuestionIndex((index) => index + 1)}
-                    >
-                      {aliasQuestionIndex === ALIAS_QUESTIONS.length - 1 ? "Create my alias" : "Next question"}
-                      {aliasQuestionIndex === ALIAS_QUESTIONS.length - 1 ? <Sparkles className="size-4" /> : <ArrowRight className="size-4" />}
-                    </Button>
-                  </div>
+              ) : !usernameChoice ? (
+                <div className="space-y-3">
+                  <button type="button" onClick={() => { setUsernameChoice("own"); setUsernameSuggestions([]); setUsername(""); setMessage(null); }} className="group flex w-full items-center gap-4 rounded-2xl border border-border bg-background p-4 text-left transition-all hover:border-primary/50 hover:bg-secondary/40 sm:p-5">
+                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-foreground"><Pencil className="size-5" /></span>
+                    <span className="min-w-0 flex-1"><span className="block font-semibold">I’ll choose my own</span><span className="mt-1 block text-sm text-muted-foreground">Pick a unique username you want to post under.</span></span>
+                    <ArrowRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                  </button>
+                  <button type="button" disabled={loadingSuggestions} onClick={() => { setUsernameChoice("generated"); void generateAliases(); }} className="group flex w-full items-center gap-4 rounded-2xl border border-border bg-background p-4 text-left transition-all hover:border-primary/50 hover:bg-secondary/40 disabled:opacity-60 sm:p-5">
+                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Sparkles className="size-5" /></span>
+                    <span className="min-w-0 flex-1"><span className="block font-semibold">Let Candid choose for me</span><span className="mt-1 block text-sm text-muted-foreground">We’ll suggest available names you can pick from.</span></span>
+                    {loadingSuggestions ? <Loader2 className="size-5 animate-spin text-muted-foreground" /> : <ArrowRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />}
+                  </button>
                 </div>
               ) : (
-                <div className="space-y-5 text-center">
-                  <motion.div
-                    key={aliasIdea}
-                    initial={prefersReducedMotion ? false : { opacity: 0, y: 10, scale: 0.96 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    transition={{ duration: 0.3 }}
-                    className="rounded-2xl border border-primary/25 bg-primary/5 px-4 py-7"
-                  >
-                    <Sparkles className="mx-auto size-5 text-primary" />
-                    <p className="mt-3 text-xs font-medium uppercase tracking-widest text-muted-foreground">Your Candid alias</p>
-                    <p className="mt-2 break-all font-display text-2xl font-semibold">@{aliasIdea}</p>
-                    <p className={`mt-2 text-sm ${status === "available" ? "text-verified" : status === "taken" || status === "invalid" ? "text-destructive" : "text-muted-foreground"}`}>
-                      {status === "checking" ? "Checking availability…" : status === "available" ? "Available to claim" : status === "taken" || status === "invalid" ? message ?? "Try another alias" : "Checking availability…"}
-                    </p>
-                  </motion.div>
-                  <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button type="button" variant="outline" className="flex-1" onClick={generateAlias}>Try another</Button>
-                    <Button type="button" variant="ghost" className="flex-1" onClick={() => { setAliasStage("seed"); setUsername(""); setAliasIdea(""); }}>Change inspiration</Button>
-                  </div>
-                  <Button
-                    className="w-full glow-primary"
-                    disabled={status !== "available" || saving}
-                    onClick={() => editUsername ? void saveAliasChange() : setStep(1)}
-                  >
-                    {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-                    {editUsername ? saving ? "Saving alias…" : "Save new alias" : "Claim this alias"}
-                    {!saving ? <ArrowRight className="size-4" /> : null}
-                  </Button>
+                <div className="space-y-5">
+                  <button type="button" onClick={() => { setUsernameChoice(null); setUsername(""); setUsernameSuggestions([]); setSuggestionError(null); setMessage(null); }} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> Choose another option</button>
+                  {usernameChoice === "own" ? (
+                    <div className="space-y-3">
+                      <Label htmlFor="username">Your unique username</Label>
+                      <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 focus-within:border-primary"><AtSign className="size-4 shrink-0 text-muted-foreground" /><Input id="username" autoFocus autoComplete="off" spellCheck={false} maxLength={20} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="yourname" className="border-0 bg-transparent px-0 focus-visible:ring-0" /></div>
+                      <p className="text-xs leading-5 text-muted-foreground">Use 3–20 letters, numbers, dots, or underscores. Don’t use your real name if you want to stay anonymous.</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      <p className="text-sm font-medium">Available username suggestions</p>
+                      {loadingSuggestions ? <div className="flex items-center gap-2 rounded-xl bg-secondary/50 p-4 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Finding available names…</div> : usernameSuggestions.length ? <div className="grid gap-2 sm:grid-cols-2">{usernameSuggestions.map((suggestion) => <button key={suggestion} type="button" aria-pressed={username === suggestion} onClick={() => setUsername(suggestion)} className={cn("rounded-xl border px-4 py-3 text-left font-medium transition-colors", username === suggestion ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/30" : "border-border bg-background hover:border-primary/50")}>@{suggestion}</button>)}</div> : null}
+                      {suggestionError ? <p role="status" className="text-sm text-muted-foreground">{suggestionError}</p> : null}
+                      <Button type="button" variant="outline" onClick={() => void generateAliases()} disabled={loadingSuggestions}><Sparkles className="size-4" /> Generate more</Button>
+                    </div>
+                  )}
+                  {username ? <p aria-live="polite" className={`text-sm ${status === "available" ? "text-verified" : status === "taken" || status === "invalid" ? "text-destructive" : "text-muted-foreground"}`}>{status === "checking" ? "Checking username availability…" : status === "available" ? "This username is available." : status === "taken" || status === "invalid" ? message ?? "Choose another username." : "Checking username availability…"}</p> : null}
+                  {submitError ? <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-sm text-danger"><AlertCircle className="mt-0.5 size-4 shrink-0" /><p className="min-w-0 break-words">{submitError}</p></div> : null}
+                  {editUsername ? <Button className="w-full glow-primary" disabled={status !== "available" || saving} onClick={() => void saveAliasChange()}>{saving ? <Loader2 className="size-4 animate-spin" /> : null}{saving ? "Saving username…" : "Save username"}</Button> : <Button className="w-full glow-primary" disabled={status !== "available" || saving} onClick={() => setStep(1)}>Use @{username} <ArrowRight className="size-4" /></Button>}
                 </div>
               )}
             </motion.section>
@@ -849,150 +486,3 @@ function OnboardingPage() {
   );
 }
 
-type CandidLensExperienceProps = {
-  screen: Exclude<LensScreen, "onboarding">;
-  scenarioIndex: number;
-  selectedChoice: string | null;
-  answers: LensAnswer;
-  onStart: () => void;
-  onAnswer: (value: string) => void;
-  onSkip: () => void;
-  onContinue: () => void;
-  reducedMotion: boolean;
-};
-
-function CandidLensExperience({
-  screen,
-  scenarioIndex,
-  selectedChoice,
-  answers,
-  onStart,
-  onAnswer,
-  onSkip,
-  onContinue,
-  reducedMotion,
-}: CandidLensExperienceProps) {
-  const scenario = LENS_SCENARIOS[scenarioIndex];
-  const scenarioKey = `scenario${scenarioIndex + 1}` as keyof LensAnswer;
-  const interests = getLensInterests(answers);
-  const highlightedInterests = LENS_INTEREST_LABELS.filter((item) => interests[item.key] > 0)
-    .sort((first, second) => interests[second.key] - interests[first.key]);
-  const transition = reducedMotion
-    ? { duration: 0 }
-    : { duration: 0.36, ease: [0.22, 1, 0.36, 1] as const };
-  const answersMade = Object.keys(answers).length;
-  const isQuestion = screen === "scenario" && Boolean(scenario);
-
-  return (
-    <main className="min-h-[100dvh] w-full bg-background px-4 py-4 text-foreground sm:px-8 sm:py-7 lg:px-12">
-      <div className="mx-auto flex min-h-[calc(100dvh-2rem)] w-full max-w-6xl flex-col sm:min-h-[calc(100dvh-3.5rem)]">
-        <header className="flex items-center justify-between border-b border-border/70 pb-4 sm:pb-5">
-          <div className="flex items-center gap-3">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Flame className="size-5" /></span>
-            <span className="font-display text-base font-bold tracking-tight">Candid</span>
-            <span className="hidden h-5 w-px bg-border sm:block" />
-            <span className="hidden text-sm text-muted-foreground sm:block">Your Lens</span>
-          </div>
-          <div className="flex items-center gap-3">
-            {isQuestion ? <span className="text-xs font-medium tabular-nums text-muted-foreground">{scenarioIndex + 1} <span className="text-muted-foreground/50">/ 5</span></span> : null}
-            {screen === "intro" || screen === "scenario" ? <button type="button" onClick={onSkip} className="min-h-10 rounded-full px-3 text-sm text-muted-foreground transition hover:bg-secondary hover:text-foreground">Skip</button> : null}
-          </div>
-        </header>
-
-        {isQuestion ? <div className="mt-5 flex gap-1.5 sm:mt-7" aria-label={`Question ${scenarioIndex + 1} of 5`}>
-          {LENS_SCENARIOS.map((item, index) => <span key={item.label} className={`h-1 flex-1 rounded-full transition-colors ${index <= scenarioIndex ? "bg-primary" : "bg-secondary"}`} />)}
-        </div> : null}
-
-        <div className="grid flex-1 items-center gap-8 py-7 lg:grid-cols-[minmax(0,1.25fr)_minmax(280px,0.75fr)] lg:gap-16 lg:py-10">
-          <AnimatePresence mode="wait" initial={false}>
-            {screen === "intro" ? (
-              <motion.section key="lens-intro" initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} {...(reducedMotion ? {} : { exit: { opacity: 0, y: -8 } })} transition={transition} className="w-full max-w-2xl">
-                <p className="mb-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><Sparkles className="size-4" /> A quick check-in</p>
-                <h1 className="max-w-2xl font-display text-4xl font-semibold leading-[1.06] tracking-[-0.04em] sm:text-6xl">What do you look for at work?</h1>
-                <div className="mt-8 grid grid-cols-2 gap-2 sm:grid-cols-5">
-                  {LENS_SCENARIOS.map((item, index) => <div key={item.label} className="flex min-h-20 flex-col justify-between rounded-xl border border-border/70 bg-card/50 p-3"><span className="text-[10px] font-semibold tracking-[0.12em] text-muted-foreground">0{index + 1}</span><span className="text-xs font-medium">{item.label.toLowerCase()}</span></div>)}
-                </div>
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Button onClick={onStart} className="h-12 w-full rounded-xl px-6 text-sm sm:w-auto">Start the check-in <ArrowRight className="size-4" /></Button>
-                </div>
-              </motion.section>
-            ) : screen === "scenario" && scenario ? (
-              <motion.section key={`lens-scenario-${scenarioIndex}`} initial={reducedMotion ? false : { opacity: 0, x: 12 }} animate={{ opacity: 1, x: 0 }} {...(reducedMotion ? {} : { exit: { opacity: 0, x: -12 } })} transition={transition} aria-live="polite" className="w-full max-w-2xl">
-                <p className="mb-4 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><scenario.icon className="size-4" /> {scenario.label}</p>
-                <h1 className="font-display text-[1.75rem] font-semibold leading-[1.18] tracking-[-0.03em] sm:text-4xl">{scenario.text}</h1>
-                <div className="mt-7 grid gap-3 sm:grid-cols-2">
-                  {scenario.choices.map((choice, index) => {
-                    const selected = selectedChoice === choice.value;
-                    return <motion.button key={choice.value} type="button" disabled={Boolean(selectedChoice)} aria-pressed={answers[scenarioKey] === choice.value} onClick={() => onAnswer(choice.value)} {...(reducedMotion ? {} : { whileTap: { scale: 0.985 } })} className={`group flex min-h-28 w-full flex-col items-start justify-between rounded-2xl border p-4 text-left transition-all sm:min-h-36 sm:p-5 ${selected ? "border-primary bg-primary/10 ring-1 ring-primary/40" : "border-border bg-card/60 hover:border-primary/50 hover:bg-card"}`}>
-                      <span className={`flex size-7 items-center justify-center rounded-full border text-xs ${selected ? "border-primary bg-primary text-primary-foreground" : "border-border text-muted-foreground group-hover:border-primary/50"}`}>{selected ? <Check className="size-4" /> : index + 1}</span>
-                      <span className="mt-4 text-sm font-semibold leading-6 sm:text-base">{choice.label}</span>
-                    </motion.button>;
-                  })}
-                </div>
-              </motion.section>
-            ) : screen === "transition" ? (
-              <motion.section key="lens-transition" initial={reducedMotion ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={transition} aria-live="polite" className="flex min-h-64 flex-col justify-center">
-                <span className="mb-5 flex size-11 items-center justify-center rounded-full bg-primary/15 text-primary"><Check className="size-5" /></span>
-                <h1 className="font-display text-3xl font-semibold tracking-tight">Got it.</h1>
-                <p className="mt-2 text-sm text-muted-foreground">One more everyday situation.</p>
-              </motion.section>
-            ) : screen === "result" ? (
-              <motion.section key="lens-result" initial={reducedMotion ? false : { opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={transition} className="w-full max-w-2xl">
-                <p className="mb-5 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary"><ShieldCheck className="size-4" /> Your Lens</p>
-                <h1 className="font-display text-4xl font-semibold leading-[1.06] tracking-[-0.04em] sm:text-6xl">We’ll keep an eye on what matters to you.</h1>
-                <div className="mt-7 grid gap-2 sm:grid-cols-2">
-                  {highlightedInterests.map((item) => <div key={item.key} className="flex items-center gap-3 rounded-xl border border-border/70 bg-card/50 px-4 py-3"><span className="size-2 rounded-full bg-primary" /><span className="text-sm font-medium">{item.label}</span></div>)}
-                </div>
-                <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center">
-                  <Button onClick={onContinue} className="h-12 w-full rounded-xl px-6 text-sm sm:w-auto">Continue to your profile <ArrowRight className="size-4" /></Button>
-                </div>
-              </motion.section>
-            ) : null}
-          </AnimatePresence>
-
-          <aside className="hidden lg:block">
-            {screen === "result" ? (
-              <div className="rounded-3xl border border-border bg-card/65 p-7">
-                <span className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">What you noticed</span>
-                <div className="mt-7 space-y-5">{LENS_INTEREST_LABELS.map((item) => <div key={item.key}><div className="mb-2 flex justify-between text-sm"><span>{item.label}</span><span className="tabular-nums text-muted-foreground">{interests[item.key]}</span></div><div className="h-1.5 overflow-hidden rounded-full bg-secondary"><motion.div initial={{ width: 0 }} animate={{ width: `${Math.min(100, interests[item.key] * 25)}%` }} transition={{ duration: reducedMotion ? 0 : 0.6 }} className="h-full rounded-full bg-primary" /></div></div>)}</div>
-              </div>
-            ) : screen === "intro" ? (
-              <div className="relative overflow-hidden rounded-3xl border border-border bg-card/65 p-7">
-                <div className="absolute -right-12 -top-16 size-48 rounded-full bg-primary/10 blur-3xl" />
-                <p className="relative mt-10 font-display text-3xl font-medium leading-tight">“The small details often tell you the most.”</p>
-              </div>
-            ) : (
-              <div className="rounded-3xl border border-border bg-card/65 p-7">
-                <span className="text-xs font-semibold uppercase tracking-[0.15em] text-muted-foreground">Your check-in</span>
-                <p className="mt-2 text-sm text-muted-foreground">{answersMade} of 5 answered</p>
-                <div className="mt-6 space-y-3">{LENS_SCENARIOS.map((item, index) => { const answer = answers[`scenario${index + 1}` as keyof LensAnswer]; return <div key={item.label} className="flex items-start gap-3 border-t border-border/70 pt-3"><span className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-[10px] ${answer ? "bg-primary/15 text-primary" : "bg-secondary text-muted-foreground"}`}>{answer ? <Check className="size-3" /> : String(index + 1)}</span><span className="text-xs leading-5 text-muted-foreground">{item.label.toLowerCase()}{index === scenarioIndex ? <span className="ml-2 text-primary">Current</span> : ""}</span></div>; })}</div>
-              </div>
-            )}
-          </aside>
-        </div>
-        <footer className="border-t border-border/70 py-3 text-[11px] text-muted-foreground">Candid · Kenya</footer>
-      </div>
-    </main>
-  );
-}
-
-function AuroraBackdrop({ reducedMotion = false }: { reducedMotion?: boolean } = {}) {
-  return (
-    <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden">
-      <motion.div
-        className="absolute -left-24 top-0 size-72 rounded-full bg-primary/25 blur-3xl"
-        animate={reducedMotion ? { x: 0, y: 0 } : { x: [0, 40, -10, 0], y: [0, 30, 60, 0] }}
-        transition={
-          reducedMotion ? { duration: 0 } : { duration: 18, repeat: Infinity, ease: "easeInOut" }
-        }
-      />
-      <motion.div
-        className="absolute -right-20 top-40 size-80 rounded-full bg-verified/20 blur-3xl"
-        animate={reducedMotion ? { x: 0, y: 0 } : { x: [0, -30, 20, 0], y: [0, 40, -20, 0] }}
-        transition={
-          reducedMotion ? { duration: 0 } : { duration: 22, repeat: Infinity, ease: "easeInOut" }
-        }
-      />
-    </div>
-  );
-}
