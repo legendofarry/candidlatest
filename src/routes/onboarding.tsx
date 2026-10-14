@@ -22,6 +22,7 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 import { requiresEmailVerification } from "@/lib/email-verification";
 import { notify as toast } from "@/lib/notifications-store";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
 import { Input } from "@/components/ui/input";
@@ -212,7 +213,6 @@ function OnboardingPage() {
       }
       // Refresh claims before the server checks the verified-email requirement.
       await user.getIdToken(true);
-      const lensComplete = Object.values(lensAnswers).filter(Boolean).length === 5;
       const result = await complete({
         data: {
           username: username.trim().toLowerCase(),
@@ -367,8 +367,9 @@ function OnboardingPage() {
                     </div>
                   ) : (
                     <div className="space-y-3">
-                      <p className="text-sm font-medium">Available username suggestions</p>
-                      {loadingSuggestions ? <div className="flex items-center gap-2 rounded-xl bg-secondary/50 p-4 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Finding available names…</div> : usernameSuggestions.length ? <div className="grid gap-2 sm:grid-cols-2">{usernameSuggestions.map((suggestion) => <button key={suggestion} type="button" aria-pressed={username === suggestion} onClick={() => setUsername(suggestion)} className={cn("rounded-xl border px-4 py-3 text-left font-medium transition-colors", username === suggestion ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/30" : "border-border bg-background hover:border-primary/50")}>@{suggestion}</button>)}</div> : null}
+                      <p className="text-sm font-medium">Username ideas</p>
+                      <p className="text-xs text-muted-foreground">We’ll check availability when you select one.</p>
+                      {loadingSuggestions ? <div className="flex items-center gap-2 rounded-xl bg-secondary/50 p-4 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Generating username ideas…</div> : usernameSuggestions.length ? <div className="grid gap-2 sm:grid-cols-2">{usernameSuggestions.map((suggestion) => <button key={suggestion} type="button" aria-pressed={username === suggestion} onClick={() => setUsername(suggestion)} className={cn("rounded-xl border px-4 py-3 text-left font-medium transition-colors", username === suggestion ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/30" : "border-border bg-background hover:border-primary/50")}>@{suggestion}</button>)}</div> : null}
                       {suggestionError ? <p role="status" className="text-sm text-muted-foreground">{suggestionError}</p> : null}
                       <Button type="button" variant="outline" onClick={() => void generateAliases()} disabled={loadingSuggestions}><Sparkles className="size-4" /> Generate more</Button>
                     </div>

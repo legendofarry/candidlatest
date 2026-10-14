@@ -66,13 +66,12 @@ export const getUsernameSuggestions = createServerFn({ method: "POST" })
     z
       .object({
         seed: z.string().max(40).default("candid"),
-        ageRange: z.enum(["18-24", "25-34", "35-44", "45+", "skip"]).optional(),
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data, context }) => {
+  .handler(async ({ data }) => {
     const { suggestUsernames } = await import("./onboarding.server");
-    return { suggestions: await suggestUsernames(data.seed, 5, context.userId, data.ageRange) };
+    return { suggestions: suggestUsernames(data.seed, 5) };
   });
 
 export const completeOnboarding = createServerFn({ method: "POST" })

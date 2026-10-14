@@ -2,7 +2,7 @@ import { getFirestoreDb } from "./firebase.server";
 import { isPresetAvatarUrl } from "./preset-avatars";
 import type { ProfileRecord } from "./firebase-data.server";
 import { DEFAULT_MEMBERSHIP } from "./membership";
-import { generateAliasCandidate, type AliasAgeRange } from "./alias-generator";
+import { generateAliasCandidate } from "./alias-generator";
 
 export const USERNAME_MIN = 3;
 export const USERNAME_MAX = 20;
@@ -87,19 +87,16 @@ export async function checkUsernameAvailability(
   };
 }
 
-/** Only returns usernames that were confirmed free at generation time. */
-export async function suggestUsernames(
+/** Generates username ideas; availability is checked when someone selects one. */
+export function suggestUsernames(
   seed: string,
   limit = 5,
-  currentUserId?: string,
-  ageRange: AliasAgeRange = "skip",
 ) {
   const found = new Set<string>();
-  for (let attempt = 0; attempt < 80 && found.size < Math.min(limit, 10); attempt += 1) {
-    const candidate = generateAliasCandidate(seed, [], ageRange, attempt);
-    if (!validateUsername(candidate).ok || !(await isUsernameFree(candidate, currentUserId)))
-      continue;
-    found.add(candidate);
+  const target = Math.min(Math.max(limit, 1), 10);
+  for (let attempt = 0; attempt < target * 3 && found.size < target; attempt += 1) {
+    const candidate = generateAliasCandidate(seed, attempt);
+    if (validateUsername(candidate).ok) found.add(candidate);
   }
   return [...found];
 }
