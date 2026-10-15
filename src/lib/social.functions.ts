@@ -58,9 +58,17 @@ export const getStoryEngagement = createServerFn({ method: "POST" })
 
 export const getFollowedStories = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
-  .handler(async ({ context }) => {
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        limit: z.number().min(1).max(50).default(20),
+        cursor: z.object({ lastSeenAt: z.string(), id: z.string() }).nullable().default(null),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ context, data }) => {
     const { listFollowedStories } = await import("./social.server");
-    return listFollowedStories(context.userId);
+    return listFollowedStories(context.userId, data);
   });
 
 export const getStoryCatchUp = createServerFn({ method: "POST" })

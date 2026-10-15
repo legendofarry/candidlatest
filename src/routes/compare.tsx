@@ -19,6 +19,7 @@ import {
 } from "@/lib/company-comparison";
 import { Button } from "@/components/ui/button";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { formatCount } from "@/lib/utils";
 
 const compareQuery = queryOptions({
   queryKey: ["company-compare"],
@@ -215,7 +216,7 @@ function ComparePage() {
                     <CompareMetric
                       icon={MessageSquare}
                       label="Published stories"
-                      value={Number(company.story_count ?? 0).toLocaleString("en-KE")}
+                      value={formatCount(company.story_count)}
                       detail="Worker experiences shared; this count is not a workplace score."
                     />
                     <CompareMetric

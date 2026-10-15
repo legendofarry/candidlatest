@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
+import { useInfiniteQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
@@ -40,6 +42,7 @@ import {
   clearArchived,
   clearNotifications,
   closeNotifications,
+  ingestServerNotifications,
   markAllRead,
   markRead,
   markUnread,
@@ -52,8 +55,12 @@ import {
   type AppNotification,
   type NotifyKind,
 } from "@/lib/notifications-store";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import { openMessagePanel } from "@/lib/message-panel-state";
+import { syncMyNotifications } from "@/lib/notification-sync.functions";
+import { useAuth } from "@/hooks/useAuth";
+import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
+import { requiresEmailVerification } from "@/lib/email-verification";
 
 const kindMeta: Record<NotifyKind, { icon: typeof Info; tint: string; ring: string }> = {
   success: { icon: CheckCircle2, tint: "text-emerald-400", ring: "bg-emerald-400/10" },
@@ -86,10 +93,26 @@ type PendingAction =
 export function NotificationsOverlay() {
   const { open, view } = useNotificationsOverlay();
   const all = useNotifications();
+  const { user } = useAuth();
+  const fetchNotificationPage = useServerFn(syncMyNotifications);
   const navigate = useNavigate();
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [tab, setTab] = useState<"inbox" | "archive">("inbox");
+  const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(20);
   const panelRef = useRef<HTMLDivElement | null>(null);
+
+  const serverPages = useInfiniteQuery({
+    queryKey: ["notification-pages", user?.uid ?? "anon"],
+    initialPageParam: null as { createdAt: string; id: string } | null,
+    queryFn: ({ pageParam }) => fetchNotificationPage({ data: { limit: 20, cursor: pageParam } }),
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
+    enabled: open && Boolean(user) && !requiresEmailVerification(user),
+  });
+
+  useEffect(() => {
+    const items = serverPages.data?.pages.flatMap((page) => page.items) ?? [];
+    if (items.length) ingestServerNotifications(items);
+  }, [serverPages.data]);
 
   const notifications = all.filter((n) => (tab === "archive" ? n.archived : !n.archived));
   const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
@@ -128,11 +151,11 @@ export function NotificationsOverlay() {
     startOfToday.setHours(0, 0, 0, 0);
     const today: AppNotification[] = [];
     const earlier: AppNotification[] = [];
-    for (const n of notifications) {
+    for (const n of notifications.slice(0, visibleCount)) {
       (n.createdAt >= startOfToday.getTime() ? today : earlier).push(n);
     }
     return { today, earlier };
-  }, [notifications]);
+  }, [notifications, visibleCount]);
 
   const detail =
     view.name === "detail" ? (notifications.find((n) => n.id === view.id) ?? null) : null;
@@ -186,6 +209,35 @@ export function NotificationsOverlay() {
           onActivate={activate}
           onRequest={setPending}
         />
+        {notifications.length > visibleCount || serverPages.hasNextPage ? (
+          <div className="flex flex-col items-center gap-2 pt-1">
+            <p className="text-xs text-muted-foreground">
+              Showing {formatCount(visibleCount)} of {formatCount(notifications.length)}{" "}
+              notifications
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={serverPages.isFetchingNextPage}
+              onClick={(event) => {
+                if (visibleCount < notifications.length) {
+                  expandBy(20, event.currentTarget);
+                } else if (serverPages.hasNextPage) {
+                  const anchor = event.currentTarget;
+                  void serverPages.fetchNextPage().then((result) => {
+                    if (result.isSuccess) expandBy(20, anchor);
+                  });
+                }
+              }}
+            >
+              {serverPages.isFetchingNextPage
+                ? "Loading notifications…"
+                : visibleCount < notifications.length
+                  ? "Show 20 more"
+                  : "Load next 20 notifications"}
+            </Button>
+          </div>
+        ) : null}
       </div>
     );
   }
@@ -202,7 +254,10 @@ export function NotificationsOverlay() {
           <button
             key={item.key}
             type="button"
-            onClick={() => setTab(item.key)}
+            onClick={() => {
+              setTab(item.key);
+              resetVisibleCount();
+            }}
             className={cn(
               "rounded-t-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors",
               tab === item.key &&
@@ -211,7 +266,12 @@ export function NotificationsOverlay() {
           >
             {item.label}
             {item.count > 0 ? (
-              <span className="ml-1.5 text-xs text-muted-foreground">{item.count}</span>
+              <span
+                className="ml-1.5 text-xs text-muted-foreground"
+                aria-label={item.count.toLocaleString()}
+              >
+                {formatCount(item.count)}
+              </span>
             ) : null}
           </button>
         ))}

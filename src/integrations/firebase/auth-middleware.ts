@@ -29,36 +29,50 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
 
     const db = getFirestoreDb();
     const profile = await db.collection("profiles").doc(decoded.uid).get();
-    const profileData = profile.data() as {
-      banned?: boolean;
-      investigation_hold?: boolean | { active?: boolean } | null;
-      subscription_tier?: string;
-      subscription_status?: string;
-      subscription_source?: string;
-      subscription_version?: number;
-    } | undefined;
+    const profileData = profile.data() as
+      | {
+          username?: string | null;
+          banned?: boolean;
+          investigation_hold?: boolean | { active?: boolean } | null;
+          subscription_tier?: string;
+          subscription_status?: string;
+          subscription_source?: string;
+          subscription_version?: number;
+        }
+      | undefined;
     if (profileData?.banned) {
       throw new Error("This account has been restricted.");
     }
     const investigationHold = profileData?.investigation_hold;
-    if (investigationHold === true || (typeof investigationHold === "object" && investigationHold?.active)) {
+    if (
+      investigationHold === true ||
+      (typeof investigationHold === "object" && investigationHold?.active)
+    ) {
       throw new Error("ACCOUNT_INVESTIGATION_HOLD");
     }
     if (!profileData?.subscription_tier || !profileData.subscription_status) {
-      await db.collection("profiles").doc(decoded.uid).set({
-        id: decoded.uid,
-        subscription_tier: profileData?.subscription_tier || DEFAULT_MEMBERSHIP.subscription_tier,
-        subscription_status: profileData?.subscription_status || DEFAULT_MEMBERSHIP.subscription_status,
-        subscription_provider: DEFAULT_MEMBERSHIP.subscription_provider,
-        subscription_started_at: DEFAULT_MEMBERSHIP.subscription_started_at,
-        subscription_period_ends_at: DEFAULT_MEMBERSHIP.subscription_period_ends_at,
-        subscription_source:
-          profileData?.subscription_source ??
-          (profileData?.subscription_tier && profileData.subscription_tier !== "basic"
-            ? "manual"
-            : DEFAULT_MEMBERSHIP.subscription_source),
-        subscription_version: profileData?.subscription_version ?? 0,
-      }, { merge: true });
+      await db
+        .collection("profiles")
+        .doc(decoded.uid)
+        .set(
+          {
+            id: decoded.uid,
+            subscription_tier:
+              profileData?.subscription_tier || DEFAULT_MEMBERSHIP.subscription_tier,
+            subscription_status:
+              profileData?.subscription_status || DEFAULT_MEMBERSHIP.subscription_status,
+            subscription_provider: DEFAULT_MEMBERSHIP.subscription_provider,
+            subscription_started_at: DEFAULT_MEMBERSHIP.subscription_started_at,
+            subscription_period_ends_at: DEFAULT_MEMBERSHIP.subscription_period_ends_at,
+            subscription_source:
+              profileData?.subscription_source ??
+              (profileData?.subscription_tier && profileData.subscription_tier !== "basic"
+                ? "manual"
+                : DEFAULT_MEMBERSHIP.subscription_source),
+            subscription_version: profileData?.subscription_version ?? 0,
+          },
+          { merge: true },
+        );
     }
 
     if (profileData?.username && !welcomedUsers.has(decoded.uid)) {

@@ -48,6 +48,17 @@ function PrivacyPage() {
         </ul>
       </section>
       <section>
+        <h2>Browser storage and cache</h2>
+        <p>
+          Candid stores recently viewed public stories, employer information and salary summaries in
+          your browser for up to 24 hours so pages can reopen faster. The app also uses browser
+          storage for your notification inbox, preferences and story drafts. This storage stays on
+          your device and may remain after you close the browser; it is separate from the account
+          records Candid stores on its servers. Clear Candid site data in your browser to remove
+          local copies. Avoid saving a story draft on a shared device.
+        </p>
+      </section>
+      <section>
         <h2>What stays private</h2>
         <ul>
           <li>
@@ -81,9 +92,9 @@ function PrivacyPage() {
             change the result.
           </li>
           <li>
-            Support chat messages may be processed by Candid’s AI support assistant to answer
-            common product questions. Questions it cannot confidently answer are flagged for the
-            Candid team, who can read and reply in the same chat.
+            Support chat messages may be processed by Candid’s AI support assistant to answer common
+            product questions. Questions it cannot confidently answer are flagged for the Candid
+            team, who can read and reply in the same chat.
           </li>
         </ul>
       </section>
@@ -98,8 +109,8 @@ function PrivacyPage() {
         <h2>Disclaimer</h2>
         <ul>
           <li>
-            Stories are the personal opinions and recollections shared by members. They are
-            not findings of fact and we do not independently verify them.
+            Stories are the personal opinions and recollections shared by members. They are not
+            findings of fact and we do not independently verify them.
           </li>
           <li>
             Automated screening reviews submissions for safety and privacy. It does not verify the

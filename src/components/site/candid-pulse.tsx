@@ -4,6 +4,7 @@ import { Activity, ChevronRight, MapPin } from "lucide-react";
 import { Link } from "@tanstack/react-router";
 import { toast } from "sonner";
 import { getPulse } from "@/lib/public.functions";
+import { formatCount } from "@/lib/utils";
 
 /** Counts up to the target so the panel feels alive without faking data. */
 function useCountUp(target: number, duration = 900) {
@@ -121,7 +122,13 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
       aria-label="Candid Pulse — live workplace signals"
     >
       <div className="signal-grid absolute inset-0 rounded-3xl" />
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[oklch(0.135_0.014_285)] p-5 text-foreground shadow-2xl shadow-black/30 backdrop-blur-sm transition-shadow xl:p-7" style={{ boxShadow: "0 25px 60px -15px color-mix(in oklab, var(--primary) calc(var(--spot, 0) * 45%), transparent)" }}>
+      <div
+        className="relative overflow-hidden rounded-3xl border border-white/10 bg-[oklch(0.135_0.014_285)] p-5 text-foreground shadow-2xl shadow-black/30 backdrop-blur-sm transition-shadow xl:p-7"
+        style={{
+          boxShadow:
+            "0 25px 60px -15px color-mix(in oklab, var(--primary) calc(var(--spot, 0) * 45%), transparent)",
+        }}
+      >
         <div className="flex items-center justify-between text-xs xl:text-sm">
           <span className="flex items-center gap-2 font-medium text-foreground">
             <Activity className="size-4 text-primary xl:size-5" /> Candid Pulse
@@ -175,7 +182,7 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <span className="truncate capitalize text-foreground/90">{row.reason}</span>
                   <span className="flex items-center gap-1 tabular-nums text-muted-foreground">
-                    {row.count}
+                    {formatCount(row.count)}
                     <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                   </span>
                 </div>
@@ -192,9 +199,10 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
 
         <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs xl:mt-5 xl:px-4 xl:py-3 xl:text-sm">
           <span className="flex items-center gap-1.5 text-muted-foreground">
-            <MapPin className="size-3.5 text-verified" /> {pulse?.counties ?? 0} counties covered
+            <MapPin className="size-3.5 text-verified" /> {formatCount(pulse?.counties ?? 0)}{" "}
+            counties covered
           </span>
-          <span className="text-primary">{pulse?.storiesLast24Hours ?? 0} in 24h</span>
+          <span className="text-primary">{formatCount(pulse?.storiesLast24Hours ?? 0)} in 24h</span>
         </div>
       </div>
     </div>

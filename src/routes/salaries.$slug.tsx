@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { getCompanySalaries } from "@/lib/public.functions";
 import { Button } from "@/components/ui/button";
+import { formatCount } from "@/lib/utils";
 import { kes } from "@/routes/salaries.index";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 
@@ -107,8 +108,8 @@ function CompanySalaryPage() {
           salaries
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {data.company.industry ?? "—"} · {data.company.county ?? "—"} · {data.contributions}{" "}
-          contribution{data.contributions === 1 ? "" : "s"}
+          {data.company.industry ?? "—"} · {data.company.county ?? "—"} ·{" "}
+          {formatCount(data.contributions)} contribution{data.contributions === 1 ? "" : "s"}
         </p>
         <Link
           to="/companies/$slug"
@@ -161,7 +162,7 @@ function CompanySalaryPage() {
                     )}
                   </td>
                   <td className="px-3 py-3 text-right text-muted-foreground">
-                    {row.contributions}
+                    {formatCount(row.contributions)}
                   </td>
                 </tr>
               ))

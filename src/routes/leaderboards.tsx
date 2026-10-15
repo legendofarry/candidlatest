@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { Flame, Star, Undo2 } from "lucide-react";
 import { getLeaderboards } from "@/lib/public.functions";
+import { formatCount } from "@/lib/utils";
 
 const boardsQuery = queryOptions({
   queryKey: ["leaderboards"],
@@ -21,8 +22,7 @@ export const Route = createFileRoute("/leaderboards")({
       { property: "og:title", content: "Kenya employer leaderboards | Candid" },
       {
         property: "og:description",
-        content:
-          "Most reported, best rated, and would-work-again rankings from Kenyan workers.",
+        content: "Most reported, best rated, and would-work-again rankings from Kenyan workers.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -92,8 +92,8 @@ function LeaderboardsPage() {
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Leaderboards</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Rankings built from workplace stories and culture ratings by Kenyan workers. Scores
-          move as new reports come in.
+          Rankings built from workplace stories and culture ratings by Kenyan workers. Scores move
+          as new reports come in.
         </p>
       </header>
 
@@ -103,7 +103,7 @@ function LeaderboardsPage() {
           blurb="Employers with the highest number of published exit stories."
           icon={<Flame className="size-5" />}
           rows={data.mostReported as Row[]}
-          value={(row) => `${Number(row.story_count ?? 0)} stories`}
+          value={(row) => `${formatCount(row.story_count)} stories`}
         />
         <Board
           title="Best rated"

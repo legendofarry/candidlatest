@@ -6,6 +6,7 @@ import {
   getCompanyView,
   getFilterOptionsData,
   getPublicStories,
+  getPublicStoryPage,
   getStoryView,
   searchData,
 } from "./firebase-data.server";
@@ -27,29 +28,76 @@ const FeedInput = z.object({
   reason: z.string().nullable().default(null),
   companySlug: z.string().nullable().default(null),
   limit: z.number().min(1).max(50).default(20),
+  cursor: z.object({ createdAt: z.string(), id: z.string() }).nullable().optional(),
 });
 
 export const listStories = createServerFn({ method: "GET" })
   .inputValidator((input: unknown) => FeedInput.parse(input ?? {}))
   .handler(async ({ data }) => {
     try {
-      console.log("[listStories] Fetching stories with params:", data);
-      const stories = await getPublicStories({
+      if (data.sort === "new") {
+        const page = await getPublicStoryPage({
+          limit: data.limit,
+          cursor: data.cursor ?? null,
+          industry: data.industry,
+          county: data.county,
+          area: data.area,
+        });
+        return { ...page, error: null as string | null };
+      }
+      const allStories = await getPublicStories({
         sort: data.sort,
         industry: data.industry,
         county: data.county,
         area: data.area,
         reason: data.reason,
         companySlug: data.companySlug,
-        limit: data.limit,
+        limit: 0,
       });
-      console.log("[listStories] Success, returned", stories.length, "stories");
-      return { stories, error: null as string | null };
+      const cursorIndex = data.cursor
+        ? allStories.findIndex((story) => story.id === data.cursor?.id)
+        : -1;
+      const start = Math.max(0, cursorIndex + 1);
+      const page = allStories.slice(start, start + data.limit + 1);
+      const hasMore = page.length > data.limit;
+      const stories = page.slice(0, data.limit);
+      const last = stories.at(-1);
+      return {
+        stories,
+        error: null as string | null,
+        hasMore,
+        nextCursor:
+          hasMore && last?.created_at && last.id
+            ? { createdAt: last.created_at, id: last.id }
+            : null,
+      };
     } catch (error) {
       console.error("[listStories] Full error:", error);
       if (!isFirebaseReadUnavailable(error)) throw error;
       console.warn("[listStories] Firebase public read unavailable", error);
-      return { stories: [], error: "Firebase is not ready yet." };
+      return { stories: [], error: "Firebase is not ready yet.", hasMore: false, nextCursor: null };
+    }
+  });
+
+export const listStoryPage = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        limit: z.number().min(1).max(50).default(20),
+        cursor: z.object({ createdAt: z.string(), id: z.string() }).nullable().default(null),
+        industry: z.string().nullable().default(null),
+        county: z.string().nullable().default(null),
+        area: z.string().nullable().default(null),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data }) => {
+    try {
+      return { ...(await getPublicStoryPage(data)), error: null as string | null };
+    } catch (error) {
+      if (!isFirebaseReadUnavailable(error)) throw error;
+      console.warn("[listStoryPage] Firebase public read unavailable", error);
+      return { stories: [], hasMore: false, nextCursor: null, error: "Firebase is not ready yet." };
     }
   });
 

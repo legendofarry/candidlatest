@@ -12,13 +12,13 @@ export function useServerNotificationsSync() {
   const sync = useServerFn(syncMyNotifications);
   const query = useQuery({
     queryKey: ["server-notifications", user?.uid ?? "anon"],
-    queryFn: () => sync(),
+    queryFn: () => sync({ data: { limit: 20, cursor: null } }),
     enabled: Boolean(user) && !requiresEmailVerification(user),
     refetchInterval: 60_000,
     refetchOnWindowFocus: true,
   });
 
   useEffect(() => {
-    if (query.data) ingestServerNotifications(query.data);
+    if (query.data) ingestServerNotifications(query.data.items);
   }, [query.data]);
 }

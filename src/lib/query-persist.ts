@@ -3,7 +3,20 @@ import { dehydrate, hydrate, type QueryClient } from "@tanstack/react-query";
 const KEY = "candid_query_cache_v1";
 const MAX_AGE_MS = 1000 * 60 * 60 * 24; // 24h
 
-type Snapshot = { savedAt: number; state: unknown };
+type Snapshot = { version?: number; savedAt: number; state: unknown };
+const PERSISTED_PUBLIC_QUERIES = new Set([
+  "stories",
+  "story-pages",
+  "story",
+  "filters",
+  "company-scores",
+  "company",
+  "salary-companies",
+  "salary-aggregates",
+  "leaderboards",
+  "compare",
+  "pulse",
+]);
 
 /**
  * Keeps the read cache in local storage so returning users see the feed,
@@ -16,7 +29,7 @@ export function enableQueryPersistence(queryClient: QueryClient) {
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const snapshot = JSON.parse(raw) as Snapshot;
-      if (Date.now() - snapshot.savedAt < MAX_AGE_MS) {
+      if (snapshot.version === 2 && Date.now() - snapshot.savedAt < MAX_AGE_MS) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         hydrate(queryClient, snapshot.state as any);
       } else {
@@ -33,11 +46,14 @@ export function enableQueryPersistence(queryClient: QueryClient) {
     timer = setTimeout(() => {
       try {
         const state = dehydrate(queryClient, {
-          shouldDehydrateQuery: (query) => query.state.status === "success",
+          shouldDehydrateQuery: (query) =>
+            query.state.status === "success" &&
+            typeof query.queryKey[0] === "string" &&
+            PERSISTED_PUBLIC_QUERIES.has(query.queryKey[0]),
         });
         localStorage.setItem(
           KEY,
-          JSON.stringify({ savedAt: Date.now(), state } satisfies Snapshot),
+          JSON.stringify({ version: 2, savedAt: Date.now(), state } satisfies Snapshot),
         );
       } catch {
         /* storage full or unavailable */

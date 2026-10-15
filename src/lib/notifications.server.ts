@@ -38,27 +38,63 @@ export async function pushServerNotification(input: {
     throw error;
   }
   const { dispatchWebPush } = await import("./push.server");
-  await dispatchWebPush(input.userId, { title: record.title, body: record.description, link: record.link, notificationId: record.id });
+  await dispatchWebPush(input.userId, {
+    title: record.title,
+    body: record.description,
+    link: record.link,
+    notificationId: record.id,
+  });
   return record;
 }
 
-export async function listServerNotifications(userId: string, limit = 30) {
+export async function listServerNotifications(
+  userId: string,
+  limit = 20,
+  cursor?: { createdAt: string; id: string } | null,
+) {
   const db = getFirestoreDb();
-  const snap = await db.collection("notifications").where("user_id", "==", userId).get();
-  return snap.docs
-    .map((doc) => doc.data() as ServerNotificationRecord)
-    // Messages own their unread state and badge in the Messages workspace.
-    // This also keeps already-created legacy message alerts out of the main inbox.
-    .filter((item) => !item.link?.startsWith("/messages/"))
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))
-    .slice(0, limit);
+  const baseQuery = db
+    .collection("notifications")
+    .where("user_id", "==", userId)
+    .orderBy("created_at", "desc")
+    .orderBy("__name__", "desc");
+  const items: ServerNotificationRecord[] = [];
+  let scanCursor = cursor ?? null;
+  let exhausted = false;
+  while (items.length <= limit && !exhausted) {
+    let query = baseQuery;
+    if (scanCursor) {
+      query = query.startAfter(
+        scanCursor.createdAt,
+        db.collection("notifications").doc(scanCursor.id),
+      );
+    }
+    const snap = await query.limit(limit * 2).get();
+    for (const doc of snap.docs) {
+      const item = { ...(doc.data() as ServerNotificationRecord), id: doc.id };
+      scanCursor = { createdAt: item.created_at, id: item.id };
+      // Messages own their unread state and badge in the Messages workspace.
+      if (!item.link?.startsWith("/messages/")) items.push(item);
+      if (items.length > limit) break;
+    }
+    exhausted = snap.size < limit * 2 || snap.docs.length === 0;
+    if (items.length > limit || exhausted) break;
+  }
+  const hasMore = items.length > limit;
+  const page = items.slice(0, limit);
+  const last = page.at(-1);
+  return {
+    items: page,
+    hasMore,
+    nextCursor: hasMore && last ? { createdAt: last.created_at, id: last.id } : null,
+  };
 }
 
 /** Resolves @usernames in a text body to user ids via the usernames collection. */
 export async function resolveMentionedUserIds(body: string, excludeUserId?: string) {
-  const handles = [...new Set(
-    (body.match(/@([a-z0-9_]{2,24})/gi) ?? []).map((m) => m.slice(1).toLowerCase()),
-  )];
+  const handles = [
+    ...new Set((body.match(/@([a-z0-9_]{2,24})/gi) ?? []).map((m) => m.slice(1).toLowerCase())),
+  ];
   if (handles.length === 0) return [];
   const db = getFirestoreDb();
   const ids: string[] = [];

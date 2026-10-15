@@ -14,7 +14,8 @@ import { generateId } from "./firebase-data.server";
 /** The seeded owner account. Candid can always reach every user. */
 export const CANDID_USER_ID = "candid-official";
 export const CANDID_USERNAME = "candid";
-export const CANDID_WELCOME_MESSAGE = "Welcome to Candid 👋\n\nExplore workplace stories, follow discussions and share your experience using your Candid alias. Your email and legal name are not shown with your stories. Please avoid details that could identify you or another person.\n\nWe’re glad you’re here.\nCandid Team";
+export const CANDID_WELCOME_MESSAGE =
+  "Welcome to Candid 👋\n\nExplore workplace stories, follow discussions and share your experience using your Candid alias. Your email and legal name are not shown with your stories. Please avoid details that could identify you or another person.\n\nWe’re glad you’re here.\nCandid Team";
 
 export async function getCandidAccountId() {
   const db = getFirestoreDb();
@@ -250,17 +251,26 @@ export async function ensureCandidAccount() {
     const legacyProfileRef = db.collection("profiles").doc(CANDID_USER_ID);
     const legacyProfile = await legacyProfileRef.get();
     if (legacyProfile.exists) {
-      await legacyProfileRef.set({
-        display_name: "Candid Team",
-        role_label: "Candid Team",
-        account_type: "unknown",
-        verified: false,
-        migrated_to: candidUserId,
-      }, { merge: true });
-      await db.collection("account_verifications").doc(CANDID_USER_ID).set({
-        account_type: "unknown", owner_override: null, badge_status: "none", owner_verified: false,
-        approval_status: "none",
-      }, { merge: true });
+      await legacyProfileRef.set(
+        {
+          display_name: "Candid Team",
+          role_label: "Candid Team",
+          account_type: "unknown",
+          verified: false,
+          migrated_to: candidUserId,
+        },
+        { merge: true },
+      );
+      await db.collection("account_verifications").doc(CANDID_USER_ID).set(
+        {
+          account_type: "unknown",
+          owner_override: null,
+          badge_status: "none",
+          owner_verified: false,
+          approval_status: "none",
+        },
+        { merge: true },
+      );
     }
   }
   return candidUserId;
@@ -278,7 +288,9 @@ export async function ensureWelcomeMessage(userId: string) {
 
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const [markerSnapshot, messageSnapshot, conversationSnapshot] = await Promise.all([
-      markerRef.get(), messageRef.get(), conversationRef.get(),
+      markerRef.get(),
+      messageRef.get(),
+      conversationRef.get(),
     ]);
     if (markerSnapshot.exists || messageSnapshot.exists) return { sent: false };
     const timestamp = now();
@@ -294,19 +306,34 @@ export async function ensureWelcomeMessage(userId: string) {
       is_deleted: false,
     };
     const batch = db.batch();
-    batch.create(markerRef, { id: messageId, user_id: userId, message_id: messageId, type: "welcome", created_at: timestamp });
+    batch.create(markerRef, {
+      id: messageId,
+      user_id: userId,
+      message_id: messageId,
+      type: "welcome",
+      created_at: timestamp,
+    });
     batch.create(messageRef, message);
     if (conversationSnapshot.exists) {
       const conversation = conversationSnapshot.data() as ConversationRecord;
-      if (!conversation.participant_ids?.includes(candidUserId) || !conversation.participant_ids.includes(userId)) {
+      if (
+        !conversation.participant_ids?.includes(candidUserId) ||
+        !conversation.participant_ids.includes(userId)
+      ) {
         throw new Error("Candid welcome conversation has invalid participants.");
       }
-      batch.update(conversationRef, {
-        last_message: CANDID_WELCOME_MESSAGE,
-        last_message_at: timestamp,
-        last_sender_id: candidUserId,
-        [`unread.${userId}`]: FieldValue.increment(1),
-      }, conversationSnapshot.updateTime ? { updateTime: conversationSnapshot.updateTime } : undefined);
+      batch.update(
+        conversationRef,
+        {
+          last_message: CANDID_WELCOME_MESSAGE,
+          last_message_at: timestamp,
+          last_sender_id: candidUserId,
+          [`unread.${userId}`]: FieldValue.increment(1),
+        },
+        conversationSnapshot.updateTime
+          ? { updateTime: conversationSnapshot.updateTime }
+          : undefined,
+      );
     } else {
       const conversation: ConversationRecord = {
         id: conversationId,
@@ -324,7 +351,10 @@ export async function ensureWelcomeMessage(userId: string) {
       return { sent: true };
     } catch (error) {
       if (error instanceof Error && /\[(409|412)\]/.test(error.message)) {
-        const [latestMarker, latestMessage] = await Promise.all([markerRef.get(), messageRef.get()]);
+        const [latestMarker, latestMessage] = await Promise.all([
+          markerRef.get(),
+          messageRef.get(),
+        ]);
         if (latestMarker.exists || latestMessage.exists) return { sent: false };
         if (attempt < 2) continue;
       }
@@ -345,7 +375,11 @@ export async function sendWelcomeMessagesToExistingMembers() {
   const failures: string[] = [];
   for (const profile of profiles.docs) {
     const data = profile.data() as Partial<ProfileRecord>;
-    if (profile.id === candidUserId || data.account_type === "official" || !(data.username || data.handle)) {
+    if (
+      profile.id === candidUserId ||
+      data.account_type === "official" ||
+      !(data.username || data.handle)
+    ) {
       skipped += 1;
       continue;
     }
@@ -501,6 +535,48 @@ export async function listConversations(userId: string) {
       };
     })
     .sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+}
+
+/** Loads one inbox page without reading the member's full conversation history. */
+export async function listConversationPage(
+  userId: string,
+  limit = 20,
+  cursor?: { lastMessageAt: string; id: string } | null,
+) {
+  const db = getFirestoreDb();
+  let query = db
+    .collection("conversations")
+    .where("participant_ids", "array-contains", userId)
+    .orderBy("last_message_at", "desc")
+    .orderBy("__name__", "desc");
+  if (cursor) {
+    query = query.startAfter(cursor.lastMessageAt, db.collection("conversations").doc(cursor.id));
+  }
+  const snap = await query.limit(limit + 1).get();
+  const pageDocs = snap.docs.slice(0, limit);
+  const records = pageDocs.map((doc) => ({ ...(doc.data() as ConversationRecord), id: doc.id }));
+  const otherIds = records.map(
+    (record) => record.participant_ids.find((id) => id !== userId) ?? userId,
+  );
+  const participants = await readParticipants(otherIds);
+  const items = records.map((record) => {
+    const otherId = record.participant_ids.find((id) => id !== userId) ?? userId;
+    return {
+      id: record.id,
+      with: participants.get(otherId)!,
+      last_message: record.last_message,
+      last_message_at: record.last_message_at,
+      unread: record.unread?.[userId] ?? 0,
+      mine: record.last_sender_id === userId,
+    };
+  });
+  const last = records.at(-1);
+  const hasMore = snap.docs.length > limit;
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last ? { lastMessageAt: last.last_message_at, id: last.id } : null,
+  };
 }
 
 export async function unreadMessageCount(userId: string) {
@@ -694,7 +770,9 @@ export async function sendMessage(input: {
       db.collection("profiles").doc(input.userId).get(),
     ]);
     const sender = senderSnap.data() as { username?: string | null } | undefined;
-    const messagePreview = image ? "Sent you a photo" : input.body.replace(/\s+/g, " ").trim().slice(0, 180);
+    const messagePreview = image
+      ? "Sent you a photo"
+      : input.body.replace(/\s+/g, " ").trim().slice(0, 180);
     await dispatchWebPush(otherId, {
       title: sender?.username ? `@${sender.username}` : "New message",
       body: messagePreview || "Sent you a message",
@@ -703,7 +781,10 @@ export async function sendMessage(input: {
     });
   } catch (error) {
     // The message is already saved; push delivery must never make sending fail.
-    console.warn("[message push] Could not notify recipient", error instanceof Error ? error.message : "unknown error");
+    console.warn(
+      "[message push] Could not notify recipient",
+      error instanceof Error ? error.message : "unknown error",
+    );
   }
 
   return message;
@@ -811,22 +892,47 @@ export async function readPublicProfile(username: string, viewerId: string | nul
   const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
   if (!userId) return null;
 
-  const [participants, profileSnap, followers, following, stories, comments, profileFollowsViewer] =
-    await Promise.all([
-      readParticipants([userId]),
-      db.collection("profiles").doc(userId).get(),
-      db.collection("follows").where("following_id", "==", userId).get(),
-      db.collection("follows").where("follower_id", "==", userId).get(),
-      db.collection("stories").where("author_id", "==", userId).get(),
-      db.collection("comments").where("author_id", "==", userId).get(),
-      viewerId
-        ? db.collection("follows").doc(`${userId}:${viewerId}`).get()
-        : Promise.resolve(null),
-    ]);
+  const [
+    participants,
+    profileSnap,
+    followerCount,
+    followingCount,
+    storyCount,
+    commentCount,
+    stories,
+    followerPreviews,
+    profileFollowsViewer,
+    viewerFollowsProfile,
+  ] = await Promise.all([
+    readParticipants([userId]),
+    db.collection("profiles").doc(userId).get(),
+    db.collection("follows").where("following_id", "==", userId).count(),
+    db.collection("follows").where("follower_id", "==", userId).count(),
+    db
+      .collection("stories")
+      .where("author_id", "==", userId)
+      .where("status", "==", "published")
+      .count(),
+    db
+      .collection("comments")
+      .where("author_id", "==", userId)
+      .where("status", "==", "published")
+      .count(),
+    db
+      .collection("stories")
+      .where("author_id", "==", userId)
+      .where("status", "==", "published")
+      .orderBy("created_at", "desc")
+      .limit(30)
+      .get(),
+    db.collection("follows").where("following_id", "==", userId).limit(8).get(),
+    viewerId ? db.collection("follows").doc(`${userId}:${viewerId}`).get() : Promise.resolve(null),
+    viewerId ? db.collection("follows").doc(`${viewerId}:${userId}`).get() : Promise.resolve(null),
+  ]);
   const profile = profileSnap.data() as ProfileRecord | undefined;
   if (!profileSnap.exists || profile?.banned) return null;
   const followerPreview = await Promise.all(
-    followers.docs.slice(0, 8).map(async (doc) => {
+    followerPreviews.docs.map(async (doc) => {
       const followerId = (doc.data() as { follower_id: string }).follower_id;
       const followerSnap = await db.collection("profiles").doc(followerId).get();
       const follower = followerSnap.data() as ProfileRecord | undefined;
@@ -839,7 +945,6 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     viewerId && viewerId !== userId
       ? await canMessage(viewerId, userId)
       : { allowed: false as const, reason: null };
-
   return {
     ...participants.get(userId)!,
     role_label: profile?.role_label ?? null,
@@ -848,23 +953,18 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     cover_url: profile?.cover_url ?? null,
     county: profile?.county ?? null,
     socials: profile?.socials ?? null,
-    followers: followers.size,
-    following: following.size,
-    follower_preview: followerPreview.filter(
-      (entry): entry is NonNullable<typeof entry> => Boolean(entry),
+    followers: followerCount,
+    following: followingCount,
+    follower_preview: followerPreview.filter((entry): entry is NonNullable<typeof entry> =>
+      Boolean(entry),
     ),
     contributions: {
-      stories: stories.docs.filter((doc) => (doc.data() as StoryRecord).status === "published")
-        .length,
-      comments: comments.docs.filter((doc) => (doc.data() as CommentRecord).status === "published")
-        .length,
+      stories: storyCount,
+      comments: commentCount,
       joined_at: profile?.onboarded_at ?? profile?.created_at ?? null,
     },
     stories: stories.docs
       .map((doc) => doc.data() as StoryRecord)
-      .filter((story) => story.status === "published")
-      .sort((a, b) => Date.parse(b.created_at) - Date.parse(a.created_at))
-      .slice(0, 30)
       .map((story) => ({
         id: story.id,
         title: story.title,
@@ -876,11 +976,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
         comment_count: story.comment_count,
         likes: story.likes ?? 0,
       })),
-    isFollowing: viewerId
-      ? followers.docs.some(
-          (doc) => (doc.data() as { follower_id: string }).follower_id === viewerId,
-        )
-      : false,
+    isFollowing: Boolean(viewerFollowsProfile?.exists),
     isBlocked: viewerId ? await isBlocked(viewerId, userId) : false,
     followsYou: Boolean(profileFollowsViewer?.exists),
     messaging: { allowed: messaging.allowed, reason: messaging.allowed ? null : messaging.reason },

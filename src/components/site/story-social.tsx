@@ -5,7 +5,7 @@ import { Bookmark, Heart } from "lucide-react";
 import { followStory, getStoryEngagement, likeStory } from "@/lib/social.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 
 /** Like + follow-this-story controls, shared by the feed card and the story page. */
 export function StorySocial({
@@ -105,7 +105,7 @@ export function StorySocial({
         )}
       >
         <Heart className={cn("size-4", liked && "fill-current")} />
-        <span>{likeCount}</span>
+        <span aria-label={`${likeCount.toLocaleString()} likes`}>{formatCount(likeCount)}</span>
       </button>
       <button
         type="button"
@@ -119,7 +119,9 @@ export function StorySocial({
         )}
       >
         <Bookmark className={cn("size-4", following && "fill-current")} />
-        <span aria-label={`${followerCount} followers`}>{followerCount}</span>
+        <span aria-label={`${followerCount.toLocaleString()} followers`}>
+          {formatCount(followerCount)}
+        </span>
       </button>
     </div>
   );

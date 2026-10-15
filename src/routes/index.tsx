@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useQuery, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useInfiniteQuery, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Activity, Flame, PenLine, TrendingUp, Users } from "lucide-react";
-import { getFilterOptions, getPulse, listStories } from "@/lib/public.functions";
+import { getFilterOptions, getPulse, listStories, listStoryPage } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
 import type { PublicStory } from "@/components/site/story-card";
 import { FeedDiscussionPanel } from "@/components/site/feed-discussion-panel";
@@ -13,6 +13,8 @@ import { CandidPulse } from "@/components/site/candid-pulse";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { formatCount } from "@/lib/utils";
+import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import {
   Drawer,
   DrawerContent,
@@ -23,7 +25,7 @@ import {
 
 const feedQuery = queryOptions({
   queryKey: ["stories", "new"],
-  queryFn: () => listStories({ data: { sort: "new" } }),
+  queryFn: () => listStoryPage({ data: { limit: 20, cursor: null } }),
 });
 
 const filtersQuery = queryOptions({
@@ -49,7 +51,8 @@ export const Route = createFileRoute("/")({
       { property: "og:title", content: "Candid — Kenyan workplace stories" },
       {
         property: "og:description",
-        content: "Why Kenyans really left their jobs. Search workplace stories employer by employer.",
+        content:
+          "Why Kenyans really left their jobs. Search workplace stories employer by employer.",
       },
     ],
   }),
@@ -72,6 +75,7 @@ function FeedPage() {
   const [q, setQ] = useState("");
   const [activeDiscussion, setActiveDiscussion] = useState<PublicStory | null>(null);
   const [pulseSheetOpen, setPulseSheetOpen] = useState(false);
+  const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(20);
 
   /**
    * The unfiltered view reuses the data the loader already fetched, so the
@@ -79,25 +83,32 @@ function FeedPage() {
    */
   const isDefaultView = sort === "new" && industry === null && county === null && area === null;
 
-  const { data, isPending } = useQuery({
-    queryKey: ["stories", sort, industry, county, area],
-    queryFn: () => listStories({ data: { sort, industry, county, area } }),
-    ...(isDefaultView ? { initialData: initialFeed } : {}),
+  useEffect(() => resetVisibleCount(), [sort, industry, county, area, q, resetVisibleCount]);
+
+  const feedPages = useInfiniteQuery({
+    queryKey: ["story-pages", sort, industry, county, area],
+    initialPageParam: null as { createdAt: string; id: string } | null,
+    queryFn: ({ pageParam }) =>
+      sort === "new"
+        ? listStoryPage({ data: { limit: 20, cursor: pageParam, industry, county, area } })
+        : listStories({ data: { sort, industry, county, area, cursor: pageParam } }),
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
+    ...(isDefaultView ? { initialData: { pages: [initialFeed], pageParams: [null] } } : {}),
   });
   const areaOptions = county ? (filters.areasByCounty[county] ?? []) : filters.areas;
 
   const needle = q.trim().toLowerCase();
-  const stories = (data?.stories ?? []).filter((story) =>
+  const stories = (feedPages.data?.pages.flatMap((page) => page.stories) ?? []).filter((story) =>
     needle
       ? [
-        story.title,
-        story.body,
-        story.company_name ?? "",
-        ...((story as { reasons?: string[] }).reasons ?? []),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle)
+          story.title,
+          story.body,
+          story.company_name ?? "",
+          ...((story as { reasons?: string[] }).reasons ?? []),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle)
       : true,
   );
 
@@ -107,7 +118,8 @@ function FeedPage() {
     );
   }
 
-  const canReset = Boolean(needle) || industry !== null || county !== null || area !== null || sort !== "new";
+  const canReset =
+    Boolean(needle) || industry !== null || county !== null || area !== null || sort !== "new";
 
   return (
     <div className="space-y-5 md:space-y-8">
@@ -256,7 +268,7 @@ function FeedPage() {
             ]}
           />
 
-          {isPending ? (
+          {feedPages.isPending ? (
             <div className="space-y-4">
               <PulseLoader label="Loading stories" />
               {[0, 1, 2].map((i) => (
@@ -268,18 +280,44 @@ function FeedPage() {
               No stories match these filters yet.
             </p>
           ) : (
-            stories.map((story, index) => (
-              <StoryCard
-                key={story.id}
-                story={story}
-                index={index}
-                discussionOpen={activeDiscussion?.id === story.id}
-                onToggleDiscussion={() =>
-                  setActiveDiscussion((current) => (current?.id === story.id ? null : story))
-                }
-              />
-            ))
+            stories
+              .slice(0, visibleCount)
+              .map((story, index) => (
+                <StoryCard
+                  key={story.id}
+                  story={story}
+                  index={index}
+                  discussionOpen={activeDiscussion?.id === story.id}
+                  onToggleDiscussion={() =>
+                    setActiveDiscussion((current) => (current?.id === story.id ? null : story))
+                  }
+                />
+              ))
           )}
+          {stories.length > visibleCount || feedPages.hasNextPage ? (
+            <div className="flex justify-center py-3">
+              <Button
+                variant="outline"
+                onClick={(event) => {
+                  if (visibleCount < stories.length) {
+                    expandBy(20, event.currentTarget);
+                  } else {
+                    const anchor = event.currentTarget;
+                    void feedPages.fetchNextPage().then((result) => {
+                      if (result.isSuccess) expandBy(20, anchor);
+                    });
+                  }
+                }}
+                disabled={feedPages.isFetchingNextPage}
+              >
+                {feedPages.isFetchingNextPage
+                  ? "Loading stories…"
+                  : visibleCount < stories.length
+                    ? "Show 20 more stories"
+                    : "Load more stories"}
+              </Button>
+            </div>
+          ) : null}
         </div>
 
         <AnimatePresence mode="wait" initial={false}>
@@ -304,7 +342,9 @@ function FeedPage() {
                         className="text-muted-foreground hover:text-primary"
                       >
                         {company.name}
-                        {company.verified ? <CompanyVerifiedBadge className="ml-1 align-middle" /> : null}
+                        {company.verified ? (
+                          <CompanyVerifiedBadge className="ml-1 align-middle" />
+                        ) : null}
                       </Link>
                     </li>
                   ))}
@@ -364,14 +404,15 @@ function LiveMemberCounter() {
     return () => window.cancelAnimationFrame(frame);
   }, [count]);
 
-  const displayCount = count === null ? "—" : String(animatedCount).padStart(3, "0");
-
-  const leadingDigits = displayCount.slice(0, -1);
-  const finalDigit = displayCount.slice(-1);
+  const displayCount = count === null ? "—" : formatCount(animatedCount);
 
   return (
     <div
-      aria-label={count === null ? "Candid member count unavailable" : `${count} members on Candid`}
+      aria-label={
+        count === null
+          ? "Candid member count unavailable"
+          : `${count.toLocaleString("en-KE")} members on Candid`
+      }
       aria-live="polite"
       className="relative mb-2 flex h-11 items-center justify-between overflow-visible text-foreground sm:mb-3 sm:h-auto sm:min-h-32"
     >
@@ -381,14 +422,18 @@ function LiveMemberCounter() {
           The Candid community
         </div>
         <p className="mt-2 hidden text-lg font-semibold leading-tight tracking-tight text-foreground sm:block sm:text-xl md:text-2xl">
-          Real people.<br />A growing voice.
+          Real people.
+          <br />A growing voice.
         </p>
         <p className="mt-1.5 hidden text-[10px] text-muted-foreground sm:block sm:text-xs">
           Every story starts with someone.
         </p>
       </div>
 
-      <div className="pointer-events-none absolute inset-y-0 right-0 flex w-[45%] items-center justify-end" aria-hidden="true">
+      <div
+        className="pointer-events-none absolute inset-y-0 right-0 flex w-[45%] items-center justify-end"
+        aria-hidden="true"
+      >
         <span className="absolute inset-x-0 top-[28%] h-px bg-foreground/10" />
         <span className="absolute inset-x-0 top-1/2 h-px bg-foreground/10" />
         <span className="absolute inset-x-0 top-[72%] h-px bg-foreground/10" />
@@ -399,10 +444,11 @@ function LiveMemberCounter() {
             animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
             exit={{ y: -14, opacity: 0, filter: "blur(6px)" }}
             transition={{ duration: 0.4, ease: "easeOut" }}
-            className="relative z-10 whitespace-nowrap text-4xl font-black leading-none tracking-[-0.025em] tabular-nums sm:text-8xl md:text-8xl lg:text-9xl"
+            className="relative z-10 whitespace-nowrap text-4xl font-black leading-none tracking-[-0.025em] tabular-nums sm:text-7xl md:text-8xl lg:text-9xl"
           >
-            <span className="font-normal text-foreground/20">{leadingDigits}</span>
-            <span className="font-black text-foreground drop-shadow-[3px_3px_0_rgba(163,208,0,0.55)]">{finalDigit}</span>
+            <span className="font-black text-foreground drop-shadow-[3px_3px_0_rgba(163,208,0,0.35)]">
+              {displayCount}
+            </span>
           </motion.span>
         </AnimatePresence>
         <span className="absolute -bottom-1 right-0 flex items-center gap-1.5 whitespace-nowrap text-[9px] text-muted-foreground sm:text-[10px]">

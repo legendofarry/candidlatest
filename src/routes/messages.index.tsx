@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, Sparkles } from "lucide-react";
@@ -11,23 +11,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
-
-function useDemoConversation() {
-  return null as null | {
-    id: string;
-    with: {
-      username: string;
-      verified?: boolean;
-      official?: boolean;
-      photo_url?: string | null;
-      membership_tier?: "basic" | "premium" | "gold";
-    };
-    last_message: string;
-    last_message_at: string;
-    unread: number;
-    mine: boolean;
-  };
-}
+import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 
 export const Route = createFileRoute("/messages/")({
   head: () => ({
@@ -68,15 +52,18 @@ export function MessagesInbox({
   const { user, loading } = useAuth();
   const navigate = useNavigate();
   const fetchConversations = useServerFn(getConversations);
-  const demo = useDemoConversation();
   const listRef = useRef<HTMLDivElement>(null);
   const restoredRef = useRef(false);
+  const { visibleCount, expandBy } = useAutoCollapsingCount(20);
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } = useInfiniteQuery({
     queryKey: ["conversations", user?.uid],
-    queryFn: () => fetchConversations(),
+    initialPageParam: null as { lastMessageAt: string; id: string } | null,
+    queryFn: ({ pageParam }) => fetchConversations({ data: { limit: 20, cursor: pageParam } }),
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
     enabled: Boolean(user),
-    refetchInterval: 15000,
+    staleTime: 30_000,
+    refetchOnWindowFocus: true,
   });
 
   // Restore the previous inbox scroll position once the list has rendered.
@@ -103,22 +90,8 @@ export function MessagesInbox({
     return () => target.removeEventListener("scroll", handler);
   }, []);
 
-  const conversations = [
-    ...(demo
-      ? [
-          {
-            id: demo.id,
-            with: demo.with,
-            last_message: demo.last_message,
-            last_message_at: demo.last_message_at,
-            unread: demo.unread,
-            mine: demo.mine,
-            demo: true,
-          },
-        ]
-      : []),
-    ...(data ?? []).map((item) => ({ ...item, demo: false })),
-  ].sort((a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+  const conversations = data?.pages.flatMap((page) => page.items) ?? [];
+  const visibleConversations = conversations.slice(0, visibleCount);
 
   return (
     <div ref={listRef} className="mx-auto max-w-2xl">
@@ -136,7 +109,7 @@ export function MessagesInbox({
         </div>
       </header>
 
-      {isLoading ? (
+      {loading || (isLoading && Boolean(user)) ? (
         <div className="space-y-3">
           {[0, 1, 2].map((index) => (
             <div key={index} className="h-20 animate-pulse rounded-2xl bg-secondary/60" />
@@ -157,7 +130,7 @@ export function MessagesInbox({
       ) : (
         <ul className="space-y-2">
           <AnimatePresence initial={false}>
-            {conversations.map((item, index) => (
+            {visibleConversations.map((item, index) => (
               <motion.li
                 key={item.id}
                 layout
@@ -169,11 +142,11 @@ export function MessagesInbox({
                   <button
                     type="button"
                     aria-label={`Open conversation with @${item.with?.username ?? "member"}`}
-                    onClick={() =>
+                    onClick={() => {
                       onSelectConversation
                         ? onSelectConversation(item.id)
-                        : void navigate({ to: "/messages/$id", params: { id: item.id } })
-                    }
+                        : void navigate({ to: "/messages/$id", params: { id: item.id } });
+                    }}
                     className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <ProfileAvatar
@@ -208,11 +181,11 @@ export function MessagesInbox({
                     </span>
                     <button
                       type="button"
-                      onClick={() =>
+                      onClick={() => {
                         onSelectConversation
                           ? onSelectConversation(item.id)
-                          : void navigate({ to: "/messages/$id", params: { id: item.id } })
-                      }
+                          : void navigate({ to: "/messages/$id", params: { id: item.id } });
+                      }}
                       className={cn(
                         "mt-0.5 block w-full truncate text-left text-sm text-muted-foreground",
                         item.unread > 0 && "font-medium text-foreground",
@@ -233,6 +206,37 @@ export function MessagesInbox({
           </AnimatePresence>
         </ul>
       )}
+      {visibleConversations.length > 0 &&
+      (conversations.length > visibleConversations.length || hasNextPage) ? (
+        <div className="flex flex-col items-center gap-2 py-5">
+          <p className="text-xs text-muted-foreground">
+            {hasNextPage
+              ? `Showing ${visibleConversations.length.toLocaleString()} conversations loaded so far`
+              : `Showing ${visibleConversations.length.toLocaleString()} of ${conversations.length.toLocaleString()} conversations`}
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isFetchingNextPage}
+            onClick={(event) => {
+              if (visibleCount < conversations.length) {
+                expandBy(20, event.currentTarget);
+              } else if (hasNextPage) {
+                const anchor = event.currentTarget;
+                void fetchNextPage().then((result) => {
+                  if (result.isSuccess) expandBy(20, anchor);
+                });
+              }
+            }}
+          >
+            {isFetchingNextPage
+              ? "Loading conversations…"
+              : visibleCount < conversations.length
+                ? "Show 20 more"
+                : "Load next 20 conversations"}
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

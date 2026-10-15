@@ -32,8 +32,9 @@ import {
 } from "@/lib/actions.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import type { MembershipTier } from "@/lib/membership";
@@ -92,7 +93,8 @@ export function CommentThread({
   const engagementFn = useServerFn(getMyEngagement);
   const [body, setBody] = useState("");
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
-  const [visibleRootCount, setVisibleRootCount] = useState(30);
+  const { visibleCount: visibleRootCount, expandBy: expandRootComments } =
+    useAutoCollapsingCount(30);
 
   useEffect(() => {
     if (!focusCommentId) return;
@@ -155,7 +157,9 @@ export function CommentThread({
           panelMode && "hidden",
         )}
       >
-        <h2 className="text-sm font-semibold">{total} comments</h2>
+        <h2 className="text-sm font-semibold" aria-label={`${total.toLocaleString()} comments`}>
+          {formatCount(total)} comments
+        </h2>
         <span className="ml-auto text-[11px] text-muted-foreground">
           Official replies pinned first
         </span>
@@ -190,13 +194,17 @@ export function CommentThread({
       </div>
 
       {sortedComments.length > visibleRootCount ? (
-        <div className="border-t border-border/60 p-3 text-center">
+        <div className="flex flex-col items-center gap-1 border-t border-border/60 p-3 text-center">
+          <p className="text-xs text-muted-foreground">
+            Showing {formatCount(Math.min(visibleRootCount, sortedComments.length))} of{" "}
+            {formatCount(sortedComments.length)} top-level comments
+          </p>
           <Button
             variant="ghost"
             size="sm"
-            onClick={() => setVisibleRootCount((count) => count + 30)}
+            onClick={(event) => expandRootComments(30, event.currentTarget)}
           >
-            Show more comments
+            Show 30 more comments
           </Button>
         </div>
       ) : null}
@@ -313,7 +321,7 @@ function CommentRow({
   const [editing, setEditing] = useState(false);
   const [editedBody, setEditedBody] = useState(comment.body);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const [visibleReplies, setVisibleReplies] = useState(10);
+  const { visibleCount: visibleReplies, expandBy: expandReplies } = useAutoCollapsingCount(10);
 
   useEffect(() => {
     if (!editing) setEditedBody(comment.body);
@@ -466,7 +474,7 @@ function CommentRow({
                 <ChevronDown
                   className={cn("size-3.5 transition-transform", open && "rotate-180")}
                 />
-                {open ? "Hide" : `View ${comment.replies.length}`}{" "}
+                {open ? "Hide" : `View ${formatCount(comment.replies.length)}`}{" "}
                 {comment.replies.length === 1 ? "reply" : "replies"}
               </button>
             ) : null}
@@ -485,7 +493,12 @@ function CommentRow({
               >
                 <Heart className={cn("size-4", isLiked && "fill-danger text-danger")} />
               </button>
-              <span className="text-[10px] text-muted-foreground">{localLikes}</span>
+              <span
+                className="text-[10px] text-muted-foreground"
+                aria-label={`${localLikes.toLocaleString()} likes`}
+              >
+                {formatCount(localLikes)}
+              </span>
             </>
           ) : null}
 
@@ -561,9 +574,10 @@ function CommentRow({
         <button
           type="button"
           className="ml-12 mt-1 text-xs font-medium text-primary"
-          onClick={() => setVisibleReplies((count) => count + 10)}
+          onClick={(event) => expandReplies(10, event.currentTarget)}
         >
-          Show more replies
+          Show 10 more replies · {formatCount(Math.min(visibleReplies, comment.replies.length))} of{" "}
+          {formatCount(comment.replies.length)}
         </button>
       ) : null}
 

@@ -11,9 +11,10 @@ import { useState } from "react";
 import { ArrowBigUp, Flag, MapPin, Users } from "lucide-react";
 import { notify as toast } from "@/lib/notifications-store";
 import { getStory } from "@/lib/public.functions";
+import { formatCount } from "@/lib/utils";
 import { castVote, getMyEngagement } from "@/lib/actions.functions";
 import { formatDate, reasonTone } from "@/components/site/story-card";
-import { CommentThread, type ThreadComment } from "@/components/site/comment-thread";
+import { CommentThread } from "@/components/site/comment-thread";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { ReportDialog } from "@/components/site/report-dialog";
 import { useAuth } from "@/hooks/useAuth";
@@ -82,7 +83,7 @@ function StoryPage() {
   });
 
   if (!data) return null;
-  const { story, comments } = data;
+  const { story, comments, commentTotal } = data;
   const isReported = locallyReported || (engagement.data?.reportedTargetIds ?? []).includes(id);
   const votedKinds = engagement.data?.votedKinds ?? [];
 
@@ -161,14 +162,14 @@ function StoryPage() {
           disabled={!user || voteMutation.isPending}
           onClick={() => voteMutation.mutate("up")}
         >
-          <ArrowBigUp className="size-4" /> Upvote {story.upvotes ?? 0}
+          <ArrowBigUp className="size-4" /> Upvote {formatCount(story.upvotes ?? 0)}
         </Button>
         <Button
           variant={votedKinds.includes("metoo") ? "default" : "outline"}
           disabled={!user || voteMutation.isPending}
           onClick={() => voteMutation.mutate("metoo")}
         >
-          <Users className="size-4" /> This happened to me too {story.metoo ?? 0}
+          <Users className="size-4" /> This happened to me too {formatCount(story.metoo ?? 0)}
         </Button>
         <StorySocial storyId={id} likes={story.likes ?? 0} followers={story.follower_count ?? 0} />
         <Button
@@ -193,7 +194,7 @@ function StoryPage() {
       <CommentThread
         storyId={id}
         comments={comments}
-        total={countComments(comments)}
+        total={commentTotal}
         focusCommentId={focusCommentId}
       />
 
@@ -209,8 +210,4 @@ function StoryPage() {
       />
     </article>
   );
-}
-
-function countComments(list: ThreadComment[]): number {
-  return list.reduce((total, item) => total + 1 + countComments(item.replies), 0);
 }

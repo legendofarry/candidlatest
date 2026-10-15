@@ -8,6 +8,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CompanyIntelPanel } from "@/components/site/company-intel";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { formatCount } from "@/lib/utils";
 
 const companyQuery = (slug: string) =>
   queryOptions({
@@ -129,7 +130,7 @@ function CompanyPage() {
           <div className="text-right">
             <ScoreBadge value={score?.overall ?? null} />
             <p className="mt-2 text-xs text-muted-foreground">
-              {Number(score?.story_count ?? 0)} stories · {Number(score?.rating_count ?? 0)} ratings
+              {formatCount(score?.story_count)} stories · {formatCount(score?.rating_count)} ratings
             </p>
             {score?.would_work_again_pct !== null && score?.would_work_again_pct !== undefined ? (
               <p className="text-xs text-verified">

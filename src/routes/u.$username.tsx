@@ -25,7 +25,7 @@ import { followAccount } from "@/lib/social.functions";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 
@@ -162,8 +162,18 @@ function PublicProfilePage() {
             />
           ) : (
             <div className="relative size-full overflow-hidden bg-[radial-gradient(ellipse_at_18%_5%,rgba(204,255,0,0.3),transparent_40%),radial-gradient(ellipse_at_88%_100%,rgba(0,198,160,0.2),transparent_42%),linear-gradient(125deg,#17201d,#0b1113_60%,#131a1c)]">
-              <div aria-hidden="true" className="absolute -right-12 -top-24 size-72 rounded-full border border-white/10 shadow-[0_0_0_32px_rgba(255,255,255,0.025),0_0_0_72px_rgba(255,255,255,0.02)]" />
-              <div className="absolute bottom-5 left-5 sm:bottom-7 sm:left-8"><p className="text-[10px] font-semibold uppercase tracking-[.24em] text-primary">Candid community</p><p className="mt-1 font-display text-lg font-semibold text-white/90 sm:text-2xl">Real stories. Real workplaces.</p></div>
+              <div
+                aria-hidden="true"
+                className="absolute -right-12 -top-24 size-72 rounded-full border border-white/10 shadow-[0_0_0_32px_rgba(255,255,255,0.025),0_0_0_72px_rgba(255,255,255,0.02)]"
+              />
+              <div className="absolute bottom-5 left-5 sm:bottom-7 sm:left-8">
+                <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-primary">
+                  Candid community
+                </p>
+                <p className="mt-1 font-display text-lg font-semibold text-white/90 sm:text-2xl">
+                  Real stories. Real workplaces.
+                </p>
+              </div>
             </div>
           )}
           <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/15" />
@@ -231,12 +241,14 @@ function PublicProfilePage() {
                 <h1 className="flex flex-wrap items-center gap-1.5 text-xl font-bold tracking-tight sm:text-3xl">
                   @{profile.username}
                   {profile.verified ? <BadgeCheck className="size-5 text-sky-500" /> : null}
-                  <MembershipBadge tier={profile.membership_tier} official={profile.official} />
+                  <MembershipBadge
+                    tier={profile.membership_tier as "basic" | "premium" | "gold" | null}
+                    official={profile.official}
+                  />
                 </h1>
                 <p className="text-xs text-muted-foreground sm:text-sm">
-                  {profile.followers.toLocaleString()} followers ·{" "}
-                  {profile.following.toLocaleString()} following ·{" "}
-                  {profile.contributions.stories.toLocaleString()} stories
+                  {formatCount(profile.followers)} followers · {formatCount(profile.following)}{" "}
+                  following · {formatCount(profile.contributions.stories)} stories
                 </p>
                 {profile.official ? (
                   <p className="text-xs font-medium text-primary">Official Candid account</p>
@@ -381,18 +393,43 @@ function PublicProfilePage() {
 
           <section className="border-y border-border/70 bg-card/80 px-4 py-3 sm:rounded-xl sm:border sm:px-5 sm:py-4">
             <div className="mb-2 flex items-center justify-between">
-              <div><h2 className="text-lg font-bold sm:text-xl">Community <span className="ml-1 text-sm font-medium text-muted-foreground">{profile.followers}</span></h2><p className="text-xs text-muted-foreground sm:text-sm">People following @{profile.username}</p></div>
+              <div>
+                <h2 className="text-lg font-bold sm:text-xl">
+                  Community{" "}
+                  <span className="ml-1 text-sm font-medium text-muted-foreground">
+                    {formatCount(profile.followers)}
+                  </span>
+                </h2>
+                <p className="text-xs text-muted-foreground sm:text-sm">
+                  People following @{profile.username}
+                </p>
+              </div>
             </div>
             {followerPreview.length ? (
               <div className="-mx-1 flex gap-3 overflow-x-auto pb-1">
                 {followerPreview.map((person) => (
-                  <Link key={person.id} to="/u/$username" params={{ username: person.username }} className="w-[calc(50%-6px)] min-w-[138px] shrink-0 overflow-hidden rounded-xl border border-border bg-background sm:w-40">
-                    <ProfileAvatar photoUrl={person.photo_url} initials={person.username.slice(0, 2)} className="aspect-square w-full rounded-none bg-secondary text-3xl" />
-                    <span className="block truncate px-3 py-2 text-sm font-semibold">@{person.username}</span>
+                  <Link
+                    key={person.id}
+                    to="/u/$username"
+                    params={{ username: person.username }}
+                    className="w-[calc(50%-6px)] min-w-[138px] shrink-0 overflow-hidden rounded-xl border border-border bg-background sm:w-40"
+                  >
+                    <ProfileAvatar
+                      photoUrl={person.photo_url}
+                      initials={person.username.slice(0, 2)}
+                      className="aspect-square w-full rounded-none bg-secondary text-3xl"
+                    />
+                    <span className="block truncate px-3 py-2 text-sm font-semibold">
+                      @{person.username}
+                    </span>
                   </Link>
                 ))}
               </div>
-            ) : <p className="py-2 text-sm text-muted-foreground">No community members to show yet.</p>}
+            ) : (
+              <p className="py-2 text-sm text-muted-foreground">
+                No community members to show yet.
+              </p>
+            )}
           </section>
         </div>
       ) : null}
@@ -401,13 +438,27 @@ function PublicProfilePage() {
         <div className="bg-background pb-3 sm:px-5">
           <section className="overflow-hidden border-y border-border/70 bg-card sm:rounded-xl sm:border">
             <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4">
-              <div><h2 className="text-lg font-bold sm:text-xl">Stories</h2><p className="text-xs text-muted-foreground">{profile.contributions.stories} published</p></div>
+              <div>
+                <h2 className="text-lg font-bold sm:text-xl">Stories</h2>
+                <p className="text-xs text-muted-foreground">
+                  {formatCount(profile.contributions.stories)} published
+                </p>
+              </div>
             </div>
             {profile.isSelf ? (
               <>
-                <Link to="/post" className="flex items-center gap-3 border-y border-border px-4 py-3 sm:px-5">
-                  <ProfileAvatar photoUrl={profile.photo_url} initials={profile.username.slice(0, 2)} className="size-10 border border-border" />
-                  <span className="flex-1 rounded-full bg-secondary px-4 py-2.5 text-sm text-muted-foreground">Share a workplace story…</span>
+                <Link
+                  to="/post"
+                  className="flex items-center gap-3 border-y border-border px-4 py-3 sm:px-5"
+                >
+                  <ProfileAvatar
+                    photoUrl={profile.photo_url}
+                    initials={profile.username.slice(0, 2)}
+                    className="size-10 border border-border"
+                  />
+                  <span className="flex-1 rounded-full bg-secondary px-4 py-2.5 text-sm text-muted-foreground">
+                    Share a workplace story…
+                  </span>
                   <Image className="size-5 text-primary" />
                 </Link>
                 <Link
@@ -423,25 +474,60 @@ function PublicProfilePage() {
                 {publicStories.map((story) => (
                   <article key={story.id} className="px-4 py-4 sm:px-5">
                     <div className="flex items-start gap-3">
-                      <ProfileAvatar photoUrl={profile.photo_url} initials={profile.username.slice(0, 2)} className="size-10 border border-border" />
+                      <ProfileAvatar
+                        photoUrl={profile.photo_url}
+                        initials={profile.username.slice(0, 2)}
+                        className="size-10 border border-border"
+                      />
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold">@{profile.username}</p>
-                        <p className="text-xs text-muted-foreground">{story.company_name || "Workplace story"}{story.county ? ` · ${story.county}${story.area ? `, ${story.area}` : ""}` : ""} · {new Date(story.created_at).toLocaleDateString("en-KE")}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {story.company_name || "Workplace story"}
+                          {story.county
+                            ? ` · ${story.county}${story.area ? `, ${story.area}` : ""}`
+                            : ""}{" "}
+                          · {new Date(story.created_at).toLocaleDateString("en-KE")}
+                        </p>
                       </div>
                     </div>
-                    <Link to="/stories/$id" params={{ id: story.id }} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                    <Link
+                      to="/stories/$id"
+                      params={{ id: story.id }}
+                      className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                    >
                       <h3 className="mt-3 text-base font-semibold">{story.title}</h3>
-                      <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">{story.body}</p>
+                      <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                        {story.body}
+                      </p>
                     </Link>
                     <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5"><Heart className="size-4" /> {story.likes}</span>
-                      <Link to="/stories/$id" params={{ id: story.id }} className="inline-flex items-center gap-1.5"><MessageSquare className="size-4" /> {story.comment_count} comments</Link>
-                      <Link to="/stories/$id" params={{ id: story.id }} className="font-medium text-primary">Read story</Link>
+                      <span className="inline-flex items-center gap-1.5">
+                        <Heart className="size-4" /> {formatCount(story.likes)}
+                      </span>
+                      <Link
+                        to="/stories/$id"
+                        params={{ id: story.id }}
+                        className="inline-flex items-center gap-1.5"
+                      >
+                        <MessageSquare className="size-4" /> {formatCount(story.comment_count)}{" "}
+                        comments
+                      </Link>
+                      <Link
+                        to="/stories/$id"
+                        params={{ id: story.id }}
+                        className="font-medium text-primary"
+                      >
+                        Read story
+                      </Link>
                     </div>
                   </article>
                 ))}
               </div>
-            ) : <p className="px-4 py-8 text-center text-sm text-muted-foreground">No published stories yet.</p>}
+            ) : (
+              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                No published stories yet.
+              </p>
+            )}
           </section>
         </div>
       ) : null}

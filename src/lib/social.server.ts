@@ -1,10 +1,5 @@
 import { getFirestoreDb } from "./firebase.server";
-import {
-  readCollection,
-  type CommentRecord,
-  type CompanyRecord,
-  type StoryRecord,
-} from "./firebase-data.server";
+import { type CommentRecord, type StoryRecord } from "./firebase-data.server";
 
 export type FollowRecord = {
   id: string;
@@ -56,19 +51,18 @@ export async function toggleAccountFollow(followerId: string, followingId: strin
 /** Follower / following counts for a profile, plus the viewer's own relationship. */
 export async function readFollowStats(profileId: string, viewerId: string | null) {
   const db = getFirestoreDb();
-  const [followers, following] = await Promise.all([
-    db.collection("follows").where("following_id", "==", profileId).get(),
-    db.collection("follows").where("follower_id", "==", profileId).get(),
+  const [followers, following, viewerFollow] = await Promise.all([
+    db.collection("follows").where("following_id", "==", profileId).count(),
+    db.collection("follows").where("follower_id", "==", profileId).count(),
+    viewerId
+      ? db.collection("follows").doc(`${viewerId}:${profileId}`).get()
+      : Promise.resolve(null),
   ]);
 
   return {
-    followers: followers.size,
-    following: following.size,
-    isFollowing: viewerId
-      ? followers.docs.some((doc) => (doc.data() as FollowRecord).follower_id === viewerId)
-      : false,
-    followerIds: followers.docs.map((doc) => (doc.data() as FollowRecord).follower_id),
-    followingIds: following.docs.map((doc) => (doc.data() as FollowRecord).following_id),
+    followers,
+    following,
+    isFollowing: Boolean(viewerFollow?.exists),
   };
 }
 
@@ -124,9 +118,10 @@ export async function toggleStoryFollow(storyId: string, userId: string) {
   const db = getFirestoreDb();
   const ref = db.collection("story_follows").doc(`${storyId}:${userId}`);
   const storyRef = db.collection("stories").doc(storyId);
-  const legacyFollowerCount = (
-    await db.collection("story_follows").where("story_id", "==", storyId).get()
-  ).size;
+  const legacyFollowerCount = await db
+    .collection("story_follows")
+    .where("story_id", "==", storyId)
+    .count();
   return db.runTransaction(async (transaction) => {
     const [snap, storySnap] = await Promise.all([transaction.get(ref), transaction.get(storyRef)]);
     const existingCount = Math.max(
@@ -184,38 +179,77 @@ export type FollowedStory = {
 };
 
 /** Stories the user follows, annotated with what has changed since their last visit. */
-export async function listFollowedStories(userId: string): Promise<FollowedStory[]> {
+export async function listFollowedStories(
+  userId: string,
+  input: {
+    limit: number;
+    cursor?: { lastSeenAt: string; id: string } | null;
+  },
+): Promise<{
+  items: FollowedStory[];
+  hasMore: boolean;
+  nextCursor: { lastSeenAt: string; id: string } | null;
+}> {
   const db = getFirestoreDb();
-  const follows = await db.collection("story_follows").where("user_id", "==", userId).get();
-  if (follows.empty) return [];
+  let query = db
+    .collection("story_follows")
+    .where("user_id", "==", userId)
+    .orderBy("last_seen_at", "desc")
+    .orderBy("__name__", "desc");
+  if (input.cursor) {
+    query = query.startAfter(
+      input.cursor.lastSeenAt,
+      db.collection("story_follows").doc(input.cursor.id),
+    );
+  }
+  const follows = await query.limit(input.limit + 1).get();
+  const hasMore = follows.size > input.limit;
+  const records = follows.docs.slice(0, input.limit).map((doc) => ({
+    ...(doc.data() as StoryFollowRecord),
+    id: doc.id,
+  }));
+  if (!records.length) return { items: [], hasMore: false, nextCursor: null };
 
-  const records = follows.docs.map((doc) => doc.data() as StoryFollowRecord);
-  const [stories, comments, companies] = await Promise.all([
-    readCollection<StoryRecord>("stories"),
-    readCollection<CommentRecord>("comments"),
-    readCollection<CompanyRecord>("companies"),
+  const storyIds = [...new Set(records.map((record) => record.story_id))];
+  const [stories, comments] = await Promise.all([
+    Promise.all(storyIds.map((id) => db.collection("stories").doc(id).get())),
+    Promise.all(
+      records.map(async (record) => {
+        const recent = await db
+          .collection("comments")
+          .where("story_id", "==", record.story_id)
+          .where("status", "==", "published")
+          .where("created_at", ">", record.last_seen_at)
+          .count();
+        return [record.story_id, recent] as const;
+      }),
+    ),
   ]);
-  const storyById = new Map(stories.map((story) => [story.id, story] as const));
-  const companyById = new Map(companies.map((company) => [company.id, company] as const));
-
-  return records
+  const storyById = new Map(
+    stories.filter((doc) => doc.exists).map((doc) => [doc.id, doc.data() as StoryRecord] as const),
+  );
+  const commentCounts = new Map(comments);
+  const items = records
     .map((record) => {
       const story = storyById.get(record.story_id) ?? null;
-      const storyComments = comments.filter((comment) => comment.story_id === record.story_id);
-      const since = new Date(record.last_seen_at).getTime();
+      const recentComments = commentCounts.get(record.story_id) ?? 0;
       return {
         story_id: record.story_id,
         title: story?.title ?? null,
         company_name: story?.company_name ?? null,
-        company_verified: Boolean(story && companyById.get(story.company_id)?.verified),
+        company_verified: Boolean(story?.company_verified),
         last_seen_at: record.last_seen_at,
-        new_comments: storyComments.filter(
-          (comment) => new Date(comment.created_at).getTime() > since,
-        ).length,
-        total_comments: storyComments.length,
+        new_comments: recentComments,
+        total_comments: Number(story?.comment_count ?? 0),
       };
     })
     .sort((a, b) => b.new_comments - a.new_comments);
+  const last = records.at(-1);
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last ? { lastSeenAt: last.last_seen_at, id: last.id } : null,
+  };
 }
 
 /** Marks a followed story as caught up. */

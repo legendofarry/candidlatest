@@ -9,8 +9,9 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 
 const salaryCompaniesQuery = queryOptions({
   queryKey: ["salary-companies"],
@@ -45,6 +46,7 @@ export const kes = (value: number) => `KES ${Math.round(value).toLocaleString("e
 function SalaryDirectory() {
   const { data } = useSuspenseQuery(salaryCompaniesQuery);
   const [q, setQ] = useState("");
+  const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(30);
 
   const rows = useMemo(
     () =>
@@ -57,6 +59,7 @@ function SalaryDirectory() {
       ),
     [data.companies, q],
   );
+  const visibleRows = rows.slice(0, visibleCount);
 
   return (
     <div className="min-w-0 space-y-6 overflow-x-clip">
@@ -72,7 +75,10 @@ function SalaryDirectory() {
         <section className="space-y-3">
           <Input
             value={q}
-            onChange={(event) => setQ(event.target.value)}
+            onChange={(event) => {
+              setQ(event.target.value);
+              resetVisibleCount();
+            }}
             placeholder="Search employer, industry or county"
           />
           {rows.length === 0 ? (
@@ -81,7 +87,7 @@ function SalaryDirectory() {
             </p>
           ) : (
             <ul className="space-y-2">
-              {rows.map((row) => (
+              {visibleRows.map((row) => (
                 <li key={row.company_id}>
                   <Link
                     to="/salaries/$slug"
@@ -96,7 +102,8 @@ function SalaryDirectory() {
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
                         {row.industry ?? "—"} · {row.county ?? "—"} · {row.positions} position
-                        {row.positions === 1 ? "" : "s"} · {row.contributions} contribution
+                        {row.positions === 1 ? "" : "s"} · {formatCount(row.contributions)}{" "}
+                        contribution
                         {row.contributions === 1 ? "" : "s"}
                       </p>
                     </div>
@@ -114,6 +121,18 @@ function SalaryDirectory() {
               ))}
             </ul>
           )}
+          {rows.length > 0 ? (
+            <div className="flex flex-col items-center gap-2 pt-2">
+              <p className="text-xs text-muted-foreground">
+                Showing {formatCount(visibleRows.length)} of {formatCount(rows.length)} employers
+              </p>
+              {rows.length > visibleRows.length ? (
+                <Button variant="outline" onClick={(event) => expandBy(30, event.currentTarget)}>
+                  Show 30 more employers
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         <ContributeCard />
@@ -128,7 +147,9 @@ function ContributeCard() {
   const [busy, setBusy] = useState(false);
   const [formOpen, setFormOpen] = useState(false);
   const [companyQuery, setCompanyQuery] = useState("");
-  const [company, setCompany] = useState<{ id: string; name: string; verified: boolean } | null>(null);
+  const [company, setCompany] = useState<{ id: string; name: string; verified: boolean } | null>(
+    null,
+  );
   const [form, setForm] = useState({ role_title: "", min_kes: "", max_kes: "" });
 
   const options = useQuery({
@@ -147,7 +168,9 @@ function ContributeCard() {
   );
 
   const matches = useMemo(() => {
-    const list = (options.data?.companies ?? []).filter((item) => !submittedCompanyIds.has(item.id));
+    const list = (options.data?.companies ?? []).filter(
+      (item) => !submittedCompanyIds.has(item.id),
+    );
     const needle = companyQuery.trim().toLowerCase();
     return (needle ? list.filter((item) => item.name.toLowerCase().includes(needle)) : list).slice(
       0,
@@ -205,10 +228,7 @@ function ContributeCard() {
         </Button>
       </div>
       {user ? (
-        <form
-          onSubmit={submit}
-          className={cn("mt-4 space-y-3", !formOpen && "hidden md:block")}
-        >
+        <form onSubmit={submit} className={cn("mt-4 space-y-3", !formOpen && "hidden md:block")}>
           <div className="space-y-1.5">
             <Label htmlFor="company">Employer</Label>
             {company ? (
@@ -234,7 +254,9 @@ function ContributeCard() {
                     <button
                       key={item.id}
                       type="button"
-                      onClick={() => setCompany({ id: item.id, name: item.name, verified: item.verified })}
+                      onClick={() =>
+                        setCompany({ id: item.id, name: item.name, verified: item.verified })
+                      }
                       className={cn(
                         "w-full rounded-lg px-3 py-2 text-left text-sm transition hover:bg-secondary",
                       )}
@@ -298,7 +320,12 @@ function ContributeCard() {
           </Button>
         </form>
       ) : (
-        <div className={cn("mt-4 space-y-3 text-sm text-muted-foreground", !formOpen && "hidden md:block")}>
+        <div
+          className={cn(
+            "mt-4 space-y-3 text-sm text-muted-foreground",
+            !formOpen && "hidden md:block",
+          )}
+        >
           <p>Sign in to add a salary range. Your identity is never attached to it.</p>
           <Button asChild variant="outline" className="w-full">
             <Link to="/auth">Sign in to contribute</Link>

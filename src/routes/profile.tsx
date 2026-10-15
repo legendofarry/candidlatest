@@ -31,11 +31,17 @@ import { useServerFn } from "@tanstack/react-start";
 import { declareAccountType, getOnboardingState } from "@/lib/onboarding.functions";
 import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
+import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { useAuth } from "@/hooks/useAuth";
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
-import { ProfileAvatar, ProfileCoverPicker, ProfilePhotoPicker } from "@/components/site/profile-photo";
+import {
+  ProfileAvatar,
+  ProfileCoverPicker,
+  ProfilePhotoPicker,
+} from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { formatCount } from "@/lib/utils";
 import { getMyContributions } from "@/lib/social.functions";
 import { getPublicProfile } from "@/lib/messaging.functions";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -154,40 +160,40 @@ function ProfilePage() {
     <div className="min-h-screen bg-background">
       <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
       <section className="min-h-screen px-3 pb-4 pt-2 sm:px-5 sm:pt-2 md:px-8 md:py-8">
-          <motion.div
-            initial={{ opacity: 0, y: 16 }}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.45, ease: "easeOut" }}
+          className="mx-auto w-full max-w-5xl space-y-4 pb-8 md:space-y-6"
+        >
+          <motion.section
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.45, ease: "easeOut" }}
-            className="mx-auto w-full max-w-5xl space-y-4 pb-8 md:space-y-6"
+            transition={{ duration: 0.4, delay: 0.06, ease: "easeOut" }}
+            className="relative -mx-3 overflow-hidden rounded-none border-y border-x-0 border-border bg-card pb-4 shadow-sm sm:mx-0 sm:rounded-3xl sm:border-x md:glass-card md:p-0"
           >
-            <motion.section
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.06, ease: "easeOut" }}
-              className="relative -mx-3 overflow-hidden rounded-none border-y border-x-0 border-border bg-card pb-4 shadow-sm sm:mx-0 sm:rounded-3xl sm:border-x md:glass-card md:p-0"
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.5 }}
+              className="relative h-[170px] overflow-hidden sm:h-56 md:h-64"
             >
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ duration: 0.5 }}
-                className="relative h-[170px] overflow-hidden sm:h-56 md:h-64"
-              >
-                <ProfileCoverPicker
-                  coverUrl={onboarding.data?.coverUrl}
-                  editable={Boolean(user)}
-                  onSaved={(coverUrl) => {
-                    queryClient.setQueryData(
-                      ["onboarding-state", user?.uid ?? null],
-                      (previous: unknown) =>
-                        previous && typeof previous === "object"
-                          ? { ...previous, coverUrl }
-                          : previous,
-                    );
-                    void queryClient.invalidateQueries({ queryKey: ["public-profile"] });
-                  }}
-                />
-              </motion.div>
-              <div className="relative px-4 pb-4 sm:px-6 md:px-8 md:pb-6">
+              <ProfileCoverPicker
+                coverUrl={onboarding.data?.coverUrl ?? null}
+                editable={Boolean(user)}
+                onSaved={(coverUrl) => {
+                  queryClient.setQueryData(
+                    ["onboarding-state", user?.uid ?? null],
+                    (previous: unknown) =>
+                      previous && typeof previous === "object"
+                        ? { ...previous, coverUrl }
+                        : previous,
+                  );
+                  void queryClient.invalidateQueries({ queryKey: ["public-profile"] });
+                }}
+              />
+            </motion.div>
+            <div className="relative px-4 pb-4 sm:px-6 md:px-8 md:pb-6">
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -337,160 +343,162 @@ function ProfilePage() {
                   votes stay private.
                 </p>
               </div>
-              </div>
-            </motion.section>
+            </div>
+          </motion.section>
 
-            {user ? (
-              <motion.section
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4, delay: 0.12 }}
-                className="grid grid-cols-3 gap-2 sm:gap-3"
-              >
-                <ProfileStat
-                  icon={<Users className="size-4 text-primary" />}
-                  value={publicProfile.data?.followers ?? (publicProfile.isLoading ? "—" : 0)}
-                  label="Followers"
-                />
-                <ProfileStat
-                  icon={<Users className="size-4 text-primary" />}
-                  value={publicProfile.data?.following ?? (publicProfile.isLoading ? "—" : 0)}
-                  label="Following"
-                />
-                <ProfileStat
-                  icon={<MessageSquare className="size-4 text-primary" />}
-                  value={contributions.data?.active.stories.length ?? (contributions.isLoading ? "—" : 0)}
-                  label="Stories"
-                />
-              </motion.section>
-            ) : null}
-
-            {socialLinks.length > 0 ? (
-              <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
-                <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-                  Links
-                </h2>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {socialLinks.map(([key, value]) => (
-                    <a
-                      key={key}
-                      href={value ?? undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-secondary/70 px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
-                    >
-                      <Link2 className="size-3.5" />
-                      <span className="capitalize">{key}</span>
-                    </a>
-                  ))}
-                </div>
-              </section>
-            ) : null}
-
-            <FollowedStories />
-
-            {user ? (
-              <ContributionsPanel data={contributions.data} loading={contributions.isLoading} />
-            ) : null}
-
-            {askAccountType ? (
-              <SettingsGroup title="One quick question">
-                <div className="px-4 py-3">
-                  <p className="text-sm font-medium">Are you here as a worker or an employer?</p>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    We never worked this out for your account. Employers get a reply tool and a
-                    company page; workers can share workplace stories under their Candid handle.
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <Button
-                      size="sm"
-                      disabled={savingType}
-                      onClick={() => void chooseAccountType("individual")}
-                    >
-                      I am a worker
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      disabled={savingType}
-                      onClick={() => void chooseAccountType("company")}
-                    >
-                      I represent a company
-                    </Button>
-                  </div>
-                </div>
-              </SettingsGroup>
-            ) : null}
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
+          {user ? (
+            <motion.section
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.18, ease: "easeOut" }}
-              className="grid divide-y divide-border sm:grid-cols-2 sm:gap-3 sm:divide-y-0"
+              transition={{ duration: 0.4, delay: 0.12 }}
+              className="grid grid-cols-3 gap-2 sm:gap-3"
             >
-              <Button
-                asChild
-                variant="outline"
-                className="h-auto min-h-14 justify-between rounded-none border-0 bg-transparent px-0 py-3 text-left shadow-none hover:bg-secondary/30 md:min-h-16 md:rounded-xl md:border md:bg-background md:px-4"
-              >
-                <Link to="/settings">
-                  <span className="flex min-w-0 items-center gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                      <Settings className="size-4" />
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block font-medium">Account settings</span>
-                      <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
-                        Privacy and preferences
-                      </span>
-                    </span>
-                  </span>
-                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
-              </Button>
+              <ProfileStat
+                icon={<Users className="size-4 text-primary" />}
+                value={publicProfile.data?.followers ?? (publicProfile.isLoading ? "—" : 0)}
+                label="Followers"
+              />
+              <ProfileStat
+                icon={<Users className="size-4 text-primary" />}
+                value={publicProfile.data?.following ?? (publicProfile.isLoading ? "—" : 0)}
+                label="Following"
+              />
+              <ProfileStat
+                icon={<MessageSquare className="size-4 text-primary" />}
+                value={
+                  contributions.data?.active.stories.length ?? (contributions.isLoading ? "—" : 0)
+                }
+                label="Stories"
+              />
+            </motion.section>
+          ) : null}
 
-              {user ? (
-                <Button
-                  variant="outline"
-                  className="h-auto min-h-14 justify-start gap-3 rounded-none border-0 bg-transparent px-0 py-3 text-left text-danger shadow-none hover:bg-danger/5 hover:text-danger md:min-h-16 md:rounded-xl md:border md:border-danger/20 md:bg-background md:px-4"
-                  onClick={() => setConfirmSignOut(true)}
-                >
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-danger/10">
-                    <LogOut className="size-4" />
-                  </span>
-                  <span>
-                    <span className="block font-medium">Sign out</span>
-                    <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                      End this session
-                    </span>
-                  </span>
-                </Button>
-              ) : null}
-            </motion.div>
-
-            <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Sign out of Candid?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    You will need to sign in again to post stories, comment or vote.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Stay signed in</AlertDialogCancel>
-                  <AlertDialogAction
-                    onClick={() => {
-                      setConfirmSignOut(false);
-                      void signOut().then(() => navigate({ to: "/" }));
-                    }}
+          {socialLinks.length > 0 ? (
+            <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+              <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                Links
+              </h2>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {socialLinks.map(([key, value]) => (
+                  <a
+                    key={key}
+                    href={value ?? undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-2 rounded-full bg-secondary/70 px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
                   >
-                    Sign out
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+                    <Link2 className="size-3.5" />
+                    <span className="capitalize">{key}</span>
+                  </a>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          <FollowedStories />
+
+          {user ? (
+            <ContributionsPanel data={contributions.data} loading={contributions.isLoading} />
+          ) : null}
+
+          {askAccountType ? (
+            <SettingsGroup title="One quick question">
+              <div className="px-4 py-3">
+                <p className="text-sm font-medium">Are you here as a worker or an employer?</p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  We never worked this out for your account. Employers get a reply tool and a
+                  company page; workers can share workplace stories under their Candid handle.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Button
+                    size="sm"
+                    disabled={savingType}
+                    onClick={() => void chooseAccountType("individual")}
+                  >
+                    I am a worker
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={savingType}
+                    onClick={() => void chooseAccountType("company")}
+                  >
+                    I represent a company
+                  </Button>
+                </div>
+              </div>
+            </SettingsGroup>
+          ) : null}
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4, delay: 0.18, ease: "easeOut" }}
+            className="grid divide-y divide-border sm:grid-cols-2 sm:gap-3 sm:divide-y-0"
+          >
+            <Button
+              asChild
+              variant="outline"
+              className="h-auto min-h-14 justify-between rounded-none border-0 bg-transparent px-0 py-3 text-left shadow-none hover:bg-secondary/30 md:min-h-16 md:rounded-xl md:border md:bg-background md:px-4"
+            >
+              <Link to="/settings">
+                <span className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <Settings className="size-4" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block font-medium">Account settings</span>
+                    <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
+                      Privacy and preferences
+                    </span>
+                  </span>
+                </span>
+                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+              </Link>
+            </Button>
+
+            {user ? (
+              <Button
+                variant="outline"
+                className="h-auto min-h-14 justify-start gap-3 rounded-none border-0 bg-transparent px-0 py-3 text-left text-danger shadow-none hover:bg-danger/5 hover:text-danger md:min-h-16 md:rounded-xl md:border md:border-danger/20 md:bg-background md:px-4"
+                onClick={() => setConfirmSignOut(true)}
+              >
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-danger/10">
+                  <LogOut className="size-4" />
+                </span>
+                <span>
+                  <span className="block font-medium">Sign out</span>
+                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                    End this session
+                  </span>
+                </span>
+              </Button>
+            ) : null}
           </motion.div>
-        </section>
+
+          <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Sign out of Candid?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You will need to sign in again to post stories, comment or vote.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Stay signed in</AlertDialogCancel>
+                <AlertDialogAction
+                  onClick={() => {
+                    setConfirmSignOut(false);
+                    void signOut().then(() => navigate({ to: "/" }));
+                  }}
+                >
+                  Sign out
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        </motion.div>
+      </section>
     </div>
   );
 }
@@ -519,7 +527,12 @@ function ProfileStat({
 }) {
   return (
     <div className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
-      <div className="flex items-center gap-2">{icon}<span className="text-xl font-semibold tabular-nums sm:text-2xl">{value}</span></div>
+      <div className="flex items-center gap-2">
+        {icon}
+        <span className="text-xl font-semibold tabular-nums sm:text-2xl">
+          {typeof value === "number" ? formatCount(value) : value}
+        </span>
+      </div>
       <p className="mt-1 text-[11px] text-muted-foreground sm:text-sm">{label}</p>
     </div>
   );
@@ -543,6 +556,9 @@ function ContributionsPanel({
     | { active: ContributionGroup; inactive: ContributionGroup; pending: ContributionGroup };
   loading: boolean;
 }) {
+  const activeList = useAutoCollapsingCount(20);
+  const inactiveList = useAutoCollapsingCount(20);
+  const pendingList = useAutoCollapsingCount(20);
   const groups = data ?? {
     active: { stories: [], comments: [] },
     inactive: { stories: [], comments: [] },
@@ -561,18 +577,20 @@ function ContributionsPanel({
         <TabsList className="grid h-auto w-full grid-cols-3 bg-secondary/60 p-1">
           <TabsTrigger value="active" className="gap-1.5 text-xs sm:text-sm">
             <PenLine className="size-3.5" />
-            Active <span>{count(groups.active)}</span>
+            Active <span>{formatCount(count(groups.active))}</span>
           </TabsTrigger>
           <TabsTrigger value="pending" className="gap-1.5 text-xs sm:text-sm">
             <Clock3 className="size-3.5" />
-            Pending <span>{count(groups.pending)}</span>
+            Pending <span>{formatCount(count(groups.pending))}</span>
           </TabsTrigger>
           <TabsTrigger value="inactive" className="gap-1.5 text-xs sm:text-sm">
             <Archive className="size-3.5" />
-            Inactive <span>{count(groups.inactive)}</span>
+            Inactive <span>{formatCount(count(groups.inactive))}</span>
           </TabsTrigger>
         </TabsList>
         {(["active", "pending", "inactive"] as const).map((status) => {
+          const listState =
+            status === "active" ? activeList : status === "pending" ? pendingList : inactiveList;
           const group = groups[status];
           const items = [...group.stories, ...group.comments].sort(
             (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
@@ -584,37 +602,58 @@ function ContributionsPanel({
                   Loading your contributions…
                 </p>
               ) : items.length ? (
-                <div className="divide-y divide-border">
-                  {items.map((item) => (
-                    <Link
-                      key={`${item.type}-${item.id}`}
-                      to={item.type === "story" ? "/post" : "/stories/$id"}
-                      {...(item.type === "story"
-                        ? { search: { edit: item.id } }
-                        : { params: { id: item.storyId ?? "" } })}
-                      className="flex items-start gap-3 py-3 first:pt-1 last:pb-1"
-                    >
-                      <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                        {item.type === "story" ? (
-                          <PenLine className="size-4" />
-                        ) : (
-                          <MessageSquare className="size-4" />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="line-clamp-2 block text-sm font-medium">{item.title}</span>
-                        <span className="mt-1 block text-xs capitalize text-muted-foreground">
-                          {item.type}
-                          {item.type === "story" ? " · Edit and resubmit for approval" : ""} ·{" "}
-                          {item.createdAt
-                            ? new Date(item.createdAt).toLocaleDateString("en-KE")
-                            : "Date unavailable"}
-                        </span>
-                      </span>
-                      <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                    </Link>
-                  ))}
-                </div>
+                <>
+                  <div className="divide-y divide-border">
+                    {items.slice(0, listState.visibleCount).map((item) => {
+                      const opensStory = item.type === "comment";
+                      const storyId = item.type === "story" ? item.id : (item.storyId ?? "");
+                      return (
+                        <Link
+                          key={`${item.type}-${item.id}`}
+                          to={opensStory ? "/stories/$id" : "/post"}
+                          {...(opensStory
+                            ? { params: { id: storyId } }
+                            : { search: { edit: item.id } })}
+                          className="flex items-start gap-3 py-3 first:pt-1 last:pb-1"
+                        >
+                          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            {item.type === "story" ? (
+                              <PenLine className="size-4" />
+                            ) : (
+                              <MessageSquare className="size-4" />
+                            )}
+                          </span>
+                          <span className="min-w-0 flex-1">
+                            <span className="line-clamp-2 block text-sm font-medium">
+                              {item.title}
+                            </span>
+                            <span className="mt-1 block text-xs capitalize text-muted-foreground">
+                              {item.type}
+                              {item.type === "story" ? " · Edit and resubmit for approval" : " "}·{" "}
+                              {item.createdAt
+                                ? new Date(item.createdAt).toLocaleDateString("en-KE")
+                                : "Date unavailable"}
+                            </span>
+                          </span>
+                          <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
+                        </Link>
+                      );
+                    })}
+                  </div>
+                  {items.length > listState.visibleCount ? (
+                    <div className="flex justify-center pt-3">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={(event) => listState.expandBy(20, event.currentTarget)}
+                      >
+                        Show 20 more contributions · {formatCount(listState.visibleCount)} of{" "}
+                        {formatCount(items.length)} shown
+                      </Button>
+                    </div>
+                  ) : null}
+                </>
               ) : (
                 <p className="py-5 text-center text-sm text-muted-foreground">
                   {status === "active"

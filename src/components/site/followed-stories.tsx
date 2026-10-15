@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import {
@@ -32,6 +32,8 @@ import {
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { formatCount } from "@/lib/utils";
+import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 
 type StoryTimeline = {
   id: string;
@@ -44,6 +46,15 @@ type StoryTimeline = {
   };
 };
 
+type FollowedStoryRow = {
+  story_id: string;
+  title: string | null;
+  company_name: string | null;
+  company_verified: boolean;
+  new_comments: number;
+  total_comments: number;
+};
+
 /** Followers/following counts plus followed stories with an AI catch-up. */
 export function FollowedStories() {
   const { user } = useAuth();
@@ -53,6 +64,7 @@ export function FollowedStories() {
   const seenFn = useServerFn(markStoryCaughtUp);
 
   const [openId, setOpenId] = useState<string | null>(null);
+  const { visibleCount, expandBy } = useAutoCollapsingCount(10);
   const [storyTimeline, setStoryTimeline] = useState<StoryTimeline | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [catchUpError, setCatchUpError] = useState<string | null>(null);
@@ -63,9 +75,11 @@ export function FollowedStories() {
     enabled: Boolean(user),
   });
 
-  const stories = useQuery({
+  const stories = useInfiniteQuery({
     queryKey: ["followed-stories", user?.uid ?? null],
-    queryFn: () => listFn(),
+    initialPageParam: null as { lastSeenAt: string; id: string } | null,
+    queryFn: ({ pageParam }) => listFn({ data: { limit: 20, cursor: pageParam } }),
+    getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
     enabled: Boolean(user),
   });
 
@@ -89,7 +103,9 @@ export function FollowedStories() {
     }
   }
 
-  const list = stories.data ?? [];
+  const list: FollowedStoryRow[] =
+    stories.data?.pages.flatMap((page) => page.items as FollowedStoryRow[]) ?? [];
+  const visibleStories = list.slice(0, visibleCount);
   const selectedStory = list.find((item) => item.story_id === openId) ?? null;
 
   return (
@@ -133,7 +149,7 @@ export function FollowedStories() {
           </li>
         ) : null}
 
-        {list.map((item, index) => (
+        {visibleStories.map((item, index) => (
           <motion.li
             key={item.story_id}
             initial={{ opacity: 0, y: 8 }}
@@ -157,10 +173,11 @@ export function FollowedStories() {
                   <span className="inline-flex items-center gap-1">
                     {item.company_name ?? "Unknown company"}
                     {item.company_verified ? <CompanyVerifiedBadge /> : null}
-                  </span> ·{" "}
+                  </span>{" "}
+                  ·{" "}
                   {item.new_comments > 0
-                    ? `${item.new_comments} ${item.new_comments === 1 ? "new reply" : "new replies"} · ${item.total_comments} total`
-                    : `${item.total_comments} ${item.total_comments === 1 ? "reply" : "replies"} · up to date`}
+                    ? `${formatCount(item.new_comments)} ${item.new_comments === 1 ? "new reply" : "new replies"} · ${formatCount(item.total_comments)} total`
+                    : `${formatCount(item.total_comments)} ${item.total_comments === 1 ? "reply" : "replies"} · up to date`}
                 </p>
               </div>
               <Button
@@ -179,9 +196,38 @@ export function FollowedStories() {
                 <span className="sm:hidden">Catch up</span>
               </Button>
             </div>
-
           </motion.li>
         ))}
+        {list.length > visibleStories.length || stories.hasNextPage ? (
+          <li className="flex flex-col items-center gap-2 pt-2">
+            <p className="text-xs text-muted-foreground">
+              {stories.hasNextPage
+                ? `Showing ${formatCount(visibleStories.length)} followed stories loaded so far`
+                : `Showing ${formatCount(visibleStories.length)} of ${formatCount(list.length)} followed stories`}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={stories.isFetchingNextPage}
+              onClick={(event) => {
+                if (visibleCount < list.length) {
+                  expandBy(10, event.currentTarget);
+                } else if (stories.hasNextPage) {
+                  const anchor = event.currentTarget;
+                  void stories.fetchNextPage().then((result) => {
+                    if (result.isSuccess) expandBy(10, anchor);
+                  });
+                }
+              }}
+            >
+              {stories.isFetchingNextPage
+                ? "Loading followed stories…"
+                : visibleCount < list.length
+                  ? "Show 10 more"
+                  : "Load more followed stories"}
+            </Button>
+          </li>
+        ) : null}
       </ul>
 
       <Dialog
@@ -207,7 +253,9 @@ export function FollowedStories() {
                 {storyTimeline?.data.story.title ?? selectedStory?.title ?? "Loading story…"}
               </DialogTitle>
               <DialogDescription className="text-xs">
-                {storyTimeline?.data.story.company_name ?? selectedStory?.company_name ?? "Your followed story"}
+                {storyTimeline?.data.story.company_name ??
+                  selectedStory?.company_name ??
+                  "Your followed story"}
               </DialogDescription>
             </DialogHeader>
             <DialogClose asChild>
@@ -230,7 +278,9 @@ export function FollowedStories() {
                   </span>
                   <div>
                     <p className="font-medium">Putting the story in order</p>
-                    <p className="mt-1 text-sm text-muted-foreground">Gathering the original post and published replies.</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      Gathering the original post and published replies.
+                    </p>
                   </div>
                 </div>
               ) : catchUpError ? (
@@ -238,7 +288,10 @@ export function FollowedStories() {
                   <p className="font-medium">Couldn’t load this story</p>
                   <p className="max-w-sm text-sm text-muted-foreground">{catchUpError}</p>
                   {openId ? (
-                    <Button onClick={() => void handleCatchUp(openId)} className="mt-2 rounded-full">
+                    <Button
+                      onClick={() => void handleCatchUp(openId)}
+                      className="mt-2 rounded-full"
+                    >
                       Try again
                     </Button>
                   ) : null}
@@ -259,7 +312,8 @@ export function FollowedStories() {
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <MessageCircle className="size-3.5" />
-                        {storyTimeline.data.totalUpdates} {storyTimeline.data.totalUpdates === 1 ? "reply" : "replies"}
+                        {formatCount(storyTimeline.data.totalUpdates)}{" "}
+                        {storyTimeline.data.totalUpdates === 1 ? "reply" : "replies"}
                       </span>
                       <span className="inline-flex items-center gap-1.5">
                         <Clock3 className="size-3.5" />
@@ -270,7 +324,9 @@ export function FollowedStories() {
 
                   <section>
                     <div className="mb-4">
-                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">From the beginning</p>
+                      <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                        From the beginning
+                      </p>
                       <h3 className="mt-1 text-lg font-semibold">What happened, in order</h3>
                     </div>
                     <div className="relative space-y-0 before:absolute before:bottom-4 before:left-[11px] before:top-3 before:w-px before:bg-border">
@@ -361,7 +417,9 @@ function formatTimelineDate(value: string) {
 function FollowMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="px-2 py-2.5 text-center md:rounded-xl md:border md:border-border/70 md:bg-secondary/35 md:px-3">
-      <p className="text-xl font-semibold tabular-nums">{value}</p>
+      <p className="text-xl font-semibold tabular-nums" aria-label={value.toLocaleString()}>
+        {formatCount(value)}
+      </p>
       <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{label}</p>
     </div>
   );

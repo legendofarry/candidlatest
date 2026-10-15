@@ -13,6 +13,7 @@ import type { PublicStory } from "@/components/site/story-card";
 import { getStory } from "@/lib/public.functions";
 import { cn } from "@/lib/utils";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { formatCount } from "@/lib/utils";
 
 const sortOptions: { value: CommentSortMode; label: string; icon: typeof TrendingUp }[] = [
   { value: "top", label: "Top", icon: TrendingUp },
@@ -35,7 +36,7 @@ export function FeedDiscussionPanel({
     enabled: Boolean(story.id),
   });
   const comments = thread.data?.comments ?? [];
-  const total = thread.data ? countComments(comments) : (story.comment_count ?? 0);
+  const total = thread.data?.commentTotal ?? story.comment_count ?? countComments(comments);
 
   return (
     <motion.aside
@@ -50,7 +51,7 @@ export function FeedDiscussionPanel({
         <div className="flex items-start gap-3">
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
-              <MessageCircle className="size-3.5" /> Discussion · {total}
+              <MessageCircle className="size-3.5" /> Discussion · {formatCount(total)}
             </p>
             <h2 className="mt-2 line-clamp-2 text-base font-semibold leading-snug">
               {story.title || "Post discussion"}
@@ -59,7 +60,8 @@ export function FeedDiscussionPanel({
               <span className="inline-flex items-center gap-1">
                 {story.company_name || "Employer not listed"}
                 {story.company_verified ? <CompanyVerifiedBadge /> : null}
-              </span> · Member story
+              </span>{" "}
+              · Member story
             </p>
           </div>
           <Button variant="ghost" size="icon" onClick={onClose} aria-label="Close discussion">

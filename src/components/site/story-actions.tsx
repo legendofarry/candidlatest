@@ -15,7 +15,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { formatDate } from "@/components/site/story-card";
 import { StorySocial } from "@/components/site/story-social";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import { MembershipBadge } from "@/components/site/membership-badge";
 
 /** Inline vote + comment bar so people can act without leaving the feed. */
@@ -93,21 +93,24 @@ export function StoryActions({
       <div className="mt-3 grid grid-cols-6 items-center gap-1 border-t border-border pt-3 sm:flex sm:flex-wrap sm:gap-1.5">
         <ActionChip
           icon={<ArrowBigUp className="size-4 text-primary" />}
-          label={`${upvotes + optimistic.up}`}
+          label={formatCount(upvotes + optimistic.up)}
+          ariaLabel={`${(upvotes + optimistic.up).toLocaleString()} upvotes`}
           hint="Upvote"
           disabled={!user || voteMutation.isPending}
           onClick={() => voteMutation.mutate("up")}
         />
         <ActionChip
           icon={<Users className="size-4" />}
-          label={`${metoo + optimistic.metoo}`}
+          label={formatCount(metoo + optimistic.metoo)}
+          ariaLabel={`${(metoo + optimistic.metoo).toLocaleString()} people said this happened to them too`}
           hint="This happened to me too"
           disabled={!user || voteMutation.isPending}
           onClick={() => voteMutation.mutate("metoo")}
         />
         <ActionChip
           icon={<MessageSquare className="size-4" />}
-          label={`${commentCount + optimistic.comments}`}
+          label={formatCount(commentCount + optimistic.comments)}
+          ariaLabel={`${(commentCount + optimistic.comments).toLocaleString()} comments`}
           hint="Comments"
           active={discussionOpen || open || sheetOpen}
           onClick={() => {
@@ -220,7 +223,7 @@ export function StoryActions({
                     params={{ id: storyId }}
                     className="text-xs font-medium text-primary"
                   >
-                    View all {thread.data?.comments?.length} comments
+                    View all {formatCount(thread.data?.commentTotal ?? commentCount)} comments
                   </Link>
                 </li>
               ) : null}
@@ -257,6 +260,7 @@ function ActionChip({
   icon,
   label,
   hint,
+  ariaLabel,
   onClick,
   disabled,
   active,
@@ -265,6 +269,7 @@ function ActionChip({
   icon: React.ReactNode;
   label: string;
   hint: string;
+  ariaLabel?: string;
   onClick: () => void;
   disabled?: boolean;
   active?: boolean;
@@ -274,7 +279,7 @@ function ActionChip({
     <button
       type="button"
       title={hint}
-      aria-label={hint}
+      aria-label={ariaLabel ?? hint}
       disabled={disabled}
       onClick={onClick}
       className={cn(

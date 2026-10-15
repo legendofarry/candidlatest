@@ -541,10 +541,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           className={cn(
             "min-w-0 md:pb-10 md:pl-80",
             fullscreenRoute ||
-            pathname === "/post" ||
-            pathname === "/profile" ||
-            pathname === "/support" ||
-            directConversationRoute
+              pathname === "/post" ||
+              pathname === "/profile" ||
+              pathname === "/support" ||
+              directConversationRoute
               ? "p-0 md:pb-0"
               : "pt-6",
             !fullscreenRoute && pathname !== "/support" && (showDock ? "pb-32" : "pb-10"),

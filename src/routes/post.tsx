@@ -800,12 +800,13 @@ function PostPage() {
                           placeholder="Choose a suggestion or type an area"
                         />
                         <datalist id="candid-work-areas">
-                          {areaSuggestions.map((suggestion) => (
+                          {(areaSuggestions ?? []).map((suggestion) => (
                             <option key={suggestion} value={suggestion} />
                           ))}
                         </datalist>
                         <p className="text-xs text-muted-foreground">
-                          Suggestions follow your county. You can enter another area or leave it blank.
+                          Suggestions follow your county. You can enter another area or leave it
+                          blank.
                         </p>
                       </div>
                       <div className="space-y-2">

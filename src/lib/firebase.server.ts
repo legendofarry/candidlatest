@@ -1,4 +1,4 @@
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { createRemoteJWKSet, importPKCS8, jwtVerify, SignJWT } from "jose";
 import { Firestore } from "./firestore-rest.server";
 
 type ServiceAccountInput = {
@@ -28,7 +28,8 @@ function parseServiceAccount(): ServiceAccountInput {
   if (rawJson) {
     try {
       const parsed = JSON.parse(rawJson) as Record<string, string | undefined>;
-      const projectId = parsed["project_id"] ?? parsed["projectId"] ?? process.env["FIREBASE_PROJECT_ID"];
+      const projectId =
+        parsed["project_id"] ?? parsed["projectId"] ?? process.env["FIREBASE_PROJECT_ID"];
       const clientEmail = parsed["client_email"] ?? parsed["clientEmail"];
       const privateKey = parsed["private_key"] ?? parsed["privateKey"];
       if (projectId && clientEmail && looksLikeKey(privateKey)) {
@@ -62,12 +63,18 @@ let messagingToken: { value: string; expiresAt: number; projectId: string } | un
 /** Mints a short-lived OAuth token for sending Firebase Cloud Messaging notifications. */
 export async function getFirebaseMessagingCredentials() {
   const credentials = parseServiceAccount();
-  if (messagingToken && messagingToken.projectId === credentials.projectId && messagingToken.expiresAt > Date.now() + 60_000) {
+  if (
+    messagingToken &&
+    messagingToken.projectId === credentials.projectId &&
+    messagingToken.expiresAt > Date.now() + 60_000
+  ) {
     return { accessToken: messagingToken.value, projectId: credentials.projectId };
   }
   const key = await importPKCS8(credentials.privateKey, "RS256");
   const issuedAt = Math.floor(Date.now() / 1000);
-  const assertion = await new SignJWT({ scope: "https://www.googleapis.com/auth/firebase.messaging" })
+  const assertion = await new SignJWT({
+    scope: "https://www.googleapis.com/auth/firebase.messaging",
+  })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(credentials.clientEmail)
     .setAudience("https://oauth2.googleapis.com/token")
@@ -82,8 +89,9 @@ export async function getFirebaseMessagingCredentials() {
       assertion,
     }),
   });
-  if (!response.ok) throw new Error(`Firebase messaging authorization failed (${response.status}).`);
-  const result = await response.json() as { access_token?: string; expires_in?: number };
+  if (!response.ok)
+    throw new Error(`Firebase messaging authorization failed (${response.status}).`);
+  const result = (await response.json()) as { access_token?: string; expires_in?: number };
   if (!result.access_token) throw new Error("Firebase did not return a messaging access token.");
   messagingToken = {
     value: result.access_token,
@@ -101,7 +109,9 @@ export function getFirebaseAuth() {
     async verifyIdToken(token: string) {
       const projectId = process.env["FIREBASE_PROJECT_ID"] ?? "candid-bbef5";
       jwks ??= createRemoteJWKSet(
-        new URL("https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"),
+        new URL(
+          "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",
+        ),
       );
       const { payload } = await jwtVerify(token, jwks, {
         issuer: `https://securetoken.google.com/${projectId}`,

@@ -4,9 +4,10 @@ import { useMemo, useState } from "react";
 import { Building2, Scale, Search } from "lucide-react";
 import { listCompanyScores } from "@/lib/public.functions";
 import { FilterBar } from "@/components/site/filter-bar";
-import { cn } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 
 const companiesQuery = queryOptions({
   queryKey: ["company-scores"],
@@ -41,6 +42,7 @@ function CompaniesPage() {
   const [q, setQ] = useState("");
   const [industry, setIndustry] = useState<string | null>(null);
   const [sort, setSort] = useState<SortKey>("discussed");
+  const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(24);
 
   const industries = useMemo(
     () => [...new Set(data.companies.map((c) => c.industry).filter(Boolean))].sort() as string[],
@@ -58,11 +60,13 @@ function CompaniesPage() {
       return Number(b.story_count ?? 0) - Number(a.story_count ?? 0);
     });
   }, [data.companies, q, industry, sort]);
+  const visibleRows = rows.slice(0, visibleCount);
 
   function resetFilters() {
     setQ("");
     setIndustry(null);
     setSort("discussed");
+    resetVisibleCount();
   }
 
   return (
@@ -86,7 +90,10 @@ function CompaniesPage() {
 
       <FilterBar
         query={q}
-        onQueryChange={setQ}
+        onQueryChange={(value) => {
+          setQ(value);
+          resetVisibleCount();
+        }}
         placeholder="Search employers…"
         canReset={Boolean(q) || industry !== null || sort !== "discussed"}
         onReset={resetFilters}
@@ -99,14 +106,20 @@ function CompaniesPage() {
             options: ["discussed", "score", "az"],
             optionLabel: (key) =>
               key === "discussed" ? "Most discussed" : key === "score" ? "Best rated" : "A–Z",
-            onChange: (next) => setSort((next as SortKey) ?? "discussed"),
+            onChange: (next) => {
+              setSort((next as SortKey) ?? "discussed");
+              resetVisibleCount();
+            },
           },
           {
             id: "industry",
             label: "Industry",
             value: industry,
             options: industries,
-            onChange: setIndustry,
+            onChange: (next) => {
+              setIndustry(next);
+              resetVisibleCount();
+            },
           },
         ]}
       />
@@ -148,7 +161,7 @@ function CompaniesPage() {
         </section>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-          {rows.map((company, index) => (
+          {visibleRows.map((company, index) => (
             <Link
               key={company.company_id}
               to="/companies/$slug"
@@ -172,7 +185,7 @@ function CompaniesPage() {
                 <p className="mt-3 text-sm text-muted-foreground">{company.descriptor}</p>
               ) : null}
               <p className="mt-3 text-xs text-muted-foreground">
-                {Number(company.story_count ?? 0)} stories · {Number(company.rating_count ?? 0)}{" "}
+                {formatCount(company.story_count)} stories · {formatCount(company.rating_count)}{" "}
                 ratings
                 {company.would_work_again_pct !== null
                   ? ` · ${Math.round(Number(company.would_work_again_pct))}% would work here again`
@@ -182,6 +195,18 @@ function CompaniesPage() {
           ))}
         </div>
       )}
+      {rows.length > 0 ? (
+        <div className="flex flex-col items-center gap-2">
+          <p className="text-xs text-muted-foreground">
+            Showing {formatCount(visibleRows.length)} of {formatCount(rows.length)} employers
+          </p>
+          {rows.length > visibleRows.length ? (
+            <Button variant="outline" onClick={(event) => expandBy(24, event.currentTarget)}>
+              Show 24 more employers
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -4,10 +4,18 @@ import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 
 export const getConversations = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
-  .handler(async ({ context }) => {
-    const { listConversations, ensureCandidAccount } = await import("./messaging.server");
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        limit: z.number().int().min(1).max(50).default(20),
+        cursor: z.object({ lastMessageAt: z.string(), id: z.string() }).nullable().default(null),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ context, data }) => {
+    const { listConversationPage, ensureCandidAccount } = await import("./messaging.server");
     await ensureCandidAccount();
-    return listConversations(context.userId);
+    return listConversationPage(context.userId, data.limit, data.cursor);
   });
 
 export const getUnreadMessages = createServerFn({ method: "POST" })
@@ -47,7 +55,11 @@ export const postMessage = createServerFn({ method: "POST" })
             version: z.number().int().positive(),
             signature: z.string().regex(/^[a-f0-9]{40,64}$/i),
             format: z.enum(["jpg", "png", "webp"]),
-            bytes: z.number().int().positive().max(8 * 1024 * 1024),
+            bytes: z
+              .number()
+              .int()
+              .positive()
+              .max(8 * 1024 * 1024),
           })
           .nullable()
           .optional(),
@@ -67,7 +79,9 @@ export const postMessage = createServerFn({ method: "POST" })
 
 export const deleteChatMessage = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
-  .inputValidator((input: unknown) => z.object({ message_id: z.string().min(1).max(180) }).parse(input))
+  .inputValidator((input: unknown) =>
+    z.object({ message_id: z.string().min(1).max(180) }).parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { deleteMessage } = await import("./messaging.server");
     return deleteMessage(context.userId, data.message_id);
@@ -79,7 +93,11 @@ export const issueChatImageUpload = createServerFn({ method: "POST" })
     z
       .object({
         conversation_id: z.string().min(1),
-        size: z.number().int().positive().max(8 * 1024 * 1024),
+        size: z
+          .number()
+          .int()
+          .positive()
+          .max(8 * 1024 * 1024),
         mimeType: z.enum(["image/jpeg", "image/png", "image/webp"]),
       })
       .parse(input),

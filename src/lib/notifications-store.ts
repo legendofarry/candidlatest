@@ -33,7 +33,7 @@ const STORAGE_PREFIX = "candid.notifications.v2";
 const LEGACY_STORAGE_KEYS = ["candid.notifications.v1", "candid.demo-chat.v1"];
 /** Same event pushed twice inside this window collapses into one row. */
 const DEDUPE_WINDOW_MS = 60_000;
-const MAX_STORED = 60;
+const MAX_STORED = 500;
 /** One-time system notices disappear this long after the user has read them. */
 export const SYSTEM_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -70,10 +70,13 @@ function hydrate() {
     if (raw) {
       const parsed = JSON.parse(raw) as AppNotification[];
       if (Array.isArray(parsed)) {
+        const previousCount = parsed.length;
         notifications = parsed
-          .filter((item) => !("demo" in item && Boolean((item as Record<string, unknown>)["demo"])))
+          // Remove synthetic notifications left in this browser by the retired preview build.
+          .filter((item) => !item.id.startsWith("demo-notification-"))
           .filter((item) => !item.link?.href.startsWith("/messages/"))
           .slice(0, MAX_STORED);
+        if (notifications.length !== previousCount) persist();
         pruneExpired();
         emit();
       }

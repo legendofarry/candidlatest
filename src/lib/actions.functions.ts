@@ -30,8 +30,9 @@ function slugify(name: string) {
 function randomHandle() {
   const adjectives = ["Quiet", "Frank", "Steady", "Wary", "Bold", "Patient"];
   const roles = ["Analyst", "Agent", "Driver", "Teller", "Engineer", "Officer", "Clerk"];
-  return `Anon ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${roles[Math.floor(Math.random() * roles.length)]
-    }`;
+  return `Anon ${adjectives[Math.floor(Math.random() * adjectives.length)]} ${
+    roles[Math.floor(Math.random() * roles.length)]
+  }`;
 }
 
 function validateEmployerName(value: string) {
@@ -111,7 +112,15 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       const indexId = slugify(normalized);
       if (indexId) {
         const indexRef = db.collection("company_name_index").doc(indexId);
-        try { await indexRef.create({ company_id: exact.id, normalized_name: normalized, created_at: new Date().toISOString() }); } catch { /* another alias/index may already exist */ }
+        try {
+          await indexRef.create({
+            company_id: exact.id,
+            normalized_name: normalized,
+            created_at: new Date().toISOString(),
+          });
+        } catch {
+          /* another alias/index may already exist */
+        }
       }
       return clientCompany(exact);
     }
@@ -121,13 +130,19 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
     if (!indexId) throw new Error("Enter a valid employer name.");
     const indexRef = db.collection("company_name_index").doc(indexId);
     try {
-      await indexRef.create({ normalized_name: normalized, company_id: null, created_at: new Date().toISOString() });
+      await indexRef.create({
+        normalized_name: normalized,
+        company_id: null,
+        created_at: new Date().toISOString(),
+      });
     } catch {
       const racedIndex = await indexRef.get();
-      const racedCompanyId = (racedIndex.data() as { company_id?: string | null } | undefined)?.company_id;
+      const racedCompanyId = (racedIndex.data() as { company_id?: string | null } | undefined)
+        ?.company_id;
       if (racedCompanyId) {
         const racedCompany = await db.collection("companies").doc(racedCompanyId).get();
-        if (racedCompany.exists) return clientCompany({ ...(racedCompany.data() as CompanyRecord), id: racedCompany.id });
+        if (racedCompany.exists)
+          return clientCompany({ ...(racedCompany.data() as CompanyRecord), id: racedCompany.id });
       }
       throw new Error("This employer is being added already. Try selecting it again in a moment.");
     }
@@ -149,7 +164,11 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       batch.update(indexRef, { company_id: created.id });
       await batch.commit();
     } catch (error) {
-      try { await indexRef.delete(); } catch { /* retain any index that now points at a live company */ }
+      try {
+        await indexRef.delete();
+      } catch {
+        /* retain any index that now points at a live company */
+      }
       throw error;
     }
 
@@ -276,10 +295,10 @@ export const createStory = createServerFn({ method: "POST" })
       body: data.body.trim(),
       evidence: uploadedEvidence
         ? {
-          publicId: uploadedEvidence.public_id,
-          format: uploadedEvidence.format,
-          bytes: uploadedEvidence.bytes,
-        }
+            publicId: uploadedEvidence.public_id,
+            format: uploadedEvidence.format,
+            bytes: uploadedEvidence.bytes,
+          }
         : null,
       evidenceNote: data.evidence?.note?.trim() || null,
     });
@@ -490,8 +509,8 @@ export const updateStory = createServerFn({ method: "POST" })
       body: data.body.trim(),
       evidence:
         typeof evidencePublicId === "string" &&
-          typeof evidenceFormat === "string" &&
-          typeof evidenceBytes === "number"
+        typeof evidenceFormat === "string" &&
+        typeof evidenceBytes === "number"
           ? { publicId: evidencePublicId, format: evidenceFormat, bytes: evidenceBytes }
           : null,
       evidenceNote:
@@ -517,7 +536,8 @@ export const updateStory = createServerFn({ method: "POST" })
       status: "pending" as const,
       moderation_note: screen.summary,
       evidence_status: existingEvidence
-        ? screen.evidence_assessment === "unavailable" || screen.evidence_assessment === "not_provided"
+        ? screen.evidence_assessment === "unavailable" ||
+          screen.evidence_assessment === "not_provided"
           ? "pending_review"
           : "reviewed"
         : null,
@@ -605,29 +625,38 @@ export const addComment = createServerFn({ method: "POST" })
     const storyRef = db.collection("stories").doc(data.story_id);
     const storySnap = await storyRef.get();
     const currentStory = storySnap.exists ? storySnap.data() : null;
-    if (!currentStory || currentStory["status"] !== "published") throw new Error("Story not found.");
+    if (!currentStory || currentStory["status"] !== "published")
+      throw new Error("Story not found.");
     const parentCommentSnap = data.parent_id
       ? await db.collection("comments").doc(data.parent_id).get()
       : null;
     const parentComment = parentCommentSnap?.exists ? parentCommentSnap.data() : null;
-    if (data.parent_id && (!parentComment || parentComment["story_id"] !== data.story_id || parentComment["status"] !== "published" || parentComment["is_deleted"] === true)) {
+    if (
+      data.parent_id &&
+      (!parentComment ||
+        parentComment["story_id"] !== data.story_id ||
+        parentComment["status"] !== "published" ||
+        parentComment["is_deleted"] === true)
+    ) {
       throw new Error("That comment is no longer available to reply to.");
     }
 
     const verificationSnap = await db.collection("account_verifications").doc(context.userId).get();
     const verification = verificationSnap.exists
       ? (verificationSnap.data() as {
-        account_type?: string;
-        company_id?: string | null;
-        badge_status?: string;
-      })
+          account_type?: string;
+          company_id?: string | null;
+          badge_status?: string;
+        })
       : null;
-    const isOfficial = context.userId === "candid-official" || Boolean(
-      verification?.account_type === "official" ||
-      (verification?.account_type === "company" &&
-        verification.company_id &&
-        verification.company_id === currentStory?.["company_id"]),
-    );
+    const isOfficial =
+      context.userId === "candid-official" ||
+      Boolean(
+        verification?.account_type === "official" ||
+        (verification?.account_type === "company" &&
+          verification.company_id &&
+          verification.company_id === currentStory?.["company_id"]),
+      );
 
     await db
       .collection("comments")
@@ -649,7 +678,8 @@ export const addComment = createServerFn({ method: "POST" })
 
     // Notify the story author and the parent-comment author about new replies.
     try {
-      const { pushServerNotification, resolveMentionedUserIds } = await import("./notifications.server");
+      const { pushServerNotification, resolveMentionedUserIds } =
+        await import("./notifications.server");
       const authorName = profile?.username ? `@${profile.username}` : "Someone";
       const storyTitle =
         typeof currentStory?.["title"] === "string" ? currentStory["title"] : "a story";
@@ -717,8 +747,7 @@ export const likeComment = createServerFn({ method: "POST" })
     const commentRef = db.collection("comments").doc(data.comment_id);
     const [likeSnap, commentSnap] = await Promise.all([likeRef.get(), commentRef.get()]);
     const comment = commentSnap.data() as
-      | { likes?: number; author_id?: string | null; story_id?: string; body?: string }
-      | undefined;
+      { likes?: number; author_id?: string | null; story_id?: string; body?: string } | undefined;
     const current = Number(comment?.likes ?? 0);
 
     if (likeSnap.exists) {
@@ -739,7 +768,9 @@ export const likeComment = createServerFn({ method: "POST" })
         const [{ pushServerNotification }, actorSnap, storySnap] = await Promise.all([
           import("./notifications.server"),
           db.collection("profiles").doc(context.userId).get(),
-          comment.story_id ? db.collection("stories").doc(comment.story_id).get() : Promise.resolve(null),
+          comment.story_id
+            ? db.collection("stories").doc(comment.story_id).get()
+            : Promise.resolve(null),
         ]);
         const actor = (actorSnap.data() as { username?: string | null } | undefined)?.username;
         const story = storySnap?.data() as { title?: string } | undefined;
@@ -760,17 +791,27 @@ export const likeComment = createServerFn({ method: "POST" })
 export const editComment = createServerFn({ method: "POST" })
   .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ comment_id: z.string().uuid(), body: z.string().trim().min(2).max(2000) }).parse(input),
+    z
+      .object({ comment_id: z.string().uuid(), body: z.string().trim().min(2).max(2000) })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
     const ref = db.collection("comments").doc(data.comment_id);
     const snap = await ref.get();
     const comment = snap.data() as Record<string, unknown> | undefined;
-    if (!snap.exists || comment?.["author_id"] !== context.userId || comment["status"] !== "published" || comment["is_deleted"] === true) {
+    if (
+      !snap.exists ||
+      comment?.["author_id"] !== context.userId ||
+      comment["status"] !== "published" ||
+      comment["is_deleted"] === true
+    ) {
       throw new Error("You can no longer edit this comment.");
     }
-    await ref.update({ body: data.body, edited_at: new Date().toISOString() }, snap.updateTime ? { updateTime: snap.updateTime } : undefined);
+    await ref.update(
+      { body: data.body, edited_at: new Date().toISOString() },
+      snap.updateTime ? { updateTime: snap.updateTime } : undefined,
+    );
     return { ok: true as const };
   });
 
@@ -782,10 +823,18 @@ export const deleteComment = createServerFn({ method: "POST" })
     const ref = db.collection("comments").doc(data.comment_id);
     const snap = await ref.get();
     const comment = snap.data() as Record<string, unknown> | undefined;
-    if (!snap.exists || comment?.["author_id"] !== context.userId || comment["status"] !== "published" || comment["is_deleted"] === true) {
+    if (
+      !snap.exists ||
+      comment?.["author_id"] !== context.userId ||
+      comment["status"] !== "published" ||
+      comment["is_deleted"] === true
+    ) {
       throw new Error("You can no longer delete this comment.");
     }
-    await ref.update({ body: "", is_deleted: true, deleted_at: new Date().toISOString() }, snap.updateTime ? { updateTime: snap.updateTime } : undefined);
+    await ref.update(
+      { body: "", is_deleted: true, deleted_at: new Date().toISOString() },
+      snap.updateTime ? { updateTime: snap.updateTime } : undefined,
+    );
     return { ok: true as const };
   });
 
@@ -901,8 +950,8 @@ export const submitSalary = createServerFn({ method: "POST" })
     const reports = db.collection("salary_reports");
     const salaryId = `${data.company_id}:${context.userId}`;
     await db.runTransaction(async (transaction) => {
-      const existingForUser = await transaction.get(reports.where("user_id", "==", context.userId));
-      if (existingForUser.docs.some((doc) => doc.get("company_id") === data.company_id)) {
+      const existingForCompany = await transaction.get(reports.doc(salaryId));
+      if (existingForCompany.exists) {
         throw new Error("You have already submitted a salary range for this company.");
       }
       transaction.create(reports.doc(salaryId), {
@@ -923,5 +972,7 @@ export const getMySalaryCompanyIds = createServerFn({ method: "GET" })
       .collection("salary_reports")
       .where("user_id", "==", context.userId)
       .get();
-    return [...new Set(snapshot.docs.map((doc) => doc.get("company_id")).filter(Boolean))] as string[];
+    return [
+      ...new Set(snapshot.docs.map((doc) => doc.get("company_id")).filter(Boolean)),
+    ] as string[];
   });

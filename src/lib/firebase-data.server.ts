@@ -56,6 +56,7 @@ export type ProfileRecord = {
   created_at: string;
   role_label: string | null;
   username?: string | null;
+  display_name?: string | null;
   photo_url?: string | null;
   cover_url?: string | null;
   verified?: boolean;
@@ -282,8 +283,10 @@ function isPlaceholderCompanyName(name: string | null | undefined) {
 }
 
 function isDiscoverableCompany(company: CompanyRecord, publishedCompanyIds: ReadonlySet<string>) {
-  return !isPlaceholderCompanyName(company.name) &&
-    (isPublicCompany(company) || publishedCompanyIds.has(company.id));
+  return (
+    !isPlaceholderCompanyName(company.name) &&
+    (isPublicCompany(company) || publishedCompanyIds.has(company.id))
+  );
 }
 
 export async function buildCompanyScores() {
@@ -443,7 +446,9 @@ export async function buildCompanySalaryDirectory() {
   ]);
 
   const companiesWithPublishedStories = new Set(
-    stories.filter((story) => story.status === "published" && story.company_id).map((story) => story.company_id),
+    stories
+      .filter((story) => story.status === "published" && story.company_id)
+      .map((story) => story.company_id),
   );
 
   const byCompany = new Map<string, SalaryReportRecord[]>();
@@ -455,7 +460,9 @@ export async function buildCompanySalaryDirectory() {
   }
 
   const rows: CompanySalarySummary[] = [];
-  for (const company of companies.filter((entry) => isDiscoverableCompany(entry, companiesWithPublishedStories))) {
+  for (const company of companies.filter((entry) =>
+    isDiscoverableCompany(entry, companiesWithPublishedStories),
+  )) {
     const items = byCompany.get(company.id) ?? [];
     if (items.length === 0) continue;
     const positions = new Set(items.map((item) => item.role_title.trim().toLowerCase()));
@@ -485,9 +492,10 @@ export async function buildCompanySalaryDetail(slug: string) {
     readCollection<StoryRecord>("stories"),
   ]);
   const company = companies.find((entry) => entry.slug === slug) ?? null;
-  const hasPublishedStory = Boolean(company && stories.some(
-    (story) => story.company_id === company.id && story.status === "published",
-  ));
+  const hasPublishedStory = Boolean(
+    company &&
+    stories.some((story) => story.company_id === company.id && story.status === "published"),
+  );
   if (company && isPlaceholderCompanyName(company.name)) return null;
   if (company && !isPublicCompany(company) && !hasPublishedStory) return null;
   if (!company) return null;
@@ -594,19 +602,64 @@ export async function getFilterOptionsData() {
     readCollection<StoryRecord>("stories"),
   ]);
   const companiesWithPublishedStories = new Set(
-    stories.filter((story) => story.status === "published" && story.company_id).map((story) => story.company_id),
+    stories
+      .filter((story) => story.status === "published" && story.company_id)
+      .map((story) => story.company_id),
   );
-  const companies = allCompanies.filter((company) => isDiscoverableCompany(company, companiesWithPublishedStories));
+  const companies = allCompanies.filter((company) =>
+    isDiscoverableCompany(company, companiesWithPublishedStories),
+  );
   const industries = [
     ...new Set(companies.map((company) => company.industry).filter(Boolean)),
   ].sort() as string[];
   const counties = [
-    "Baringo", "Bomet", "Bungoma", "Busia", "Elgeyo-Marakwet", "Embu", "Garissa", "Homa Bay",
-    "Isiolo", "Kajiado", "Kakamega", "Kericho", "Kiambu", "Kilifi", "Kirinyaga", "Kisii",
-    "Kisumu", "Kitui", "Kwale", "Laikipia", "Lamu", "Machakos", "Makueni", "Mandera",
-    "Marsabit", "Meru", "Migori", "Mombasa", "Murang’a", "Nairobi", "Nakuru", "Nandi",
-    "Narok", "Nyamira", "Nyandarua", "Nyeri", "Samburu", "Siaya", "Taita-Taveta", "Tana River",
-    "Tharaka-Nithi", "Trans Nzoia", "Turkana", "Uasin Gishu", "Vihiga", "Wajir", "West Pokot",
+    "Baringo",
+    "Bomet",
+    "Bungoma",
+    "Busia",
+    "Elgeyo-Marakwet",
+    "Embu",
+    "Garissa",
+    "Homa Bay",
+    "Isiolo",
+    "Kajiado",
+    "Kakamega",
+    "Kericho",
+    "Kiambu",
+    "Kilifi",
+    "Kirinyaga",
+    "Kisii",
+    "Kisumu",
+    "Kitui",
+    "Kwale",
+    "Laikipia",
+    "Lamu",
+    "Machakos",
+    "Makueni",
+    "Mandera",
+    "Marsabit",
+    "Meru",
+    "Migori",
+    "Mombasa",
+    "Murang’a",
+    "Nairobi",
+    "Nakuru",
+    "Nandi",
+    "Narok",
+    "Nyamira",
+    "Nyandarua",
+    "Nyeri",
+    "Samburu",
+    "Siaya",
+    "Taita-Taveta",
+    "Tana River",
+    "Tharaka-Nithi",
+    "Trans Nzoia",
+    "Turkana",
+    "Uasin Gishu",
+    "Vihiga",
+    "Wajir",
+    "West Pokot",
   ];
   const publishedStories = stories.filter((story) => story.status === "published");
   const areasByCounty = Object.fromEntries(
@@ -616,7 +669,7 @@ export async function getFilterOptionsData() {
         .map((story) => story.area?.trim())
         .filter((area): area is string => Boolean(area));
       const byNormalizedArea = new Map<string, string>();
-      for (const area of [...areasForCounty(county), ...customAreas]) {
+      for (const area of [...(areasForCounty(county) ?? []), ...customAreas]) {
         const cleaned = area.trim().replace(/\s+/g, " ");
         if (cleaned && !byNormalizedArea.has(cleaned.toLocaleLowerCase())) {
           byNormalizedArea.set(cleaned.toLocaleLowerCase(), cleaned);
@@ -677,7 +730,9 @@ export async function getPublicStories(input: {
     .filter((story) => story.status === "published")
     .filter((story) => (input.industry ? story.industry === input.industry : true))
     .filter((story) =>
-      input.county ? normalizeCountyFilter(story.county) === normalizeCountyFilter(input.county) : true,
+      input.county
+        ? normalizeCountyFilter(story.county) === normalizeCountyFilter(input.county)
+        : true,
     )
     .filter((story) =>
       input.area
@@ -702,7 +757,7 @@ export async function getPublicStories(input: {
         company_verified: Boolean(company?.verified),
         area: story.area ?? null,
         likes: Number(story.likes ?? 0),
-        follower_count: followsByStory.get(story.id) ?? 0,
+        follower_count: followsByStory.get(story.id) ?? Number(story.follower_count ?? 0),
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
         metoo: story.metoo,
@@ -726,7 +781,91 @@ export async function getPublicStories(input: {
   });
 
   const limit = input.limit ?? 20;
-  return sorted.slice(0, limit);
+  return limit <= 0 ? sorted : sorted.slice(0, limit);
+}
+
+/** Cursor page used by the unfiltered chronological feed. */
+export async function getPublicStoryPage(input: {
+  limit: number;
+  cursor?: { createdAt: string; id: string } | null;
+  industry?: string | null;
+  county?: string | null;
+  area?: string | null;
+}) {
+  const db = getFirestoreDb();
+  let baseQuery = db
+    .collection("stories")
+    .where("status", "==", "published")
+    .orderBy("created_at", "desc")
+    .orderBy("__name__", "desc");
+  if (input.industry) baseQuery = baseQuery.where("industry", "==", input.industry);
+  if (input.county) baseQuery = baseQuery.where("county", "==", input.county);
+  if (input.area) baseQuery = baseQuery.where("area", "==", input.area);
+  let cursor = input.cursor ?? null;
+  const pageRows: StoryRecord[] = [];
+  let exhausted = false;
+  // The query filters and cursor keep reads bounded to matching published stories.
+  while (pageRows.length <= input.limit && !exhausted) {
+    let query = baseQuery;
+    if (cursor) {
+      query = query.startAfter(cursor.createdAt, db.collection("stories").doc(cursor.id));
+    }
+    const snapshot = await query.limit(input.limit * 2).get();
+    const chunk = snapshot.docs.map((doc) => toRecord<StoryRecord>(doc));
+    pageRows.push(...chunk);
+    const lastDocument = snapshot.docs.at(-1);
+    exhausted = snapshot.size < input.limit * 2 || !lastDocument;
+    if (lastDocument) {
+      const lastStory = toRecord<StoryRecord>(lastDocument);
+      cursor = { createdAt: lastStory.created_at, id: lastStory.id };
+    }
+  }
+  const hasMore = pageRows.length > input.limit;
+  const stories = pageRows.slice(0, input.limit);
+  const [companies, authors] = await Promise.all([
+    Promise.all(
+      [...new Set(stories.map((story) => story.company_id).filter(Boolean))].map((id) =>
+        readDocument<CompanyRecord>("companies", id),
+      ),
+    ),
+    Promise.all(
+      [
+        ...new Set(
+          stories.map((story) => story.author_id).filter((id): id is string => Boolean(id)),
+        ),
+      ].map((id) => readDocument<ProfileRecord>("profiles", id)),
+    ),
+  ]);
+  const companiesById = new Map(
+    companies.filter(Boolean).map((company) => [company!.id, company!]),
+  );
+  const authorsById = new Map(authors.filter(Boolean).map((profile) => [profile!.id, profile!]));
+  const publicStories = stories.map<PublicStoryRecord>((story) => {
+    const company = companiesById.get(story.company_id);
+    const author = story.author_id ? authorsById.get(story.author_id) : null;
+    return {
+      ...story,
+      company_location_suggestion: null,
+      company_name: company?.name ?? story.company_name ?? null,
+      company_slug: story.company_slug ?? company?.slug ?? null,
+      company_verified: Boolean(company?.verified),
+      area: story.area ?? null,
+      likes: Number(story.likes ?? 0),
+      follower_count: Number(story.follower_count ?? 0),
+      reasons: story.reasons ?? [],
+      comment_count: Number(story.comment_count ?? 0),
+      metoo: Number(story.metoo ?? 0),
+      upvotes: Number(story.upvotes ?? 0),
+      author_username: story.author_username ?? author?.username ?? null,
+      author_membership_tier: membershipBadgeTier(author ?? undefined),
+    };
+  });
+  const last = stories.at(-1);
+  return {
+    stories: publicStories,
+    hasMore,
+    nextCursor: hasMore && last ? { createdAt: last.created_at, id: last.id } : null,
+  };
 }
 
 export async function getCompanyView(slug: string) {
@@ -777,7 +916,7 @@ export async function getCompanyView(slug: string) {
         reasons: story.reasons ?? [],
         comment_count: story.comment_count,
         likes: Number(story.likes ?? 0),
-        follower_count: followsByStory.get(story.id) ?? 0,
+        follower_count: followsByStory.get(story.id) ?? Number(story.follower_count ?? 0),
         metoo: story.metoo,
         upvotes: story.upvotes,
         would_work_again: story.would_work_again,
@@ -908,7 +1047,7 @@ export async function getStoryView(id: string) {
       author_membership_tier: membershipBadgeTier(authorProfile ?? undefined),
     } as PublicStoryRecord,
     comments: roots,
-    commentTotal: enriched.length,
+    commentTotal: Math.max(enriched.length, Number(story.comment_count ?? 0)),
   };
 }
 

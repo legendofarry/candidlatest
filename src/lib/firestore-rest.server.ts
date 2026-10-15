@@ -121,7 +121,9 @@ type SetOptions = { merge?: boolean };
 abstract class FieldTransform {}
 
 class IncrementTransform extends FieldTransform {
-  constructor(readonly operand: number) { super(); }
+  constructor(readonly operand: number) {
+    super();
+  }
 }
 class ArrayUnionTransform extends FieldTransform {
   constructor(readonly operands: unknown[]) {
@@ -228,7 +230,10 @@ export class DocumentReference {
     };
   }
   createWrite(data: DocumentData): Write {
-    return { update: { name: this.name, fields: encodeFields(data) }, currentDocument: { exists: false } };
+    return {
+      update: { name: this.name, fields: encodeFields(data) },
+      currentDocument: { exists: false },
+    };
   }
   deleteWrite(): Write {
     return { delete: this.name };
@@ -268,6 +273,7 @@ export class Query {
     protected filters: Filter[] = [],
     protected orders: { field: string; dir: string }[] = [],
     protected max?: number,
+    protected cursor?: unknown[],
   ) {}
   where(field: string, op: string, value: unknown) {
     return new Query(
@@ -276,13 +282,24 @@ export class Query {
       [...this.filters, { field, op, value }],
       this.orders,
       this.max,
+      this.cursor,
     );
   }
   orderBy(field: string, dir: "asc" | "desc" = "asc") {
-    return new Query(this.db, this.path, this.filters, [...this.orders, { field, dir }], this.max);
+    return new Query(
+      this.db,
+      this.path,
+      this.filters,
+      [...this.orders, { field, dir }],
+      this.max,
+      this.cursor,
+    );
   }
   limit(n: number) {
-    return new Query(this.db, this.path, this.filters, this.orders, n);
+    return new Query(this.db, this.path, this.filters, this.orders, n, this.cursor);
+  }
+  startAfter(...values: unknown[]) {
+    return new Query(this.db, this.path, this.filters, this.orders, this.max, values);
   }
   async get() {
     const parts = this.path.split("/");
@@ -305,6 +322,14 @@ export class Query {
         direction: o.dir === "desc" ? "DESCENDING" : "ASCENDING",
       }));
     if (this.max) structuredQuery["limit"] = this.max;
+    if (this.cursor) {
+      structuredQuery["startAt"] = {
+        values: this.cursor.map((value) =>
+          value instanceof DocumentReference ? { referenceValue: value.name } : encode(value),
+        ),
+        before: false,
+      };
+    }
     const rows = (await this.db.request(`${parent}:runQuery`, {
       method: "POST",
       body: JSON.stringify({ structuredQuery }),
@@ -321,6 +346,33 @@ export class Query {
         ) as QueryDocumentSnapshot;
       });
     return new QuerySnapshot(docs);
+  }
+  async count() {
+    const parts = this.path.split("/");
+    const collectionId = parts.pop()!;
+    const parent = parts.length ? `/${parts.join("/")}` : "";
+    const fieldFilters = this.filters.map((filter) => ({
+      fieldFilter: {
+        field: { fieldPath: filter.field.split(".").map(quote).join(".") },
+        op: OPS[filter.op] ?? "EQUAL",
+        value: encode(filter.value),
+      },
+    }));
+    const structuredQuery: Record<string, unknown> = { from: [{ collectionId }] };
+    if (fieldFilters.length === 1) structuredQuery["where"] = fieldFilters[0];
+    else if (fieldFilters.length > 1) {
+      structuredQuery["where"] = { compositeFilter: { op: "AND", filters: fieldFilters } };
+    }
+    const response = (await this.db.request(`${parent}:runAggregationQuery`, {
+      method: "POST",
+      body: JSON.stringify({
+        structuredAggregationQuery: {
+          structuredQuery,
+          aggregations: [{ count: {}, alias: "total" }],
+        },
+      }),
+    })) as Array<{ result?: { aggregateFields?: { total?: { integerValue?: string } } } }>;
+    return Number(response[0]?.result?.aggregateFields?.total?.integerValue ?? 0);
   }
 }
 
