@@ -28,6 +28,7 @@ export function StoryActions({
   followers,
   discussionOpen = false,
   onToggleDiscussion,
+  announcement = false,
 }: {
   storyId: string;
   upvotes: number;
@@ -37,6 +38,7 @@ export function StoryActions({
   followers?: number;
   discussionOpen?: boolean;
   onToggleDiscussion?: (() => void) | undefined;
+  announcement?: boolean;
 }) {
   const { user } = useAuth();
   const isMobile = useIsMobile();
@@ -90,23 +92,29 @@ export function StoryActions({
 
   return (
     <div onClick={stop} className="relative z-10">
-      <div className="mt-3 grid grid-cols-6 items-center gap-1 border-t border-border pt-3 sm:flex sm:flex-wrap sm:gap-1.5">
-        <ActionChip
-          icon={<ArrowBigUp className="size-4 text-primary" />}
-          label={formatCount(upvotes + optimistic.up)}
-          ariaLabel={`${(upvotes + optimistic.up).toLocaleString()} upvotes`}
-          hint="Upvote"
-          disabled={!user || voteMutation.isPending}
-          onClick={() => voteMutation.mutate("up")}
-        />
-        <ActionChip
-          icon={<Users className="size-4" />}
-          label={formatCount(metoo + optimistic.metoo)}
-          ariaLabel={`${(metoo + optimistic.metoo).toLocaleString()} people said this happened to them too`}
-          hint="This happened to me too"
-          disabled={!user || voteMutation.isPending}
-          onClick={() => voteMutation.mutate("metoo")}
-        />
+      <div
+        className={`mt-3 grid items-center gap-1 border-t border-border pt-3 sm:flex sm:flex-wrap sm:gap-1.5 ${announcement ? "grid-cols-4" : "grid-cols-6"}`}
+      >
+        {!announcement ? (
+          <>
+            <ActionChip
+              icon={<ArrowBigUp className="size-4 text-primary" />}
+              label={formatCount(upvotes + optimistic.up)}
+              ariaLabel={`${(upvotes + optimistic.up).toLocaleString()} upvotes`}
+              hint="Upvote"
+              disabled={!user || voteMutation.isPending}
+              onClick={() => voteMutation.mutate("up")}
+            />
+            <ActionChip
+              icon={<Users className="size-4" />}
+              label={formatCount(metoo + optimistic.metoo)}
+              ariaLabel={`${(metoo + optimistic.metoo).toLocaleString()} people said this happened to them too`}
+              hint="This happened to me too"
+              disabled={!user || voteMutation.isPending}
+              onClick={() => voteMutation.mutate("metoo")}
+            />
+          </>
+        ) : null}
         <ActionChip
           icon={<MessageSquare className="size-4" />}
           label={formatCount(commentCount + optimistic.comments)}
@@ -127,26 +135,31 @@ export function StoryActions({
           storyId={storyId}
           likes={likes ?? 0}
           followers={followers ?? 0}
+          variant={announcement ? "announcement" : "story"}
           className="contents sm:flex"
         />
 
-        <ActionChip
-          icon={<Flag className="size-4" />}
-          label={reported ? "Reported" : ""}
-          hint={reported ? "Already reported" : "Report"}
-          disabled={!user || reported}
-          className="text-danger sm:ml-auto"
-          onClick={() => setReportOpen(true)}
-        />
+        {!announcement ? (
+          <ActionChip
+            icon={<Flag className="size-4" />}
+            label={reported ? "Reported" : ""}
+            hint={reported ? "Already reported" : "Report"}
+            disabled={!user || reported}
+            className="text-danger sm:ml-auto"
+            onClick={() => setReportOpen(true)}
+          />
+        ) : null}
       </div>
 
-      <ReportDialog
-        open={reportOpen}
-        onOpenChange={setReportOpen}
-        targetType="story"
-        targetId={storyId}
-        onReported={() => setReported(true)}
-      />
+      {!announcement ? (
+        <ReportDialog
+          open={reportOpen}
+          onOpenChange={setReportOpen}
+          targetType="story"
+          targetId={storyId}
+          onReported={() => setReported(true)}
+        />
+      ) : null}
 
       {open ? (
         <div className="animate-fade mt-3 space-y-3 border-t border-border/70 pt-3">
@@ -156,7 +169,11 @@ export function StoryActions({
                 rows={2}
                 value={body}
                 onChange={(event) => setBody(event.target.value)}
-                placeholder="Add context or share what happened to you. No names of individuals."
+                placeholder={
+                  announcement
+                    ? "Write a comment…"
+                    : "Add context or share what happened to you. No names of individuals."
+                }
                 className="bg-background"
               />
               <Button
@@ -177,7 +194,9 @@ export function StoryActions({
               <Link to="/auth" className="font-medium text-primary">
                 Sign in
               </Link>{" "}
-              to vote or comment. Your identity is never shown.
+              {announcement
+                ? "to like, save or comment on this update."
+                : "to vote or comment. Your identity is never shown."}
             </p>
           )}
 

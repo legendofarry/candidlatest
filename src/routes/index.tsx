@@ -216,8 +216,10 @@ function FeedPage() {
         </DrawerContent>
       </Drawer>
 
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem]">
-        <div id="feed" className="min-w-0 scroll-mt-20 space-y-4">
+      <div
+        className={`grid gap-6 ${activeDiscussion ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : "grid-cols-1"}`}
+      >
+        <div id="feed" className="min-w-0 scroll-mt-20 space-y-0">
           <FilterBar
             query={q}
             onQueryChange={setQ}
@@ -327,44 +329,45 @@ function FeedPage() {
               story={activeDiscussion}
               onClose={() => setActiveDiscussion(null)}
             />
-          ) : (
-            <aside key="feed-highlights" className="space-y-4 lg:sticky lg:top-20 lg:self-start">
-              <div className="rounded-2xl border border-border bg-card p-4">
-                <h2 className="flex items-center gap-2 text-sm font-semibold">
-                  <TrendingUp className="size-4 text-primary" /> Most discussed
-                </h2>
-                <ul className="mt-3 space-y-2 text-sm">
-                  {filters.companies.slice(0, 6).map((company) => (
-                    <li key={company.slug}>
-                      <Link
-                        to="/companies/$slug"
-                        params={{ slug: company.slug }}
-                        className="text-muted-foreground hover:text-primary"
-                      >
-                        {company.name}
-                        {company.verified ? (
-                          <CompanyVerifiedBadge className="ml-1 align-middle" />
-                        ) : null}
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-              <div className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
-                <h2 className="flex items-center gap-2 font-semibold">
-                  <Flame className="size-4 text-danger" /> Know your rights
-                </h2>
-                <p className="mt-2 text-muted-foreground">
-                  Unpaid salary, no contract or forced overtime? See what Kenyan labour law says.
-                </p>
-                <Link to="/rights" className="mt-2 inline-block font-medium text-danger">
-                  Read the basics →
-                </Link>
-              </div>
-            </aside>
-          )}
+          ) : null}
         </AnimatePresence>
       </div>
+      {!activeDiscussion ? (
+        <aside className="mt-8 grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2">
+          <div className="rounded-2xl border border-border bg-card p-4">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <TrendingUp className="size-4 text-primary" /> Most discussed
+            </h2>
+            <ul className="mt-3 space-y-2 text-sm">
+              {filters.companies.slice(0, 6).map((company) => (
+                <li key={company.slug}>
+                  <Link
+                    to="/companies/$slug"
+                    params={{ slug: company.slug }}
+                    className="text-muted-foreground hover:text-primary"
+                  >
+                    {company.name}
+                    {company.verified ? (
+                      <CompanyVerifiedBadge className="ml-1 align-middle" />
+                    ) : null}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
+            <h2 className="flex items-center gap-2 font-semibold">
+              <Flame className="size-4 text-danger" /> Know your rights
+            </h2>
+            <p className="mt-2 text-muted-foreground">
+              Unpaid salary, no contract or forced overtime? See what Kenyan labour law says.
+            </p>
+            <Link to="/rights" className="mt-2 inline-block font-medium text-danger">
+              Read the basics →
+            </Link>
+          </div>
+        </aside>
+      ) : null}
     </div>
   );
 }

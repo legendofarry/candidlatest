@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { motion } from "motion/react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,6 +13,7 @@ import {
   Lock,
   LoaderCircle,
   MapPin,
+  PenLine,
   Paperclip,
   Save,
   ShieldCheck,
@@ -44,6 +45,8 @@ import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { cn } from "@/lib/utils";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { allKenyaAreas, areasForCounty } from "@/lib/kenya-locations";
+import { CommunityPostComposer } from "@/components/site/community-post-composer";
+import { getOnboardingState } from "@/lib/onboarding.functions";
 
 const filtersQuery = queryOptions({ queryKey: ["filters"], queryFn: () => getFilterOptions() });
 
@@ -106,9 +109,10 @@ type StoryDraft = {
 };
 
 export const Route = createFileRoute("/post")({
-  validateSearch: (search: Record<string, unknown>): { edit?: string } =>
-    typeof search["edit"] === "string" ? { edit: search["edit"] } : {},
-  loader: ({ context }) => context.queryClient.ensureQueryData(filtersQuery),
+  validateSearch: (search: Record<string, unknown>): { edit?: string; mode?: "announcement" } => ({
+    ...(typeof search["edit"] === "string" ? { edit: search["edit"] } : {}),
+    ...(search["mode"] === "announcement" ? { mode: "announcement" as const } : {}),
+  }),
   head: () => ({
     meta: [
       { title: "Share your exit story | Candid" },
@@ -128,9 +132,20 @@ export const Route = createFileRoute("/post")({
 });
 
 function PostPage() {
+  const { mode } = Route.useSearch();
+  return mode === "announcement" ? <CommunityPostComposer /> : <WorkplaceStoryComposer />;
+}
+
+function WorkplaceStoryComposer() {
   const { edit: editStoryId } = Route.useSearch();
   const { data: filters } = useSuspenseQuery(filtersQuery);
   const { user, loading } = useAuth();
+  const fetchOnboarding = useServerFn(getOnboardingState);
+  const { data: account } = useQuery({
+    queryKey: ["onboarding-state", user?.uid ?? null],
+    queryFn: () => fetchOnboarding(),
+    enabled: Boolean(user),
+  });
   const navigate = useNavigate();
   const queryClient = useQueryClient();
 
@@ -715,6 +730,15 @@ function PostPage() {
           <div className="flex items-start p-4 pt-3 md:h-dvh md:items-center md:overflow-y-auto md:p-8">
             <div className="w-full space-y-6">
               <header>
+                {account?.accountType === "official" &&
+                account.username === "candid" &&
+                !isEditing ? (
+                  <Button asChild variant="outline" size="sm" className="mb-4">
+                    <Link to="/post" search={{ mode: "announcement" }}>
+                      <PenLine className="size-4" /> Create Candid update
+                    </Link>
+                  </Button>
+                ) : null}
                 <h1 className="text-3xl font-semibold md:text-4xl">
                   {isEditing ? "Edit your story" : "Share your exit story"}
                 </h1>

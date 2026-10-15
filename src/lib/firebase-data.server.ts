@@ -105,6 +105,7 @@ export type StoryRecord = {
   would_work_again: boolean | null;
   author_id: string | null;
   author_username?: string | null;
+  author_photo_url?: string | null;
   author_membership_tier?: "basic" | "premium" | "gold";
   verified?: boolean;
   status: "published" | "pending" | "hidden";
@@ -116,6 +117,16 @@ export type StoryRecord = {
   metoo: number;
   comment_count: number;
   created_at: string;
+  post_type?: "workplace_story" | "announcement";
+  media?: CommunityPostMedia[];
+};
+
+export type CommunityPostMedia = {
+  url: string;
+  resource_type: "image" | "video";
+  format: string;
+  width?: number | null;
+  height?: number | null;
 };
 
 export type CommentRecord = {
@@ -943,10 +954,10 @@ export async function getStoryView(id: string) {
     .where("story_id", "==", id)
     .limit(1000)
     .get();
-  const storyFollowSnapshot = await getFirestoreDb()
+  const storyFollowerCount = await getFirestoreDb()
     .collection("story_follows")
     .where("story_id", "==", id)
-    .get();
+    .count();
   // Filter and sort after the indexed story_id lookup. Combining the status
   // filter and created_at ordering here requires a composite Firestore index;
   // without it, the public story route throws before it can render comments.
@@ -1037,7 +1048,7 @@ export async function getStoryView(id: string) {
       company_verified: Boolean(company?.verified),
       area: story.area ?? null,
       likes: Number(story.likes ?? 0),
-      follower_count: Math.max(storyFollowSnapshot.size, Number(story.follower_count ?? 0)),
+      follower_count: Math.max(storyFollowerCount, Number(story.follower_count ?? 0)),
       reasons: story.reasons ?? [],
       comment_count: story.comment_count,
       metoo: story.metoo,

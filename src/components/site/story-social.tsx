@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Bookmark, Heart } from "lucide-react";
-import { followStory, getStoryEngagement, likeStory } from "@/lib/social.functions";
+import { Bookmark, Heart, Share2 } from "lucide-react";
+import { followStory, getStoryEngagement, likeStory, saveStory } from "@/lib/social.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn, formatCount } from "@/lib/utils";
@@ -13,16 +13,19 @@ export function StorySocial({
   likes = 0,
   followers = 0,
   className,
+  variant = "story",
 }: {
   storyId: string;
   likes?: number;
   followers?: number;
   className?: string;
+  variant?: "story" | "announcement";
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const like = useServerFn(likeStory);
   const follow = useServerFn(followStory);
+  const save = useServerFn(saveStory);
   const engagementFn = useServerFn(getStoryEngagement);
 
   const engagement = useQuery({
@@ -34,6 +37,7 @@ export function StorySocial({
   const [followerCount, setFollowerCount] = useState(followers);
   const [likedOverride, setLikedOverride] = useState<boolean | null>(null);
   const [followingOverride, setFollowingOverride] = useState<boolean | null>(null);
+  const [savedOverride, setSavedOverride] = useState<boolean | null>(null);
 
   useEffect(() => setLikeCount(engagement.data?.likes ?? likes), [engagement.data?.likes, likes]);
   useEffect(
@@ -42,11 +46,13 @@ export function StorySocial({
   );
   useEffect(() => setLikedOverride(null), [engagement.data?.liked]);
   useEffect(() => setFollowingOverride(null), [engagement.data?.following]);
+  useEffect(() => setSavedOverride(null), [engagement.data?.saved]);
 
-  const invalidate = () => {
+  const invalidate = (options: { followChanged?: boolean; feedChanged?: boolean } = {}) => {
     void queryClient.invalidateQueries({ queryKey: ["story-engagement", storyId] });
-    void queryClient.invalidateQueries({ queryKey: ["followed-stories"] });
-    void queryClient.invalidateQueries({ queryKey: ["stories"] });
+    if (options.feedChanged) void queryClient.invalidateQueries({ queryKey: ["stories"] });
+    if (options.followChanged)
+      void queryClient.invalidateQueries({ queryKey: ["followed-stories"] });
   };
 
   const likeMutation = useMutation({
@@ -60,7 +66,7 @@ export function StorySocial({
     onSuccess: (result) => {
       setLikedOverride(result.liked);
       setLikeCount(result.likes);
-      invalidate();
+      invalidate({ feedChanged: true });
     },
     onError: (error: Error, _variables, context) => {
       setLikedOverride(null);
@@ -74,7 +80,7 @@ export function StorySocial({
     onSuccess: (result) => {
       setFollowingOverride(result.following);
       setFollowerCount(result.followers);
-      invalidate();
+      invalidate({ followChanged: true, feedChanged: true });
     },
     onMutate: () => {
       const next = !following;
@@ -88,8 +94,41 @@ export function StorySocial({
     },
   });
 
+  const saveMutation = useMutation({
+    mutationFn: () => save({ data: { story_id: storyId } }),
+    onMutate: () => setSavedOverride(!saved),
+    onSuccess: (result) => {
+      setSavedOverride(result.saved);
+      invalidate();
+      void queryClient.invalidateQueries({ queryKey: ["saved-community-posts"] });
+    },
+    onError: (error: Error) => {
+      setSavedOverride(null);
+      toast.error(error.message);
+    },
+  });
+
   const liked = likedOverride ?? Boolean(engagement.data?.liked);
   const following = followingOverride ?? Boolean(engagement.data?.following);
+  const saved = savedOverride ?? Boolean(engagement.data?.saved);
+
+  async function sharePost() {
+    const url = new URL(
+      `/stories/${encodeURIComponent(storyId)}`,
+      window.location.origin,
+    ).toString();
+    try {
+      if (navigator.share) await navigator.share({ title: "Candid update", url });
+      else {
+        await navigator.clipboard.writeText(url);
+        toast.success("Link copied");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name !== "AbortError") {
+        toast.error("Could not share this post");
+      }
+    }
+  }
 
   return (
     <div className={cn("flex items-center gap-1.5", className)}>
@@ -109,20 +148,60 @@ export function StorySocial({
       </button>
       <button
         type="button"
-        title={following ? "Unfollow story" : "Follow story"}
-        aria-label={following ? "Unfollow story" : "Follow story"}
-        disabled={!user || followMutation.isPending}
-        onClick={() => followMutation.mutate()}
+        title={
+          (variant === "announcement" ? saved : following)
+            ? variant === "announcement"
+              ? "Remove saved post"
+              : "Unfollow story"
+            : variant === "announcement"
+              ? "Save post"
+              : "Follow story"
+        }
+        aria-label={
+          (variant === "announcement" ? saved : following)
+            ? variant === "announcement"
+              ? "Remove saved post"
+              : "Unfollow story"
+            : variant === "announcement"
+              ? "Save post"
+              : "Follow story"
+        }
+        disabled={
+          !user || (variant === "announcement" ? saveMutation.isPending : followMutation.isPending)
+        }
+        onClick={() =>
+          variant === "announcement" ? saveMutation.mutate() : followMutation.mutate()
+        }
         className={cn(
           "inline-flex h-9 min-w-0 items-center justify-center rounded-full px-1 text-xs font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground active:scale-95 disabled:opacity-50 sm:px-2",
-          following && "text-primary",
+          (variant === "announcement" ? saved : following) && "text-primary",
         )}
       >
-        <Bookmark className={cn("size-4", following && "fill-current")} />
-        <span aria-label={`${followerCount.toLocaleString()} followers`}>
-          {formatCount(followerCount)}
-        </span>
+        <Bookmark
+          className={cn(
+            "size-4",
+            (variant === "announcement" ? saved : following) && "fill-current",
+          )}
+        />
+        {variant === "announcement" ? (
+          <span>{saved ? "Saved" : "Save"}</span>
+        ) : (
+          <span aria-label={`${followerCount.toLocaleString()} followers`}>
+            {formatCount(followerCount)}
+          </span>
+        )}
       </button>
+      {variant === "announcement" ? (
+        <button
+          type="button"
+          title="Share post"
+          aria-label="Share post"
+          onClick={() => void sharePost()}
+          className="inline-flex h-9 min-w-0 items-center justify-center gap-1 rounded-full px-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground sm:px-2"
+        >
+          <Share2 className="size-4" /> <span>Share</span>
+        </button>
+      ) : null}
     </div>
   );
 }

@@ -148,21 +148,97 @@ export async function toggleStoryFollow(storyId: string, userId: string) {
   });
 }
 
+/** Saves or removes a story from the viewer's private bookmarks. */
+export async function toggleStorySave(storyId: string, userId: string) {
+  const db = getFirestoreDb();
+  const ref = db.collection("story_saves").doc(`${storyId}:${userId}`);
+  const storyRef = db.collection("stories").doc(storyId);
+  return db.runTransaction(async (transaction) => {
+    const [snap, storySnap] = await Promise.all([transaction.get(ref), transaction.get(storyRef)]);
+    if (
+      !storySnap.exists ||
+      (storySnap.data() as { status?: string } | undefined)?.status !== "published"
+    ) {
+      throw new Error("This post is no longer available.");
+    }
+    if (snap.exists) {
+      transaction.delete(ref);
+      return { saved: false };
+    }
+    transaction.create(ref, {
+      id: ref.id,
+      story_id: storyId,
+      user_id: userId,
+      created_at: now(),
+    });
+    return { saved: true };
+  });
+}
+
+export async function listSavedCommunityPosts(
+  userId: string,
+  input: { limit: number; cursor?: { createdAt: string; id: string } | null },
+) {
+  const db = getFirestoreDb();
+  let query = db
+    .collection("story_saves")
+    .where("user_id", "==", userId)
+    .orderBy("created_at", "desc")
+    .orderBy("__name__", "desc");
+  if (input.cursor) {
+    query = query.startAfter(
+      input.cursor.createdAt,
+      db.collection("story_saves").doc(input.cursor.id),
+    );
+  }
+  const snapshot = await query.limit(input.limit + 1).get();
+  const hasMore = snapshot.size > input.limit;
+  const saved = snapshot.docs.slice(0, input.limit).map((doc) => ({
+    id: doc.id,
+    ...(doc.data() as { story_id: string; created_at: string }),
+  }));
+  const stories = await Promise.all(
+    saved.map((item) => db.collection("stories").doc(item.story_id).get()),
+  );
+  const items = stories
+    .filter((doc) => {
+      const story = doc.data() as StoryRecord | undefined;
+      return doc.exists && story?.status === "published" && story.post_type === "announcement";
+    })
+    .map((doc) => {
+      const story = doc.data() as StoryRecord;
+      return {
+        id: story.id,
+        body: story.body,
+        created_at: story.created_at,
+        media: story.media ?? [],
+      };
+    });
+  const last = saved.at(-1);
+  return {
+    items,
+    hasMore,
+    nextCursor: hasMore && last ? { createdAt: last.created_at, id: last.id } : null,
+  };
+}
+
 /** Everything the viewer has engaged with on a story. */
 export async function readStoryEngagement(storyId: string, userId: string) {
   const db = getFirestoreDb();
-  const [like, follow, story, followers] = await Promise.all([
+  const [like, follow, save, story, followers] = await Promise.all([
     db.collection("story_likes").doc(`${storyId}:${userId}`).get(),
     db.collection("story_follows").doc(`${storyId}:${userId}`).get(),
+    db.collection("story_saves").doc(`${storyId}:${userId}`).get(),
     db.collection("stories").doc(storyId).get(),
-    db.collection("story_follows").where("story_id", "==", storyId).get(),
+    db.collection("story_follows").where("story_id", "==", storyId).count(),
   ]);
   return {
     liked: like.exists,
     following: follow.exists,
+    saved: save.exists,
     likes: Number((story.data() as { likes?: number } | undefined)?.likes ?? 0),
     followers: Math.max(
-      followers.size,
+      followers,
       Number((story.data() as { follower_count?: number } | undefined)?.follower_count ?? 0),
     ),
   };

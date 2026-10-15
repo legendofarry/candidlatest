@@ -48,6 +48,29 @@ export const followStory = createServerFn({ method: "POST" })
     return toggleStoryFollow(data.story_id, context.userId);
   });
 
+export const saveStory = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator(storyInput)
+  .handler(async ({ data, context }) => {
+    const { toggleStorySave } = await import("./social.server");
+    return toggleStorySave(data.story_id, context.userId);
+  });
+
+export const getSavedCommunityPosts = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        limit: z.number().min(1).max(50).default(20),
+        cursor: z.object({ createdAt: z.string(), id: z.string() }).nullable().default(null),
+      })
+      .parse(input ?? {}),
+  )
+  .handler(async ({ data, context }) => {
+    const { listSavedCommunityPosts } = await import("./social.server");
+    return listSavedCommunityPosts(context.userId, data);
+  });
+
 export const getStoryEngagement = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator(storyInput)

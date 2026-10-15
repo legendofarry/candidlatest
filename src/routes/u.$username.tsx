@@ -26,7 +26,11 @@ import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn, formatCount } from "@/lib/utils";
-import { ProfileAvatar } from "@/components/site/profile-photo";
+import {
+  DEFAULT_PROFILE_COVER_URL,
+  ProfileAvatar,
+  coverDeliveryUrl,
+} from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 
 export const Route = createFileRoute("/u/$username")({
@@ -151,31 +155,11 @@ function PublicProfilePage() {
         className="bg-card"
       >
         <div className="relative h-[170px] overflow-hidden bg-secondary sm:h-[280px] md:h-[360px]">
-          {typeof profile.cover_url === "string" && profile.cover_url ? (
-            <img
-              src={profile.cover_url.replace(
-                "/upload/",
-                "/upload/c_fill,ar_16:6,w_1600,q_auto,f_auto/",
-              )}
-              alt=""
-              className="size-full object-cover"
-            />
-          ) : (
-            <div className="relative size-full overflow-hidden bg-[radial-gradient(ellipse_at_18%_5%,rgba(204,255,0,0.3),transparent_40%),radial-gradient(ellipse_at_88%_100%,rgba(0,198,160,0.2),transparent_42%),linear-gradient(125deg,#17201d,#0b1113_60%,#131a1c)]">
-              <div
-                aria-hidden="true"
-                className="absolute -right-12 -top-24 size-72 rounded-full border border-white/10 shadow-[0_0_0_32px_rgba(255,255,255,0.025),0_0_0_72px_rgba(255,255,255,0.02)]"
-              />
-              <div className="absolute bottom-5 left-5 sm:bottom-7 sm:left-8">
-                <p className="text-[10px] font-semibold uppercase tracking-[.24em] text-primary">
-                  Candid community
-                </p>
-                <p className="mt-1 font-display text-lg font-semibold text-white/90 sm:text-2xl">
-                  Real stories. Real workplaces.
-                </p>
-              </div>
-            </div>
-          )}
+          <img
+            src={coverDeliveryUrl(profile.cover_url || DEFAULT_PROFILE_COVER_URL)}
+            alt=""
+            className="size-full scale-[1.03] object-cover blur-[2px]"
+          />
           <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/15" />
           <div className="absolute inset-x-0 top-0 flex items-center justify-end p-3 text-white sm:p-5">
             <div className="flex items-center gap-2">

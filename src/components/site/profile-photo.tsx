@@ -15,10 +15,18 @@ import { notify } from "@/lib/notifications-store";
 import { PRESET_AVATARS, presetAvatarUrl } from "@/lib/preset-avatars";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
+export const DEFAULT_PROFILE_COVER_URL = "/images/candid-community-cover.png";
+
 function avatarDeliveryUrl(url: string) {
   return url.startsWith("/")
     ? url
     : url.replace("/upload/", "/upload/c_fill,g_face,ar_1:1,w_512,h_512,q_auto,f_auto/");
+}
+
+export function coverDeliveryUrl(url: string) {
+  return url.startsWith("/")
+    ? url
+    : url.replace("/upload/", "/upload/c_fill,ar_16:6,w_1600,q_auto,f_auto/");
 }
 
 async function compressCoverImage(file: File): Promise<Blob> {
@@ -34,7 +42,9 @@ async function compressCoverImage(file: File): Promise<Blob> {
   }
   context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
   bitmap.close();
-  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.84));
+  const blob = await new Promise<Blob | null>((resolve) =>
+    canvas.toBlob(resolve, "image/jpeg", 0.84),
+  );
   if (!blob) throw new Error("This browser could not process the cover image.");
   return blob;
 }
@@ -103,15 +113,17 @@ export function ProfileCoverPicker({
     setUploading(true);
     try {
       const body = new FormData();
-      const image =
-        typeof createImageBitmap === "function" ? await compressCoverImage(file) : file;
+      const image = typeof createImageBitmap === "function" ? await compressCoverImage(file) : file;
       body.append("file", image, "cover.jpg");
       body.append("upload_preset", uploadPreset);
       const response = await fetch(
         `https://api.cloudinary.com/v1_1/${encodeURIComponent(cloudName)}/image/upload`,
         { method: "POST", body },
       );
-      const result = (await response.json()) as { secure_url?: string; error?: { message?: string } };
+      const result = (await response.json()) as {
+        secure_url?: string;
+        error?: { message?: string };
+      };
       if (!response.ok || !result.secure_url) {
         throw new Error(result.error?.message || "Could not upload that cover image.");
       }
@@ -124,19 +136,12 @@ export function ProfileCoverPicker({
     }
   }
 
-  const imageUrl = coverUrl?.replace(
-    "/upload/",
-    "/upload/c_fill,ar_16:6,w_1600,q_auto,f_auto/",
-  );
+  const imageUrl = coverDeliveryUrl(coverUrl || DEFAULT_PROFILE_COVER_URL);
 
   return (
     <div className="absolute inset-0">
-      {imageUrl ? (
-        <img src={imageUrl} alt="" className="size-full object-cover" />
-      ) : (
-        <div className="size-full bg-[radial-gradient(circle_at_18%_20%,rgba(190,242,100,0.4),transparent_30%),radial-gradient(circle_at_85%_10%,rgba(34,211,238,0.22),transparent_35%),linear-gradient(130deg,hsl(var(--secondary)),hsl(var(--background)))]" />
-      )}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-transparent to-black/10" />
+      <img src={imageUrl} alt="" className="size-full scale-[1.03] object-cover blur-[2px]" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/15" />
       {editable ? (
         <>
           <input
@@ -158,13 +163,20 @@ export function ProfileCoverPicker({
             aria-label={coverUrl ? "Change cover photo" : "Add cover photo"}
             className="absolute bottom-3 right-3 h-9 rounded-full border border-white/20 bg-background/90 px-3 shadow-lg backdrop-blur"
           >
-            {uploading ? <Loader2 className="size-4 animate-spin" /> : <ImagePlus className="size-4" />}
+            {uploading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <ImagePlus className="size-4" />
+            )}
             <span className="hidden sm:inline">{coverUrl ? "Edit cover" : "Add cover"}</span>
           </Button>
         </>
       ) : null}
       {error ? (
-        <p role="alert" className="absolute bottom-14 right-3 max-w-[80%] rounded-lg bg-destructive px-3 py-2 text-xs text-destructive-foreground shadow-lg">
+        <p
+          role="alert"
+          className="absolute bottom-14 right-3 max-w-[80%] rounded-lg bg-destructive px-3 py-2 text-xs text-destructive-foreground shadow-lg"
+        >
           {error}
         </p>
       ) : null}
@@ -403,7 +415,7 @@ export function ProfilePhotoPicker({
             <p className="text-xs text-muted-foreground">
               {compact
                 ? "Tap photo to view or update"
-              : "Optional · tap photo to view or update · images up to 20 MB"}
+                : "Optional · tap photo to view or update · images up to 20 MB"}
             </p>
           </div>
         ) : null}

@@ -24,7 +24,7 @@ import { requiresEmailVerification } from "@/lib/email-verification";
 import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ProfilePhotoPicker } from "@/components/site/profile-photo";
+import { ProfileCoverPicker, ProfilePhotoPicker } from "@/components/site/profile-photo";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -84,6 +84,7 @@ function OnboardingPage() {
 
   const [step, setStep] = useState<0 | 1 | 2>(0);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [usernameAcknowledgementChecked, setUsernameAcknowledgementChecked] = useState(false);
   const [usernameAcknowledged, setUsernameAcknowledged] = useState(false);
@@ -123,6 +124,7 @@ function OnboardingPage() {
       .then((result) => {
         if (!active) return;
         setPhotoUrl(result.photoUrl);
+        setCoverUrl(result.coverUrl);
         if (!result.needsOnboarding && !editUsername) navigate({ to: "/" });
       })
       .catch((error: unknown) => {
@@ -143,7 +145,9 @@ function OnboardingPage() {
       const result = await getSuggestions({ data: { seed: "Candid" } });
       setUsernameSuggestions(result.suggestions);
       if (!result.suggestions.length) {
-        setSuggestionError("We couldn’t find an available suggestion. Try again or choose your own.");
+        setSuggestionError(
+          "We couldn’t find an available suggestion. Try again or choose your own.",
+        );
       }
     } catch {
       setUsernameSuggestions([]);
@@ -259,231 +263,437 @@ function OnboardingPage() {
       <div className="mx-auto w-full max-w-2xl">
         <header className="mb-8 flex items-center justify-between">
           <div className="flex items-center gap-2 font-display text-sm font-semibold">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground"><Flame className="size-4" /></span>
+            <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+              <Flame className="size-4" />
+            </span>
             Candid
           </div>
           {editUsername ? (
-            <button type="button" onClick={() => void navigate({ to: "/profile" })} className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground">
+            <button
+              type="button"
+              onClick={() => void navigate({ to: "/profile" })}
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+            >
               <ArrowLeft className="size-3.5" /> Cancel edit
             </button>
-          ) : <span className="text-xs text-muted-foreground">Your account</span>}
+          ) : (
+            <span className="text-xs text-muted-foreground">Your account</span>
+          )}
         </header>
         <div>
-        <motion.div
-          initial={{ opacity: 0, y: 18 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
-          className="mb-7"
-        >
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
-            {editUsername ? "Update your public username" : `Account setup · ${step + 1} of 3`}
-          </p>
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-            {step === 0
-              ? !usernameAcknowledged
-                ? "Your username is public"
-                : !usernameChoice
-                  ? "How would you like to choose it?"
-                  : usernameChoice === "own"
-                    ? "Choose your username"
-                    : "Pick a suggested username"
-              : step === 1
-                ? "Add a profile photo"
-                : "Add your links"}
-          </h1>
-          <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
-            {step === 0
-              ? !usernameAcknowledged
-                ? "The username you choose can identify you to other members when you post a story or comment. Your email and legal name are not displayed, but avoid using your real name or details that could identify you."
-                : !usernameChoice
-                  ? "You can choose a unique username yourself, or let Candid suggest available options. You can change your mind before continuing."
-                  : usernameChoice === "own"
-                    ? "Choose a name you’re comfortable having shown on your stories and comments. We’ll check that it’s available."
-                    : "Choose one of these available names, or ask Candid for another set."
-              : step === 1
-                ? "A photo is optional and visible on your profile. Choose an image that doesn’t identify you, or continue without one."
-                : "Social links are optional. Add any you want people to find on your profile."}
-          </p>
-        </motion.div>
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
+            className="mb-7"
+          >
+            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+              {editUsername ? "Update your public username" : `Account setup · ${step + 1} of 3`}
+            </p>
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              {step === 0
+                ? !usernameAcknowledged
+                  ? "Your username is public"
+                  : !usernameChoice
+                    ? "How would you like to choose it?"
+                    : usernameChoice === "own"
+                      ? "Choose your username"
+                      : "Pick a suggested username"
+                : step === 1
+                  ? "Make your profile yours"
+                  : "Add your links"}
+            </h1>
+            <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
+              {step === 0
+                ? !usernameAcknowledged
+                  ? "The username you choose can identify you to other members when you post a story or comment. Your email and legal name are not displayed, but avoid using your real name or details that could identify you."
+                  : !usernameChoice
+                    ? "You can choose a unique username yourself, or let Candid suggest available options. You can change your mind before continuing."
+                    : usernameChoice === "own"
+                      ? "Choose a name you’re comfortable having shown on your stories and comments. We’ll check that it’s available."
+                      : "Choose one of these available names, or ask Candid for another set."
+                : step === 1
+                  ? "Add a profile photo and choose a cover. Both are optional; we’ve added a Candid banner if you want to use a cover later."
+                  : "Social links are optional. Add any you want people to find on your profile."}
+            </p>
+          </motion.div>
 
-        {!editUsername ? <div className="mb-5 flex gap-2" aria-label={`Profile setup step ${step + 1} of 3`}>
-          {[0, 1, 2].map((index) => (
-            <div key={index} className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
-              <motion.div
-                className="h-full rounded-full bg-primary"
-                initial={false}
-                animate={{ width: step >= index ? "100%" : "0%" }}
-                transition={{ duration: 0.45, ease: "easeOut" }}
-              />
-            </div>
-          ))}
-        </div> : null}
-
-        <AnimatePresence mode="wait" initial={false}>
-          {step === 0 ? (
-            <motion.section
-              key="username"
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
-            >
-              {!usernameAcknowledged ? (
-                <div className="space-y-5">
-                  <div className="rounded-2xl border border-sky-500/20 bg-sky-500/[0.06] p-5 sm:p-6">
-                    <span className="flex size-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400"><ShieldCheck className="size-6" /></span>
-                    <h2 className="mt-4 text-xl font-semibold tracking-tight">Your name, your choice</h2>
-                    <p className="mt-2 text-sm leading-6 text-muted-foreground">Your username appears next to the stories and comments you share. Other members may recognize it, so choose a name you’re comfortable using publicly.</p>
-                    <p className="mt-3 text-sm leading-6 text-muted-foreground">Your email and legal name are not shown. Still, avoid usernames or story details that could identify you if you want to stay private.</p>
-                  </div>
-                  <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background p-4 transition-colors hover:bg-secondary/40">
-                    <input type="checkbox" checked={usernameAcknowledgementChecked} onChange={(event) => setUsernameAcknowledgementChecked(event.target.checked)} className="mt-1 size-4 accent-primary" />
-                    <span className="text-sm leading-5">I understand that my username can be seen on my stories and comments.</span>
-                  </label>
-                  <Button className="w-full glow-primary" disabled={!usernameAcknowledgementChecked} onClick={() => setUsernameAcknowledged(true)}>Continue <ArrowRight className="size-4" /></Button>
-                </div>
-              ) : !usernameChoice ? (
-                <div className="space-y-3">
-                  <button type="button" onClick={() => { setUsernameChoice("own"); setUsernameSuggestions([]); setUsername(""); setMessage(null); }} className="group flex w-full items-center gap-4 rounded-2xl border border-border bg-background p-4 text-left transition-all hover:border-primary/50 hover:bg-secondary/40 sm:p-5">
-                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-foreground"><Pencil className="size-5" /></span>
-                    <span className="min-w-0 flex-1"><span className="block font-semibold">I’ll choose my own</span><span className="mt-1 block text-sm text-muted-foreground">Pick a unique username you want to post under.</span></span>
-                    <ArrowRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
-                  </button>
-                  <button type="button" disabled={loadingSuggestions} onClick={() => { setUsernameChoice("generated"); void generateAliases(); }} className="group flex w-full items-center gap-4 rounded-2xl border border-border bg-background p-4 text-left transition-all hover:border-primary/50 hover:bg-secondary/40 disabled:opacity-60 sm:p-5">
-                    <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Sparkles className="size-5" /></span>
-                    <span className="min-w-0 flex-1"><span className="block font-semibold">Let Candid choose for me</span><span className="mt-1 block text-sm text-muted-foreground">We’ll suggest available names you can pick from.</span></span>
-                    {loadingSuggestions ? <Loader2 className="size-5 animate-spin text-muted-foreground" /> : <ArrowRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />}
-                  </button>
-                </div>
-              ) : (
-                <div className="space-y-5">
-                  <button type="button" onClick={() => { setUsernameChoice(null); setUsername(""); setUsernameSuggestions([]); setSuggestionError(null); setMessage(null); }} className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"><ArrowLeft className="size-4" /> Choose another option</button>
-                  {usernameChoice === "own" ? (
-                    <div className="space-y-3">
-                      <Label htmlFor="username">Your unique username</Label>
-                      <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 focus-within:border-primary"><AtSign className="size-4 shrink-0 text-muted-foreground" /><Input id="username" autoFocus autoComplete="off" spellCheck={false} maxLength={20} value={username} onChange={(event) => setUsername(event.target.value)} placeholder="yourname" className="border-0 bg-transparent px-0 focus-visible:ring-0" /></div>
-                      <p className="text-xs leading-5 text-muted-foreground">Use 3–20 letters, numbers, dots, or underscores. Don’t use your real name if you want to stay anonymous.</p>
-                    </div>
-                  ) : (
-                    <div className="space-y-3">
-                      <p className="text-sm font-medium">Username ideas</p>
-                      <p className="text-xs text-muted-foreground">We’ll check availability when you select one.</p>
-                      {loadingSuggestions ? <div className="flex items-center gap-2 rounded-xl bg-secondary/50 p-4 text-sm text-muted-foreground"><Loader2 className="size-4 animate-spin" /> Generating username ideas…</div> : usernameSuggestions.length ? <div className="grid gap-2 sm:grid-cols-2">{usernameSuggestions.map((suggestion) => <button key={suggestion} type="button" aria-pressed={username === suggestion} onClick={() => setUsername(suggestion)} className={cn("rounded-xl border px-4 py-3 text-left font-medium transition-colors", username === suggestion ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/30" : "border-border bg-background hover:border-primary/50")}>@{suggestion}</button>)}</div> : null}
-                      {suggestionError ? <p role="status" className="text-sm text-muted-foreground">{suggestionError}</p> : null}
-                      <Button type="button" variant="outline" onClick={() => void generateAliases()} disabled={loadingSuggestions}><Sparkles className="size-4" /> Generate more</Button>
-                    </div>
-                  )}
-                  {username ? <p aria-live="polite" className={`text-sm ${status === "available" ? "text-verified" : status === "taken" || status === "invalid" ? "text-destructive" : "text-muted-foreground"}`}>{status === "checking" ? "Checking username availability…" : status === "available" ? "This username is available." : status === "taken" || status === "invalid" ? message ?? "Choose another username." : "Checking username availability…"}</p> : null}
-                  {submitError ? <div role="alert" className="flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-sm text-danger"><AlertCircle className="mt-0.5 size-4 shrink-0" /><p className="min-w-0 break-words">{submitError}</p></div> : null}
-                  {editUsername ? <Button className="w-full glow-primary" disabled={status !== "available" || saving} onClick={() => void saveAliasChange()}>{saving ? <Loader2 className="size-4 animate-spin" /> : null}{saving ? "Saving username…" : "Save username"}</Button> : <Button className="w-full glow-primary" disabled={status !== "available" || saving} onClick={() => setStep(1)}>Use @{username} <ArrowRight className="size-4" /></Button>}
-                </div>
-              )}
-            </motion.section>
-          ) : step === 1 ? (
-            <motion.section
-              key="photo"
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
-            >
-              <ProfilePhotoPicker
-                photoUrl={photoUrl}
-                initials={(user?.email?.[0] ?? "C").toUpperCase()}
-                onSaved={(nextPhotoUrl) => {
-                  setPhotoUrl(nextPhotoUrl);
-                  if (user) {
-                    queryClient.setQueryData(["onboarding-state", user.uid], (previous: unknown) =>
-                      previous && typeof previous === "object"
-                        ? { ...previous, photoUrl: nextPhotoUrl }
-                        : previous,
-                    );
-                  }
-                }}
-              />
-              <div className="flex items-center gap-3">
-                <Button className="flex-1 glow-primary" onClick={() => setStep(2)}>
-                  {photoUrl ? "Continue with photo" : "Continue without photo"}{" "}
-                  <ArrowRight className="size-4" />
-                </Button>
-              </div>
-              <button
-                type="button"
-                onClick={() => setStep(0)}
-                className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-              >
-                Back to username
-              </button>
-            </motion.section>
-          ) : (
-            <motion.section
-              key="socials"
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -24 }}
-              transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-              className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
-            >
-              <div className="space-y-3">
-                {SOCIAL_FIELDS.map((field, index) => (
+          {!editUsername ? (
+            <div className="mb-5 flex gap-2" aria-label={`Profile setup step ${step + 1} of 3`}>
+              {[0, 1, 2].map((index) => (
+                <div key={index} className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
                   <motion.div
-                    key={field.key}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.05 * index }}
-                    className="flex items-center gap-2 rounded-xl border border-input px-3 focus-within:border-primary"
-                  >
-                    <field.icon className="size-4 shrink-0 text-muted-foreground" />
-                    <Input
-                      value={socials[field.key]}
-                      onChange={(event) =>
-                        setSocials((prev) => ({ ...prev, [field.key]: event.target.value }))
-                      }
-                      placeholder={`${field.label} — ${field.placeholder}`}
-                      className="border-0 bg-transparent px-0 focus-visible:ring-0"
-                    />
-                  </motion.div>
-                ))}
-              </div>
-
-              {submitError ? (
-                <div
-                  role="alert"
-                  className="mt-4 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-sm text-danger"
-                >
-                  <AlertCircle className="mt-0.5 size-4 shrink-0" />
-                  <p className="min-w-0 break-words">{submitError}</p>
+                    className="h-full rounded-full bg-primary"
+                    initial={false}
+                    animate={{ width: step >= index ? "100%" : "0%" }}
+                    transition={{ duration: 0.45, ease: "easeOut" }}
+                  />
                 </div>
-              ) : null}
+              ))}
+            </div>
+          ) : null}
 
-              <Button className="mt-6 w-full glow-primary" disabled={saving} onClick={() => void submit()}>
-                {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-                {saving ? "Finishing setup…" : `Enter Candid as @${username}`}
-              </Button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void submit(false)}
-                className="mt-3 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+          <AnimatePresence mode="wait" initial={false}>
+            {step === 0 ? (
+              <motion.section
+                key="username"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
               >
-                Skip links and finish
-              </button>
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="mt-3 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                {!usernameAcknowledged ? (
+                  <div className="space-y-5">
+                    <div className="rounded-2xl border border-sky-500/20 bg-sky-500/[0.06] p-5 sm:p-6">
+                      <span className="flex size-11 items-center justify-center rounded-2xl bg-sky-500/10 text-sky-600 dark:text-sky-400">
+                        <ShieldCheck className="size-6" />
+                      </span>
+                      <h2 className="mt-4 text-xl font-semibold tracking-tight">
+                        Your name, your choice
+                      </h2>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        Your username appears next to the stories and comments you share. Other
+                        members may recognize it, so choose a name you’re comfortable using
+                        publicly.
+                      </p>
+                      <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                        Your email and legal name are not shown. Still, avoid usernames or story
+                        details that could identify you if you want to stay private.
+                      </p>
+                    </div>
+                    <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background p-4 transition-colors hover:bg-secondary/40">
+                      <input
+                        type="checkbox"
+                        checked={usernameAcknowledgementChecked}
+                        onChange={(event) =>
+                          setUsernameAcknowledgementChecked(event.target.checked)
+                        }
+                        className="mt-1 size-4 accent-primary"
+                      />
+                      <span className="text-sm leading-5">
+                        I understand that my username can be seen on my stories and comments.
+                      </span>
+                    </label>
+                    <Button
+                      className="w-full glow-primary"
+                      disabled={!usernameAcknowledgementChecked}
+                      onClick={() => setUsernameAcknowledged(true)}
+                    >
+                      Continue <ArrowRight className="size-4" />
+                    </Button>
+                  </div>
+                ) : !usernameChoice ? (
+                  <div className="space-y-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsernameChoice("own");
+                        setUsernameSuggestions([]);
+                        setUsername("");
+                        setMessage(null);
+                      }}
+                      className="group flex w-full items-center gap-4 rounded-2xl border border-border bg-background p-4 text-left transition-all hover:border-primary/50 hover:bg-secondary/40 sm:p-5"
+                    >
+                      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-secondary text-foreground">
+                        <Pencil className="size-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold">I’ll choose my own</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          Pick a unique username you want to post under.
+                        </span>
+                      </span>
+                      <ArrowRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                    </button>
+                    <button
+                      type="button"
+                      disabled={loadingSuggestions}
+                      onClick={() => {
+                        setUsernameChoice("generated");
+                        void generateAliases();
+                      }}
+                      className="group flex w-full items-center gap-4 rounded-2xl border border-border bg-background p-4 text-left transition-all hover:border-primary/50 hover:bg-secondary/40 disabled:opacity-60 sm:p-5"
+                    >
+                      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <Sparkles className="size-5" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold">Let Candid choose for me</span>
+                        <span className="mt-1 block text-sm text-muted-foreground">
+                          We’ll suggest available names you can pick from.
+                        </span>
+                      </span>
+                      {loadingSuggestions ? (
+                        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+                      ) : (
+                        <ArrowRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                      )}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUsernameChoice(null);
+                        setUsername("");
+                        setUsernameSuggestions([]);
+                        setSuggestionError(null);
+                        setMessage(null);
+                      }}
+                      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                    >
+                      <ArrowLeft className="size-4" /> Choose another option
+                    </button>
+                    {usernameChoice === "own" ? (
+                      <div className="space-y-3">
+                        <Label htmlFor="username">Your unique username</Label>
+                        <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 focus-within:border-primary">
+                          <AtSign className="size-4 shrink-0 text-muted-foreground" />
+                          <Input
+                            id="username"
+                            autoFocus
+                            autoComplete="off"
+                            spellCheck={false}
+                            maxLength={20}
+                            value={username}
+                            onChange={(event) => setUsername(event.target.value)}
+                            placeholder="yourname"
+                            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+                          />
+                        </div>
+                        <p className="text-xs leading-5 text-muted-foreground">
+                          Use 3–20 letters, numbers, dots, or underscores. Don’t use your real name
+                          if you want to stay anonymous.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-sm font-medium">Username ideas</p>
+                        <p className="text-xs text-muted-foreground">
+                          We’ll check availability when you select one.
+                        </p>
+                        {loadingSuggestions ? (
+                          <div className="flex items-center gap-2 rounded-xl bg-secondary/50 p-4 text-sm text-muted-foreground">
+                            <Loader2 className="size-4 animate-spin" /> Generating username ideas…
+                          </div>
+                        ) : usernameSuggestions.length ? (
+                          <div className="grid gap-2 sm:grid-cols-2">
+                            {usernameSuggestions.map((suggestion) => (
+                              <button
+                                key={suggestion}
+                                type="button"
+                                aria-pressed={username === suggestion}
+                                onClick={() => setUsername(suggestion)}
+                                className={cn(
+                                  "rounded-xl border px-4 py-3 text-left font-medium transition-colors",
+                                  username === suggestion
+                                    ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/30"
+                                    : "border-border bg-background hover:border-primary/50",
+                                )}
+                              >
+                                @{suggestion}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        {suggestionError ? (
+                          <p role="status" className="text-sm text-muted-foreground">
+                            {suggestionError}
+                          </p>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => void generateAliases()}
+                          disabled={loadingSuggestions}
+                        >
+                          <Sparkles className="size-4" /> Generate more
+                        </Button>
+                      </div>
+                    )}
+                    {username ? (
+                      <p
+                        aria-live="polite"
+                        className={`text-sm ${status === "available" ? "text-verified" : status === "taken" || status === "invalid" ? "text-destructive" : "text-muted-foreground"}`}
+                      >
+                        {status === "checking"
+                          ? "Checking username availability…"
+                          : status === "available"
+                            ? "This username is available."
+                            : status === "taken" || status === "invalid"
+                              ? (message ?? "Choose another username.")
+                              : "Checking username availability…"}
+                      </p>
+                    ) : null}
+                    {submitError ? (
+                      <div
+                        role="alert"
+                        className="flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-sm text-danger"
+                      >
+                        <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                        <p className="min-w-0 break-words">{submitError}</p>
+                      </div>
+                    ) : null}
+                    {editUsername ? (
+                      <Button
+                        className="w-full glow-primary"
+                        disabled={status !== "available" || saving}
+                        onClick={() => void saveAliasChange()}
+                      >
+                        {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                        {saving ? "Saving username…" : "Save username"}
+                      </Button>
+                    ) : (
+                      <Button
+                        className="w-full glow-primary"
+                        disabled={status !== "available" || saving}
+                        onClick={() => setStep(1)}
+                      >
+                        Use @{username} <ArrowRight className="size-4" />
+                      </Button>
+                    )}
+                  </div>
+                )}
+              </motion.section>
+            ) : step === 1 ? (
+              <motion.section
+                key="photo"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
               >
-                Back
-              </button>
-            </motion.section>
-          )}
-        </AnimatePresence>
+                <ProfilePhotoPicker
+                  photoUrl={photoUrl}
+                  initials={(user?.email?.[0] ?? "C").toUpperCase()}
+                  onSaved={(nextPhotoUrl) => {
+                    setPhotoUrl(nextPhotoUrl);
+                    if (user) {
+                      queryClient.setQueryData(
+                        ["onboarding-state", user.uid],
+                        (previous: unknown) =>
+                          previous && typeof previous === "object"
+                            ? { ...previous, photoUrl: nextPhotoUrl }
+                            : previous,
+                      );
+                    }
+                  }}
+                />
+                <div className="space-y-2 border-t border-border/70 pt-5">
+                  <div>
+                    <p className="text-sm font-medium">Your cover photo</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      This appears softly blurred at the top of your public profile. You can change
+                      it anytime.
+                    </p>
+                  </div>
+                  <div className="relative h-32 overflow-hidden rounded-2xl border border-border bg-secondary sm:h-40">
+                    <ProfileCoverPicker
+                      coverUrl={coverUrl}
+                      onSaved={(nextCoverUrl) => {
+                        setCoverUrl(nextCoverUrl);
+                        if (user) {
+                          queryClient.setQueryData(
+                            ["onboarding-state", user.uid],
+                            (previous: unknown) =>
+                              previous && typeof previous === "object"
+                                ? { ...previous, coverUrl: nextCoverUrl }
+                                : previous,
+                          );
+                        }
+                      }}
+                    />
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <Button className="flex-1 glow-primary" onClick={() => setStep(2)}>
+                    {photoUrl || coverUrl ? "Continue" : "Continue without photos"}{" "}
+                    <ArrowRight className="size-4" />
+                  </Button>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setStep(0)}
+                  className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Back to username
+                </button>
+              </motion.section>
+            ) : (
+              <motion.section
+                key="socials"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
+              >
+                <div className="space-y-3">
+                  {SOCIAL_FIELDS.map((field, index) => (
+                    <motion.div
+                      key={field.key}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.05 * index }}
+                      className="flex items-center gap-2 rounded-xl border border-input px-3 focus-within:border-primary"
+                    >
+                      <field.icon className="size-4 shrink-0 text-muted-foreground" />
+                      <Input
+                        value={socials[field.key]}
+                        onChange={(event) =>
+                          setSocials((prev) => ({ ...prev, [field.key]: event.target.value }))
+                        }
+                        placeholder={`${field.label} — ${field.placeholder}`}
+                        className="border-0 bg-transparent px-0 focus-visible:ring-0"
+                      />
+                    </motion.div>
+                  ))}
+                </div>
+
+                {submitError ? (
+                  <div
+                    role="alert"
+                    className="mt-4 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-sm text-danger"
+                  >
+                    <AlertCircle className="mt-0.5 size-4 shrink-0" />
+                    <p className="min-w-0 break-words">{submitError}</p>
+                  </div>
+                ) : null}
+
+                <Button
+                  className="mt-6 w-full glow-primary"
+                  disabled={saving}
+                  onClick={() => void submit()}
+                >
+                  {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                  {saving ? "Finishing setup…" : `Enter Candid as @${username}`}
+                </Button>
+                <button
+                  type="button"
+                  disabled={saving}
+                  onClick={() => void submit(false)}
+                  className="mt-3 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+                >
+                  Skip links and finish
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setStep(1)}
+                  className="mt-3 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                >
+                  Back
+                </button>
+              </motion.section>
+            )}
+          </AnimatePresence>
         </div>
-        <footer className="mt-6 pb-2 text-center text-xs leading-5 text-muted-foreground">Your alias appears publicly. Candid cannot guarantee complete anonymity.</footer>
+        <footer className="mt-6 pb-2 text-center text-xs leading-5 text-muted-foreground">
+          Your alias appears publicly. Candid cannot guarantee complete anonymity.
+        </footer>
       </div>
     </main>
   );
 }
-

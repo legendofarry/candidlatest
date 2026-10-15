@@ -56,7 +56,16 @@ export function MessagesInbox({
   const restoredRef = useRef(false);
   const { visibleCount, expandBy } = useAutoCollapsingCount(20);
 
-  const { data, isLoading, hasNextPage, isFetchingNextPage, fetchNextPage } = useInfiniteQuery({
+  const {
+    data,
+    isLoading,
+    isError,
+    isFetching,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+    refetch,
+  } = useInfiniteQuery({
     queryKey: ["conversations", user?.uid],
     initialPageParam: null as { lastMessageAt: string; id: string } | null,
     queryFn: ({ pageParam }) => fetchConversations({ data: { limit: 20, cursor: pageParam } }),
@@ -115,6 +124,27 @@ export function MessagesInbox({
             <div key={index} className="h-20 animate-pulse rounded-2xl bg-secondary/60" />
           ))}
         </div>
+      ) : isError ? (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="glass-card rounded-3xl p-8 text-center"
+          role="alert"
+        >
+          <p className="font-medium">We couldn&apos;t load your conversations</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Your messages are still here. Check your connection and try again.
+          </p>
+          <Button
+            className="mt-4"
+            variant="outline"
+            size="sm"
+            disabled={isFetching}
+            onClick={() => void refetch()}
+          >
+            {isFetching ? "Trying again…" : "Try again"}
+          </Button>
+        </motion.div>
       ) : conversations.length === 0 ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}

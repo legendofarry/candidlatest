@@ -13,7 +13,6 @@ import {
   PenLine,
   Settings,
   ShieldCheck,
-  Users,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -31,6 +30,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { declareAccountType, getOnboardingState } from "@/lib/onboarding.functions";
 import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
+import { SavedCommunityPosts } from "@/components/site/saved-community-posts";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { useAuth } from "@/hooks/useAuth";
 import { inbox, notify as toast } from "@/lib/notifications-store";
@@ -346,33 +346,6 @@ function ProfilePage() {
             </div>
           </motion.section>
 
-          {user ? (
-            <motion.section
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.12 }}
-              className="grid grid-cols-3 gap-2 sm:gap-3"
-            >
-              <ProfileStat
-                icon={<Users className="size-4 text-primary" />}
-                value={publicProfile.data?.followers ?? (publicProfile.isLoading ? "—" : 0)}
-                label="Followers"
-              />
-              <ProfileStat
-                icon={<Users className="size-4 text-primary" />}
-                value={publicProfile.data?.following ?? (publicProfile.isLoading ? "—" : 0)}
-                label="Following"
-              />
-              <ProfileStat
-                icon={<MessageSquare className="size-4 text-primary" />}
-                value={
-                  contributions.data?.active.stories.length ?? (contributions.isLoading ? "—" : 0)
-                }
-                label="Stories"
-              />
-            </motion.section>
-          ) : null}
-
           {socialLinks.length > 0 ? (
             <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
               <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
@@ -396,6 +369,7 @@ function ProfilePage() {
           ) : null}
 
           <FollowedStories />
+          <SavedCommunityPosts />
 
           {user ? (
             <ContributionsPanel data={contributions.data} loading={contributions.isLoading} />
@@ -516,28 +490,6 @@ function SettingsGroup({ title, children }: { title: string; children: React.Rea
   );
 }
 
-function ProfileStat({
-  icon,
-  value,
-  label,
-}: {
-  icon: React.ReactNode;
-  value: number | string;
-  label: string;
-}) {
-  return (
-    <div className="rounded-2xl border border-border bg-card p-3 shadow-sm sm:p-4">
-      <div className="flex items-center gap-2">
-        {icon}
-        <span className="text-xl font-semibold tabular-nums sm:text-2xl">
-          {typeof value === "number" ? formatCount(value) : value}
-        </span>
-      </div>
-      <p className="mt-1 text-[11px] text-muted-foreground sm:text-sm">{label}</p>
-    </div>
-  );
-}
-
 type ContributionItem = {
   id: string;
   title: string;
@@ -629,7 +581,9 @@ function ContributionsPanel({
                             </span>
                             <span className="mt-1 block text-xs capitalize text-muted-foreground">
                               {item.type}
-                              {item.type === "story" ? " · Edit and resubmit for approval" : " "}·{" "}
+                              {item.type === "story"
+                                ? " · Edit and resubmit for approval"
+                                : " "}·{" "}
                               {item.createdAt
                                 ? new Date(item.createdAt).toLocaleDateString("en-KE")
                                 : "Date unavailable"}
