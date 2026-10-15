@@ -153,7 +153,7 @@ function ProfilePage() {
   return (
     <div className="min-h-screen bg-background">
       <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
-      <section className="min-h-screen px-3 py-4 sm:px-5 md:px-8 md:py-8">
+      <section className="min-h-screen px-3 pb-4 pt-2 sm:px-5 sm:pt-2 md:px-8 md:py-8">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -164,13 +164,13 @@ function ProfilePage() {
               initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.06, ease: "easeOut" }}
-              className="relative overflow-hidden rounded-3xl border border-border bg-card pb-4 shadow-sm md:glass-card md:p-0"
+              className="relative -mx-3 overflow-hidden rounded-none border-y border-x-0 border-border bg-card pb-4 shadow-sm sm:mx-0 sm:rounded-3xl sm:border-x md:glass-card md:p-0"
             >
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.5 }}
-                className="relative h-36 overflow-hidden sm:h-48 md:h-64"
+                className="relative h-[170px] overflow-hidden sm:h-56 md:h-64"
               >
                 <ProfileCoverPicker
                   coverUrl={onboarding.data?.coverUrl}
@@ -198,7 +198,7 @@ function ProfilePage() {
                   <ProfilePhotoPicker
                     compact
                     avatarOnly
-                    avatarClassName="size-16 border-4 border-card shadow-lg md:size-20"
+                    avatarClassName="size-20 border-4 border-card shadow-lg md:size-24"
                     photoUrl={onboarding.data?.photoUrl}
                     initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
                     onSaved={(photoUrl) => {
@@ -216,7 +216,7 @@ function ProfilePage() {
                   <ProfileAvatar
                     photoUrl={onboarding.data?.photoUrl}
                     initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
-                    className="size-16 shrink-0 border-4 border-card shadow-lg md:size-20"
+                    className="size-20 shrink-0 border-4 border-card shadow-lg md:size-24"
                   />
                 )}
                 <div className="min-w-0">
@@ -264,8 +264,22 @@ function ProfilePage() {
                   </Button>
                 ) : null}
               </motion.div>
+              {user && onboarding.data?.username ? (
+                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-4">
+                  <Button asChild className="h-11 rounded-xl">
+                    <Link to="/post">
+                      <PenLine className="size-4" /> Share a story
+                    </Link>
+                  </Button>
+                  <Button asChild variant="secondary" className="h-11 rounded-xl">
+                    <Link to="/u/$username" params={{ username: onboarding.data.username }}>
+                      <Link2 className="size-4" /> View public profile
+                    </Link>
+                  </Button>
+                </div>
+              ) : null}
               {user ? (
-                <div className="mt-4 space-y-4 border-t border-border pt-4">
+                <div className="mt-3 space-y-4 border-t border-border pt-4">
                   {onboarding.data?.username ? (
                     <div className="flex flex-wrap items-center gap-2">
                       {nextUsernameChangeAt !== null && Date.now() < nextUsernameChangeAt ? (
@@ -319,9 +333,8 @@ function ProfilePage() {
               <div className="mt-4 flex items-start gap-3 border-l-2 border-verified/35 py-2 pl-3 md:mt-5 md:rounded-xl md:border md:border-verified/15 md:bg-verified/5 md:p-4">
                 <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verified" />
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Your email is only used to sign in. Your Candid handle, profile photo, and cover
-                  image are public; avoid images that could identify you. Individual votes are
-                  never shown.
+                  Your email stays private. Your handle, photo, and cover are public; individual
+                  votes stay private.
                 </p>
               </div>
               </div>

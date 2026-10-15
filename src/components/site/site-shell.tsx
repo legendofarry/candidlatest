@@ -417,7 +417,16 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <div className={cn("relative", !fullscreenRoute && pathname !== "/post" && "app-shell")}>
+      <div
+        className={cn(
+          "relative",
+          !fullscreenRoute &&
+            pathname !== "/post" &&
+            pathname !== "/profile" &&
+            !pathname.startsWith("/u/") &&
+            "app-shell",
+        )}
+      >
         <aside
           className={cn(
             "fixed bottom-0 left-0 z-30 hidden w-72 flex-col border-r border-border bg-card/95 px-4 pb-4 pt-6 shadow-sm backdrop-blur md:flex",
@@ -531,7 +540,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <main
           className={cn(
             "min-w-0 md:pb-10 md:pl-80",
-            fullscreenRoute || pathname === "/post" || pathname === "/support" || directConversationRoute
+            fullscreenRoute ||
+            pathname === "/post" ||
+            pathname === "/profile" ||
+            pathname === "/support" ||
+            directConversationRoute
               ? "p-0 md:pb-0"
               : "pt-6",
             !fullscreenRoute && pathname !== "/support" && (showDock ? "pb-32" : "pb-10"),
