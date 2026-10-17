@@ -1148,7 +1148,7 @@ async function calculateStoryView(id: string) {
     : null;
   if (!story || story.status !== "published") return null;
 
-  const [company, authorProfile, commentSnapshot, commentTotal] = await Promise.all([
+  const [company, authorProfile, commentSnapshot, storedCommentTotal] = await Promise.all([
     story.company_id ? readDocument<CompanyRecord>("companies", story.company_id) : null,
     story.author_id ? readDocument<ProfileRecord>("profiles", story.author_id) : null,
     getFirestoreDb()
@@ -1210,6 +1210,36 @@ async function calculateStoryView(id: string) {
     else roots.push(comment);
   }
   const visibleRoots = omitDeletedCommentNodes(roots);
+  const commentsHasMore = commentSnapshot.size > 50;
+  let commentTotal = Math.max(storedCommentTotal, visibleRoots.length);
+
+  // When the whole thread fits in this page, its rendered root list is the
+  // authoritative count. This also repairs legacy comments whose parent_id
+  // was absent and comments promoted after a deleted parent was removed.
+  if (!commentsHasMore) {
+    commentTotal = visibleRoots.length;
+    if (
+      commentTotal !== Number(story.comment_count ?? 0) ||
+      story.comment_count_scope !== "top_level_v1"
+    ) {
+      const storyRef = getFirestoreDb().collection("stories").doc(id);
+      const latestStorySnapshot = await storyRef.get();
+      const latestStory = latestStorySnapshot.data() as StoryRecord | undefined;
+      if (
+        latestStorySnapshot.exists &&
+        Number(latestStory?.comment_count ?? 0) === Number(story.comment_count ?? 0)
+      ) {
+        await storyRef.update(
+          { comment_count: commentTotal, comment_count_scope: "top_level_v1" },
+          latestStorySnapshot.updateTime
+            ? { updateTime: latestStorySnapshot.updateTime }
+            : undefined,
+        );
+      }
+    }
+  }
+  story.comment_count = commentTotal;
+  story.comment_count_scope = "top_level_v1";
 
   // A thread containing an official reply anywhere floats to the top.
   const officialInThread = new Map<string, boolean>();
@@ -1258,7 +1288,7 @@ async function calculateStoryView(id: string) {
     } as PublicStoryRecord,
     comments: visibleRoots,
     commentTotal,
-    commentsHasMore: commentSnapshot.size > 50,
+    commentsHasMore,
     commentsCursor:
       commentSnapshot.size > 50 && commentRows.at(-1)
         ? {

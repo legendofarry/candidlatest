@@ -125,6 +125,9 @@ export function CommentThread({
   const [nextCommentsCursor, setNextCommentsCursor] = useState(commentsCursor);
   const [hasMoreComments, setHasMoreComments] = useState(commentsHasMore);
   const [loadingMoreComments, setLoadingMoreComments] = useState(false);
+  // The loaded array contains visible top-level comments. Never show a stored
+  // counter that is lower than the comments already rendered in this thread.
+  const displayedTotal = Math.max(total, loadedComments.length);
   const visibleCommentIds = useMemo(
     () => collectCommentIds(loadedComments).slice(0, 100),
     [loadedComments],
@@ -229,9 +232,14 @@ export function CommentThread({
   const commentMutation = useMutation({
     mutationFn: () => post({ data: { story_id: storyId, parent_id: replyTo?.id ?? null, body } }),
     onSuccess: () => {
+      const addedTopLevelComment = replyTo === null;
       setBody("");
       setReplyTo(null);
       void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
+      if (addedTopLevelComment) {
+        void queryClient.invalidateQueries({ queryKey: ["story-pages"] });
+        void queryClient.invalidateQueries({ queryKey: ["stories"] });
+      }
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -254,8 +262,11 @@ export function CommentThread({
           panelMode && "hidden",
         )}
       >
-        <h2 className="text-sm font-semibold" aria-label={`${total.toLocaleString()} comments`}>
-          {formatCount(total)} comments
+        <h2
+          className="text-sm font-semibold"
+          aria-label={`${displayedTotal.toLocaleString()} comments`}
+        >
+          {formatCount(displayedTotal)} comments
         </h2>
         <span className="ml-auto text-[11px] text-muted-foreground">
           Official replies pinned first

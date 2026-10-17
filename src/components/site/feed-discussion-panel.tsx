@@ -36,7 +36,10 @@ export function FeedDiscussionPanel({
     enabled: Boolean(story.id),
   });
   const comments = thread.data?.comments ?? [];
-  const total = thread.data?.commentTotal ?? story.comment_count ?? countComments(comments);
+  const total = Math.max(
+    thread.data?.commentTotal ?? story.comment_count ?? countComments(comments),
+    comments.length,
+  );
 
   return (
     <motion.aside

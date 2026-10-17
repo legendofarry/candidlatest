@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -61,6 +61,15 @@ export function StoryActions({
     queryFn: () => getStory({ data: { id: storyId } }),
     enabled: open || sheetOpen || discussionOpen,
   });
+  const displayedCommentCount = Math.max(
+    commentCount + optimistic.comments,
+    thread.data?.commentTotal ?? 0,
+    thread.data?.comments.length ?? 0,
+  );
+
+  useEffect(() => {
+    setOptimistic((current) => (current.comments === 0 ? current : { ...current, comments: 0 }));
+  }, [commentCount]);
 
   const voteMutation = useMutation({
     mutationFn: (kind: "up" | "metoo") => vote({ data: { story_id: storyId, kind } }),
@@ -83,6 +92,7 @@ export function StoryActions({
       setBody("");
       setOptimistic((prev) => ({ ...prev, comments: prev.comments + 1 }));
       void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
+      void queryClient.invalidateQueries({ queryKey: ["story-pages"] });
       void queryClient.invalidateQueries({ queryKey: ["stories"] });
     },
     onError: (error: Error) => toast.error(error.message),
@@ -117,8 +127,8 @@ export function StoryActions({
         ) : null}
         <ActionChip
           icon={<MessageSquare className="size-4" />}
-          label={formatCount(commentCount + optimistic.comments)}
-          ariaLabel={`${(commentCount + optimistic.comments).toLocaleString()} comments`}
+          label={formatCount(displayedCommentCount)}
+          ariaLabel={`${displayedCommentCount.toLocaleString()} comments`}
           hint="Comments"
           active={discussionOpen || open || sheetOpen}
           onClick={() => {
@@ -242,7 +252,7 @@ export function StoryActions({
                     params={{ id: storyId }}
                     className="text-xs font-medium text-primary"
                   >
-                    View all {formatCount(thread.data?.commentTotal ?? commentCount)} comments
+                    View all {formatCount(displayedCommentCount)} comments
                   </Link>
                 </li>
               ) : null}
@@ -265,7 +275,7 @@ export function StoryActions({
               <CommentThread
                 storyId={storyId}
                 comments={thread.data?.comments ?? []}
-                total={commentCount + optimistic.comments}
+                total={displayedCommentCount}
                 commentsHasMore={thread.data?.commentsHasMore ?? false}
                 commentsCursor={thread.data?.commentsCursor ?? null}
               />

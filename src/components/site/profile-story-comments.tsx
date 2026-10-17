@@ -47,7 +47,10 @@ export function ProfileStoryComments({
   });
   const storyTitle =
     story?.post_type === "announcement" ? "Candid update" : story?.title || "Story comments";
-  const total = thread.data?.commentTotal ?? story?.comment_count ?? 0;
+  const total = Math.max(
+    thread.data?.commentTotal ?? story?.comment_count ?? 0,
+    thread.data?.comments.length ?? 0,
+  );
 
   const content = thread.isPending ? (
     <div className="grid min-h-56 place-items-center gap-2 text-sm text-muted-foreground">
