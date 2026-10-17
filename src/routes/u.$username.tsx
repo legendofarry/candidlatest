@@ -19,8 +19,13 @@ import {
   UserPlus,
   UserCheck,
 } from "lucide-react";
-import { useState } from "react";
-import { getPublicProfile, startConversation, toggleBlockAccount } from "@/lib/messaging.functions";
+import { useEffect, useState } from "react";
+import {
+  getPublicProfile,
+  getPublicProfileStories,
+  startConversation,
+  toggleBlockAccount,
+} from "@/lib/messaging.functions";
 import { followAccount } from "@/lib/social.functions";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notifications-store";
@@ -32,6 +37,22 @@ import {
   coverDeliveryUrl,
 } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { ProfileCommunity } from "@/components/site/profile-community";
+import { ProfileStoryComments } from "@/components/site/profile-story-comments";
+
+type ProfileStory = {
+  id: string;
+  title: string;
+  body: string;
+  company_name: string | null;
+  county: string | null;
+  area: string | null;
+  created_at: string;
+  comment_count: number;
+  likes: number;
+  post_type: "workplace_story" | "announcement";
+  media: { url: string; resource_type: "image" | "video" }[];
+};
 
 export const Route = createFileRoute("/u/$username")({
   head: ({ params }) => {
@@ -53,14 +74,16 @@ export const Route = createFileRoute("/u/$username")({
 
 function PublicProfilePage() {
   const { username } = Route.useParams();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<"All" | "Stories" | "About">("All");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [commentStory, setCommentStory] = useState<ProfileStory | null>(null);
 
   const fetchProfile = useServerFn(getPublicProfile);
+  const fetchProfileStories = useServerFn(getPublicProfileStories);
   const follow = useServerFn(followAccount);
   const block = useServerFn(toggleBlockAccount);
   const openChat = useServerFn(startConversation);
@@ -69,7 +92,31 @@ function PublicProfilePage() {
     queryKey: ["public-profile", username, user?.uid ?? null],
     queryFn: () => fetchProfile({ data: { username } }),
     enabled: Boolean(user),
+    staleTime: 30_000,
   });
+  const [profileStories, setProfileStories] = useState<ProfileStory[]>([]);
+  const [profileStoriesCursor, setProfileStoriesCursor] = useState<{
+    createdAt: string;
+    id: string;
+  } | null>(null);
+  const [hasMoreProfileStories, setHasMoreProfileStories] = useState(false);
+  const [loadingProfileStories, setLoadingProfileStories] = useState(false);
+
+  useEffect(() => {
+    if (!data) return;
+    setProfileStories(data.stories as ProfileStory[]);
+    setProfileStoriesCursor(data.storiesCursor);
+    setHasMoreProfileStories(data.storiesHasMore);
+  }, [data]);
+
+  if (authLoading || (isLoading && Boolean(user))) {
+    return (
+      <div className="mx-auto max-w-xl space-y-4">
+        <div className="h-40 animate-pulse rounded-3xl bg-secondary" />
+        <div className="h-24 animate-pulse rounded-2xl bg-secondary" />
+      </div>
+    );
+  }
 
   if (!user) {
     return (
@@ -78,15 +125,6 @@ function PublicProfilePage() {
         body="Candid profiles are only visible to members."
         action={<Button onClick={() => navigate({ to: "/auth" })}>Sign in</Button>}
       />
-    );
-  }
-
-  if (isLoading) {
-    return (
-      <div className="mx-auto max-w-xl space-y-4">
-        <div className="h-40 animate-pulse rounded-3xl bg-secondary" />
-        <div className="h-24 animate-pulse rounded-2xl bg-secondary" />
-      </div>
     );
   }
 
@@ -125,7 +163,29 @@ function PublicProfilePage() {
 
   const profile = data;
   const followerPreview = profile.follower_preview ?? [];
-  const publicStories = profile.stories ?? [];
+
+  async function loadMoreProfileStories() {
+    if (!profileStoriesCursor || loadingProfileStories) return;
+    setLoadingProfileStories(true);
+    try {
+      const page = await fetchProfileStories({
+        data: { username: profile.username, cursor: profileStoriesCursor },
+      });
+      setProfileStories((current) => {
+        const known = new Set(current.map((story) => story.id));
+        return [
+          ...current,
+          ...(page.stories as ProfileStory[]).filter((story) => !known.has(story.id)),
+        ];
+      });
+      setProfileStoriesCursor(page.nextCursor);
+      setHasMoreProfileStories(page.hasMore);
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not load more stories.");
+    } finally {
+      setLoadingProfileStories(false);
+    }
+  }
 
   async function run(action: () => Promise<unknown>) {
     setBusy(true);
@@ -375,46 +435,11 @@ function PublicProfilePage() {
             </div>
           </section>
 
-          <section className="border-y border-border/70 bg-card/80 px-4 py-3 sm:rounded-xl sm:border sm:px-5 sm:py-4">
-            <div className="mb-2 flex items-center justify-between">
-              <div>
-                <h2 className="text-lg font-bold sm:text-xl">
-                  Community{" "}
-                  <span className="ml-1 text-sm font-medium text-muted-foreground">
-                    {formatCount(profile.followers)}
-                  </span>
-                </h2>
-                <p className="text-xs text-muted-foreground sm:text-sm">
-                  People following @{profile.username}
-                </p>
-              </div>
-            </div>
-            {followerPreview.length ? (
-              <div className="-mx-1 flex gap-3 overflow-x-auto pb-1">
-                {followerPreview.map((person) => (
-                  <Link
-                    key={person.id}
-                    to="/u/$username"
-                    params={{ username: person.username }}
-                    className="w-[calc(50%-6px)] min-w-[138px] shrink-0 overflow-hidden rounded-xl border border-border bg-background sm:w-40"
-                  >
-                    <ProfileAvatar
-                      photoUrl={person.photo_url}
-                      initials={person.username.slice(0, 2)}
-                      className="aspect-square w-full rounded-none bg-secondary text-3xl"
-                    />
-                    <span className="block truncate px-3 py-2 text-sm font-semibold">
-                      @{person.username}
-                    </span>
-                  </Link>
-                ))}
-              </div>
-            ) : (
-              <p className="py-2 text-sm text-muted-foreground">
-                No community members to show yet.
-              </p>
-            )}
-          </section>
+          <ProfileCommunity
+            username={profile.username}
+            followerCount={profile.followers}
+            preview={followerPreview}
+          />
         </div>
       ) : null}
 
@@ -453,9 +478,9 @@ function PublicProfilePage() {
                 </Link>
               </>
             ) : null}
-            {publicStories.length ? (
+            {profileStories.length ? (
               <div className="divide-y divide-border">
-                {publicStories.map((story) => (
+                {profileStories.map((story) => (
                   <article key={story.id} className="px-4 py-4 sm:px-5">
                     <div className="flex items-start gap-3">
                       <ProfileAvatar
@@ -466,8 +491,10 @@ function PublicProfilePage() {
                       <div className="min-w-0 flex-1">
                         <p className="font-semibold">@{profile.username}</p>
                         <p className="text-xs text-muted-foreground">
-                          {story.company_name || "Workplace story"}
-                          {story.county
+                          {story.post_type === "announcement"
+                            ? "Candid update"
+                            : story.company_name || "Workplace story"}
+                          {story.post_type !== "announcement" && story.county
                             ? ` · ${story.county}${story.area ? `, ${story.area}` : ""}`
                             : ""}{" "}
                           · {new Date(story.created_at).toLocaleDateString("en-KE")}
@@ -479,23 +506,51 @@ function PublicProfilePage() {
                       params={{ id: story.id }}
                       className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
-                      <h3 className="mt-3 text-base font-semibold">{story.title}</h3>
+                      <h3 className="mt-3 text-base font-semibold">
+                        {story.post_type === "announcement" ? "Candid update" : story.title}
+                      </h3>
                       <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
                         {story.body}
                       </p>
                     </Link>
+                    {story.media.length ? (
+                      <div
+                        className={`mt-3 grid gap-1.5 overflow-hidden rounded-xl bg-secondary ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+                      >
+                        {story.media.map((media, index) =>
+                          media.resource_type === "video" ? (
+                            <video
+                              key={`${media.url}-${index}`}
+                              src={media.url}
+                              controls
+                              playsInline
+                              className="max-h-[60vh] min-h-32 w-full object-contain"
+                            />
+                          ) : (
+                            <img
+                              key={`${media.url}-${index}`}
+                              src={media.url}
+                              alt={`Candid update attachment ${index + 1}`}
+                              loading="lazy"
+                              className="max-h-[60vh] min-h-32 w-full object-contain"
+                            />
+                          ),
+                        )}
+                      </div>
+                    ) : null}
                     <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
                         <Heart className="size-4" /> {formatCount(story.likes)}
                       </span>
-                      <Link
-                        to="/stories/$id"
-                        params={{ id: story.id }}
-                        className="inline-flex items-center gap-1.5"
+                      <button
+                        type="button"
+                        onClick={() => setCommentStory(story)}
+                        aria-label={`View comments, ${formatCount(story.comment_count)} total`}
+                        className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
-                        <MessageSquare className="size-4" /> {formatCount(story.comment_count)}{" "}
-                        comments
-                      </Link>
+                        <MessageSquare className="size-4" />
+                        {formatCount(story.comment_count)} comments
+                      </button>
                       <Link
                         to="/stories/$id"
                         params={{ id: story.id }}
@@ -512,9 +567,29 @@ function PublicProfilePage() {
                 No published stories yet.
               </p>
             )}
+            {hasMoreProfileStories ? (
+              <div className="flex justify-center border-t border-border p-4">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={loadingProfileStories}
+                  onClick={() => void loadMoreProfileStories()}
+                >
+                  {loadingProfileStories ? "Loading stories…" : "Load 30 more stories"}
+                </Button>
+              </div>
+            ) : null}
           </section>
         </div>
       ) : null}
+
+      <ProfileStoryComments
+        story={commentStory}
+        open={Boolean(commentStory)}
+        onOpenChange={(open) => {
+          if (!open) setCommentStory(null);
+        }}
+      />
     </div>
   );
 }

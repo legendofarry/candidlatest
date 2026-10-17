@@ -34,6 +34,10 @@ export const getOnboardingState = createServerFn({ method: "POST" })
       usernameChangedAt: profile?.username_changed_at ?? null,
       socials: profile?.socials ?? null,
       accountType: profile?.account_type ?? "unknown",
+      investigationHold: (() => {
+        const hold = profile?.investigation_hold;
+        return hold === true || (typeof hold === "object" && hold?.active === true);
+      })(),
       membership: {
         tier: getEffectiveMembershipTier(profile),
         assignedTier: profile?.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
@@ -101,7 +105,12 @@ export const claimOfficialCandidAccount = createServerFn({ method: "POST" })
 export const saveMyProfilePhoto = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ photoUrl: z.string().min(1).max(2048), kind: z.enum(["avatar", "cover"]).default("avatar") }).parse(input),
+    z
+      .object({
+        photoUrl: z.string().min(1).max(2048),
+        kind: z.enum(["avatar", "cover"]).default("avatar"),
+      })
+      .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { saveProfilePhoto } = await import("./onboarding.server");

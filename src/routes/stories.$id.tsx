@@ -8,7 +8,7 @@ import {
 } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { ArrowBigUp, Flag, MapPin, Users } from "lucide-react";
+import { ArrowBigUp, Flag, Users } from "lucide-react";
 import { notify as toast } from "@/lib/notifications-store";
 import { getStory } from "@/lib/public.functions";
 import { formatCount } from "@/lib/utils";
@@ -21,12 +21,16 @@ import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StorySocial } from "@/components/site/story-social";
-import { StoryLocationTag } from "@/components/site/company-intel";
+import { StoryLocationDialog } from "@/components/site/story-location-dialog";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 
 const storyQuery = (id: string) =>
-  queryOptions({ queryKey: ["story", id], queryFn: () => getStory({ data: { id } }) });
+  queryOptions({
+    queryKey: ["story", id],
+    queryFn: () => getStory({ data: { id } }),
+    staleTime: 30_000,
+  });
 
 export const Route = createFileRoute("/stories/$id")({
   validateSearch: (search: Record<string, unknown>): { comment?: string } =>
@@ -89,7 +93,7 @@ function StoryPage() {
   });
 
   if (!data) return null;
-  const { story, comments, commentTotal } = data;
+  const { story, comments, commentTotal, commentsHasMore, commentsCursor } = data;
   const isReported = locallyReported || (engagement.data?.reportedTargetIds ?? []).includes(id);
   const votedKinds = engagement.data?.votedKinds ?? [];
 
@@ -127,14 +131,17 @@ function StoryPage() {
                 </Link>
               ) : null}
               <span>· {story.industry}</span>
-              {story.company_id ? (
-                <StoryLocationTag companyId={story.company_id} county={story.county} />
-              ) : (
-                <span className="inline-flex items-center gap-1">
-                  <MapPin className="size-3" /> {story.county}
-                </span>
-              )}
-              {story.area ? <span>· {story.area}</span> : null}
+              <StoryLocationDialog
+                storyId={id}
+                county={story.county}
+                area={story.area ?? null}
+                initialCoordinates={
+                  typeof story.workplace_lat === "number" && typeof story.workplace_lng === "number"
+                    ? { lat: story.workplace_lat, lng: story.workplace_lng }
+                    : null
+                }
+                authorId={story.author_id ?? null}
+              />
               <span>· {story.tenure}</span>
               <span>· {story.role_level}</span>
             </div>
@@ -266,6 +273,8 @@ function StoryPage() {
         storyId={id}
         comments={comments}
         total={commentTotal}
+        commentsHasMore={commentsHasMore}
+        commentsCursor={commentsCursor}
         focusCommentId={focusCommentId}
       />
 

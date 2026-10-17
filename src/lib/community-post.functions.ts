@@ -182,6 +182,7 @@ export const createCommunityPost = createServerFn({ method: "POST" })
       follower_count: 0,
       metoo: 0,
       comment_count: 0,
+      comment_count_scope: "top_level_v1",
       created_at: createdAt,
     };
     const batch = db.batch();

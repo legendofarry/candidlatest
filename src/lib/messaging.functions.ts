@@ -13,8 +13,7 @@ export const getConversations = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ context, data }) => {
-    const { listConversationPage, ensureCandidAccount } = await import("./messaging.server");
-    await ensureCandidAccount();
+    const { listConversationPage } = await import("./messaging.server");
     return listConversationPage(context.userId, data.limit, data.cursor);
   });
 
@@ -35,10 +34,23 @@ export const startConversation = createServerFn({ method: "POST" })
 
 export const getConversation = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
-  .inputValidator((input: unknown) => z.object({ conversation_id: z.string().min(1) }).parse(input))
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        conversation_id: z.string().min(1),
+        cursor: z.object({ createdAt: z.string(), id: z.string() }).nullable().default(null),
+        known_activity_at: z.string().nullable().optional(),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const { readConversation } = await import("./messaging.server");
-    return readConversation(context.userId, data.conversation_id);
+    return readConversation(
+      context.userId,
+      data.conversation_id,
+      data.cursor,
+      data.known_activity_at ?? null,
+    );
   });
 
 export const postMessage = createServerFn({ method: "POST" })
@@ -170,4 +182,34 @@ export const getPublicProfile = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { readPublicProfile } = await import("./messaging.server");
     return readPublicProfile(data.username, context.userId);
+  });
+
+export const getPublicProfileStories = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        username: z.string().trim().min(1).max(32),
+        cursor: z.object({ createdAt: z.string(), id: z.string() }).nullable().default(null),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { readPublicProfileStories } = await import("./messaging.server");
+    return readPublicProfileStories(data.username, data.cursor);
+  });
+
+export const getPublicProfileFollowers = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        username: z.string().trim().min(1).max(32),
+        cursor: z.string().min(1).max(200).nullable().default(null),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { readPublicProfileFollowers } = await import("./messaging.server");
+    return readPublicProfileFollowers(data.username, data.cursor);
   });

@@ -5,6 +5,7 @@ import { StoryActions } from "@/components/site/story-actions";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { ProfileAvatar } from "@/components/site/profile-photo";
+import { StoryLocationDialog } from "@/components/site/story-location-dialog";
 import type { MembershipTier } from "@/lib/membership";
 
 export type PublicStory = {
@@ -17,6 +18,9 @@ export type PublicStory = {
   role_level: string | null;
   county: string | null;
   area?: string | null;
+  workplace_lat?: number | null;
+  workplace_lng?: number | null;
+  author_id?: string | null;
   tenure: string | null;
   industry: string | null;
   upvotes: number | null;
@@ -180,11 +184,21 @@ export function StoryCard({
         )}
         <span>·</span>
         <span>{story.industry}</span>
-        <span className="inline-flex items-center gap-1">
-          <MapPin className="size-3" />
-          {story.county}
-        </span>
-        {story.area ? <span>· {story.area}</span> : null}
+        {story.id ? (
+          <StoryLocationDialog
+            storyId={story.id}
+            county={story.county}
+            area={story.area ?? null}
+            initialCoordinates={
+              typeof story.workplace_lat === "number" && typeof story.workplace_lng === "number"
+                ? { lat: story.workplace_lat, lng: story.workplace_lng }
+                : null
+            }
+            authorId={story.author_id ?? null}
+          />
+        ) : (
+          <span className="inline-flex items-center gap-1"><MapPin className="size-3" />{story.county}{story.area ? ` · ${story.area}` : ""}</span>
+        )}
         {story.tenure ? <span>· {story.tenure}</span> : null}
         {story.role_level ? <span>· {story.role_level}</span> : null}
       </div>

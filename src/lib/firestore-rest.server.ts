@@ -333,7 +333,9 @@ export class Query {
     const rows = (await this.db.request(`${parent}:runQuery`, {
       method: "POST",
       body: JSON.stringify({ structuredQuery }),
-    })) as Array<{ document?: { name: string; fields?: Record<string, FsValue> } }>;
+    })) as Array<{
+      document?: { name: string; fields?: Record<string, FsValue>; updateTime?: string };
+    }>;
     const docs = rows
       .filter((r) => r.document)
       .map((r) => {
@@ -343,6 +345,7 @@ export class Query {
           ref.id,
           ref,
           decodeFields(r.document!.fields ?? {}),
+          r.document!.updateTime,
         ) as QueryDocumentSnapshot;
       });
     return new QuerySnapshot(docs);

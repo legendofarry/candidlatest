@@ -1,5 +1,6 @@
 import { getFirestoreDb } from "./firebase.server";
-import { readCollection, readDocument, type CompanyRatingRecord } from "./firebase-data.server";
+import { readDocument, type CompanyRatingRecord } from "./firebase-data.server";
+import { cacheServerRead } from "./server-cache";
 
 export type CompanyRatingAnswerRecord = {
   id: string;
@@ -52,15 +53,29 @@ export async function getCompanyLocation(companyId: string) {
 }
 
 /** Everything the company detail screen needs beyond the base score. */
-export async function buildCompanyIntel(companyId: string) {
+async function calculateCompanyIntel(companyId: string) {
   const [answers, ratings, location] = await Promise.all([
-    readCollection<CompanyRatingAnswerRecord>("company_rating_answers"),
-    readCollection<CompanyRatingRecord>("company_ratings"),
+    getFirestoreDb()
+      .collection("company_rating_answers")
+      .where("company_id", "==", companyId)
+      .limit(1000)
+      .get()
+      .then((snapshot) =>
+        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as CompanyRatingAnswerRecord),
+      ),
+    getFirestoreDb()
+      .collection("company_ratings")
+      .where("company_id", "==", companyId)
+      .limit(1000)
+      .get()
+      .then((snapshot) =>
+        snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as CompanyRatingRecord),
+      ),
     getCompanyLocation(companyId),
   ]);
 
-  const ours = answers.filter((answer) => answer.company_id === companyId);
-  const companyRatings = ratings.filter((rating) => rating.company_id === companyId);
+  const ours = answers;
+  const companyRatings = ratings;
 
   const tally = new Map<string, number>();
   for (const answer of ours) {
@@ -84,6 +99,12 @@ export async function buildCompanyIntel(companyId: string) {
       }))
       .sort((a, b) => b.count - a.count),
   };
+}
+
+export function buildCompanyIntel(companyId: string) {
+  return cacheServerRead(`public:company-intel:${companyId}`, 60_000, () =>
+    calculateCompanyIntel(companyId),
+  );
 }
 
 export async function saveCompanyRating(input: {

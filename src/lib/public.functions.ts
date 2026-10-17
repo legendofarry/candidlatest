@@ -8,6 +8,8 @@ import {
   getPublicStories,
   getPublicStoryPage,
   getStoryView,
+  getStoryCommentContext as readStoryCommentContext,
+  getStoryCommentsPage as readStoryCommentsPage,
   searchData,
 } from "./firebase-data.server";
 
@@ -160,6 +162,23 @@ export const getStory = createServerFn({ method: "GET" })
       return null;
     }
   });
+
+export const getStoryComments = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        id: z.string().uuid(),
+        cursor: z.object({ createdAt: z.string(), id: z.string() }).nullable().default(null),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => readStoryCommentsPage(data.id, data.cursor));
+
+export const getStoryCommentContext = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({ story_id: z.string().uuid(), comment_id: z.string().uuid() }).parse(input),
+  )
+  .handler(async ({ data }) => readStoryCommentContext(data.story_id, data.comment_id));
 
 export const getLeaderboards = createServerFn({ method: "GET" }).handler(async () => {
   try {

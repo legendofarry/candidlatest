@@ -1,10 +1,6 @@
 import { getFirestoreDb } from "./firebase.server";
-import {
-  readCollection,
-  type CompanyRecord,
-  type ProfileRecord,
-  type StoryRecord,
-} from "./firebase-data.server";
+import { type StoryRecord } from "./firebase-data.server";
+import { cacheServerRead } from "./server-cache";
 
 /** "How to reach us" block shown on the About screen, editable by the owner. */
 export type SiteContact = {
@@ -61,17 +57,24 @@ export type PulseSnapshot = {
   generatedAt: string;
 };
 
-export async function buildPulse(): Promise<PulseSnapshot> {
-  const [stories, companies, profiles] = await Promise.all([
-    readCollection<StoryRecord>("stories"),
-    readCollection<CompanyRecord>("companies"),
-    readCollection<ProfileRecord>("profiles"),
-  ]);
-
-  const published = stories.filter((story) => story.status === "published");
+async function calculatePulse(): Promise<PulseSnapshot> {
+  const db = getFirestoreDb();
   const now = Date.now();
   const week = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString();
   const day = new Date(now - 24 * 60 * 60 * 1000).toISOString();
+  const publishedQuery = db.collection("stories").where("status", "==", "published");
+  const [storyCount, weekCount, dayCount, companyCount, voiceCount, recentStories] =
+    await Promise.all([
+      publishedQuery.count(),
+      publishedQuery.where("created_at", ">=", week).count(),
+      publishedQuery.where("created_at", ">=", day).count(),
+      db.collection("companies").count(),
+      db.collection("profiles").count(),
+      publishedQuery.orderBy("created_at", "desc").limit(100).get(),
+    ]);
+  const published = recentStories.docs.map(
+    (doc) => ({ ...(doc.data() as StoryRecord), id: doc.id }) as StoryRecord,
+  );
 
   const reasonTally = new Map<string, number>();
   for (const story of published) {
@@ -80,9 +83,8 @@ export async function buildPulse(): Promise<PulseSnapshot> {
     }
   }
 
-  const counties = new Set(
-    published.map((story) => story.county).filter((county): county is string => Boolean(county)),
-  );
+  // Keep this qualitative summary bounded; totals above use Firestore aggregates.
+  const counties = new Set(published.map((story) => story.county).filter(Boolean));
 
   const latest = published
     .map((story) => story.created_at)
@@ -90,12 +92,12 @@ export async function buildPulse(): Promise<PulseSnapshot> {
     .at(-1);
 
   return {
-    storiesTotal: published.length,
-    storiesLast7Days: published.filter((story) => story.created_at >= week).length,
-    storiesLast24Hours: published.filter((story) => story.created_at >= day).length,
-    companies: companies.filter((company) => company.is_public !== false).length,
+    storiesTotal: storyCount,
+    storiesLast7Days: weekCount,
+    storiesLast24Hours: dayCount,
+    companies: companyCount,
     counties: counties.size,
-    voices: profiles.length,
+    voices: voiceCount,
     topReasons: [...reasonTally.entries()]
       .map(([reason, count]) => ({ reason, count }))
       .sort((a, b) => b.count - a.count)
@@ -103,4 +105,8 @@ export async function buildPulse(): Promise<PulseSnapshot> {
     latestAt: latest ?? null,
     generatedAt: new Date().toISOString(),
   };
+}
+
+export function buildPulse(): Promise<PulseSnapshot> {
+  return cacheServerRead("public:pulse", 60_000, calculatePulse);
 }

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Building2, FileText, Search as SearchIcon } from "lucide-react";
 import { searchAll } from "@/lib/public.functions";
 import { Input } from "@/components/ui/input";
@@ -31,11 +31,18 @@ export const Route = createFileRoute("/search")({
 function SearchPage() {
   const [q, setQ] = useState("");
   const trimmed = q.trim();
+  const [searchTerm, setSearchTerm] = useState(trimmed);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setSearchTerm(trimmed), 350);
+    return () => window.clearTimeout(timer);
+  }, [trimmed]);
 
   const { data, isFetching } = useQuery({
-    queryKey: ["search", trimmed],
-    queryFn: () => searchAll({ data: { q: trimmed } }),
-    enabled: trimmed.length >= 2,
+    queryKey: ["search", searchTerm],
+    queryFn: () => searchAll({ data: { q: searchTerm } }),
+    enabled: searchTerm.length >= 2,
+    staleTime: 60_000,
   });
 
   return (
@@ -59,7 +66,7 @@ function SearchPage() {
         />
       </div>
 
-      {trimmed.length < 2 ? (
+      {searchTerm.length < 2 ? (
         <p className="text-sm text-muted-foreground">Type at least two characters to search.</p>
       ) : isFetching && !data ? (
         <div className="space-y-3">

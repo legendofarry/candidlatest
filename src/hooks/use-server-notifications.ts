@@ -14,7 +14,8 @@ export function useServerNotificationsSync() {
     queryKey: ["server-notifications", user?.uid ?? "anon"],
     queryFn: () => sync({ data: { limit: 20, cursor: null } }),
     enabled: Boolean(user) && !requiresEmailVerification(user),
-    refetchInterval: 60_000,
+    refetchInterval: 5 * 60_000,
+    staleTime: 2 * 60_000,
     refetchOnWindowFocus: true,
   });
 

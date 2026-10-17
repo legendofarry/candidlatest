@@ -50,7 +50,7 @@ function CheckoutPage() {
     queryKey: ["billing", user?.uid ?? null],
     queryFn: () => fetchBilling(),
     enabled: Boolean(user),
-    refetchInterval: 15_000,
+    refetchInterval: 60_000,
   });
   const [request, setRequest] = useState<CheckoutRequest | null>(null);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);

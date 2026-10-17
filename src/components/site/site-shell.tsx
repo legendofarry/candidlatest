@@ -46,7 +46,6 @@ import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { requiresEmailVerification } from "@/lib/email-verification";
 import { getOnboardingState } from "@/lib/onboarding.functions";
-import { getInvestigationHoldState } from "@/lib/account-access.functions";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { usePushRegistrationSync } from "@/hooks/use-push-registration-sync";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
@@ -145,24 +144,17 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const { data: accountProfile } = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
-    enabled: Boolean(user) && !needsEmailVerification,
-    refetchInterval: 30_000,
-    refetchOnWindowFocus: true,
-  });
-  const fetchInvestigationHold = useServerFn(getInvestigationHoldState);
-  const { data: investigationState } = useQuery({
-    queryKey: ["investigation-hold", user?.uid ?? null],
-    queryFn: () => fetchInvestigationHold(),
     enabled: Boolean(user),
-    refetchInterval: 15000,
-    retry: 1,
+    // One profile read supplies both onboarding and account-hold state.
+    refetchInterval: 60_000,
+    refetchOnWindowFocus: true,
   });
   const fetchUnreadMessages = useServerFn(getUnreadMessages);
   const { data: messageState } = useQuery({
     queryKey: ["unread-messages", user?.uid ?? null],
     queryFn: () => fetchUnreadMessages(),
     enabled: Boolean(user) && !needsEmailVerification,
-    refetchInterval: 20000,
+    refetchInterval: 60_000,
   });
   const nested = isNestedRoute(pathname);
   const standaloneDesktopRoute = [
@@ -282,7 +274,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
 
   const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
 
-  if (user && investigationState?.active) {
+  if (user && accountProfile?.investigationHold) {
     return (
       <main className="fixed inset-0 z-[100] flex min-h-dvh items-center justify-center overflow-hidden bg-background px-5 py-8 text-foreground">
         <div className="pointer-events-none absolute -top-64 left-1/2 size-[34rem] -translate-x-1/2 rounded-full bg-primary/10 blur-3xl" />

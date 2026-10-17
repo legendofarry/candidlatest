@@ -1,7 +1,12 @@
 import { getFirestoreDb } from "./firebase.server";
 import { createHash } from "node:crypto";
 import { FieldValue, type DocumentReference } from "./firestore-rest.server";
-import type { CommentRecord, ProfileRecord, StoryRecord } from "./firebase-data.server";
+import {
+  getTopLevelCommentCount,
+  type CommentRecord,
+  type ProfileRecord,
+  type StoryRecord,
+} from "./firebase-data.server";
 import { getEffectiveMembershipTier } from "./membership";
 import {
   createAuthenticatedImageUrl,
@@ -36,6 +41,7 @@ export type ConversationRecord = {
   id: string;
   participant_ids: string[];
   created_at: string;
+  activity_at?: string;
   last_message_at: string;
   last_message: string;
   last_sender_id: string | null;
@@ -184,6 +190,19 @@ export type ChatParticipant = {
   membership_tier: "basic" | "premium" | "gold";
 };
 
+export type ConversationView = {
+  id: string;
+  with: ChatParticipant | null;
+  messages: MessageRecord[];
+  unread_cleared: boolean;
+  unchanged: boolean;
+  activity_at: string;
+  hasOlder: boolean;
+  nextCursor: { createdAt: string; id: string } | null;
+  can_send: boolean;
+  blocked_reason: string | null;
+};
+
 const now = () => new Date().toISOString();
 
 export function conversationIdFor(a: string, b: string) {
@@ -327,6 +346,7 @@ export async function ensureWelcomeMessage(userId: string) {
         {
           last_message: CANDID_WELCOME_MESSAGE,
           last_message_at: timestamp,
+          activity_at: timestamp,
           last_sender_id: candidUserId,
           [`unread.${userId}`]: FieldValue.increment(1),
         },
@@ -340,6 +360,7 @@ export async function ensureWelcomeMessage(userId: string) {
         participant_ids: [candidUserId, userId].sort(),
         created_at: timestamp,
         last_message_at: timestamp,
+        activity_at: timestamp,
         last_message: CANDID_WELCOME_MESSAGE,
         last_sender_id: candidUserId,
         unread: { [candidUserId]: 0, [userId]: 1 },
@@ -411,7 +432,8 @@ async function readParticipants(ids: string[]): Promise<Map<string, ChatParticip
         { badge_status?: string; owner_verified?: boolean } | undefined;
       map.set(id, {
         id,
-        username: profile?.display_name ?? profile?.username ?? profile?.handle ?? "member",
+        // This field is rendered as @handle and used in /u/$username links.
+        username: profile?.username ?? profile?.handle ?? "member",
         photo_url: profile?.photo_url ?? null,
         verified:
           id === candidUserId ||
@@ -580,8 +602,14 @@ export async function listConversationPage(
 }
 
 export async function unreadMessageCount(userId: string) {
-  const conversations = await listConversations(userId);
-  return conversations.reduce((total, item) => total + item.unread, 0);
+  const snap = await getFirestoreDb()
+    .collection("conversations")
+    .where(`unread.${userId}`, ">", 0)
+    .get();
+  return snap.docs.reduce((total, doc) => {
+    const unread = (doc.data() as ConversationRecord).unread?.[userId] ?? 0;
+    return total + Math.max(0, Number(unread));
+  }, 0);
 }
 
 /** Opens (or creates) a conversation between two accounts after privacy checks. */
@@ -594,11 +622,13 @@ export async function openConversation(userId: string, otherId: string) {
   const ref = db.collection("conversations").doc(id);
   const snap = await ref.get();
   if (!snap.exists) {
+    const timestamp = now();
     const record: ConversationRecord = {
       id,
       participant_ids: [userId, otherId].sort(),
-      created_at: now(),
-      last_message_at: now(),
+      created_at: timestamp,
+      last_message_at: timestamp,
+      activity_at: timestamp,
       last_message: "",
       last_sender_id: null,
       unread: { [userId]: 0, [otherId]: 0 },
@@ -608,7 +638,12 @@ export async function openConversation(userId: string, otherId: string) {
   return { conversation_id: id };
 }
 
-export async function readConversation(userId: string, conversationId: string) {
+export async function readConversation(
+  userId: string,
+  conversationId: string,
+  cursor: { createdAt: string; id: string } | null = null,
+  knownActivityAt: string | null = null,
+): Promise<ConversationView> {
   const db = getFirestoreDb();
   const ref = db.collection("conversations").doc(conversationId);
   const snap = await ref.get();
@@ -616,15 +651,49 @@ export async function readConversation(userId: string, conversationId: string) {
   const record = snap.data() as ConversationRecord;
   if (!record.participant_ids.includes(userId)) throw new Error("Not your conversation");
 
+  const activityAt = record.activity_at ?? record.last_message_at;
+  if (
+    !cursor &&
+    knownActivityAt &&
+    knownActivityAt === activityAt &&
+    Number(record.unread?.[userId] ?? 0) === 0
+  ) {
+    return {
+      id: conversationId,
+      with: null,
+      messages: [],
+      unread_cleared: false,
+      unchanged: true,
+      activity_at: activityAt,
+      hasOlder: false,
+      nextCursor: null,
+      can_send: true,
+      blocked_reason: null,
+    };
+  }
+
   const otherId = record.participant_ids.find((id) => id !== userId) ?? userId;
+  let messageQuery = db
+    .collection("messages")
+    .where("conversation_id", "==", conversationId)
+    .orderBy("created_at", "desc")
+    .orderBy("__name__", "desc");
+  if (cursor) {
+    messageQuery = messageQuery.startAfter(
+      cursor.createdAt,
+      db.collection("messages").doc(cursor.id),
+    );
+  }
   const [participants, messagesSnap] = await Promise.all([
     readParticipants([otherId]),
-    db.collection("messages").where("conversation_id", "==", conversationId).get(),
+    messageQuery.limit(51).get(),
   ]);
 
+  const hasOlder = messagesSnap.size > 50;
   const messages = messagesSnap.docs
-    .map((doc) => doc.data() as MessageRecord)
-    .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+    .slice(0, 50)
+    .map((doc) => ({ ...(doc.data() as MessageRecord), id: doc.id }))
+    .reverse();
   const messagesWithImages = await Promise.all(
     messages.map(async (message) => {
       if (!message.image) return message;
@@ -650,21 +719,41 @@ export async function readConversation(userId: string, conversationId: string) {
   );
 
   // Reading the thread clears this user's unread counter and marks their inbox read.
-  const batch = db.batch();
-  batch.update(ref, { [`unread.${userId}`]: 0 });
-  for (const message of messages) {
-    if (message.sender_id !== userId && !message.read_at) {
-      batch.update(db.collection("messages").doc(message.id), { read_at: now() });
+  let latestActivityAt = activityAt;
+  if (!cursor) {
+    const batch = db.batch();
+    let writes = 0;
+    if (Number(record.unread?.[userId] ?? 0) > 0) {
+      batch.update(ref, { [`unread.${userId}`]: 0 });
+      writes += 1;
+    }
+    for (const message of messages) {
+      if (message.sender_id !== userId && !message.read_at) {
+        batch.update(db.collection("messages").doc(message.id), { read_at: now() });
+        writes += 1;
+      }
+    }
+    if (writes) {
+      latestActivityAt = now();
+      batch.update(ref, { activity_at: latestActivityAt });
+      await batch.commit();
     }
   }
-  await batch.commit();
 
-  const gate = await canMessage(userId, otherId);
+  const gate = cursor
+    ? { allowed: true as const, reason: null }
+    : await canMessage(userId, otherId);
 
   return {
     id: conversationId,
     with: participants.get(otherId)!,
     messages: messagesWithImages,
+    unread_cleared: !cursor && Number(record.unread?.[userId] ?? 0) > 0,
+    unchanged: false,
+    activity_at: latestActivityAt,
+    hasOlder,
+    nextCursor:
+      hasOlder && messages[0] ? { createdAt: messages[0].created_at, id: messages[0].id } : null,
     can_send: gate.allowed,
     blocked_reason: gate.allowed ? null : gate.reason,
   };
@@ -752,6 +841,7 @@ export async function sendMessage(input: {
   batch.update(ref, {
     last_message: input.body || (image ? "📷 Image" : ""),
     last_message_at: message.created_at,
+    activity_at: message.created_at,
     last_sender_id: input.userId,
     [`unread.${otherId}`]: FieldValue.increment(1),
   });
@@ -810,6 +900,7 @@ export async function deleteMessage(userId: string, messageId: string) {
     throw new Error("Not your conversation.");
   }
   const batch = db.batch();
+  const activityAt = now();
   batch.update(
     messageRef,
     {
@@ -817,16 +908,16 @@ export async function deleteMessage(userId: string, messageId: string) {
       image: null,
       reactions: {},
       is_deleted: true,
-      deleted_at: now(),
+      deleted_at: activityAt,
     },
     messageSnap.updateTime ? { updateTime: messageSnap.updateTime } : undefined,
   );
-  if (
-    conversation.last_message_at === message.created_at &&
-    conversation.last_sender_id === userId
-  ) {
-    batch.update(conversationRef, { last_message: "Message deleted" });
-  }
+  const isLastMessage =
+    conversation.last_message_at === message.created_at && conversation.last_sender_id === userId;
+  batch.update(conversationRef, {
+    activity_at: activityAt,
+    ...(isLastMessage ? { last_message: "Message deleted" } : {}),
+  });
   await batch.commit();
   if (message.image?.public_id) {
     try {
@@ -876,25 +967,30 @@ export async function toggleReaction(userId: string, messageId: string, emoji: s
     throw new Error("Not your conversation");
   }
   const current = message.reactions?.[emoji] ?? [];
-  await ref.update({
+  const batch = db.batch();
+  batch.update(ref, {
     [`reactions.${emoji}`]: current.includes(userId)
       ? FieldValue.arrayRemove(userId)
       : FieldValue.arrayUnion(userId),
   });
+  batch.update(conversationSnap.ref, { activity_at: now() });
+  await batch.commit();
   return { ok: true };
 }
 
 /** Public-facing profile used by the chat header and profile detail screen. */
 export async function readPublicProfile(username: string, viewerId: string | null) {
   const db = getFirestoreDb();
-  if (username.trim().toLowerCase() === CANDID_USERNAME) await ensureCandidAccount();
-  const usernameSnap = await db.collection("usernames").doc(username.toLowerCase()).get();
+  const usernameSnap = await db.collection("usernames").doc(username.trim().toLowerCase()).get();
   const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
   if (!userId) return null;
 
+  const profileSnap = await db.collection("profiles").doc(userId).get();
+  const profile = profileSnap.data() as ProfileRecord | undefined;
+  if (!profileSnap.exists || profile?.banned) return null;
+
   const [
     participants,
-    profileSnap,
     followerCount,
     followingCount,
     storyCount,
@@ -905,7 +1001,6 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     viewerFollowsProfile,
   ] = await Promise.all([
     readParticipants([userId]),
-    db.collection("profiles").doc(userId).get(),
     db.collection("follows").where("following_id", "==", userId).count(),
     db.collection("follows").where("follower_id", "==", userId).count(),
     db
@@ -923,14 +1018,13 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       .where("author_id", "==", userId)
       .where("status", "==", "published")
       .orderBy("created_at", "desc")
-      .limit(30)
+      .orderBy("__name__", "desc")
+      .limit(31)
       .get(),
     db.collection("follows").where("following_id", "==", userId).limit(8).get(),
     viewerId ? db.collection("follows").doc(`${userId}:${viewerId}`).get() : Promise.resolve(null),
     viewerId ? db.collection("follows").doc(`${viewerId}:${userId}`).get() : Promise.resolve(null),
   ]);
-  const profile = profileSnap.data() as ProfileRecord | undefined;
-  if (!profileSnap.exists || profile?.banned) return null;
   const followerPreview = await Promise.all(
     followerPreviews.docs.map(async (doc) => {
       const followerId = (doc.data() as { follower_id: string }).follower_id;
@@ -963,23 +1057,125 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       comments: commentCount,
       joined_at: profile?.onboarded_at ?? profile?.created_at ?? null,
     },
-    stories: stories.docs
-      .map((doc) => doc.data() as StoryRecord)
-      .map((story) => ({
-        id: story.id,
-        title: story.title,
-        body: story.body,
-        company_name: story.company_name,
-        county: story.county,
-        area: story.area ?? null,
-        created_at: story.created_at,
-        comment_count: story.comment_count,
-        likes: story.likes ?? 0,
-      })),
+    stories: await Promise.all(
+      stories.docs
+        .slice(0, 30)
+        .map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
+    ),
+    storiesHasMore: stories.size > 30,
+    storiesCursor:
+      stories.size > 30 && stories.docs[29]
+        ? {
+            createdAt: String(stories.docs[29]!.get("created_at") ?? ""),
+            id: stories.docs[29]!.id,
+          }
+        : null,
     isFollowing: Boolean(viewerFollowsProfile?.exists),
     isBlocked: viewerId ? await isBlocked(viewerId, userId) : false,
     followsYou: Boolean(profileFollowsViewer?.exists),
     messaging: { allowed: messaging.allowed, reason: messaging.allowed ? null : messaging.reason },
     isSelf: viewerId === userId,
+  };
+}
+
+async function publicProfileStory(id: string, story: StoryRecord, updateTime?: string) {
+  const commentCount = await getTopLevelCommentCount(story, updateTime);
+  return {
+    id,
+    title: story.title,
+    body: story.body,
+    company_name: story.company_name,
+    county: story.county,
+    area: story.area ?? null,
+    created_at: story.created_at,
+    comment_count: commentCount,
+    likes: Number(story.likes ?? 0),
+    post_type: story.post_type ?? "workplace_story",
+    media: story.media ?? [],
+  };
+}
+
+/** Loads additional public stories without repeating profile counts and social-stat reads. */
+export async function readPublicProfileStories(
+  username: string,
+  cursor: { createdAt: string; id: string } | null,
+) {
+  const db = getFirestoreDb();
+  const usernameSnap = await db.collection("usernames").doc(username.trim().toLowerCase()).get();
+  const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
+  if (!userId) return { stories: [], hasMore: false, nextCursor: null };
+
+  const profileSnap = await db.collection("profiles").doc(userId).get();
+  const profile = profileSnap.data() as ProfileRecord | undefined;
+  if (!profileSnap.exists || profile?.banned)
+    return { stories: [], hasMore: false, nextCursor: null };
+
+  let query = db
+    .collection("stories")
+    .where("author_id", "==", userId)
+    .where("status", "==", "published")
+    .orderBy("created_at", "desc")
+    .orderBy("__name__", "desc");
+  if (cursor) {
+    query = query.startAfter(cursor.createdAt, db.collection("stories").doc(cursor.id));
+  }
+  const snapshot = await query.limit(31).get();
+  const docs = snapshot.docs.slice(0, 30);
+  const last = docs.at(-1);
+  return {
+    stories: await Promise.all(
+      docs.map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
+    ),
+    hasMore: snapshot.size > 30,
+    nextCursor:
+      snapshot.size > 30 && last
+        ? { createdAt: String(last.get("created_at") ?? ""), id: last.id }
+        : null,
+  };
+}
+
+/** Cursor-paged public follower directory. Each request reads one bounded page. */
+export async function readPublicProfileFollowers(username: string, cursor: string | null) {
+  const db = getFirestoreDb();
+  const usernameSnap = await db.collection("usernames").doc(username.trim().toLowerCase()).get();
+  const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
+  if (!userId) return { followers: [], hasMore: false, nextCursor: null };
+
+  const profileSnap = await db.collection("profiles").doc(userId).get();
+  const profile = profileSnap.data() as ProfileRecord | undefined;
+  if (!profileSnap.exists || profile?.banned)
+    return { followers: [], hasMore: false, nextCursor: null };
+
+  let query = db
+    .collection("follows")
+    .where("following_id", "==", userId)
+    .orderBy("__name__", "asc");
+  if (cursor) query = query.startAfter(db.collection("follows").doc(cursor));
+
+  const pageSize = 24;
+  const snapshot = await query.limit(pageSize + 1).get();
+  const pageDocs = snapshot.docs.slice(0, pageSize);
+  const profiles = await Promise.all(
+    pageDocs.map(async (followDoc) => {
+      const followerId = (followDoc.data() as { follower_id?: string }).follower_id;
+      if (!followerId) return null;
+      const followerSnap = await db.collection("profiles").doc(followerId).get();
+      const follower = followerSnap.data() as ProfileRecord | undefined;
+      if (!followerSnap.exists || follower?.banned || !follower?.username) return null;
+      return {
+        id: followerId,
+        username: follower.username,
+        photo_url: follower.photo_url ?? null,
+      };
+    }),
+  );
+  const last = pageDocs.at(-1);
+  const hasMore = snapshot.size > pageSize;
+  return {
+    followers: profiles.filter((follower): follower is NonNullable<typeof follower> =>
+      Boolean(follower),
+    ),
+    hasMore,
+    nextCursor: hasMore && last ? last.id : null,
   };
 }

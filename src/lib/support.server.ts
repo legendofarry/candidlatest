@@ -54,7 +54,12 @@ export async function readSupportConversation(userId: string) {
   const ref = await ensureConversation(userId);
   const [conversation, messages] = await Promise.all([
     ref.get(),
-    db.collection("support_messages").where("conversation_id", "==", ref.id).get(),
+    db
+      .collection("support_messages")
+      .where("conversation_id", "==", ref.id)
+      .orderBy("created_at", "desc")
+      .limit(50)
+      .get(),
   ]);
   return {
     conversation: conversation.data(),
@@ -62,9 +67,7 @@ export async function readSupportConversation(userId: string) {
       needsOwner: Boolean(conversation.data()?.needs_owner),
       reason: conversation.data()?.escalation_reason ?? null,
     },
-    messages: messages.docs
-      .map((doc) => doc.data())
-      .sort((a, b) => String(a["created_at"]).localeCompare(String(b["created_at"]))),
+    messages: messages.docs.map((doc) => doc.data()).reverse(),
   };
 }
 
@@ -76,11 +79,12 @@ export async function writeSupportMessage(userId: string, body: string) {
   const existing = await db
     .collection("support_messages")
     .where("conversation_id", "==", ref.id)
+    .orderBy("created_at", "desc")
+    .limit(10)
     .get();
   const history = existing.docs
     .map((doc) => doc.data() as { sender_type?: string; body?: string; created_at?: string })
-    .sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)))
-    .slice(-10)
+    .reverse()
     .map((message) => ({
       sender: message.sender_type === "user" ? ("user" as const) : ("candid" as const),
       body: String(message.body || ""),
@@ -156,7 +160,12 @@ export async function writeSupportMessage(userId: string, body: string) {
   });
   if (notificationRef) {
     const { dispatchWebPush } = await import("./push.server");
-    await dispatchWebPush(userIdOnly, { title: "Candid support is following up", body: "Your question needs a closer look. The team will reply here.", link: "/support", notificationId: notificationRef.id });
+    await dispatchWebPush(userIdOnly, {
+      title: "Candid support is following up",
+      body: "Your question needs a closer look. The team will reply here.",
+      link: "/support",
+      notificationId: notificationRef.id,
+    });
   }
   return {
     id: userMessageRef.id,

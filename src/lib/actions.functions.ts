@@ -7,12 +7,15 @@ import {
 import {
   generateId,
   queryFirst,
-  readCollection,
   type CompanyRecord,
   type ProfileRecord,
   type StoryRecord,
 } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
+import { FieldValue } from "./firestore-rest.server";
+import { getEffectiveMembershipTier } from "./membership";
+import { isValidMapCoordinates } from "./map-location";
+import { parseMapCoordinates } from "./map-location";
 import {
   getCloudinaryEvidenceConfig,
   isAllowedEvidenceFormat,
@@ -91,12 +94,23 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
     const slug = slugify(data.name);
     if (!slug) throw new Error("Enter a valid employer name.");
 
-    const { findCompanyMatches, normalizeCompanyName } = await import("./company-match");
-    const all = await readCollection<CompanyRecord>("companies");
+    const { normalizeCompanyName } = await import("./company-match");
+    const normalized = normalizeCompanyName(data.name);
+    const indexId = slugify(normalized);
+    const [slugMatch, indexSnap] = await Promise.all([
+      queryFirst<CompanyRecord>("companies", "slug", slug),
+      indexId ? db.collection("company_name_index").doc(indexId).get() : Promise.resolve(null),
+    ]);
+    const indexedCompanyId = indexSnap?.data()?.["company_id"];
+    const indexedCompany =
+      typeof indexedCompanyId === "string"
+        ? await db.collection("companies").doc(indexedCompanyId).get()
+        : null;
     const exact =
-      all.find((company) => company.slug === slug) ??
-      findCompanyMatches(data.name, all, 1)[0] ??
-      null;
+      slugMatch ??
+      (indexedCompany?.exists
+        ? ({ ...(indexedCompany.data() as CompanyRecord), id: indexedCompany.id } as CompanyRecord)
+        : null);
     if (exact) {
       // Remember this alternate spelling so future matches resolve here.
       const aliases = new Set([...(exact.aliases ?? [])]);
@@ -108,8 +122,6 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
           .update({ aliases: [...aliases] });
         exact.aliases = [...aliases];
       }
-      const normalized = normalizeCompanyName(data.name);
-      const indexId = slugify(normalized);
       if (indexId) {
         const indexRef = db.collection("company_name_index").doc(indexId);
         try {
@@ -125,8 +137,6 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       return clientCompany(exact);
     }
 
-    const normalized = normalizeCompanyName(data.name);
-    const indexId = slugify(normalized);
     if (!indexId) throw new Error("Enter a valid employer name.");
     const indexRef = db.collection("company_name_index").doc(indexId);
     try {
@@ -305,6 +315,7 @@ export const createStory = createServerFn({ method: "POST" })
 
     const hasEvidence = Boolean(evidenceNote || uploadedEvidence);
     const autoApproved = screen.decision === "auto_approved";
+    const workplaceCoordinates = parseMapCoordinates(data.company_location_suggestion);
     const created: StoryRecord = {
       id: storyId,
       company_id: company.id,
@@ -319,6 +330,8 @@ export const createStory = createServerFn({ method: "POST" })
       area: data.area?.trim() || null,
       company_public: true,
       company_location_suggestion: data.company_location_suggestion,
+      workplace_lat: workplaceCoordinates?.lat ?? null,
+      workplace_lng: workplaceCoordinates?.lng ?? null,
       tenure: data.tenure,
       industry: data.industry ?? company.industry,
       would_work_again: data.would_work_again,
@@ -333,6 +346,7 @@ export const createStory = createServerFn({ method: "POST" })
       upvotes: 0,
       metoo: 0,
       comment_count: 0,
+      comment_count_scope: "top_level_v1",
       created_at: new Date().toISOString(),
     };
 
@@ -517,6 +531,7 @@ export const updateStory = createServerFn({ method: "POST" })
         typeof existingEvidence?.["note"] === "string" ? existingEvidence["note"] : null,
     });
     const now = new Date().toISOString();
+    const workplaceCoordinates = parseMapCoordinates(data.company_location_suggestion);
     const updated = {
       company_id: company.id,
       company_name: company.name,
@@ -530,6 +545,8 @@ export const updateStory = createServerFn({ method: "POST" })
       area: data.area?.trim() || null,
       company_public: true,
       company_location_suggestion: data.company_location_suggestion,
+      workplace_lat: workplaceCoordinates?.lat ?? null,
+      workplace_lng: workplaceCoordinates?.lng ?? null,
       tenure: data.tenure,
       industry: data.industry ?? company.industry,
       would_work_again: data.would_work_again,
@@ -572,6 +589,28 @@ export const updateStory = createServerFn({ method: "POST" })
     await batch.commit();
 
     return { ok: true as const, id: data.story_id, status: "pending" as const };
+  });
+
+/** Removes a member's story from public and company views while retaining its moderation record. */
+export const deleteStory = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ story_id: z.string().uuid() }).parse(input))
+  .handler(async ({ data, context }) => {
+    const db = context.db ?? getFirestoreDb();
+    const ref = db.collection("stories").doc(data.story_id);
+    const snapshot = await ref.get();
+    const story = snapshot.data() as Record<string, unknown> | undefined;
+    if (!snapshot.exists || story?.["author_id"] !== context.userId) {
+      throw new Error("Only the author can remove this story.");
+    }
+    if (story["status"] === "hidden" && story["author_deleted"] === true) {
+      return { ok: true as const };
+    }
+    await ref.update(
+      { status: "hidden", author_deleted: true, deleted_at: new Date().toISOString() },
+      snapshot.updateTime ? { updateTime: snapshot.updateTime } : undefined,
+    );
+    return { ok: true as const };
   });
 
 export const castVote = createServerFn({ method: "POST" })
@@ -658,23 +697,27 @@ export const addComment = createServerFn({ method: "POST" })
           verification.company_id === currentStory?.["company_id"]),
       );
 
-    await db
-      .collection("comments")
-      .doc(commentId)
-      .set({
-        id: commentId,
-        ...data,
-        author_id: context.userId,
-        author_handle: profile?.handle ?? "Candid member",
-        author_username: profile?.username ?? null,
-        author_verified: verification?.badge_status === "claimed",
-        is_official: isOfficial,
-        likes: 0,
-        status: "published",
-        created_at: new Date().toISOString(),
-        is_deleted: false,
-      });
-    await storyRef.update({ comment_count: Number(currentStory?.["comment_count"] ?? 0) + 1 });
+    const commentRef = db.collection("comments").doc(commentId);
+    const batch = db.batch();
+    batch.create(commentRef, {
+      id: commentId,
+      ...data,
+      author_id: context.userId,
+      author_handle: profile?.handle ?? "Candid member",
+      author_username: profile?.username ?? null,
+      author_photo_url: profile?.photo_url ?? null,
+      author_membership_tier: getEffectiveMembershipTier(profile),
+      author_verified: verification?.badge_status === "claimed",
+      is_official: isOfficial,
+      likes: 0,
+      status: "published",
+      created_at: new Date().toISOString(),
+      is_deleted: false,
+    });
+    if (!data.parent_id) {
+      batch.update(storyRef, { comment_count: FieldValue.increment(1) });
+    }
+    await batch.commit();
 
     // Notify the story author and the parent-comment author about new replies.
     try {
@@ -831,33 +874,118 @@ export const deleteComment = createServerFn({ method: "POST" })
     ) {
       throw new Error("You can no longer delete this comment.");
     }
-    await ref.update(
-      { body: "", is_deleted: true, deleted_at: new Date().toISOString() },
+    const batch = db.batch();
+    batch.update(
+      ref,
+      {
+        body: "",
+        is_deleted: true,
+        counter_adjusted_on_delete: true,
+        deleted_at: new Date().toISOString(),
+      },
       snap.updateTime ? { updateTime: snap.updateTime } : undefined,
     );
+    const storyId = typeof comment["story_id"] === "string" ? comment["story_id"] : "";
+    if (storyId && !comment["parent_id"]) {
+      batch.update(db.collection("stories").doc(storyId), {
+        comment_count: FieldValue.increment(-1),
+      });
+    }
+    await batch.commit();
     return { ok: true as const };
+  });
+
+export const updateStoryLocation = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        story_id: z.string().uuid(),
+        lat: z.number().min(-90).max(90),
+        lng: z.number().min(-180).max(180),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    if (!isValidMapCoordinates({ lat: data.lat, lng: data.lng })) {
+      throw new Error("Enter a valid map location.");
+    }
+    const db = context.db ?? getFirestoreDb();
+    const storyRef = db.collection("stories").doc(data.story_id);
+    const snapshot = await storyRef.get();
+    const story = snapshot.data() as Record<string, unknown> | undefined;
+    if (!snapshot.exists || story?.["author_id"] !== context.userId) {
+      throw new Error("Only the story author can update this location.");
+    }
+    await storyRef.update(
+      {
+        workplace_lat: data.lat,
+        workplace_lng: data.lng,
+        company_location_suggestion: `https://maps.google.com/?q=${data.lat},${data.lng}`,
+        location_updated_at: new Date().toISOString(),
+      },
+      snapshot.updateTime ? { updateTime: snapshot.updateTime } : undefined,
+    );
+    return { ok: true as const, lat: data.lat, lng: data.lng };
   });
 
 /** What the signed-in user has already done on this story (likes, votes, reports). */
 export const getMyEngagement = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
-  .inputValidator((input: unknown) => z.object({ story_id: z.string().uuid() }).parse(input))
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        story_id: z.string().uuid(),
+        comment_ids: z.array(z.string().uuid()).max(100).default([]),
+      })
+      .parse(input),
+  )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
+    const commentIds = [...new Set(data.comment_ids)];
+    const chunks: string[][] = [];
+    for (let index = 0; index < commentIds.length; index += 30) {
+      chunks.push(commentIds.slice(index, index + 30));
+    }
+    const reportTargets = [data.story_id, ...commentIds];
+    const reportChunks: string[][] = [];
+    for (let index = 0; index < reportTargets.length; index += 30) {
+      reportChunks.push(reportTargets.slice(index, index + 30));
+    }
     const [likes, votes, reports] = await Promise.all([
-      db.collection("comment_likes").where("user_id", "==", context.userId).get(),
+      Promise.all(
+        chunks.map((ids) =>
+          db
+            .collection("comment_likes")
+            .where("user_id", "==", context.userId)
+            .where("comment_id", "in", ids)
+            .get(),
+        ),
+      ),
       db
         .collection("votes")
         .where("user_id", "==", context.userId)
         .where("story_id", "==", data.story_id)
         .get(),
-      db.collection("reports").where("reporter_id", "==", context.userId).get(),
+      Promise.all(
+        reportChunks.map((ids) =>
+          db
+            .collection("reports")
+            .where("reporter_id", "==", context.userId)
+            .where("target_id", "in", ids)
+            .get(),
+        ),
+      ),
     ]);
 
     return {
-      likedCommentIds: likes.docs.map((doc) => (doc.data() as { comment_id: string }).comment_id),
+      likedCommentIds: likes.flatMap((page) =>
+        page.docs.map((doc) => (doc.data() as { comment_id: string }).comment_id),
+      ),
       votedKinds: votes.docs.map((doc) => (doc.data() as { kind: string }).kind),
-      reportedTargetIds: reports.docs.map((doc) => (doc.data() as { target_id: string }).target_id),
+      reportedTargetIds: reports.flatMap((page) =>
+        page.docs.map((doc) => (doc.data() as { target_id: string }).target_id),
+      ),
     };
   });
 

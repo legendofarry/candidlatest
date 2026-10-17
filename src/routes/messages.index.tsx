@@ -173,9 +173,8 @@ export function MessagesInbox({
                     type="button"
                     aria-label={`Open conversation with @${item.with?.username ?? "member"}`}
                     onClick={() => {
-                      onSelectConversation
-                        ? onSelectConversation(item.id)
-                        : void navigate({ to: "/messages/$id", params: { id: item.id } });
+                      if (onSelectConversation) onSelectConversation(item.id);
+                      else void navigate({ to: "/messages/$id", params: { id: item.id } });
                     }}
                     className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
@@ -212,9 +211,8 @@ export function MessagesInbox({
                     <button
                       type="button"
                       onClick={() => {
-                        onSelectConversation
-                          ? onSelectConversation(item.id)
-                          : void navigate({ to: "/messages/$id", params: { id: item.id } });
+                        if (onSelectConversation) onSelectConversation(item.id);
+                        else void navigate({ to: "/messages/$id", params: { id: item.id } });
                       }}
                       className={cn(
                         "mt-0.5 block w-full truncate text-left text-sm text-muted-foreground",

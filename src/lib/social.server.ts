@@ -118,14 +118,9 @@ export async function toggleStoryFollow(storyId: string, userId: string) {
   const db = getFirestoreDb();
   const ref = db.collection("story_follows").doc(`${storyId}:${userId}`);
   const storyRef = db.collection("stories").doc(storyId);
-  const legacyFollowerCount = await db
-    .collection("story_follows")
-    .where("story_id", "==", storyId)
-    .count();
   return db.runTransaction(async (transaction) => {
     const [snap, storySnap] = await Promise.all([transaction.get(ref), transaction.get(storyRef)]);
     const existingCount = Math.max(
-      legacyFollowerCount,
       Number((storySnap.data() as { follower_count?: number } | undefined)?.follower_count ?? 0),
     );
     const followers = Math.max(0, existingCount + (snap.exists ? -1 : 1));
@@ -225,22 +220,15 @@ export async function listSavedCommunityPosts(
 /** Everything the viewer has engaged with on a story. */
 export async function readStoryEngagement(storyId: string, userId: string) {
   const db = getFirestoreDb();
-  const [like, follow, save, story, followers] = await Promise.all([
+  const [like, follow, save] = await Promise.all([
     db.collection("story_likes").doc(`${storyId}:${userId}`).get(),
     db.collection("story_follows").doc(`${storyId}:${userId}`).get(),
     db.collection("story_saves").doc(`${storyId}:${userId}`).get(),
-    db.collection("stories").doc(storyId).get(),
-    db.collection("story_follows").where("story_id", "==", storyId).count(),
   ]);
   return {
     liked: like.exists,
     following: follow.exists,
     saved: save.exists,
-    likes: Number((story.data() as { likes?: number } | undefined)?.likes ?? 0),
-    followers: Math.max(
-      followers,
-      Number((story.data() as { follower_count?: number } | undefined)?.follower_count ?? 0),
-    ),
   };
 }
 
@@ -344,9 +332,20 @@ export async function buildStoryCatchUp(storyId: string, userId: string) {
   const followSnap = await db.collection("story_follows").doc(`${storyId}:${userId}`).get();
   if (!followSnap.exists) throw new Error("Follow this story to view its timeline.");
 
-  const [storyDoc, commentSnap] = await Promise.all([
+  const [storyDoc, commentSnap, totalComments] = await Promise.all([
     db.collection("stories").doc(storyId).get(),
-    db.collection("comments").where("story_id", "==", storyId).get(),
+    db
+      .collection("comments")
+      .where("story_id", "==", storyId)
+      .where("status", "==", "published")
+      .orderBy("created_at", "desc")
+      .limit(100)
+      .get(),
+    db
+      .collection("comments")
+      .where("story_id", "==", storyId)
+      .where("status", "==", "published")
+      .count(),
   ]);
   const story = storyDoc.exists ? (storyDoc.data() as StoryRecord) : null;
   if (!story || story.status !== "published") throw new Error("This story is no longer available.");
@@ -379,7 +378,8 @@ export async function buildStoryCatchUp(storyId: string, userId: string) {
       created_at: comment.created_at,
       official: Boolean(comment.is_official),
     })),
-    totalUpdates: timeline.length,
+    totalUpdates: totalComments,
+    hasMoreUpdates: totalComments > timeline.length,
     latestUpdateAt: timeline.at(-1)?.created_at ?? story.created_at,
   };
 }

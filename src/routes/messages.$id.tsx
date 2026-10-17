@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import { BadgeCheck, CheckCheck, ImagePlus, Loader2, Send, Smile, Trash2, X } from "lucide-react";
+import type { ConversationView } from "@/lib/messaging.server";
 import {
   discardChatImageUpload,
   deleteChatMessage,
@@ -76,7 +77,7 @@ function ChatScreen() {
 }
 
 export function MessagesThread({ id, inSidebar = false }: { id: string; inSidebar?: boolean }) {
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchConversation = useServerFn(getConversation);
@@ -85,8 +86,10 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const react = useServerFn(reactToMessage);
   const issueImageUpload = useServerFn(issueChatImageUpload);
   const discardImageUpload = useServerFn(discardChatImageUpload);
+  const conversationQueryKey = ["conversation", id, user?.uid ?? null] as const;
 
   const [draft, setDraft] = useState("");
+  const [loadingOlder, setLoadingOlder] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageReceipt, setImageReceipt] = useState<ChatImageReceipt | null>(null);
@@ -97,6 +100,8 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const imageTicketRef = useRef<string | null>(null);
   const discardUploadRef = useRef(discardImageUpload);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const skipNextAutoScroll = useRef(false);
+  const hasLoadedFullThread = useRef(false);
 
   useEffect(() => {
     discardUploadRef.current = discardImageUpload;
@@ -120,14 +125,83 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   );
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["conversation", id],
-    queryFn: () => fetchConversation({ data: { conversation_id: id } }),
+    queryKey: conversationQueryKey,
+    queryFn: async () => {
+      const previous = queryClient.getQueryData<ConversationView>(conversationQueryKey);
+      const refreshImages = previous?.messages.slice(-50).some((message) => {
+        if (!message.image) return false;
+        return (
+          !message.image.delivery_url ||
+          message.image.delivery_url_expires_at <= Math.floor(Date.now() / 1000) + 15 * 60
+        );
+      });
+      const latest = await fetchConversation({
+        data: {
+          conversation_id: id,
+          cursor: null,
+          known_activity_at:
+            hasLoadedFullThread.current && previous && !refreshImages
+              ? (previous.activity_at ?? null)
+              : null,
+        },
+      });
+      if (!latest.unchanged) hasLoadedFullThread.current = true;
+      if (latest.unread_cleared && user?.uid) {
+        void queryClient.invalidateQueries({ queryKey: ["unread-messages", user.uid] });
+        void queryClient.invalidateQueries({ queryKey: ["conversations", user.uid] });
+      }
+      if (latest.unchanged && previous) return { ...previous, unread_cleared: false };
+      if (!previous) return latest;
+      if (previous.messages.length <= 50) {
+        return { ...latest, with: latest.with ?? previous.with };
+      }
+      const byId = new Map(previous.messages.map((message) => [message.id, message]));
+      for (const message of latest.messages) byId.set(message.id, message);
+      return {
+        ...latest,
+        with: latest.with ?? previous.with,
+        messages: [...byId.values()].sort(
+          (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+        ),
+        hasOlder: previous.hasOlder,
+        nextCursor: previous.nextCursor,
+      };
+    },
     enabled: Boolean(user),
-    refetchInterval: 8000,
+    refetchInterval: 30_000,
   });
 
   const conversation = data;
   const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
+
+  async function loadOlderMessages() {
+    const cursor = conversation?.nextCursor;
+    if (!cursor || loadingOlder) return;
+    setLoadingOlder(true);
+    try {
+      const older = await fetchConversation({
+        data: { conversation_id: id, cursor },
+      });
+      skipNextAutoScroll.current = true;
+      queryClient.setQueryData(conversationQueryKey, (current: typeof data) => {
+        if (!current) return current;
+        const known = new Set(current.messages.map((message) => message.id));
+        return {
+          ...current,
+          messages: [
+            ...older.messages.filter((message) => !known.has(message.id)),
+            ...current.messages,
+          ],
+          hasOlder: older.hasOlder,
+          nextCursor: older.nextCursor,
+        };
+      });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load older messages.");
+    } finally {
+      setLoadingOlder(false);
+    }
+  }
 
   useEffect(() => {
     const timer = window.setInterval(() => setClockNow(Date.now()), 5000);
@@ -232,6 +306,10 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   }
 
   useEffect(() => {
+    if (skipNextAutoScroll.current) {
+      skipNextAutoScroll.current = false;
+      return;
+    }
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
@@ -263,7 +341,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const toggleReaction = useMutation({
     mutationFn: async (input: { message_id: string; emoji: string }) => react({ data: input }),
     onMutate: async ({ message_id, emoji }) => {
-      const queryKey = ["conversation", id] as const;
+      const queryKey = conversationQueryKey;
       await queryClient.cancelQueries({ queryKey });
       const previous = queryClient.getQueryData<NonNullable<typeof data>>(queryKey);
       if (user && previous) {
@@ -295,7 +373,26 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     },
   });
 
-  if (error) {
+  if (authLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="size-5 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return (
+      <div className="mx-auto max-w-md py-16 text-center">
+        <p className="font-medium">Sign in to view this conversation.</p>
+        <Button className="mt-4" onClick={() => navigate({ to: "/auth" })}>
+          Sign in
+        </Button>
+      </div>
+    );
+  }
+
+  if (error && !conversation) {
     return (
       <div className="mx-auto max-w-md py-16 text-center">
         <p className="font-medium">This conversation is not available.</p>
@@ -352,6 +449,19 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
         )}
       >
         <div className={cn("flex flex-col gap-3", !inSidebar && "mx-auto max-w-2xl")}>
+          {conversation?.hasOlder ? (
+            <div className="flex justify-center">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                disabled={loadingOlder}
+                onClick={() => void loadOlderMessages()}
+              >
+                {loadingOlder ? "Loading…" : "Load older messages"}
+              </Button>
+            </div>
+          ) : null}
           {isLoading ? (
             <div className="flex justify-center py-10">
               <Loader2 className="size-5 animate-spin text-muted-foreground" />

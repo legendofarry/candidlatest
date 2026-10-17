@@ -107,6 +107,8 @@ export function FeedDiscussionPanel({
             storyId={story.id!}
             comments={comments}
             total={total}
+            commentsHasMore={thread.data?.commentsHasMore ?? false}
+            commentsCursor={thread.data?.commentsCursor ?? null}
             sortMode={sortMode}
             panelMode
           />
@@ -117,5 +119,5 @@ export function FeedDiscussionPanel({
 }
 
 function countComments(comments: ThreadComment[]): number {
-  return comments.reduce((sum, comment) => sum + 1 + countComments(comment.replies), 0);
+  return comments.length;
 }

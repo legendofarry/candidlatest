@@ -30,6 +30,7 @@ import {
   getMyEngagement,
   likeComment,
 } from "@/lib/actions.functions";
+import { getStoryCommentContext, getStoryComments } from "@/lib/public.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn, formatCount } from "@/lib/utils";
@@ -45,6 +46,7 @@ export type ThreadComment = {
   created_at: string;
   author_handle: string;
   author_id?: string | null;
+  parent_id?: string | null;
   author_username: string | null;
   author_photo_url?: string | null;
   author_verified: boolean;
@@ -57,6 +59,26 @@ export type ThreadComment = {
 };
 
 export type CommentSortMode = "top" | "newest" | "helpful";
+
+function collectCommentIds(comments: ThreadComment[]): string[] {
+  return comments.flatMap((comment) => [comment.id, ...collectCommentIds(comment.replies)]);
+}
+
+function mergeCommentPages(current: ThreadComment[], incoming: ThreadComment[]) {
+  const flatten = (items: ThreadComment[]): ThreadComment[] =>
+    items.flatMap((item) => [item, ...flatten(item.replies)]);
+  const byId = new Map<string, ThreadComment>();
+  for (const item of [...flatten(current), ...flatten(incoming)]) {
+    byId.set(item.id, { ...item, replies: [] });
+  }
+  const roots: ThreadComment[] = [];
+  for (const item of byId.values()) {
+    const parent = item.parent_id ? byId.get(item.parent_id) : null;
+    if (parent) parent.replies.push(item);
+    else roots.push(item);
+  }
+  return roots;
+}
 
 function timeAgo(value: string) {
   const diff = Math.max(0, Date.now() - new Date(value).getTime());
@@ -75,26 +97,51 @@ export function CommentThread({
   storyId,
   comments,
   total,
+  commentsHasMore = false,
+  commentsCursor = null,
   focusCommentId,
   sortMode = "top",
   panelMode = false,
+  fitContent = false,
 }: {
   storyId: string;
   comments: ThreadComment[];
   total: number;
+  commentsHasMore?: boolean;
+  commentsCursor?: { createdAt: string; id: string } | null;
   /** Deep-linked comment (from a mention notification) to reveal and scroll to. */
   focusCommentId?: string | undefined;
   sortMode?: CommentSortMode;
   panelMode?: boolean;
+  /** Let short mobile sheets size to their comments, with a capped scroll region for long threads. */
+  fitContent?: boolean;
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const post = useServerFn(addComment);
   const engagementFn = useServerFn(getMyEngagement);
+  const fetchComments = useServerFn(getStoryComments);
+  const [loadedComments, setLoadedComments] = useState(comments);
+  const [nextCommentsCursor, setNextCommentsCursor] = useState(commentsCursor);
+  const [hasMoreComments, setHasMoreComments] = useState(commentsHasMore);
+  const [loadingMoreComments, setLoadingMoreComments] = useState(false);
+  const visibleCommentIds = useMemo(
+    () => collectCommentIds(loadedComments).slice(0, 100),
+    [loadedComments],
+  );
   const [body, setBody] = useState("");
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
-  const { visibleCount: visibleRootCount, expandBy: expandRootComments } =
-    useAutoCollapsingCount(30);
+  const {
+    visibleCount: visibleRootCount,
+    expandBy: expandRootComments,
+    resetVisibleCount: revealRootCount,
+  } = useAutoCollapsingCount(30);
+
+  useEffect(() => {
+    setLoadedComments(comments);
+    setNextCommentsCursor(commentsCursor);
+    setHasMoreComments(commentsHasMore);
+  }, [comments, commentsCursor, commentsHasMore]);
 
   useEffect(() => {
     if (!focusCommentId) return;
@@ -104,13 +151,51 @@ export function CommentThread({
     el.classList.add("ring-2", "ring-primary/50");
     const timer = setTimeout(() => el.classList.remove("ring-2", "ring-primary/50"), 4000);
     return () => clearTimeout(timer);
-  }, [focusCommentId, comments]);
+  }, [focusCommentId, loadedComments]);
+
+  async function loadMoreComments() {
+    if (!nextCommentsCursor || loadingMoreComments) return;
+    setLoadingMoreComments(true);
+    try {
+      const page = await fetchComments({ data: { id: storyId, cursor: nextCommentsCursor } });
+      setLoadedComments((current) => mergeCommentPages(current, page.comments));
+      setNextCommentsCursor(page.nextCursor);
+      setHasMoreComments(page.hasMore);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not load more comments.");
+    } finally {
+      setLoadingMoreComments(false);
+    }
+  }
 
   const engagement = useQuery({
-    queryKey: ["engagement", storyId, user?.uid ?? "anon"],
-    queryFn: () => engagementFn({ data: { story_id: storyId } }),
+    queryKey: ["engagement", storyId, user?.uid ?? "anon", visibleCommentIds],
+    queryFn: () =>
+      engagementFn({
+        data: { story_id: storyId, comment_ids: visibleCommentIds },
+      }),
     enabled: Boolean(user),
   });
+
+  const fetchCommentContext = useServerFn(getStoryCommentContext);
+  const focusedCommentIsLoaded = focusCommentId
+    ? collectCommentIds(loadedComments).includes(focusCommentId)
+    : true;
+  const focusedCommentContext = useQuery({
+    queryKey: ["story-comment-context", storyId, focusCommentId],
+    queryFn: () =>
+      fetchCommentContext({ data: { story_id: storyId, comment_id: focusCommentId! } }),
+    enabled: Boolean(focusCommentId) && !focusedCommentIsLoaded,
+    staleTime: 60_000,
+    retry: 1,
+  });
+
+  useEffect(() => {
+    if (!focusedCommentContext.data) return;
+    setLoadedComments((current) =>
+      mergeCommentPages(current, [focusedCommentContext.data as ThreadComment]),
+    );
+  }, [focusedCommentContext.data]);
 
   const liked = useMemo(
     () => new Set(engagement.data?.likedCommentIds ?? []),
@@ -123,7 +208,7 @@ export function CommentThread({
   const sortedComments = useMemo(() => {
     const dateOrder = (a: ThreadComment, b: ThreadComment) =>
       new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    return [...comments].sort((a, b) => {
+    return [...loadedComments].sort((a, b) => {
       if (a.is_official !== b.is_official) return a.is_official ? -1 : 1;
       if (sortMode === "newest") return dateOrder(a, b);
       if (sortMode === "helpful") return b.likes - a.likes || dateOrder(a, b);
@@ -131,7 +216,15 @@ export function CommentThread({
       const bScore = b.likes + b.replies.length * 2;
       return bScore - aScore || dateOrder(a, b);
     });
-  }, [comments, sortMode]);
+  }, [loadedComments, sortMode]);
+
+  useEffect(() => {
+    if (!focusCommentId) return;
+    const focusedRootIndex = sortedComments.findIndex((comment) =>
+      subtreeContains(comment, focusCommentId),
+    );
+    if (focusedRootIndex >= visibleRootCount) revealRootCount(focusedRootIndex + 1);
+  }, [focusCommentId, revealRootCount, sortedComments, visibleRootCount]);
 
   const commentMutation = useMutation({
     mutationFn: () => post({ data: { story_id: storyId, parent_id: replyTo?.id ?? null, body } }),
@@ -148,7 +241,11 @@ export function CommentThread({
       className={cn(
         "rounded-2xl border border-border bg-card",
         panelMode &&
+          !fitContent &&
           "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
+        panelMode &&
+          fitContent &&
+          "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
       )}
     >
       <header
@@ -166,8 +263,21 @@ export function CommentThread({
       </header>
 
       <div
-        className={cn("divide-y divide-border/60", panelMode && "min-h-0 flex-1 overflow-y-auto")}
+        className={cn(
+          "divide-y divide-border/60",
+          panelMode && !fitContent && "min-h-0 flex-1 overflow-y-auto",
+          panelMode && fitContent && "max-h-[calc(86dvh-20rem)] overflow-y-auto",
+        )}
       >
+        {focusCommentId && !focusedCommentIsLoaded ? (
+          <p className="px-4 py-3 text-center text-xs text-muted-foreground" role="status">
+            {focusedCommentContext.isLoading
+              ? "Opening the linked comment…"
+              : focusedCommentContext.isError
+                ? "Could not load the linked comment."
+                : "This comment is no longer available."}
+          </p>
+        ) : null}
         <AnimatePresence initial={false}>
           {sortedComments.slice(0, visibleRootCount).map((comment) => (
             <CommentRow
@@ -183,10 +293,18 @@ export function CommentThread({
                 void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
                 void engagement.refetch();
               }}
+              onDeleted={() => {
+                void Promise.all([
+                  queryClient.invalidateQueries({ queryKey: ["story", storyId] }),
+                  queryClient.invalidateQueries({ queryKey: ["stories"] }),
+                  queryClient.invalidateQueries({ queryKey: ["story-pages"] }),
+                  engagement.refetch(),
+                ]);
+              }}
             />
           ))}
         </AnimatePresence>
-        {comments.length === 0 ? (
+        {loadedComments.length === 0 ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">
             No comments yet — be the first voice.
           </p>
@@ -205,6 +323,19 @@ export function CommentThread({
             onClick={(event) => expandRootComments(30, event.currentTarget)}
           >
             Show 30 more comments
+          </Button>
+        </div>
+      ) : null}
+
+      {hasMoreComments ? (
+        <div className="flex justify-center border-t border-border/60 p-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={loadingMoreComments}
+            onClick={() => void loadMoreComments()}
+          >
+            {loadingMoreComments ? "Loading comments…" : "Load older comments"}
           </Button>
         </div>
       ) : null}
@@ -296,6 +427,7 @@ function CommentRow({
   focusCommentId,
   onReply,
   onChanged,
+  onDeleted,
 }: {
   comment: ThreadComment;
   storyId: string;
@@ -305,6 +437,7 @@ function CommentRow({
   focusCommentId?: string | undefined;
   onReply: (comment: ThreadComment) => void;
   onChanged: () => void;
+  onDeleted: () => void;
 }) {
   const { user } = useAuth();
   const like = useServerFn(likeComment);
@@ -333,6 +466,8 @@ function CommentRow({
     .replace(/^@/, "")
     .charAt(0)
     .toUpperCase();
+
+  if (comment.is_deleted) return null;
 
   const toggleLike = async () => {
     if (!user || comment.is_deleted) return;
@@ -363,7 +498,7 @@ function CommentRow({
     try {
       await remove({ data: { comment_id: comment.id } });
       setConfirmDelete(false);
-      onChanged();
+      onDeleted();
     } catch (error) {
       toast.error((error as Error).message);
     }
@@ -443,13 +578,8 @@ function CommentRow({
               </div>
             </div>
           ) : (
-            <p
-              className={cn(
-                "mt-1 whitespace-pre-line text-sm leading-relaxed",
-                comment.is_deleted && "italic text-muted-foreground",
-              )}
-            >
-              {comment.is_deleted ? "This comment was deleted" : comment.body}
+            <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">
+              {comment.body}
               {comment.edited_at && !comment.is_deleted ? (
                 <span className="ml-1 text-xs text-muted-foreground">(edited)</span>
               ) : null}
@@ -565,6 +695,7 @@ function CommentRow({
                   focusCommentId={focusCommentId}
                   onReply={onReply}
                   onChanged={onChanged}
+                  onDeleted={onDeleted}
                 />
               ))
           : null}

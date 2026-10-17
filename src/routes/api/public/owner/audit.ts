@@ -1,6 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { readCollection, type OwnerAuditLogRecord } from "@/lib/firebase-data.server";
-import { getAdmin, json, pagination, verifyOwnerKey } from "@/lib/owner-api.server";
+import { getAdmin, json, ownerPageMetadata, pagination, readOwnerPage, verifyOwnerKey } from "@/lib/owner-api.server";
 
 export const Route = createFileRoute("/api/public/owner/audit")({
   server: {
@@ -8,18 +7,11 @@ export const Route = createFileRoute("/api/public/owner/audit")({
       GET: async ({ request }) => {
         const denied = verifyOwnerKey(request);
         if (denied) return denied;
-
-        const { limit, offset } = pagination(new URL(request.url));
-        await getAdmin();
-        const entries = (await readCollection<OwnerAuditLogRecord>("owner_audit_log")).sort(
-          (a, b) => b.created_at.localeCompare(a.created_at),
-        );
-        return json({
-          total: entries.length,
-          limit,
-          offset,
-          entries: entries.slice(offset, offset + limit),
-        });
+        const db = await getAdmin();
+        const collection = db.collection("owner_audit_log");
+        const query = collection.orderBy("created_at", "desc");
+        const page = await readOwnerPage(query, collection, pagination(new URL(request.url)), "created_at");
+        return json({ ...ownerPageMetadata(page), entries: page.docs.map((doc) => ({ ...doc.data(), id: doc.id })) });
       },
     },
   },

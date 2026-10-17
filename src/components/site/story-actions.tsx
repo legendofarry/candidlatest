@@ -266,6 +266,8 @@ export function StoryActions({
                 storyId={storyId}
                 comments={thread.data?.comments ?? []}
                 total={commentCount + optimistic.comments}
+                commentsHasMore={thread.data?.commentsHasMore ?? false}
+                commentsCursor={thread.data?.commentsCursor ?? null}
               />
             )}
           </div>

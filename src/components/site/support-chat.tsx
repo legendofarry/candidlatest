@@ -36,7 +36,7 @@ export function SupportChat({
     queryKey: ["support-conversation", user?.uid],
     queryFn: () => fetchConversation(),
     enabled: open && Boolean(user),
-    refetchInterval: open ? 15_000 : false,
+    refetchInterval: open ? 60_000 : false,
   });
   const sendMutation = useMutation({
     mutationFn: () => send({ data: { body } }),

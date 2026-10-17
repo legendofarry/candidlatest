@@ -452,7 +452,7 @@ function WorkplaceStoryComposer() {
         setPinningLocation(false);
         toast.error("Could not get your location. Check your browser permission and try again.");
       },
-      { enableHighAccuracy: false, timeout: 12000, maximumAge: 60000 },
+        { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
     );
   }
   const exactMatch = matches.some((m) => m.name.toLowerCase() === companyName.trim().toLowerCase());
@@ -834,7 +834,7 @@ function WorkplaceStoryComposer() {
                         </p>
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="company-map">Company map pin (optional)</Label>
+                        <Label htmlFor="company-map">Public workplace map pin (optional)</Label>
                         <div className="flex gap-2">
                           <Input
                             id="company-map"
@@ -859,7 +859,7 @@ function WorkplaceStoryComposer() {
                           </Button>
                         </div>
                         <p className="text-xs text-muted-foreground">
-                          The pin is a private suggestion and is not shown on your public story.
+                          If you add a pin, its exact location is shown on the published story map. County and area are shown separately either way.
                         </p>
                       </div>
                     </>

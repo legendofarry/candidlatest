@@ -87,6 +87,7 @@ export function MobileDock({
 
   const youActive = [
     "/profile",
+    "/my-contributions",
     "/settings",
     "/notifications",
     "/search",
@@ -183,6 +184,13 @@ export function MobileDock({
                   label="Profile"
                   hint="Username, badges and unlock"
                   active={pathname.startsWith("/profile")}
+                />
+                <SheetRow
+                  to="/my-contributions"
+                  icon={PenLine}
+                  label="My contributions"
+                  hint="Manage your stories and comments"
+                  active={pathname.startsWith("/my-contributions")}
                 />
                 <SheetRow
                   to="/settings"

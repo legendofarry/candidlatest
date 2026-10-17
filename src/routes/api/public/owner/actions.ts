@@ -1,11 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
-import {
-  generateId,
-  readCollection,
-  readDocument,
-  type CommentRecord,
-} from "@/lib/firebase-data.server";
+import { generateId, readDocument } from "@/lib/firebase-data.server";
 import { FieldValue } from "@/lib/firestore-rest.server";
 import { auditOwnerAction, getAdmin, json, verifyOwnerKey } from "@/lib/owner-api.server";
 import { CANDID_USERNAME, ensureCandidAccount } from "@/lib/messaging.server";
@@ -119,12 +114,14 @@ export const Route = createFileRoute("/api/public/owner/actions")({
             is_deleted: false,
             created_at: timestamp,
           });
-          await db
-            .collection("stories")
-            .doc(input.story_id)
-            .update({
-              comment_count: FieldValue.increment(1),
-            });
+          if (!parentId) {
+            await db
+              .collection("stories")
+              .doc(input.story_id)
+              .update({
+                comment_count: FieldValue.increment(1),
+              });
+          }
           await auditOwnerAction({
             action: "official.comment_published",
             targetType: "comment",
@@ -226,45 +223,56 @@ export const Route = createFileRoute("/api/public/owner/actions")({
             }
           }
         } else if (input.entity === "comment") {
-          const comments = await readCollection<CommentRecord>("comments");
-          const selected = comments.find((comment) => comment.id === input.id);
-          if (!selected) return json({ error: "Comment not found" }, 404);
-
-          const targets = new Set([input.id]);
+          const commentsCollection = db.collection("comments");
+          const selectedSnapshot = await commentsCollection.doc(input.id).get();
+          if (!selectedSnapshot.exists) return json({ error: "Comment not found" }, 404);
+          const selected = { ...selectedSnapshot.data(), id: selectedSnapshot.id };
+          const targets = new Map([[selected.id, selected]]);
           if (input.status === "hidden") {
             let frontier = [input.id];
             while (frontier.length > 0) {
-              const next = comments
-                .filter((comment) => comment.parent_id && frontier.includes(comment.parent_id))
-                .map((comment) => comment.id)
-                .filter((id) => !targets.has(id));
-              next.forEach((id) => targets.add(id));
+              const children = await Promise.all(
+                Array.from({ length: Math.ceil(frontier.length / 30) }, (_, chunkIndex) =>
+                  commentsCollection
+                    .where("parent_id", "in", frontier.slice(chunkIndex * 30, chunkIndex * 30 + 30))
+                    .get(),
+                ),
+              );
+              const next: string[] = [];
+              for (const child of children.flatMap((snapshot) => snapshot.docs)) {
+                if (targets.has(child.id)) continue;
+                targets.set(child.id, { ...child.data(), id: child.id });
+                next.push(child.id);
+              }
               frontier = next;
             }
           }
 
-          const changed = comments.filter(
-            (comment) => targets.has(comment.id) && comment.status !== input.status,
+          const changed = [...targets.values()].filter(
+            (comment) => comment.status !== input.status,
           );
-          if (changed.length > 0) {
+          for (let start = 0; start < changed.length; start += 450) {
+            const chunk = changed.slice(start, start + 450);
             const batch = db.batch();
-            for (const comment of changed) {
-              batch.update(db.collection("comments").doc(comment.id), { status: input.status });
+            for (const comment of chunk) {
+              batch.update(commentsCollection.doc(String(comment.id)), { status: input.status });
             }
-            const countDelta = changed.reduce(
+            const countDelta = chunk.reduce(
               (delta, comment) =>
                 delta +
-                (input.status === "hidden"
-                  ? comment.status === "published"
-                    ? -1
-                    : 0
-                  : comment.status === "published"
-                    ? 0
-                    : 1),
+                (!comment.parent_id
+                  ? input.status === "hidden"
+                    ? comment.status === "published"
+                      ? -1
+                      : 0
+                    : comment.status === "published"
+                      ? 0
+                      : 1
+                  : 0),
               0,
             );
             if (countDelta !== 0) {
-              batch.update(db.collection("stories").doc(selected.story_id), {
+              batch.update(db.collection("stories").doc(String(selected["story_id"])), {
                 comment_count: FieldValue.increment(countDelta),
               });
             }
@@ -299,7 +307,11 @@ export const Route = createFileRoute("/api/public/owner/actions")({
           });
         } else if (input.entity === "payment") {
           const { reviewManualPaymentRequest } = await import("@/lib/billing.server");
-          const result = await reviewManualPaymentRequest(input.id, input.decision, input.rejection_reason);
+          const result = await reviewManualPaymentRequest(
+            input.id,
+            input.decision,
+            input.rejection_reason,
+          );
           await auditOwnerAction({
             action: `payment.${input.decision === "approve" ? "approved" : "rejected"}`,
             targetType: "payment_request",

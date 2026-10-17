@@ -109,11 +109,23 @@ export async function resolveVerification(
 
   let matchedCompany: CompanyRecord | null = null;
   if (corporate && domain) {
-    const snapshot = await db.collection("companies").get();
-    const companies = snapshot.docs.map(
-      (doc) => ({ ...(doc.data() as CompanyRecord), id: doc.id }) as CompanyRecord,
-    );
-    matchedCompany = matchCompanyByDomain(domain, companies);
+    const root = tokenize(domainRoot(domain));
+    if (root.length >= 3) {
+      const [slugMatch, nameMatch, indexSnapshot] = await Promise.all([
+        db.collection("companies").where("slug", ">=", root).where("slug", "<=", `${root}\uf8ff`).orderBy("slug", "asc").limit(20).get(),
+        db.collection("companies").where("name", ">=", root).where("name", "<=", `${root}\uf8ff`).orderBy("name", "asc").limit(20).get(),
+        db.collection("company_name_index").doc(root).get(),
+      ]);
+      const indexCompanyId = indexSnapshot.data()?.["company_id"];
+      const indexCompany = typeof indexCompanyId === "string"
+        ? await db.collection("companies").doc(indexCompanyId).get()
+        : null;
+      const candidates = [...slugMatch.docs, ...nameMatch.docs].map(
+        (doc) => ({ ...(doc.data() as CompanyRecord), id: doc.id }) as CompanyRecord,
+      );
+      matchedCompany = matchCompanyByDomain(domain, candidates) ??
+        (indexCompany?.exists ? { ...(indexCompany.data() as CompanyRecord), id: indexCompany.id } : null);
+    }
   }
 
   const claimedElsewhere = Boolean(matchedCompany?.claimed_by && matchedCompany.claimed_by !== userId);

@@ -28,7 +28,7 @@ function BillingPage() {
     queryKey: ["billing", user?.uid ?? null],
     queryFn: () => fetchBilling(),
     enabled: Boolean(user),
-    refetchInterval: 30_000,
+    refetchInterval: 60_000,
   });
   const downgradeMutation = useMutation({
     mutationFn: () => downgrade(),

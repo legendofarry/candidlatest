@@ -3,13 +3,10 @@ import { useEffect, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import {
-  Archive,
   BadgeCheck,
   ChevronRight,
-  Clock3,
   Link2,
   LogOut,
-  MessageSquare,
   PenLine,
   Settings,
   ShieldCheck,
@@ -31,7 +28,6 @@ import { declareAccountType, getOnboardingState } from "@/lib/onboarding.functio
 import { claimVerificationBadge, getVerificationState } from "@/lib/verification.functions";
 import { FollowedStories } from "@/components/site/followed-stories";
 import { SavedCommunityPosts } from "@/components/site/saved-community-posts";
-import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { useAuth } from "@/hooks/useAuth";
 import { inbox, notify as toast } from "@/lib/notifications-store";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
@@ -41,10 +37,7 @@ import {
   ProfilePhotoPicker,
 } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
-import { formatCount } from "@/lib/utils";
-import { getMyContributions } from "@/lib/social.functions";
 import { getPublicProfile } from "@/lib/messaging.functions";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -75,12 +68,6 @@ function ProfilePage() {
     enabled: Boolean(user),
   });
   const socials = onboarding.data?.socials ?? null;
-  const fetchContributions = useServerFn(getMyContributions);
-  const contributions = useQuery({
-    queryKey: ["my-contributions", user?.uid ?? null],
-    queryFn: () => fetchContributions(),
-    enabled: Boolean(user),
-  });
   const fetchPublicProfile = useServerFn(getPublicProfile);
   const publicProfile = useQuery({
     queryKey: ["my-public-profile", user?.uid ?? null, onboarding.data?.username ?? null],
@@ -371,9 +358,7 @@ function ProfilePage() {
           <FollowedStories />
           <SavedCommunityPosts />
 
-          {user ? (
-            <ContributionsPanel data={contributions.data} loading={contributions.isLoading} />
-          ) : null}
+          {user ? <ContributionsPanel /> : null}
 
           {askAccountType ? (
             <SettingsGroup title="One quick question">
@@ -490,137 +475,25 @@ function SettingsGroup({ title, children }: { title: string; children: React.Rea
   );
 }
 
-type ContributionItem = {
-  id: string;
-  title: string;
-  createdAt: string;
-  type: "story" | "comment";
-  storyId?: string;
-};
-type ContributionGroup = { stories: ContributionItem[]; comments: ContributionItem[] };
-
-function ContributionsPanel({
-  data,
-  loading,
-}: {
-  data?:
-    | undefined
-    | { active: ContributionGroup; inactive: ContributionGroup; pending: ContributionGroup };
-  loading: boolean;
-}) {
-  const activeList = useAutoCollapsingCount(20);
-  const inactiveList = useAutoCollapsingCount(20);
-  const pendingList = useAutoCollapsingCount(20);
-  const groups = data ?? {
-    active: { stories: [], comments: [] },
-    inactive: { stories: [], comments: [] },
-    pending: { stories: [], comments: [] },
-  };
-  const count = (group: ContributionGroup) => group.stories.length + group.comments.length;
+function ContributionsPanel() {
   return (
-    <section className="space-y-3 border-y border-border py-4 md:rounded-2xl md:border md:bg-card md:p-5">
-      <div>
-        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+    <Link
+      to="/my-contributions"
+      className="group flex items-center gap-4 rounded-2xl border border-border bg-card p-4 transition-colors hover:border-primary/40 hover:bg-primary/[0.03] sm:p-5"
+    >
+      <span className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <PenLine className="size-5" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
           Your activity
-        </p>
-        <h2 className="mt-1 text-lg font-semibold">My contributions</h2>
-      </div>
-      <Tabs defaultValue="active">
-        <TabsList className="grid h-auto w-full grid-cols-3 bg-secondary/60 p-1">
-          <TabsTrigger value="active" className="gap-1.5 text-xs sm:text-sm">
-            <PenLine className="size-3.5" />
-            Active <span>{formatCount(count(groups.active))}</span>
-          </TabsTrigger>
-          <TabsTrigger value="pending" className="gap-1.5 text-xs sm:text-sm">
-            <Clock3 className="size-3.5" />
-            Pending <span>{formatCount(count(groups.pending))}</span>
-          </TabsTrigger>
-          <TabsTrigger value="inactive" className="gap-1.5 text-xs sm:text-sm">
-            <Archive className="size-3.5" />
-            Inactive <span>{formatCount(count(groups.inactive))}</span>
-          </TabsTrigger>
-        </TabsList>
-        {(["active", "pending", "inactive"] as const).map((status) => {
-          const listState =
-            status === "active" ? activeList : status === "pending" ? pendingList : inactiveList;
-          const group = groups[status];
-          const items = [...group.stories, ...group.comments].sort(
-            (a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt),
-          );
-          return (
-            <TabsContent key={status} value={status} className="mt-3">
-              {loading ? (
-                <p className="py-5 text-center text-sm text-muted-foreground">
-                  Loading your contributions…
-                </p>
-              ) : items.length ? (
-                <>
-                  <div className="divide-y divide-border">
-                    {items.slice(0, listState.visibleCount).map((item) => {
-                      const opensStory = item.type === "comment";
-                      const storyId = item.type === "story" ? item.id : (item.storyId ?? "");
-                      return (
-                        <Link
-                          key={`${item.type}-${item.id}`}
-                          to={opensStory ? "/stories/$id" : "/post"}
-                          {...(opensStory
-                            ? { params: { id: storyId } }
-                            : { search: { edit: item.id } })}
-                          className="flex items-start gap-3 py-3 first:pt-1 last:pb-1"
-                        >
-                          <span className="mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            {item.type === "story" ? (
-                              <PenLine className="size-4" />
-                            ) : (
-                              <MessageSquare className="size-4" />
-                            )}
-                          </span>
-                          <span className="min-w-0 flex-1">
-                            <span className="line-clamp-2 block text-sm font-medium">
-                              {item.title}
-                            </span>
-                            <span className="mt-1 block text-xs capitalize text-muted-foreground">
-                              {item.type}
-                              {item.type === "story"
-                                ? " · Edit and resubmit for approval"
-                                : " "}·{" "}
-                              {item.createdAt
-                                ? new Date(item.createdAt).toLocaleDateString("en-KE")
-                                : "Date unavailable"}
-                            </span>
-                          </span>
-                          <ChevronRight className="mt-1 size-4 shrink-0 text-muted-foreground" />
-                        </Link>
-                      );
-                    })}
-                  </div>
-                  {items.length > listState.visibleCount ? (
-                    <div className="flex justify-center pt-3">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={(event) => listState.expandBy(20, event.currentTarget)}
-                      >
-                        Show 20 more contributions · {formatCount(listState.visibleCount)} of{" "}
-                        {formatCount(items.length)} shown
-                      </Button>
-                    </div>
-                  ) : null}
-                </>
-              ) : (
-                <p className="py-5 text-center text-sm text-muted-foreground">
-                  {status === "active"
-                    ? "Your published stories and comments will appear here."
-                    : status === "pending"
-                      ? "Nothing is waiting for review."
-                      : "No inactive contributions."}
-                </p>
-              )}
-            </TabsContent>
-          );
-        })}
-      </Tabs>
-    </section>
+        </span>
+        <span className="mt-1 block text-lg font-semibold">My contributions</span>
+        <span className="mt-0.5 block text-sm text-muted-foreground">
+          View, organize, edit, or remove the stories and comments you’ve shared.
+        </span>
+      </span>
+      <ChevronRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
+    </Link>
   );
 }

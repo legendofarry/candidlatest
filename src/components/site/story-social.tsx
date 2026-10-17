@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Bookmark, Heart, Share2 } from "lucide-react";
 import { followStory, getStoryEngagement, likeStory, saveStory } from "@/lib/social.functions";
@@ -22,6 +22,8 @@ export function StorySocial({
   variant?: "story" | "announcement";
 }) {
   const { user } = useAuth();
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [nearViewport, setNearViewport] = useState(false);
   const queryClient = useQueryClient();
   const like = useServerFn(likeStory);
   const follow = useServerFn(followStory);
@@ -31,7 +33,7 @@ export function StorySocial({
   const engagement = useQuery({
     queryKey: ["story-engagement", storyId, user?.uid ?? "anon"],
     queryFn: () => engagementFn({ data: { story_id: storyId } }),
-    enabled: Boolean(user),
+    enabled: Boolean(user) && nearViewport,
   });
   const [likeCount, setLikeCount] = useState(likes);
   const [followerCount, setFollowerCount] = useState(followers);
@@ -39,14 +41,24 @@ export function StorySocial({
   const [followingOverride, setFollowingOverride] = useState<boolean | null>(null);
   const [savedOverride, setSavedOverride] = useState<boolean | null>(null);
 
-  useEffect(() => setLikeCount(engagement.data?.likes ?? likes), [engagement.data?.likes, likes]);
-  useEffect(
-    () => setFollowerCount(engagement.data?.followers ?? followers),
-    [engagement.data?.followers, followers],
-  );
   useEffect(() => setLikedOverride(null), [engagement.data?.liked]);
   useEffect(() => setFollowingOverride(null), [engagement.data?.following]);
   useEffect(() => setSavedOverride(null), [engagement.data?.saved]);
+
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || nearViewport) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin: "300px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [nearViewport]);
 
   const invalidate = (options: { followChanged?: boolean; feedChanged?: boolean } = {}) => {
     void queryClient.invalidateQueries({ queryKey: ["story-engagement", storyId] });
@@ -89,7 +101,7 @@ export function StorySocial({
     },
     onError: (error: Error) => {
       setFollowingOverride(null);
-      setFollowerCount(engagement.data?.followers ?? followers);
+      setFollowerCount(followers);
       toast.error(error.message);
     },
   });
@@ -131,7 +143,7 @@ export function StorySocial({
   }
 
   return (
-    <div className={cn("flex items-center gap-1.5", className)}>
+    <div ref={containerRef} className={cn("flex items-center gap-1.5", className)}>
       <button
         type="button"
         title={liked ? "Unlike" : "Like"}

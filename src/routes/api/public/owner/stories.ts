@@ -1,11 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import {
-  readCollection,
-  type CompanyRecord,
-  type ProfileRecord,
-  type StoryRecord,
-} from "@/lib/firebase-data.server";
-import { getAdmin, json, pagination, verifyOwnerKey } from "@/lib/owner-api.server";
+import { getAdmin, json, ownerPageMetadata, pagination, readOwnerPage, verifyOwnerKey } from "@/lib/owner-api.server";
 
 export const Route = createFileRoute("/api/public/owner/stories")({
   server: {
@@ -13,47 +7,46 @@ export const Route = createFileRoute("/api/public/owner/stories")({
       GET: async ({ request }) => {
         const denied = verifyOwnerKey(request);
         if (denied) return denied;
-
         const url = new URL(request.url);
-        const { limit, offset } = pagination(url);
-        await getAdmin();
-
-        const status = url.searchParams.get("status");
-        const companyId = url.searchParams.get("company_id");
-        const county = url.searchParams.get("county");
-        const industry = url.searchParams.get("industry");
-        const search = url.searchParams.get("q");
-        const [stories, companies, profiles] = await Promise.all([
-          readCollection<StoryRecord>("stories"),
-          readCollection<CompanyRecord>("companies"),
-          readCollection<ProfileRecord>("profiles"),
-        ]);
-        const companyById = new Map(companies.map((company) => [company.id, company] as const));
-        const profileById = new Map(profiles.map((profile) => [profile.id, profile] as const));
-
-        const filtered = stories
-          .filter((story) => (status ? story.status === status : true))
-          .filter((story) => (companyId ? story.company_id === companyId : true))
-          .filter((story) => (county ? story.county === county : true))
-          .filter((story) => (industry ? story.industry === industry : true))
-          .filter((story) =>
-            search
-              ? `${story.title} ${story.body}`.toLowerCase().includes(search.toLowerCase())
-              : true,
-          )
-          .sort((a, b) => b.created_at.localeCompare(a.created_at));
-
-        return json({
-          total: filtered.length,
-          limit,
-          offset,
-          stories: filtered.slice(offset, offset + limit).map((story) => ({
+        const options = pagination(url);
+        const db = await getAdmin();
+        const collection = db.collection("stories");
+        let query = collection.orderBy("created_at", "desc");
+        const filters = [
+          ["status", url.searchParams.get("status")],
+          ["company_id", url.searchParams.get("company_id")],
+          ["county", url.searchParams.get("county")],
+          ["industry", url.searchParams.get("industry")],
+        ] as const;
+        for (const [field, value] of filters) if (value) query = query.where(field, "==", value);
+        const search = url.searchParams.get("q")?.trim().toLowerCase();
+        let page;
+        if (search) {
+          // Content search is bounded because Firestore does not provide substring/full-text search.
+          const candidates = (await query.limit(500).get()).docs.filter((doc) => {
+            const story = doc.data();
+            return `${story["title"] ?? ""} ${story["body"] ?? ""}`.toLowerCase().includes(search);
+          });
+          const offset = Math.min(options.offset, 500);
+          const docs = candidates.slice(offset, offset + options.limit);
+          page = { docs, total: candidates.length, limit: options.limit, offset, hasMore: offset + docs.length < candidates.length, nextCursor: null };
+        } else {
+          page = await readOwnerPage(query, collection, options, "created_at");
+        }
+        const stories = await Promise.all(page.docs.map(async (doc) => {
+          const story = { ...doc.data(), id: doc.id };
+          const [company, profile] = await Promise.all([
+            story["company_id"] ? db.collection("companies").doc(String(story["company_id"])).get() : null,
+            story["author_id"] ? db.collection("profiles").doc(String(story["author_id"])).get() : null,
+          ]);
+          return {
             ...story,
-            companies: companyById.get(story.company_id) ?? null,
-            story_reasons: (story.reasons ?? []).map((reason) => ({ reason })),
-            profiles: story.author_id ? (profileById.get(story.author_id) ?? null) : null,
-          })),
-        });
+            companies: company?.exists ? { ...company.data(), id: company.id } : null,
+            story_reasons: (Array.isArray(story["reasons"]) ? story["reasons"] : []).map((reason) => ({ reason })),
+            profiles: profile?.exists ? { ...profile.data(), id: profile.id } : null,
+          };
+        }));
+        return json({ ...ownerPageMetadata(page), stories });
       },
     },
   },

@@ -1,6 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { generateId } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
+import type { CollectionReference, Query, QueryDocumentSnapshot } from "./firestore-rest.server";
 
 const WINDOW_MS = 60_000;
 const MAX_PER_WINDOW = 120;
@@ -88,5 +89,56 @@ export async function auditOwnerAction(input: Parameters<typeof logOwnerAction>[
 export function pagination(url: URL) {
   const limit = Math.min(Math.max(Number(url.searchParams.get("limit") ?? 50), 1), 200);
   const offset = Math.max(Number(url.searchParams.get("offset") ?? 0), 0);
-  return { limit, offset };
+  return { limit, offset, cursor: decodePageCursor(url.searchParams.get("cursor")) };
+}
+
+export function decodePageCursor(raw: string | null): { value: string; id: string } | null {
+  if (!raw) return null;
+  try {
+    const value = JSON.parse(Buffer.from(raw, "base64url").toString("utf8")) as {
+      value?: unknown;
+      id?: unknown;
+    };
+    if (typeof value.value !== "string" || typeof value.id !== "string") return null;
+    return { value: value.value, id: value.id };
+  } catch {
+    return null;
+  }
+}
+
+export function encodePageCursor(value: string, id: string) {
+  return Buffer.from(JSON.stringify({ value, id }), "utf8").toString("base64url");
+}
+
+/** Reads one bounded admin-list page. Cursor requests use constant-size reads; offset is
+ * retained for older clients and capped so it cannot accidentally scan an entire collection. */
+export async function readOwnerPage(
+  query: Query,
+  collection: CollectionReference,
+  options: ReturnType<typeof pagination>,
+  orderField: string,
+) {
+  const total = await query.count();
+  const { limit, offset, cursor } = options;
+  let pageQuery = query;
+  let effectiveOffset = offset;
+  if (cursor) {
+    pageQuery = pageQuery.startAfter(cursor.value, collection.doc(cursor.id));
+    effectiveOffset = 0;
+  }
+  const skipped = Math.min(effectiveOffset, 2_000);
+  const docs = (await pageQuery.limit(skipped + limit + 1).get()).docs;
+  const page = docs.slice(skipped, skipped + limit);
+  const hasMore = docs.length > skipped + limit;
+  const last = page.at(-1) as QueryDocumentSnapshot | undefined;
+  const rawOrderValue = last?.data()[orderField];
+  const nextCursor = hasMore && last && rawOrderValue != null
+    ? encodePageCursor(String(rawOrderValue), last.id)
+    : null;
+  return { docs: page, total, limit, offset: cursor ? 0 : offset, hasMore, nextCursor };
+}
+
+export function ownerPageMetadata<T extends { docs: unknown[] }>(page: T) {
+  const { docs: _docs, ...metadata } = page;
+  return metadata;
 }

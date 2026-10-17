@@ -18,6 +18,7 @@ import { Route as DownloadRouteImport } from './routes/download'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as GuidelinesRouteImport } from './routes/guidelines'
 import { Route as LeaderboardsRouteImport } from './routes/leaderboards'
+import { Route as MyContributionsRouteImport } from './routes/my-contributions'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as PostRouteImport } from './routes/post'
@@ -91,6 +92,11 @@ const GuidelinesRoute = GuidelinesRouteImport.update({
 const LeaderboardsRoute = LeaderboardsRouteImport.update({
   id: '/leaderboards',
   path: '/leaderboards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyContributionsRoute = MyContributionsRouteImport.update({
+  id: '/my-contributions',
+  path: '/my-contributions',
   getParentRoute: () => rootRouteImport,
 } as any)
 const NotificationsRoute = NotificationsRouteImport.update({
@@ -249,6 +255,7 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
+  '/my-contributions': typeof MyContributionsRoute
   '/notifications': typeof NotificationsRoute
   '/onboarding': typeof OnboardingRoute
   '/post': typeof PostRoute
@@ -289,6 +296,7 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
+  '/my-contributions': typeof MyContributionsRoute
   '/notifications': typeof NotificationsRoute
   '/onboarding': typeof OnboardingRoute
   '/post': typeof PostRoute
@@ -329,6 +337,7 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
+  '/my-contributions': typeof MyContributionsRoute
   '/notifications': typeof NotificationsRoute
   '/onboarding': typeof OnboardingRoute
   '/post': typeof PostRoute
@@ -371,6 +380,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
+    | '/my-contributions'
     | '/notifications'
     | '/onboarding'
     | '/post'
@@ -411,6 +421,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
+    | '/my-contributions'
     | '/notifications'
     | '/onboarding'
     | '/post'
@@ -450,6 +461,7 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
+    | '/my-contributions'
     | '/notifications'
     | '/onboarding'
     | '/post'
@@ -491,6 +503,7 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   GuidelinesRoute: typeof GuidelinesRoute
   LeaderboardsRoute: typeof LeaderboardsRoute
+  MyContributionsRoute: typeof MyContributionsRoute
   NotificationsRoute: typeof NotificationsRoute
   OnboardingRoute: typeof OnboardingRoute
   PostRoute: typeof PostRoute
@@ -582,6 +595,13 @@ declare module '@tanstack/react-router' {
       path: '/leaderboards'
       fullPath: '/leaderboards'
       preLoaderRoute: typeof LeaderboardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-contributions': {
+      id: '/my-contributions'
+      path: '/my-contributions'
+      fullPath: '/my-contributions'
+      preLoaderRoute: typeof MyContributionsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/notifications': {
@@ -825,6 +845,7 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   GuidelinesRoute: GuidelinesRoute,
   LeaderboardsRoute: LeaderboardsRoute,
+  MyContributionsRoute: MyContributionsRoute,
   NotificationsRoute: NotificationsRoute,
   OnboardingRoute: OnboardingRoute,
   PostRoute: PostRoute,
