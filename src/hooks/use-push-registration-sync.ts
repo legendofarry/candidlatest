@@ -19,25 +19,28 @@ export function usePushRegistrationSync() {
       if (
         !user || requiresEmailVerification(user) ||
         typeof window === "undefined" || typeof Notification === "undefined" ||
-        Notification.permission !== "granted" || !hasPushOptIn(Notification.permission) ||
         !("serviceWorker" in navigator)
       ) return;
-
-      const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
-      if (!vapidKey) return;
 
       try {
         const messagingSdk = await import("firebase/messaging");
         if (!await messagingSdk.isSupported()) return;
+        const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
+        if (!vapidKey) return;
         const registration = await registerFirebaseServiceWorker();
         if (!active) return;
         const messaging = messagingSdk.getMessaging(firebaseApp);
         stopListening = messagingSdk.onMessage(messaging, (payload) => {
-          if (!active || document.visibilityState !== "visible") return;
-          const title = payload.notification?.title || "Candid";
-          const body = payload.notification?.body || "You have a new notification.";
+          if (
+            !active || document.visibilityState !== "visible" ||
+            Notification.permission !== "granted" || !hasPushOptIn(Notification.permission)
+          ) return;
+          const title = payload.notification?.title || payload.data?.title || "Candid";
+          const body =
+            payload.notification?.body || payload.data?.body || "You have a new notification.";
           notify.info(title, { description: body, duration: 7000 });
         });
+        if (Notification.permission !== "granted" || !hasPushOptIn(Notification.permission)) return;
         const token = await messagingSdk.getToken(messaging, {
           vapidKey,
           serviceWorkerRegistration: registration,

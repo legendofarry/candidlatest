@@ -112,41 +112,54 @@ function SettingsPage() {
         if (active) { setPushAvailable(false); setPushEnabled(false); setPushPermission("unsupported"); }
         return;
       }
-      const messagingSdk = await import("firebase/messaging");
-      const supported = await messagingSdk.isSupported().catch(() => false);
-      if (!active) return;
-      setPushAvailable(supported);
-      setPushPermission(Notification.permission);
-      if (!supported || Notification.permission !== "granted") { setPushEnabled(false); return; }
-      if (!hasPushOptIn(Notification.permission)) { setPushEnabled(false); return; }
-      const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
-      if (!vapidKey) return;
       try {
+        const messagingSdk = await import("firebase/messaging");
+        const supported = await messagingSdk.isSupported().catch(() => false);
+        if (!active) return;
+        setPushAvailable(supported);
+        setPushPermission(Notification.permission);
+        if (!supported || Notification.permission !== "granted") { setPushEnabled(false); return; }
+        if (!hasPushOptIn(Notification.permission)) { setPushEnabled(false); return; }
+        const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
+        if (!vapidKey) return;
         const registration = await registerFirebaseServiceWorker();
         const messaging = messagingSdk.getMessaging(firebaseApp);
         const token = await messagingSdk.getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
         if (!token || !active) return;
-        await registerPush({ data: { token } });
-        if (active) { setPushToken(token); setPushEnabled(true); }
+        setPushToken(token);
+        setPushEnabled(true);
       } catch (error) {
         console.warn("[push settings] Could not restore this device", error);
       }
     })();
     return () => { active = false; };
-  }, [user, registerPush]);
+  }, [user]);
 
   async function togglePushNotifications(next: boolean) {
     if (!user || pushBusy) return;
     setPushBusy(true);
     try {
-      const messagingSdk = await import("firebase/messaging");
-      if (!await messagingSdk.isSupported()) throw new Error("This browser does not support mobile notifications.");
       const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
       if (!vapidKey) throw new Error("Push notifications are not configured for this Candid site yet.");
       const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
       const installed = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
       if (next && ios && !installed) throw new Error("On iPhone or iPad, add Candid to your Home Screen before enabling notifications.");
 
+      if (next) {
+        if (typeof Notification === "undefined") throw new Error("This browser does not support notifications.");
+        let permission = Notification.permission;
+        // Ask before any async setup so the browser still recognizes the user's click.
+        if (permission === "default") permission = await Notification.requestPermission();
+        setPushPermission(permission);
+        if (permission !== "granted") {
+          throw new Error(permission === "denied"
+            ? "Notifications are blocked by your browser. Allow them in the browser's site settings."
+            : "Allow notifications to enable Candid alerts.");
+        }
+      }
+
+      const messagingSdk = await import("firebase/messaging");
+      if (!await messagingSdk.isSupported()) throw new Error("This browser does not support web push notifications.");
       const messaging = messagingSdk.getMessaging(firebaseApp);
       if (!next) {
         const registration = await registerFirebaseServiceWorker();
@@ -161,10 +174,6 @@ function SettingsPage() {
         setPushEnabled(false);
         return;
       }
-      let permission = Notification.permission;
-      if (permission === "default") permission = await Notification.requestPermission();
-      setPushPermission(permission);
-      if (permission !== "granted") throw new Error(permission === "denied" ? "Notifications are blocked by your browser. Allow them in the browser's site settings." : "Allow notifications to enable Candid alerts.");
       const registration = await registerFirebaseServiceWorker();
       const token = await messagingSdk.getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
       if (!token) throw new Error("This device did not return a notification token. Try again.");
@@ -469,6 +478,7 @@ function SettingsPage() {
                           <p className="text-sm font-medium">Check push delivery</p>
                           <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                             Send a sample alert to your push-enabled browsers and installed apps.
+                            Keep another device in the background to check its system alert.
                           </p>
                         </div>
                         <Button

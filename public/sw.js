@@ -17,6 +17,13 @@ self.addEventListener("notificationclick", (event) => {
   })());
 });
 
+self.addEventListener("install", (event) => {
+  event.waitUntil(self.skipWaiting());
+});
+self.addEventListener("activate", (event) => {
+  event.waitUntil(self.clients.claim());
+});
+
 importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-messaging-compat.js");
 
@@ -40,19 +47,11 @@ messaging.onBackgroundMessage((payload) => {
   const target = payload.data?.url || payload.notification?.click_action || "/notifications";
   const url = new URL(target, self.location.origin);
   if (url.origin !== self.location.origin) url.href = new URL("/notifications", self.location.origin).href;
-  void self.registration.showNotification(payload.notification?.title || "Candid", {
-    body: payload.notification?.body || "You have a new notification.",
+  return self.registration.showNotification(payload.notification?.title || payload.data?.title || "Candid", {
+    body: payload.notification?.body || payload.data?.body || "You have a new notification.",
     icon: payload.notification?.icon || "/icons/icon-192.png",
     badge: "/icons/icon-192.png",
-    tag: payload.notification?.tag || "candid-notification",
+    tag: payload.notification?.tag || payload.data?.notificationId || "candid-notification",
     data: { url: url.href },
   });
-});
-
-// Keep the installed app connected to the same live data and auth behavior as
-// the website. Private pages and API responses are never cached offline.
-self.addEventListener("fetch", (event) => {
-  if (event.request.method === "GET") {
-    event.respondWith(fetch(event.request));
-  }
 });

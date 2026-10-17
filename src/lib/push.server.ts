@@ -51,15 +51,12 @@ export async function dispatchWebPush(userId: string, input: PushMessage) {
               token,
               webpush: {
                 headers: { Urgency: "high" },
-                notification: {
+                data: {
                   title: input.title.slice(0, 100),
                   body: (input.body || "You have a new notification.").replace(/\s+/g, " ").trim().slice(0, 180),
-                  icon: "/icons/icon-192.png",
-                  tag: input.notificationId || "candid-notification",
-                  renotify: false,
-                  data: { url: link },
+                  url: link,
+                  notificationId: input.notificationId || "candid-notification",
                 },
-                fcm_options: { link },
               },
             },
           }),
