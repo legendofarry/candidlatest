@@ -1,3 +1,22 @@
+// Register click behavior before loading Firebase Messaging. FCM can install
+// its own notificationclick handler when the library initializes.
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = new URL(event.notification.data?.url || "/notifications", self.location.origin);
+  if (target.origin !== self.location.origin) target.href = new URL("/notifications", self.location.origin).href;
+  event.waitUntil((async () => {
+    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
+    for (const client of windows) {
+      if ("focus" in client) {
+        await client.focus();
+        if ("navigate" in client) await client.navigate(target.href);
+        return;
+      }
+    }
+    await self.clients.openWindow(target.href);
+  })());
+});
+
 importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-messaging-compat.js");
 
@@ -28,23 +47,6 @@ messaging.onBackgroundMessage((payload) => {
     tag: payload.notification?.tag || "candid-notification",
     data: { url: url.href },
   });
-});
-
-self.addEventListener("notificationclick", (event) => {
-  event.notification.close();
-  const target = new URL(event.notification.data?.url || "/notifications", self.location.origin);
-  if (target.origin !== self.location.origin) target.href = new URL("/notifications", self.location.origin).href;
-  event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: "window", includeUncontrolled: true });
-    for (const client of windows) {
-      if ("focus" in client) {
-        await client.focus();
-        if ("navigate" in client) await client.navigate(target.href);
-        return;
-      }
-    }
-    await self.clients.openWindow(target.href);
-  })());
 });
 
 // Keep the installed app connected to the same live data and auth behavior as

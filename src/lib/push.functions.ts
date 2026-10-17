@@ -18,3 +18,16 @@ export const unregisterMyPushToken = createServerFn({ method: "POST" })
     const { removePushToken } = await import("./push.server");
     return removePushToken(context.userId, data.token);
   });
+
+/** Sends a one-off test alert to this member's registered browser/app devices. */
+export const sendMyPushTestNotification = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    const { dispatchWebPush } = await import("./push.server");
+    return dispatchWebPush(context.userId, {
+      title: "Candid test notification",
+      body: "Push notifications are reaching your device.",
+      link: "/settings",
+      notificationId: `push-test-${Date.now()}`,
+    });
+  });

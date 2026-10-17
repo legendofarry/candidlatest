@@ -28,10 +28,12 @@ export async function removePushToken(userId: string, token: string) {
 
 /** Pushes an alert preview; users can control whether their OS shows previews on the lock screen. */
 export async function dispatchWebPush(userId: string, input: PushMessage) {
+  let registered = 0;
   try {
     const db = getFirestoreDb();
     const subscriptions = await db.collection("push_tokens").where("user_id", "==", userId).get();
-    if (!subscriptions.size) return { sent: 0 };
+    registered = subscriptions.size;
+    if (!registered) return { sent: 0, registered };
     const { accessToken, projectId } = await getFirebaseMessagingCredentials();
     const siteUrl = process.env["PUBLIC_APP_URL"] || "https://candid-beta.netlify.app";
     const relativeLink = input.link || "/notifications";
@@ -75,10 +77,10 @@ export async function dispatchWebPush(userId: string, input: PushMessage) {
         console.warn("[web push] Could not deliver notification", error instanceof Error ? error.message : "unknown error");
       }
     }));
-    return { sent };
+    return { sent, registered };
   } catch (error) {
     // Push delivery is best-effort; the durable notification remains in the inbox.
     console.warn("[web push] Notification dispatch failed", error instanceof Error ? error.message : "unknown error");
-    return { sent: 0 };
+    return { sent: 0, registered };
   }
 }

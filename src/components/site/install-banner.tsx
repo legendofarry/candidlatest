@@ -101,7 +101,7 @@ export function InstallBanner() {
   }, []);
 
   useEffect(() => {
-    if (isPreviewOrLocal() || !("serviceWorker" in navigator)) return;
+    if (!("serviceWorker" in navigator)) return;
     void registerFirebaseServiceWorker().catch((error: unknown) => {
       console.warn("[PWA] Service worker registration failed", error);
     });
