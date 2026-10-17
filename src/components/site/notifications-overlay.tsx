@@ -63,22 +63,30 @@ import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { requiresEmailVerification } from "@/lib/email-verification";
 
 const kindMeta: Record<NotifyKind, { icon: typeof Info; tint: string; ring: string }> = {
-  success: { icon: CheckCircle2, tint: "text-emerald-400", ring: "bg-emerald-400/10" },
-  error: { icon: XCircle, tint: "text-rose-400", ring: "bg-rose-400/10" },
-  warning: { icon: AlertTriangle, tint: "text-amber-400", ring: "bg-amber-400/10" },
+  success: {
+    icon: CheckCircle2,
+    tint: "text-emerald-700 dark:text-emerald-400",
+    ring: "bg-emerald-500/10",
+  },
+  error: { icon: XCircle, tint: "text-rose-700 dark:text-rose-400", ring: "bg-rose-500/10" },
+  warning: {
+    icon: AlertTriangle,
+    tint: "text-amber-700 dark:text-amber-400",
+    ring: "bg-amber-500/10",
+  },
   info: { icon: Info, tint: "text-primary", ring: "bg-primary/10" },
 };
 
 function timeAgo(ts: number) {
   const diff = Math.max(0, Date.now() - ts);
   const mins = Math.floor(diff / 60000);
-  if (mins < 1) return "just now";
-  if (mins < 60) return `${mins}m ago`;
+  if (mins < 1) return "now";
+  if (mins < 60) return `${mins}m`;
   const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
+  if (hrs < 24) return `${hrs}h`;
   const days = Math.floor(hrs / 24);
-  if (days < 7) return `${days}d ago`;
-  return new Date(ts).toLocaleDateString();
+  if (days < 7) return `${days}d`;
+  return new Date(ts).toLocaleDateString("en-KE", { day: "numeric", month: "short" });
 }
 
 type PendingAction =
@@ -244,7 +252,7 @@ export function NotificationsOverlay() {
 
   function renderTabs() {
     return (
-      <div className="flex gap-1 border-b border-border/70 px-4 pb-0 pt-2 sm:px-6">
+      <div className="flex gap-2 border-b border-border bg-background px-4 py-3 sm:px-6">
         {(
           [
             { key: "inbox", label: "Inbox", count: all.length - archivedCount },
@@ -259,15 +267,20 @@ export function NotificationsOverlay() {
               resetVisibleCount();
             }}
             className={cn(
-              "rounded-t-lg px-3 py-1.5 text-sm text-muted-foreground transition-colors",
-              tab === item.key &&
-                "bg-primary/10 font-medium text-foreground shadow-[inset_0_-2px_0_0_hsl(var(--primary))]",
+              "inline-flex min-h-12 items-center gap-1.5 rounded-full border-2 px-5 text-sm font-semibold transition-colors",
+              tab === item.key && "border-foreground bg-foreground text-background",
+              tab !== item.key && "border-border bg-card text-foreground hover:bg-secondary/60",
             )}
           >
             {item.label}
             {item.count > 0 ? (
               <span
-                className="ml-1.5 text-xs text-muted-foreground"
+                className={cn(
+                  "ml-1 flex size-7 items-center justify-center rounded-full text-xs font-bold",
+                  tab === item.key
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-secondary text-muted-foreground",
+                )}
                 aria-label={item.count.toLocaleString()}
               >
                 {formatCount(item.count)}
@@ -308,42 +321,36 @@ export function NotificationsOverlay() {
             <motion.div
               ref={panelRef}
               tabIndex={-1}
-              className="pointer-events-auto relative flex h-full w-full flex-col outline-none sm:mx-auto sm:my-6 sm:h-[calc(100%-3rem)] sm:max-w-2xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:bg-card/70 sm:shadow-2xl md:m-0 md:h-[calc(100vh-8rem)] md:w-[32rem] md:max-w-none md:bg-card md:shadow-2xl xl:shrink-0"
+              className="pointer-events-auto relative flex h-full w-full flex-col outline-none sm:mx-auto sm:my-6 sm:h-[calc(100%-3rem)] sm:max-w-2xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:bg-card/70 sm:shadow-2xl md:m-0 md:h-[calc(100vh-8rem)] md:w-[min(44rem,calc(100vw-3rem))] md:max-w-none md:bg-card md:shadow-2xl xl:shrink-0"
               initial={{ y: 32, opacity: 0, x: 0, scale: 0.98 }}
               animate={{ y: 0, opacity: 1, x: 0, scale: 1 }}
               exit={{ y: 24, opacity: 0, x: 40, scale: 0.98 }}
               transition={{ type: "spring", stiffness: 320, damping: 30 }}
             >
-              <header className="flex items-center gap-3 border-b border-border/70 px-4 py-4 sm:px-6">
+              <header className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-4 sm:px-6 sm:py-5">
                 {view.name === "list" ? (
-                  <div className="relative">
-                    <span className="absolute inset-0 -z-10 rounded-2xl bg-primary/25 blur-xl" />
-                    <div className="rounded-2xl border border-border bg-secondary/60 p-2.5">
-                      <Bell className="size-4 text-primary" />
-                    </div>
+                  <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
+                    <Bell className="size-6" />
                   </div>
                 ) : (
                   <>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       aria-label="Back to notifications"
-                      className="xl:hidden"
+                      className="!size-12 rounded-full border-2 xl:hidden"
                       onClick={backToNotificationList}
                     >
                       <ArrowLeft className="size-4" />
                     </Button>
-                    <div className="relative hidden xl:block">
-                      <span className="absolute inset-0 -z-10 rounded-2xl bg-primary/25 blur-xl" />
-                      <div className="rounded-2xl border border-border bg-secondary/60 p-2.5">
-                        <Bell className="size-4 text-primary" />
-                      </div>
+                    <div className="hidden size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground xl:flex">
+                      <Bell className="size-6" />
                     </div>
                   </>
                 )}
 
                 <div className="min-w-0">
-                  <h2 className="font-display text-lg font-semibold tracking-tight">
+                  <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
                     <span className={view.name === "detail" ? "xl:hidden" : ""}>
                       {view.name === "list" ? "Notifications" : "Notification"}
                     </span>
@@ -354,7 +361,7 @@ export function NotificationsOverlay() {
                   {view.name === "list" || view.name === "detail" ? (
                     <p
                       className={cn(
-                        "text-xs text-muted-foreground",
+                        "text-sm font-medium text-muted-foreground",
                         view.name === "detail" && "hidden xl:block",
                       )}
                     >
@@ -365,24 +372,26 @@ export function NotificationsOverlay() {
 
                 <div
                   className={cn(
-                    "ml-auto flex items-center gap-1",
+                    "ml-auto flex shrink-0 items-center gap-1.5",
                     view.name === "detail" && "hidden xl:flex",
                   )}
                 >
                   <>
                     <Button
                       variant="outline"
-                      size="sm"
+                      size="icon"
+                      aria-label="Mark all notifications as read"
+                      className="!size-10 rounded-full border-2 sm:!size-12"
                       onClick={markAllRead}
                       disabled={unread === 0 || tab === "archive"}
                     >
                       <CheckCheck className="size-4" />
-                      <span className="hidden sm:inline">Mark all read</span>
                     </Button>
                     <Button
-                      variant="ghost"
+                      variant="outline"
                       size="icon"
                       aria-label={tab === "archive" ? "Empty archive" : "Clear all notifications"}
+                      className="!size-10 rounded-full border-2 sm:!size-12"
                       disabled={notifications.length === 0}
                       onClick={() =>
                         setPending({ type: tab === "archive" ? "emptyArchive" : "clear" })
@@ -392,9 +401,10 @@ export function NotificationsOverlay() {
                     </Button>
                   </>
                   <Button
-                    variant="ghost"
+                    variant="outline"
                     size="icon"
                     aria-label="Close notifications"
+                    className="!size-10 rounded-full border-2 bg-foreground text-background hover:bg-foreground/90 hover:text-background sm:!size-12"
                     onClick={closeNotifications}
                   >
                     <X className="size-4" />
@@ -409,15 +419,15 @@ export function NotificationsOverlay() {
               )}
 
               {view.name === "list" ? (
-                <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6">
+                <div className="flex-1 overflow-y-auto bg-secondary/30 px-4 pb-10 pt-5 sm:px-6">
                   {renderNotificationList()}
                 </div>
               ) : (
                 <>
-                  <div className="hidden flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6 xl:block">
+                  <div className="hidden flex-1 overflow-y-auto bg-secondary/30 px-4 pb-10 pt-5 sm:px-6 xl:block">
                     {renderNotificationList()}
                   </div>
-                  <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4 sm:px-6 xl:hidden">
+                  <div className="flex-1 overflow-y-auto bg-secondary/30 px-4 pb-10 pt-5 sm:px-6 xl:hidden">
                     <AnimatePresence mode="wait" initial={false}>
                       {detail ? (
                         <motion.div
@@ -593,8 +603,8 @@ function Row({
         else if (info.offset.x > 90) onRequest({ type: n.read ? "unread" : "read", id: n.id });
       }}
       className={cn(
-        "group relative overflow-hidden rounded-2xl border border-border bg-card/60 backdrop-blur transition-colors hover:border-primary/40",
-        !n.read && "border-primary/30 bg-primary/[0.06]",
+        "group relative overflow-hidden rounded-3xl border-2 border-border bg-card transition-colors hover:border-primary/40",
+        !n.read && "border-primary/25 bg-primary/[0.08]",
       )}
     >
       <button
@@ -607,26 +617,26 @@ function Row({
           e.preventDefault();
           setMenuOpen(true);
         }}
-        className="flex w-full items-start gap-3 p-4 text-left"
+        className="flex min-h-32 w-full items-start gap-3 p-4 pr-12 text-left sm:gap-4 sm:p-5 sm:pr-14"
       >
-        <span className={cn("mt-0.5 rounded-xl p-2", meta.ring)}>
-          <Icon className={cn("size-4", meta.tint)} />
+        <span className={cn("mt-0.5 flex size-12 shrink-0 items-center justify-center rounded-full", meta.ring)}>
+          <Icon className={cn("size-6", meta.tint)} />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-2">
-            <span className="truncate text-sm font-semibold">{n.title}</span>
-            {!n.read ? <span className="size-1.5 rounded-full bg-primary" /> : null}
+          <span className="flex items-start justify-between gap-3 pr-1">
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="line-clamp-2 text-base font-bold leading-snug sm:text-lg">{n.title}</span>
+              {!n.read ? <span className="size-2 shrink-0 rounded-full bg-primary" /> : null}
+            </span>
+            <span className="shrink-0 pt-0.5 text-sm font-semibold text-muted-foreground">
+              {timeAgo(n.createdAt)}
+            </span>
           </span>
           {n.description ? (
-            <span className="mt-1 block text-xs text-muted-foreground">{n.description}</span>
+            <span className="mt-2 block text-sm leading-relaxed text-muted-foreground">{n.description}</span>
           ) : null}
-          <span className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground">
-            {timeAgo(n.createdAt)}
-            {n.link ? (
-              <span className="inline-flex items-center gap-0.5 text-primary">
-                {n.link.label ?? "Open"} <ChevronRight className="size-3" />
-              </span>
-            ) : null}
+          <span className="mt-3 inline-flex min-h-9 items-center gap-1 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm">
+            {n.link?.label ?? "Open"} <ChevronRight className="size-4" />
           </span>
         </span>
       </button>
@@ -638,7 +648,7 @@ function Row({
               variant="ghost"
               size="icon"
               aria-label="Notification options"
-              className="size-8 text-muted-foreground"
+              className="size-9 rounded-full bg-background/75 text-muted-foreground"
             >
               <MoreVertical className="size-4" />
             </Button>
@@ -669,7 +679,9 @@ function Row({
         </DropdownMenu>
       </div>
 
-      <span className="pointer-events-none absolute inset-y-0 left-0 hidden w-1 bg-primary/70 sm:block sm:opacity-0 sm:group-hover:opacity-100" />
+      {!n.read ? (
+        <span className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-primary" />
+      ) : null}
     </motion.div>
   );
 }

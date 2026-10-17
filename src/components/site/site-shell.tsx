@@ -126,8 +126,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const [messagesOpen, setMessagesOpen] = useState(false);
   const onMessagesRoute =
     pathname === "/messages" || pathname === "/messages/" || Boolean(routeConversationId);
+  const messagesInboxRoute = pathname === "/messages" || pathname === "/messages/";
   const messagesVisible = messagesOpen || Boolean(activeConversationId) || onMessagesRoute;
-  const messagePanelOpen = messagesVisible;
+  const messagePanelOpen = messagesVisible && !messagesInboxRoute;
   const returnPathRef = useRef("/");
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
@@ -326,7 +327,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <NotificationBanners />
       <NotificationsOverlay />
       <BadgeClaimModal />
-      {fullscreenRoute ? null : (
+      {fullscreenRoute || messagesInboxRoute ? null : (
         <SupportChat
           raised={dockRoots.includes(pathname)}
           mobileVisible={
@@ -340,6 +341,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           "sticky top-0 z-[80] border-b border-border glass-card",
           standaloneDesktopRoute && "md:hidden",
           fullscreenRoute && "hidden",
+          messagesInboxRoute && "hidden",
         )}
       >
         <div className="app-shell flex h-16 items-center gap-3">
@@ -422,7 +424,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <aside
           className={cn(
             "fixed bottom-0 left-0 z-30 hidden w-72 flex-col border-r border-border bg-card/95 px-4 pb-4 pt-6 shadow-sm backdrop-blur md:flex",
-            "top-16",
+            messagesInboxRoute ? "top-0" : "top-16",
             standaloneDesktopRoute && "md:hidden",
           )}
         >
@@ -533,13 +535,17 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           className={cn(
             "min-w-0 md:pb-10 md:pl-80",
             fullscreenRoute ||
+              messagesInboxRoute ||
               pathname === "/post" ||
               pathname === "/profile" ||
               pathname === "/support" ||
               directConversationRoute
               ? "p-0 md:pb-0"
               : "pt-6",
-            !fullscreenRoute && pathname !== "/support" && (showDock ? "pb-32" : "pb-10"),
+            !fullscreenRoute &&
+              pathname !== "/support" &&
+              !messagesInboxRoute &&
+              (showDock ? "pb-32" : "pb-10"),
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}

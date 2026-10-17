@@ -32,6 +32,16 @@ export const startConversation = createServerFn({ method: "POST" })
     return openConversation(context.userId, data.user_id);
   });
 
+export const startConversationByUsername = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ username: z.string().trim().min(3).max(21) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { openConversationByUsername } = await import("./messaging.server");
+    return openConversationByUsername(context.userId, data.username);
+  });
+
 export const getConversation = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>

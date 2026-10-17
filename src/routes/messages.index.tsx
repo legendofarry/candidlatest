@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useRef } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeCheck, Sparkles } from "lucide-react";
-import { getConversations } from "@/lib/messaging.functions";
+import { ArrowLeft, BadgeCheck, Search, Sparkles, SquarePen } from "lucide-react";
+import { getConversations, startConversationByUsername } from "@/lib/messaging.functions";
 import { readInboxScroll, saveInboxScroll } from "@/lib/message-panel-state";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,16 @@ import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
+import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/site/theme-toggle";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/messages/")({
   head: () => ({
@@ -51,10 +61,18 @@ export function MessagesInbox({
 } = {}) {
   const { user, loading } = useAuth();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const fetchConversations = useServerFn(getConversations);
+  const createConversation = useServerFn(startConversationByUsername);
   const listRef = useRef<HTMLDivElement>(null);
   const restoredRef = useRef(false);
   const { visibleCount, expandBy } = useAutoCollapsingCount(20);
+  const [search, setSearch] = useState("");
+  const [composeOpen, setComposeOpen] = useState(false);
+  const [username, setUsername] = useState("");
+  const [composeError, setComposeError] = useState("");
+  const [startingConversation, setStartingConversation] = useState(false);
+  const embedded = Boolean(onSelectConversation);
 
   const {
     data,
@@ -100,35 +118,123 @@ export function MessagesInbox({
   }, []);
 
   const conversations = data?.pages.flatMap((page) => page.items) ?? [];
-  const visibleConversations = conversations.slice(0, visibleCount);
+  const matchingConversations = useMemo(() => {
+    const query = search.trim().replace(/^@/, "").toLowerCase();
+    if (!query) return conversations;
+    return conversations.filter((item) =>
+      `${item.with?.username ?? ""} ${item.last_message ?? ""}`.toLowerCase().includes(query),
+    );
+  }, [conversations, search]);
+  const visibleConversations = matchingConversations.slice(0, visibleCount);
+
+  async function handleStartConversation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!user) {
+      void navigate({ to: "/auth" });
+      return;
+    }
+    const cleanUsername = username.trim().replace(/^@/, "");
+    if (!cleanUsername) {
+      setComposeError("Enter a Candid username to start a chat.");
+      return;
+    }
+    setStartingConversation(true);
+    setComposeError("");
+    try {
+      const result = await createConversation({ data: { username: cleanUsername } });
+      setComposeOpen(false);
+      setUsername("");
+      void queryClient.invalidateQueries({ queryKey: ["conversations", user.uid] });
+      void navigate({ to: "/messages/$id", params: { id: result.conversation_id } });
+    } catch (error) {
+      setComposeError(error instanceof Error ? error.message : "Could not start this conversation.");
+    } finally {
+      setStartingConversation(false);
+    }
+  }
 
   return (
-    <div ref={listRef} className="mx-auto max-w-2xl">
-      <header className="mb-6">
-        <h1 className="font-display text-3xl font-semibold tracking-tight">Messages</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Private one-to-one chats. Candid can always reach you with important updates.
-        </p>
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          {!user && !loading ? (
-            <Button variant="ghost" size="sm" onClick={() => navigate({ to: "/auth" })}>
-              Sign in for private messages
+    <div
+      ref={listRef}
+      className={cn(
+        embedded ? "mx-auto max-w-2xl" : "-mx-4 max-w-none md:mx-auto md:max-w-5xl",
+      )}
+    >
+      {!embedded ? (
+        <header className="border-b border-border bg-background px-4 pb-5 pt-4 sm:px-6 md:py-6">
+          <div className="flex items-center gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              aria-label="Back to feed"
+              className="!size-12 rounded-full border-2 bg-card"
+              onClick={() => void navigate({ to: "/" })}
+            >
+              <ArrowLeft className="size-5" />
             </Button>
-          ) : null}
-        </div>
-      </header>
+            <h1 className="min-w-0 flex-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+              Messages
+            </h1>
+            <ThemeToggle prominent className="!size-12 shrink-0" />
+            <Button
+              type="button"
+              size="icon"
+              aria-label={user ? "Start a new conversation" : "Sign in to message"}
+              className="!size-14 shrink-0 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
+              onClick={() => {
+                if (!user) void navigate({ to: "/auth" });
+                else {
+                  setComposeError("");
+                  setComposeOpen(true);
+                }
+              }}
+            >
+              <SquarePen className="!size-6" />
+            </Button>
+          </div>
+        </header>
+      ) : null}
+
+      <div className={cn("px-4 pt-5 sm:px-6", !embedded && "md:pt-6")}>
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search chats"
+            aria-label="Search chats"
+            className="h-14 rounded-full border-2 bg-card pl-12 text-base shadow-sm placeholder:text-muted-foreground/80"
+          />
+        </label>
+        {!embedded ? (
+          <p className="mt-4 max-w-3xl text-base leading-relaxed text-muted-foreground sm:text-lg">
+            Private one-to-one chats. Candid can always reach you with important updates.
+          </p>
+        ) : null}
+        {!user && !loading && !embedded ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-3"
+            onClick={() => void navigate({ to: "/auth" })}
+          >
+            Sign in for private messages
+          </Button>
+        ) : null}
+      </div>
 
       {loading || (isLoading && Boolean(user)) ? (
-        <div className="space-y-3">
+        <div className="space-y-0 overflow-hidden rounded-3xl border-2 border-border bg-card">
           {[0, 1, 2].map((index) => (
-            <div key={index} className="h-20 animate-pulse rounded-2xl bg-secondary/60" />
+            <div key={index} className="h-24 animate-pulse border-b border-border bg-secondary/60" />
           ))}
         </div>
       ) : isError ? (
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card rounded-3xl p-8 text-center"
+          className="mx-4 mt-6 rounded-3xl border-2 border-border bg-card p-8 text-center sm:mx-6"
           role="alert"
         >
           <p className="font-medium">We couldn&apos;t load your conversations</p>
@@ -149,7 +255,7 @@ export function MessagesInbox({
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="glass-card rounded-3xl p-10 text-center"
+          className="mx-4 mt-6 rounded-3xl border-2 border-border bg-card p-10 text-center sm:mx-6"
         >
           <Sparkles className="mx-auto size-8 text-primary" />
           <p className="mt-4 font-medium">No conversations yet</p>
@@ -157,8 +263,21 @@ export function MessagesInbox({
             Open someone&apos;s profile and tap Message to start a chat.
           </p>
         </motion.div>
+      ) : matchingConversations.length === 0 ? (
+        <div className="mx-4 mt-6 rounded-3xl border-2 border-border bg-card p-8 text-center sm:mx-6">
+          <Search className="mx-auto size-6 text-muted-foreground" />
+          <p className="mt-3 font-semibold">No chats match “{search.trim()}”</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Try a username or a word from a message.
+          </p>
+        </div>
       ) : (
-        <ul className="space-y-2">
+        <ul
+          className={cn(
+            "mx-4 mt-6 overflow-hidden rounded-3xl border-2 border-border bg-card sm:mx-6",
+            embedded && "mx-0 mt-4 rounded-2xl border",
+          )}
+        >
           <AnimatePresence initial={false}>
             {visibleConversations.map((item, index) => (
               <motion.li
@@ -167,8 +286,12 @@ export function MessagesInbox({
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0, transition: { delay: index * 0.03 } }}
                 exit={{ opacity: 0 }}
+                className={cn(
+                  "border-b border-border last:border-b-0",
+                  item.unread > 0 && "border-l-4 border-l-primary bg-primary/[0.07]",
+                )}
               >
-                <div className="flex w-full items-center gap-3 rounded-2xl border border-border/70 bg-card/60 p-3 transition-all hover:-translate-y-0.5 hover:border-primary/40 hover:shadow-lg">
+                <div className="flex min-h-24 w-full items-center gap-4 px-4 py-4 transition-colors hover:bg-secondary/30 sm:px-5">
                   <button
                     type="button"
                     aria-label={`Open conversation with @${item.with?.username ?? "member"}`}
@@ -181,7 +304,7 @@ export function MessagesInbox({
                     <ProfileAvatar
                       photoUrl={item.with?.photo_url}
                       initials={item.with?.username?.slice(0, 2) ?? "??"}
-                      className="size-11 text-base uppercase"
+                      className="size-14 border border-border/70 text-lg uppercase"
                     />
                   </button>
                   <span className="min-w-0 flex-1">
@@ -190,7 +313,7 @@ export function MessagesInbox({
                         <Link
                           to="/u/$username"
                           params={{ username: item.with.username }}
-                          className="truncate font-medium hover:text-primary"
+                          className="truncate font-display text-base font-bold hover:text-primary sm:text-lg"
                         >
                           @{item.with.username}
                         </Link>
@@ -204,7 +327,7 @@ export function MessagesInbox({
                         tier={item.with?.membership_tier}
                         official={item.with?.official}
                       />
-                      <span className="ml-auto text-xs text-muted-foreground">
+                      <span className="ml-auto shrink-0 pl-2 text-sm font-semibold text-muted-foreground">
                         {timeAgo(item.last_message_at)}
                       </span>
                     </span>
@@ -215,8 +338,8 @@ export function MessagesInbox({
                         else void navigate({ to: "/messages/$id", params: { id: item.id } });
                       }}
                       className={cn(
-                        "mt-0.5 block w-full truncate text-left text-sm text-muted-foreground",
-                        item.unread > 0 && "font-medium text-foreground",
+                        "mt-1 block w-full truncate text-left text-sm text-muted-foreground sm:text-base",
+                        item.unread > 0 && "font-semibold text-foreground",
                       )}
                     >
                       {item.mine ? "You: " : ""}
@@ -224,7 +347,10 @@ export function MessagesInbox({
                     </button>
                   </span>
                   {item.unread > 0 ? (
-                    <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[11px] font-bold text-primary-foreground">
+                    <span
+                      aria-label={`${item.unread} unread messages`}
+                      className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground"
+                    >
                       {item.unread > 9 ? "9+" : item.unread}
                     </span>
                   ) : null}
@@ -234,9 +360,10 @@ export function MessagesInbox({
           </AnimatePresence>
         </ul>
       )}
-      {visibleConversations.length > 0 &&
+      {!search.trim() &&
+      visibleConversations.length > 0 &&
       (conversations.length > visibleConversations.length || hasNextPage) ? (
-        <div className="flex flex-col items-center gap-2 py-5">
+        <div className="flex flex-col items-center gap-2 px-4 py-5 sm:px-6">
           <p className="text-xs text-muted-foreground">
             {hasNextPage
               ? `Showing ${visibleConversations.length.toLocaleString()} conversations loaded so far`
@@ -265,6 +392,52 @@ export function MessagesInbox({
           </Button>
         </div>
       ) : null}
+
+      <Dialog
+        open={composeOpen}
+        onOpenChange={(open) => {
+          if (!startingConversation) setComposeOpen(open);
+          if (!open) setComposeError("");
+        }}
+      >
+        <DialogContent className="rounded-3xl p-6 sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="font-display text-2xl">New message</DialogTitle>
+            <DialogDescription>
+              Enter a member’s Candid username to start a private chat.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={(event) => void handleStartConversation(event)} className="space-y-4">
+            <Input
+              autoFocus
+              value={username}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                setComposeError("");
+              }}
+              placeholder="@username"
+              aria-label="Candid username"
+              className="h-12 rounded-xl"
+              maxLength={21}
+            />
+            {composeError ? <p className="text-sm text-destructive">{composeError}</p> : null}
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                className="rounded-full"
+                disabled={startingConversation}
+                onClick={() => setComposeOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" className="rounded-full" disabled={startingConversation}>
+                {startingConversation ? "Opening chat…" : "Start chat"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

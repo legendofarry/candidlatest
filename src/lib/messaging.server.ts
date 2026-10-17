@@ -638,6 +638,18 @@ export async function openConversation(userId: string, otherId: string) {
   return { conversation_id: id };
 }
 
+/** Resolves a typed handle with one indexed document read, then applies normal chat privacy checks. */
+export async function openConversationByUsername(userId: string, rawUsername: string) {
+  const username = rawUsername.trim().replace(/^@/, "").toLowerCase();
+  if (!/^[a-z0-9][a-z0-9._]{2,19}$/.test(username) || /[._]{2,}/.test(username)) {
+    throw new Error("Enter a valid Candid username.");
+  }
+  const usernameSnap = await getFirestoreDb().collection("usernames").doc(username).get();
+  const otherId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
+  if (!otherId) throw new Error("We couldn’t find that Candid username.");
+  return openConversation(userId, otherId);
+}
+
 export async function readConversation(
   userId: string,
   conversationId: string,

@@ -124,7 +124,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     [imagePreview],
   );
 
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, isFetching, error, refetch } = useQuery({
     queryKey: conversationQueryKey,
     queryFn: async () => {
       const previous = queryClient.getQueryData<ConversationView>(conversationQueryKey);
@@ -135,7 +135,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           message.image.delivery_url_expires_at <= Math.floor(Date.now() / 1000) + 15 * 60
         );
       });
-      const latest = await fetchConversation({
+      let latest = await fetchConversation({
         data: {
           conversation_id: id,
           cursor: null,
@@ -145,6 +145,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               : null,
         },
       });
+      // An "unchanged" response omits participant details. If a stale cache has no
+      // partner profile, fetch the full thread once so the chat header can recover.
+      if (latest.unchanged && !previous?.with) {
+        latest = await fetchConversation({
+          data: { conversation_id: id, cursor: null, known_activity_at: null },
+        });
+      }
       if (!latest.unchanged) hasLoadedFullThread.current = true;
       if (latest.unread_cleared && user?.uid) {
         void queryClient.invalidateQueries({ queryKey: ["unread-messages", user.uid] });
@@ -169,6 +176,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     },
     enabled: Boolean(user),
     refetchInterval: 30_000,
+    retry: (failureCount, queryError) => {
+      const message = queryError instanceof Error ? queryError.message.toLowerCase() : "";
+      if (message.includes("conversation not found") || message.includes("not your conversation")) {
+        return false;
+      }
+      return failureCount < 1;
+    },
   });
 
   const conversation = data;
@@ -393,12 +407,32 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   }
 
   if (error && !conversation) {
+    const unavailable =
+      error instanceof Error &&
+      (error.message.toLowerCase().includes("conversation not found") ||
+        error.message.toLowerCase().includes("not your conversation"));
     return (
-      <div className="mx-auto max-w-md py-16 text-center">
-        <p className="font-medium">This conversation is not available.</p>
-        <Button className="mt-4" variant="secondary" onClick={() => navigate({ to: "/messages" })}>
-          Back to messages
-        </Button>
+      <div className="flex min-h-64 flex-col items-center justify-center px-6 py-12 text-center">
+        <p className="font-medium">
+          {unavailable
+            ? "This conversation is no longer available."
+            : "We couldn’t load this conversation."}
+        </p>
+        <p className="mt-2 max-w-sm text-sm text-muted-foreground">
+          {unavailable
+            ? "It may have been removed or you may no longer have access."
+            : "Check your connection, then try again. Your messages have not been removed."}
+        </p>
+        <div className="mt-5 flex flex-wrap justify-center gap-2">
+          {!unavailable ? (
+            <Button variant="outline" disabled={isFetching} onClick={() => void refetch()}>
+              {isFetching ? "Trying again…" : "Try again"}
+            </Button>
+          ) : null}
+          <Button variant="secondary" onClick={() => void navigate({ to: "/messages" })}>
+            Back to messages
+          </Button>
+        </div>
       </div>
     );
   }
@@ -419,11 +453,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
             void navigate({ to: "/u/$username", params: { username: partner.username } });
         }}
         className={cn(
-          "flex shrink-0 items-center gap-3 text-left transition-colors hover:bg-secondary/40",
+          "sticky top-0 z-20 flex shrink-0 items-center gap-3 text-left transition-colors hover:bg-secondary/40",
           inSidebar
-            ? "glass-card mb-4 rounded-2xl p-3"
-            : "border-b border-border bg-background px-5 py-3.5",
+            ? "glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur"
+            : "border-b border-border bg-background/95 px-5 py-3.5 backdrop-blur",
         )}
+        disabled={!partner}
+        aria-label={partner ? `View @${partner.username}'s profile` : undefined}
       >
         <ProfileAvatar
           photoUrl={partner?.photo_url}
@@ -432,7 +468,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
         />
         <span className="min-w-0">
           <span className="flex items-center gap-1.5 font-medium">
-            @{partner?.username ?? "…"}
+            {partner ? `@${partner.username}` : isLoading ? "Loading conversation…" : "Member"}
             {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
             <MembershipBadge tier={partner?.membership_tier} official={partner?.official} />
           </span>
