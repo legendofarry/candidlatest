@@ -7,7 +7,7 @@ import {
   type ProfileRecord,
   type StoryRecord,
 } from "./firebase-data.server";
-import { getEffectiveMembershipTier } from "./membership";
+import { getEffectiveMembershipTier, getMembershipEntitlements } from "./membership";
 import {
   createAuthenticatedImageUrl,
   getCloudinaryEvidenceConfig,
@@ -987,7 +987,15 @@ export async function readPublicProfile(username: string, viewerId: string | nul
 
   const profileSnap = await db.collection("profiles").doc(userId).get();
   const profile = profileSnap.data() as ProfileRecord | undefined;
-  if (!profileSnap.exists || profile?.banned) return null;
+  if (!profileSnap.exists || !profile || profile.banned) return null;
+  const pinnedLimit = getMembershipEntitlements(
+    getEffectiveMembershipTier(profile),
+  ).maxPinnedStories;
+  const requestedPinIds = Array.isArray(profile.pinned_story_ids)
+    ? [
+        ...new Set(profile.pinned_story_ids.filter((id): id is string => typeof id === "string")),
+      ].slice(0, pinnedLimit)
+    : [];
 
   const [
     participants,
@@ -1035,6 +1043,33 @@ export async function readPublicProfile(username: string, viewerId: string | nul
         : null;
     }),
   );
+  const newestStoryDocsById = new Map(stories.docs.map((doc) => [doc.id, doc] as const));
+  const profileStories = await Promise.all(
+    stories.docs
+      .slice(0, 30)
+      .map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
+  );
+  const profileStoriesById = new Map(profileStories.map((story) => [story.id, story] as const));
+  const pinnedStoryDocs = await Promise.all(
+    requestedPinIds.map(
+      async (storyId) =>
+        newestStoryDocsById.get(storyId) ?? (await db.collection("stories").doc(storyId).get()),
+    ),
+  );
+  const pinnedStories = await Promise.all(
+    pinnedStoryDocs
+      .filter((doc) => doc.exists)
+      .map(async (doc) => {
+        const story = doc.data() as StoryRecord;
+        if (story.author_id !== userId || story.status !== "published") return null;
+        const alreadyLoaded = profileStoriesById.get(doc.id);
+        if (alreadyLoaded) return { ...alreadyLoaded, is_pinned: true };
+        return publicProfileStory(doc.id, story, doc.updateTime, true);
+      }),
+  );
+  const visiblePinnedStories = pinnedStories.filter((story): story is NonNullable<typeof story> =>
+    Boolean(story),
+  );
   const messaging =
     viewerId && viewerId !== userId
       ? await canMessage(viewerId, userId)
@@ -1057,11 +1092,9 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       comments: commentCount,
       joined_at: profile?.onboarded_at ?? profile?.created_at ?? null,
     },
-    stories: await Promise.all(
-      stories.docs
-        .slice(0, 30)
-        .map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
-    ),
+    pinnedStoryIds: visiblePinnedStories.map((story) => story.id),
+    pinnedStories: visiblePinnedStories,
+    stories: profileStories,
     storiesHasMore: stories.size > 30,
     storiesCursor:
       stories.size > 30 && stories.docs[29]
@@ -1078,7 +1111,12 @@ export async function readPublicProfile(username: string, viewerId: string | nul
   };
 }
 
-async function publicProfileStory(id: string, story: StoryRecord, updateTime?: string) {
+async function publicProfileStory(
+  id: string,
+  story: StoryRecord,
+  updateTime?: string,
+  isPinned = false,
+) {
   const commentCount = await getTopLevelCommentCount(story, updateTime);
   return {
     id,
@@ -1092,6 +1130,7 @@ async function publicProfileStory(id: string, story: StoryRecord, updateTime?: s
     likes: Number(story.likes ?? 0),
     post_type: story.post_type ?? "workplace_story",
     media: story.media ?? [],
+    is_pinned: isPinned,
   };
 }
 

@@ -1,5 +1,6 @@
 import { getFirestoreDb } from "./firebase.server";
 import { type CommentRecord, type StoryRecord } from "./firebase-data.server";
+import { getEffectiveMembershipTier, getMembershipEntitlements } from "./membership";
 
 export type FollowRecord = {
   id: string;
@@ -167,6 +168,61 @@ export async function toggleStorySave(storyId: string, userId: string) {
       created_at: now(),
     });
     return { saved: true };
+  });
+}
+
+/** Pins one of the author's published stories to their public profile. */
+export async function toggleProfileStoryPin(storyId: string, userId: string) {
+  const db = getFirestoreDb();
+  const profileRef = db.collection("profiles").doc(userId);
+  const storyRef = db.collection("stories").doc(storyId);
+
+  return db.runTransaction(async (transaction) => {
+    const [profileSnap, storySnap] = await Promise.all([
+      transaction.get(profileRef),
+      transaction.get(storyRef),
+    ]);
+    if (!profileSnap.exists) throw new Error("Could not find your Candid profile.");
+    const story = storySnap.data() as (StoryRecord & { status?: string }) | undefined;
+    if (!storySnap.exists || story?.author_id !== userId) {
+      throw new Error("You can only pin stories you have posted.");
+    }
+
+    const profile = profileSnap.data() as {
+      pinned_story_ids?: unknown;
+      subscription_tier?: "basic" | "premium" | "gold";
+      subscription_status?: "active" | "cancelled" | "expired" | "past_due";
+      subscription_period_ends_at?: string | null;
+      subscription_source?: "default" | "complimentary" | "manual" | "paid";
+      account_type?: "individual" | "company" | "official" | "unknown";
+    };
+    const pinnedIds = Array.isArray(profile.pinned_story_ids)
+      ? [...new Set(profile.pinned_story_ids.filter((id): id is string => typeof id === "string"))]
+      : [];
+    const alreadyPinned = pinnedIds.includes(storyId);
+    if (alreadyPinned) {
+      const nextPinnedIds = pinnedIds.filter((id) => id !== storyId);
+      transaction.update(profileRef, { pinned_story_ids: nextPinnedIds });
+      return { pinned: false, pinnedCount: nextPinnedIds.length };
+    }
+
+    if (story.status !== "published") {
+      throw new Error("Only published stories can be pinned to your profile.");
+    }
+    const tier = getEffectiveMembershipTier(profile);
+    const limit = getMembershipEntitlements(tier).maxPinnedStories;
+    if (limit === 0) {
+      throw new Error("Story pins are included with Premium and Gold. Upgrade from Billing.");
+    }
+    if (pinnedIds.length >= limit) {
+      throw new Error(
+        `Your ${tier === "gold" ? "Gold" : "Premium"} package allows up to ${limit} pinned ${limit === 1 ? "story" : "stories"}.`,
+      );
+    }
+
+    const nextPinnedIds = [...pinnedIds, storyId];
+    transaction.update(profileRef, { pinned_story_ids: nextPinnedIds });
+    return { pinned: true, pinnedCount: nextPinnedIds.length };
   });
 }
 

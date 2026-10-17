@@ -14,6 +14,7 @@ import {
   Link2,
   MapPin,
   MessageSquare,
+  Pin,
   Plus,
   UserRound,
   UserPlus,
@@ -52,6 +53,7 @@ type ProfileStory = {
   likes: number;
   post_type: "workplace_story" | "announcement";
   media: { url: string; resource_type: "image" | "video" }[];
+  is_pinned?: boolean;
 };
 
 export const Route = createFileRoute("/u/$username")({
@@ -163,6 +165,9 @@ function PublicProfilePage() {
 
   const profile = data;
   const followerPreview = profile.follower_preview ?? [];
+  const pinnedStories = (profile.pinnedStories ?? []) as ProfileStory[];
+  const pinnedStoryIds = new Set<string>(profile.pinnedStoryIds ?? []);
+  const visibleProfileStories = profileStories.filter((story) => !pinnedStoryIds.has(story.id));
 
   async function loadMoreProfileStories() {
     if (!profileStoriesCursor || loadingProfileStories) return;
@@ -207,7 +212,7 @@ function PublicProfilePage() {
   const tabs = ["All", "Stories", "About"] as const;
 
   return (
-    <div className="-mt-4 w-full overflow-hidden bg-background text-foreground md:mt-0">
+    <div className="-mt-4 w-full overflow-x-clip bg-background text-foreground md:mt-0">
       <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -373,27 +378,28 @@ function PublicProfilePage() {
           </div>
         </div>
 
-        <nav
-          aria-label="Profile sections"
-          className="flex gap-1 overflow-x-auto border-t border-border px-1 sm:px-6"
-        >
-          {tabs.map((tab) => (
-            <button
-              type="button"
-              key={tab}
-              aria-current={activeTab === tab ? "page" : undefined}
-              onClick={() => setActiveTab(tab)}
-              className={cn(
-                "relative shrink-0 px-3 py-3 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/60 sm:px-4 sm:py-4",
-                activeTab === tab &&
-                  "text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-full after:bg-primary",
-              )}
-            >
-              {tab}
-            </button>
-          ))}
-        </nav>
       </motion.section>
+
+      <nav
+        aria-label="Profile sections"
+        className="sticky top-16 z-40 flex gap-1 overflow-x-auto border-t border-border bg-background/95 px-1 backdrop-blur-md sm:px-6"
+      >
+        {tabs.map((tab) => (
+          <button
+            type="button"
+            key={tab}
+            aria-current={activeTab === tab ? "page" : undefined}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "relative shrink-0 px-3 py-3 text-sm font-semibold text-muted-foreground transition-colors hover:bg-secondary/60 sm:px-4 sm:py-4",
+              activeTab === tab &&
+                "text-primary after:absolute after:inset-x-2 after:bottom-0 after:h-[3px] after:rounded-full after:bg-primary",
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </nav>
 
       {activeTab !== "Stories" ? (
         <div className="space-y-2 bg-background py-2 sm:space-y-3 sm:px-5 sm:py-3">
@@ -444,6 +450,46 @@ function PublicProfilePage() {
       ) : null}
 
       {activeTab !== "About" ? (
+        pinnedStories.length ? (
+          <section className="mx-4 mb-3 overflow-hidden rounded-2xl border border-primary/25 bg-primary/[0.035] sm:mx-5">
+            <div className="flex items-center justify-between gap-3 border-b border-primary/10 px-4 py-3 sm:px-5">
+              <div className="flex items-center gap-2">
+                <Pin className="size-4 text-primary" />
+                <h2 className="font-semibold">Pinned stories</h2>
+              </div>
+              {profile.isSelf ? (
+                <Link to="/my-contributions" className="text-xs font-medium text-primary">
+                  Manage pins
+                </Link>
+              ) : null}
+            </div>
+            <div className="divide-y divide-primary/10">
+              {pinnedStories.map((story) => (
+                <article key={story.id} className="px-4 py-3 sm:px-5">
+                  <p className="text-xs text-muted-foreground">
+                    {story.post_type === "announcement"
+                      ? "Candid update"
+                      : story.company_name || "Workplace story"}
+                    {story.county ? ` · ${story.county}${story.area ? `, ${story.area}` : ""}` : ""}
+                  </p>
+                  <Link
+                    to="/stories/$id"
+                    params={{ id: story.id }}
+                    className="mt-1 block font-semibold hover:text-primary"
+                  >
+                    {story.post_type === "announcement" ? "Candid update" : story.title}
+                  </Link>
+                  <p className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">
+                    {story.body}
+                  </p>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : null
+      ) : null}
+
+      {activeTab !== "About" ? (
         <div className="bg-background pb-3 sm:px-5">
           <section className="overflow-hidden border-y border-border/70 bg-card sm:rounded-xl sm:border">
             <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4">
@@ -478,9 +524,9 @@ function PublicProfilePage() {
                 </Link>
               </>
             ) : null}
-            {profileStories.length ? (
+            {visibleProfileStories.length ? (
               <div className="divide-y divide-border">
-                {profileStories.map((story) => (
+                {visibleProfileStories.map((story) => (
                   <article key={story.id} className="px-4 py-4 sm:px-5">
                     <div className="flex items-start gap-3">
                       <ProfileAvatar
@@ -562,11 +608,11 @@ function PublicProfilePage() {
                   </article>
                 ))}
               </div>
-            ) : (
+            ) : pinnedStories.length === 0 ? (
               <p className="px-4 py-8 text-center text-sm text-muted-foreground">
                 No published stories yet.
               </p>
-            )}
+            ) : null}
             {hasMoreProfileStories ? (
               <div className="flex justify-center border-t border-border p-4">
                 <Button

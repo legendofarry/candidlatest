@@ -76,7 +76,7 @@ function SearchPage() {
       ) : (
         <div className="space-y-8">
           <section>
-            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <h2 className="sticky top-16 z-20 -mx-1 flex items-center gap-2 bg-background/95 py-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-md">
               <Building2 className="size-4" /> Companies
             </h2>
             <div className="mt-3 space-y-1">
@@ -104,7 +104,7 @@ function SearchPage() {
           </section>
 
           <section>
-            <h2 className="flex items-center gap-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+            <h2 className="sticky top-16 z-20 -mx-1 flex items-center gap-2 bg-background/95 py-2 text-sm font-semibold uppercase tracking-wide text-muted-foreground backdrop-blur-md">
               <FileText className="size-4" /> Stories
             </h2>
             <div className="mt-3 space-y-1">

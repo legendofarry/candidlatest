@@ -1,7 +1,7 @@
-import { BadgeCheck } from "lucide-react";
-import type { MembershipTier } from "@/lib/membership";
+import { Heart, Sparkles } from "lucide-react";
+import { getMembershipEntitlements, type MembershipTier } from "@/lib/membership";
 
-/** The package grants the standard check badge; tier does not change its appearance. */
+/** Paid membership is shown as support for Candid, never as identity verification. */
 export function MembershipBadge({
   tier,
   official = false,
@@ -11,14 +11,21 @@ export function MembershipBadge({
   official?: boolean | undefined;
   className?: string;
 }) {
-  if (official || !tier || tier === "basic") return null;
+  if (official || !tier || !getMembershipEntitlements(tier).membershipBadge) return null;
+
+  const isGold = tier === "gold";
+  const Icon = isGold ? Sparkles : Heart;
+  const label = isGold ? "Gold supporter" : "Premium supporter";
 
   return (
-    <span title="Candid badge" className="ml-1 inline-flex translate-y-[0.04em] align-middle">
-      <BadgeCheck
-        aria-label="Candid badge"
+    <span
+      title={label}
+      className={`ml-1 inline-flex translate-y-[0.04em] align-middle ${isGold ? "text-amber-500" : "text-primary"}`}
+    >
+      <Icon
+        aria-label={label}
         role="img"
-        className={`inline-block size-4 shrink-0 text-primary ${className ?? ""}`}
+        className={`inline-block size-3.5 shrink-0 ${className ?? ""}`}
       />
     </span>
   );

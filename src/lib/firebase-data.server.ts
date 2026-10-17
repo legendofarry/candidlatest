@@ -82,6 +82,7 @@ export type ProfileRecord = {
   subscription_changed_at?: string | null;
   subscription_change_id?: string | null;
   subscription_version?: number;
+  pinned_story_ids?: string[];
   investigation_hold?:
     boolean | { active?: boolean; started_at?: string | null; updated_at?: string | null } | null;
 };

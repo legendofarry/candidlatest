@@ -125,9 +125,9 @@ function CompanySalaryPage() {
         </p>
       </header>
 
-      <div className="overflow-hidden rounded-2xl border border-border">
+      <div className="rounded-2xl border border-border">
         <table className="w-full text-sm">
-          <thead className="bg-secondary/60 text-xs text-muted-foreground">
+          <thead className="sticky top-16 z-20 bg-secondary/95 text-xs text-muted-foreground backdrop-blur-md">
             <tr>
               <Header label="Position" sortKey="role_title" />
               <Header label="Average" sortKey="average_kes" />

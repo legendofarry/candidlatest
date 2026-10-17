@@ -28,9 +28,15 @@ export const DEFAULT_MEMBERSHIP = {
   subscription_version: 0,
 };
 
-/** This is the only package benefit that is currently active in the product. */
+/** Feature limits are defined once here and enforced by both UI and server actions. */
+export const MEMBERSHIP_ENTITLEMENTS = {
+  basic: { membershipBadge: false, maxPinnedStories: 0 },
+  premium: { membershipBadge: true, maxPinnedStories: 1 },
+  gold: { membershipBadge: true, maxPinnedStories: 3 },
+} as const satisfies Record<MembershipTier, { membershipBadge: boolean; maxPinnedStories: number }>;
+
 export function getMembershipEntitlements(tier: MembershipTier) {
-  return { membershipBadge: tier === "premium" || tier === "gold" } as const;
+  return MEMBERSHIP_ENTITLEMENTS[tier];
 }
 
 export function getEffectiveMembershipTier(

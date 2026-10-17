@@ -259,7 +259,7 @@ export const createStory = createServerFn({ method: "POST" })
 
     const evidenceNote = data.evidence?.note?.trim() || null;
     const uploadedEvidence = data.evidence?.upload ?? null;
-    let evidenceTicket: Record<string, any> | null = null;
+    let evidenceTicket: Record<string, unknown> | null = null;
     let storyId: string = generateId();
 
     if (uploadedEvidence) {
@@ -269,12 +269,14 @@ export const createStory = createServerFn({ method: "POST" })
         .doc(uploadedEvidence.ticket_id);
       const ticketSnapshot = await ticketRef.get();
       evidenceTicket = ticketSnapshot.data() ?? null;
+      const ticketExpiresAt = evidenceTicket?.["expires_at"];
 
       if (
         !ticketSnapshot.exists ||
         evidenceTicket?.["user_id"] !== context.userId ||
         evidenceTicket?.["status"] !== "issued" ||
-        evidenceTicket?.["expires_at"] <= new Date().toISOString() ||
+        typeof ticketExpiresAt !== "string" ||
+        ticketExpiresAt <= new Date().toISOString() ||
         evidenceTicket?.["cloudinary_public_id"] !== uploadedEvidence.public_id ||
         evidenceTicket?.["expected_bytes"] !== uploadedEvidence.bytes ||
         evidenceTicket?.["expected_format"] !== uploadedEvidence.format ||
@@ -598,18 +600,32 @@ export const deleteStory = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
     const ref = db.collection("stories").doc(data.story_id);
-    const snapshot = await ref.get();
-    const story = snapshot.data() as Record<string, unknown> | undefined;
-    if (!snapshot.exists || story?.["author_id"] !== context.userId) {
-      throw new Error("Only the author can remove this story.");
-    }
-    if (story["status"] === "hidden" && story["author_deleted"] === true) {
-      return { ok: true as const };
-    }
-    await ref.update(
-      { status: "hidden", author_deleted: true, deleted_at: new Date().toISOString() },
-      snapshot.updateTime ? { updateTime: snapshot.updateTime } : undefined,
-    );
+    const profileRef = db.collection("profiles").doc(context.userId);
+    await db.runTransaction(async (transaction) => {
+      const [snapshot, profileSnapshot] = await Promise.all([
+        transaction.get(ref),
+        transaction.get(profileRef),
+      ]);
+      const story = snapshot.data() as Record<string, unknown> | undefined;
+      if (!snapshot.exists || story?.["author_id"] !== context.userId) {
+        throw new Error("Only the author can remove this story.");
+      }
+      if (story["status"] === "hidden" && story["author_deleted"] === true) return;
+      transaction.update(ref, {
+        status: "hidden",
+        author_deleted: true,
+        deleted_at: new Date().toISOString(),
+      });
+      const profile = profileSnapshot.data() as { pinned_story_ids?: unknown } | undefined;
+      const pinnedIds = Array.isArray(profile?.pinned_story_ids)
+        ? profile.pinned_story_ids.filter((id): id is string => typeof id === "string")
+        : [];
+      if (pinnedIds.includes(data.story_id)) {
+        transaction.update(profileRef, {
+          pinned_story_ids: pinnedIds.filter((id) => id !== data.story_id),
+        });
+      }
+    });
     return { ok: true as const };
   });
 

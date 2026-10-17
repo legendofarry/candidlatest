@@ -31,6 +31,7 @@ export const getOnboardingState = createServerFn({ method: "POST" })
       username: profile?.username ?? null,
       photoUrl: profile?.photo_url ?? null,
       coverUrl: profile?.cover_url ?? null,
+      pinnedStoryIds: Array.isArray(profile?.pinned_story_ids) ? profile.pinned_story_ids : [],
       usernameChangedAt: profile?.username_changed_at ?? null,
       socials: profile?.socials ?? null,
       accountType: profile?.account_type ?? "unknown",

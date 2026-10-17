@@ -25,7 +25,7 @@ export function SavedCommunityPosts() {
 
   return (
     <section className="border-b border-border py-5 md:rounded-2xl md:border md:p-6">
-      <div className="flex items-center gap-3">
+      <div className="sticky top-16 z-20 -mx-1 flex items-center gap-3 bg-background/95 py-2 backdrop-blur-md md:top-0">
         <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
           <Bookmark className="size-5" />
         </span>

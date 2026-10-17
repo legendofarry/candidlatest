@@ -73,14 +73,16 @@ function SalaryDirectory() {
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(300px,1fr)] xl:grid-cols-[minmax(0,1.8fr)_minmax(340px,420px)]">
         <section className="space-y-3">
-          <Input
-            value={q}
-            onChange={(event) => {
-              setQ(event.target.value);
-              resetVisibleCount();
-            }}
-            placeholder="Search employer, industry or county"
-          />
+          <div className="sticky top-16 z-30 -mx-1 bg-background/95 py-2 backdrop-blur-md">
+            <Input
+              value={q}
+              onChange={(event) => {
+                setQ(event.target.value);
+                resetVisibleCount();
+              }}
+              placeholder="Search employer, industry or county"
+            />
+          </div>
           {rows.length === 0 ? (
             <p className="rounded-2xl border border-border p-6 text-sm text-muted-foreground">
               No salary contributions yet. Add the first one.

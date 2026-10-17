@@ -19,21 +19,33 @@ const FALLBACK_PACKAGES = {
     price_kes: 0,
     billing_period: "Free",
     enabled: true,
-    benefits: ["Read and share workplace stories", "Save stories and message members"],
+    benefits: [
+      "Read and share workplace stories and salary insights",
+      "Comment, save, follow, message and report",
+      "All essential community and safety features",
+    ],
   },
   premium: {
     name: "Premium",
     price_kes: 500,
     billing_period: "One month",
     enabled: true,
-    benefits: ["All Basic features", "Premium membership badge"],
+    benefits: [
+      "Everything in Basic",
+      "Pin 1 published story to your profile",
+      "Premium supporter badge",
+    ],
   },
   gold: {
     name: "Gold",
     price_kes: 1000,
     billing_period: "One month",
     enabled: true,
-    benefits: ["All Premium features", "Gold membership badge"],
+    benefits: [
+      "Everything in Premium",
+      "Pin up to 3 published stories to your profile",
+      "Gold supporter badge",
+    ],
   },
 } as const;
 
@@ -173,10 +185,19 @@ export async function readBillingConfig(): Promise<BillingConfig> {
   const db = getFirestoreDb();
   const snapshot = await db.collection("billing_config").doc("main").get();
   const saved = snapshot.data() as Partial<BillingConfig> | undefined;
-  const packages = {
-    ...FALLBACK_CONFIG.packages,
-    ...(saved?.packages ?? {}),
-  } as BillingConfig["packages"];
+  const savedPackages = saved?.packages;
+  const packages = Object.fromEntries(
+    (Object.keys(FALLBACK_CONFIG.packages) as MembershipTier[]).map((tier) => [
+      tier,
+      {
+        ...FALLBACK_CONFIG.packages[tier],
+        ...savedPackages?.[tier],
+        // Benefit copy describes enforced entitlements, so old config cannot
+        // advertise a package feature that the server does not provide.
+        benefits: [...FALLBACK_CONFIG.packages[tier].benefits],
+      },
+    ]),
+  ) as BillingConfig["packages"];
   packages.gold = { ...packages.gold, enabled: true };
   return {
     packages,

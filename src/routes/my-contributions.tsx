@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -10,7 +10,10 @@ import {
   LayoutGrid,
   LayoutList,
   LoaderCircle,
+  LockKeyhole,
   MessageSquareText,
+  Pin,
+  PinOff,
   PenLine,
   Search,
   Trash2,
@@ -22,7 +25,9 @@ import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { useAuth } from "@/hooks/useAuth";
 import { deleteStory, editComment, deleteComment } from "@/lib/actions.functions";
-import { getMyContributions } from "@/lib/social.functions";
+import { getMyContributions, toggleMyProfileStoryPin } from "@/lib/social.functions";
+import { getOnboardingState } from "@/lib/onboarding.functions";
+import { getMembershipEntitlements, type MembershipTier } from "@/lib/membership";
 import { notify as toast } from "@/lib/notifications-store";
 import { formatCount } from "@/lib/utils";
 import {
@@ -73,6 +78,7 @@ type Contribution = {
   companyName: string | null;
   isDeleted: boolean;
   authorDeleted: boolean;
+  isPinned: boolean;
 };
 type ContributionCursor = {
   stories: { createdAt: string; id: string } | null;
@@ -84,6 +90,8 @@ function MyContributionsPage() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchContributions = useServerFn(getMyContributions);
+  const fetchAccount = useServerFn(getOnboardingState);
+  const toggleStoryPin = useServerFn(toggleMyProfileStoryPin);
   const removeStory = useServerFn(deleteStory);
   const removeComment = useServerFn(deleteComment);
   const updateComment = useServerFn(editComment);
@@ -96,6 +104,37 @@ function MyContributionsPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleting, setDeleting] = useState<Contribution | null>(null);
   const [savingDelete, setSavingDelete] = useState(false);
+  const [pinningStoryId, setPinningStoryId] = useState<string | null>(null);
+
+  const account = useQuery({
+    queryKey: ["onboarding-state", user?.uid ?? null],
+    queryFn: () => fetchAccount(),
+    enabled: Boolean(user),
+  });
+  const pinnedStoryIds = useMemo(
+    () => new Set(account.data?.pinnedStoryIds ?? []),
+    [account.data?.pinnedStoryIds],
+  );
+  const membershipTier = (account.data?.membership.tier ?? "basic") as MembershipTier;
+  const maxPinnedStories = getMembershipEntitlements(membershipTier).maxPinnedStories;
+
+  async function togglePinnedStory(storyId: string) {
+    if (!user || pinningStoryId) return;
+    setPinningStoryId(storyId);
+    try {
+      const result = await toggleStoryPin({ data: { story_id: storyId } });
+      toast.success(result.pinned ? "Pinned to your public profile" : "Removed from profile pins");
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["onboarding-state", user.uid] }),
+        queryClient.invalidateQueries({ queryKey: ["my-contributions", user.uid] }),
+        queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
+      ]);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not update your profile pins.");
+    } finally {
+      setPinningStoryId(null);
+    }
+  }
 
   useEffect(() => {
     try {
@@ -153,6 +192,8 @@ function MyContributionsPage() {
               queryClient.invalidateQueries({ queryKey: ["story-pages"] }),
               queryClient.invalidateQueries({ queryKey: ["story", deleting.id] }),
               queryClient.invalidateQueries({ queryKey: ["company-scores"] }),
+              queryClient.invalidateQueries({ queryKey: ["onboarding-state", user?.uid] }),
+              queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
             ])
           : queryClient.invalidateQueries({ queryKey: ["story", deleting.storyId] }),
       ]);
@@ -243,8 +284,29 @@ function MyContributionsPage() {
           </div>
         </header>
 
+        {category !== "comments" ? (
+          <div className="mx-4 mb-4 flex flex-wrap items-center gap-3 border-y border-border bg-card/50 px-4 py-3 sm:mx-6 sm:rounded-xl sm:border md:mx-8">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Pin className="size-4" />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="text-sm font-semibold">Profile pins</p>
+              <p className="text-xs text-muted-foreground">
+                {maxPinnedStories === 0
+                  ? "Premium lets you pin 1 published story. Gold lets you pin 3."
+                  : `${pinnedStoryIds.size} of ${maxPinnedStories} story ${maxPinnedStories === 1 ? "pin" : "pins"} used`}
+              </p>
+            </div>
+            <Button asChild variant="outline" size="sm" className="rounded-xl">
+              <Link to="/billing">
+                {maxPinnedStories === 0 ? "See packages" : "Manage package"}
+              </Link>
+            </Button>
+          </div>
+        ) : null}
+
         <section className="w-full min-w-0">
-          <div className="space-y-4 border-y border-border bg-background/70 px-4 py-3 sm:px-6 sm:py-5 md:px-8">
+          <div className="sticky top-16 z-30 space-y-4 border-y border-border bg-background/95 px-4 py-3 shadow-sm backdrop-blur-md sm:top-16 sm:rounded-xl sm:border-x sm:px-6 sm:py-5 md:px-8">
             <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div className="flex w-full gap-1 overflow-x-auto rounded-xl bg-secondary/70 p-1 lg:w-auto">
                 {(["all", "stories", "comments"] as const).map((item) => (
@@ -359,6 +421,12 @@ function MyContributionsPage() {
                   key={`${item.type}-${item.id}`}
                   item={item}
                   view={view}
+                  isPinned={pinnedStoryIds.has(item.id)}
+                  pinnedCount={pinnedStoryIds.size}
+                  maxPinnedStories={maxPinnedStories}
+                  membershipTier={membershipTier}
+                  pinning={pinningStoryId === item.id}
+                  onTogglePin={() => void togglePinnedStory(item.id)}
                   onEdit={() => {
                     setEditing(item);
                     setEditBody(item.body);
@@ -493,11 +561,23 @@ function ViewButton({
 function ContributionCard({
   item,
   view,
+  isPinned,
+  pinnedCount,
+  maxPinnedStories,
+  membershipTier,
+  pinning,
+  onTogglePin,
   onEdit,
   onDelete,
 }: {
   item: Contribution;
   view: ViewMode;
+  isPinned: boolean;
+  pinnedCount: number;
+  maxPinnedStories: number;
+  membershipTier: MembershipTier;
+  pinning: boolean;
+  onTogglePin: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
@@ -521,6 +601,7 @@ function ContributionCard({
   const href = isStory ? ("/stories/$id" as const) : ("/stories/$id" as const);
   const canView = isStory ? item.status === "published" : item.storyStatus === "published";
   const canEdit = isStory ? !item.authorDeleted : !item.isDeleted && item.status === "published";
+  const pinLimitReached = !isPinned && pinnedCount >= maxPinnedStories;
   return (
     <article
       className={`${isList ? "group flex flex-col gap-3 px-3 py-4 sm:flex-row sm:items-center sm:px-5" : `mb-3 break-inside-avoid rounded-2xl border border-border bg-background p-4 transition-shadow hover:shadow-md ${view === "tiles" ? "border-l-2 border-l-primary/50" : ""}`}`}
@@ -572,7 +653,7 @@ function ContributionCard({
         </div>
       </div>
       <div
-        className={`flex items-center gap-2 ${isList ? "pl-[3.25rem] sm:pl-0" : "mt-4 border-t border-border pt-3"}`}
+        className={`flex flex-wrap items-center gap-2 ${isList ? "pl-[3.25rem] sm:pl-0" : "mt-4 border-t border-border pt-3"}`}
       >
         {canView ? (
           <Button
@@ -615,6 +696,53 @@ function ContributionCard({
           >
             Edit
           </Button>
+        ) : null}
+        {isStory && canView ? (
+          isPinned ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="min-h-9 rounded-xl"
+              disabled={pinning}
+              onClick={onTogglePin}
+            >
+              {pinning ? <LoaderCircle className="size-4" /> : <PinOff className="size-4" />}
+              Unpin
+            </Button>
+          ) : maxPinnedStories === 0 ? (
+            <Button asChild size="sm" variant="outline" className="min-h-9 rounded-xl">
+              <Link to="/billing" title="Upgrade to Premium to pin a story">
+                <LockKeyhole className="size-4" /> Pin
+              </Link>
+            </Button>
+          ) : pinLimitReached && membershipTier === "premium" ? (
+            <Button asChild size="sm" variant="outline" className="min-h-9 rounded-xl">
+              <Link to="/billing" title="Upgrade to Gold to pin more stories">
+                <LockKeyhole className="size-4" /> Gold pins
+              </Link>
+            </Button>
+          ) : pinLimitReached ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="min-h-9 rounded-xl"
+              disabled
+              title="Your Gold package has reached its 3 story pin limit"
+            >
+              <LockKeyhole className="size-4" /> Pin limit
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="outline"
+              className="min-h-9 rounded-xl"
+              disabled={pinning}
+              onClick={onTogglePin}
+            >
+              {pinning ? <LoaderCircle className="size-4" /> : <Pin className="size-4" />}
+              Pin
+            </Button>
+          )
         ) : null}
         {!isRemoved ? (
           <Button

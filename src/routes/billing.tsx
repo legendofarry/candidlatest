@@ -115,7 +115,16 @@ function BillingPage() {
           </section>
 
           {!isOfficial ? <section className="mt-10">
-            <div className="mb-5"><h2 className="font-display text-2xl font-semibold">Available packages</h2><p className="mt-1 text-sm text-muted-foreground">Paid access starts after manual payment verification.</p></div>
+            <div className="mb-5">
+              <h2 className="font-display text-2xl font-semibold">Available packages</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Core stories, salary insights, messaging and safety tools stay free. Paid plans
+                support Candid and add profile pins.
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Paid access starts after manual payment verification.
+              </p>
+            </div>
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {(Object.entries(plans ?? {}) as ["basic" | "premium" | "gold", NonNullable<typeof plans>["basic"]][]).map(([tier, plan]) => {
                 const current = currentTier === tier;

@@ -258,7 +258,7 @@ export function CommentThread({
     >
       <header
         className={cn(
-          "flex items-center gap-2 border-b border-border px-4 py-3",
+          "sticky top-16 z-20 flex items-center gap-2 border-b border-border bg-card/95 px-4 py-3 backdrop-blur-md",
           panelMode && "hidden",
         )}
       >

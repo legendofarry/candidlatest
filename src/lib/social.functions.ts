@@ -56,6 +56,14 @@ export const saveStory = createServerFn({ method: "POST" })
     return toggleStorySave(data.story_id, context.userId);
   });
 
+export const toggleMyProfileStoryPin = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator(storyInput)
+  .handler(async ({ data, context }) => {
+    const { toggleProfileStoryPin } = await import("./social.server");
+    return toggleProfileStoryPin(data.story_id, context.userId);
+  });
+
 export const getSavedCommunityPosts = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>

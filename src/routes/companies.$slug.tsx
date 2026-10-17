@@ -142,8 +142,10 @@ function CompanyPage() {
       </section>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
-        <div className="min-w-0 space-y-4">
-          <h2 className="text-xl font-semibold">Exit stories</h2>
+        <div className="min-w-0 self-start space-y-4">
+          <h2 className="sticky top-16 z-20 -mx-1 bg-background/95 py-2 text-xl font-semibold backdrop-blur-md">
+            Exit stories
+          </h2>
           {stories.length === 0 ? (
             <p className="rounded-2xl border border-border p-6 text-sm text-muted-foreground">
               No published stories for this employer yet.{" "}
