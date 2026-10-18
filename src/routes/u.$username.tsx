@@ -19,6 +19,7 @@ import {
   UserRound,
   UserPlus,
   UserCheck,
+  X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
@@ -29,6 +30,13 @@ import {
 } from "@/lib/messaging.functions";
 import { followAccount } from "@/lib/social.functions";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { notify } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn, formatCount } from "@/lib/utils";
@@ -83,6 +91,10 @@ function PublicProfilePage() {
   const [activeTab, setActiveTab] = useState<"All" | "Stories" | "About">("All");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [commentStory, setCommentStory] = useState<ProfileStory | null>(null);
+  const [openProfileImage, setOpenProfileImage] = useState<{
+    url: string;
+    alt: string;
+  } | null>(null);
 
   const fetchProfile = useServerFn(getPublicProfile);
   const fetchProfileStories = useServerFn(getPublicProfileStories);
@@ -220,13 +232,25 @@ function PublicProfilePage() {
         className="bg-card"
       >
         <div className="relative h-[170px] overflow-hidden bg-secondary sm:h-[280px] md:h-[360px]">
-          <img
-            src={coverDeliveryUrl(profile.cover_url || DEFAULT_PROFILE_COVER_URL)}
-            alt=""
-            className="size-full scale-[1.03] object-cover blur-[2px]"
-          />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/35 via-transparent to-black/15" />
-          <div className="absolute inset-x-0 top-0 flex items-center justify-end p-3 text-white sm:p-5">
+          <button
+            type="button"
+            onClick={() =>
+              setOpenProfileImage({
+                url: profile.cover_url || DEFAULT_PROFILE_COVER_URL,
+                alt: `@${profile.username}'s cover photo`,
+              })
+            }
+            className="absolute inset-0 z-0 cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            aria-label="View cover photo full screen"
+          >
+            <img
+              src={coverDeliveryUrl(profile.cover_url || DEFAULT_PROFILE_COVER_URL)}
+              alt=""
+              className="size-full object-cover"
+            />
+          </button>
+          <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-b from-black/35 via-transparent to-black/15" />
+          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-end p-3 text-white sm:p-5">
             <div className="flex items-center gap-2">
               <div className="relative">
                 <Button
@@ -270,7 +294,7 @@ function PublicProfilePage() {
             <Button
               variant="secondary"
               size="sm"
-              className="absolute bottom-3 right-3 rounded-lg bg-card text-foreground shadow-sm hover:bg-card/90"
+              className="absolute bottom-3 right-3 z-10 rounded-lg bg-card text-foreground shadow-sm hover:bg-card/90"
               onClick={() => navigate({ to: "/profile" })}
             >
               <Camera className="size-4" /> Edit cover photo
@@ -281,11 +305,28 @@ function PublicProfilePage() {
         <div className="relative rounded-t-[24px] bg-card px-4 pb-3 sm:px-7 sm:pb-4 md:px-10">
           <div className="flex flex-col gap-3 border-b border-border pb-3 sm:flex-row sm:items-end sm:justify-between sm:pb-4">
             <div className="flex min-w-0 items-end gap-3 sm:gap-5">
-              <ProfileAvatar
-                photoUrl={profile.photo_url}
-                initials={profile.username.slice(0, 2)}
-                className="-mt-9 size-20 shrink-0 border-4 border-card bg-card text-2xl uppercase shadow sm:-mt-12 sm:size-36 sm:text-3xl"
-              />
+              <button
+                type="button"
+                onClick={() => {
+                  if (profile.photo_url) {
+                    setOpenProfileImage({
+                      url: profile.photo_url,
+                      alt: `@${profile.username}'s profile photo`,
+                    });
+                  }
+                }}
+                disabled={!profile.photo_url}
+                aria-label={
+                  profile.photo_url ? "View profile photo full screen" : "Profile photo not available"
+                }
+                className="-mt-9 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default sm:-mt-12"
+              >
+                <ProfileAvatar
+                  photoUrl={profile.photo_url}
+                  initials={profile.username.slice(0, 2)}
+                  className="size-20 border-4 border-card bg-card text-2xl uppercase shadow sm:size-36 sm:text-3xl"
+                />
+              </button>
               <div className="min-w-0 pb-1">
                 <h1 className="flex flex-wrap items-center gap-1.5 text-xl font-bold tracking-tight sm:text-3xl">
                   @{profile.username}
@@ -636,6 +677,38 @@ function PublicProfilePage() {
           if (!open) setCommentStory(null);
         }}
       />
+      <Dialog
+        open={Boolean(openProfileImage)}
+        onOpenChange={(open) => !open && setOpenProfileImage(null)}
+      >
+        <DialogContent
+          hideCloseButton
+          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:rounded-none"
+        >
+          <DialogTitle className="sr-only">Profile image</DialogTitle>
+          <DialogDescription className="sr-only">
+            A full-screen profile image.
+          </DialogDescription>
+          <DialogClose asChild>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 rounded-full"
+              aria-label="Close image"
+            >
+              <X className="size-5" />
+            </Button>
+          </DialogClose>
+          {openProfileImage ? (
+            <img
+              src={openProfileImage.url}
+              alt={openProfileImage.alt}
+              className="h-full w-full object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

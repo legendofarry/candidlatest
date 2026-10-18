@@ -225,7 +225,7 @@ export function MessagesInbox({
       </div>
 
       {loading || (isLoading && Boolean(user)) ? (
-        <div className="space-y-0 overflow-hidden rounded-3xl border-2 border-border bg-card">
+        <div className="mt-6 space-y-0 border-y border-border bg-background">
           {[0, 1, 2].map((index) => (
             <div key={index} className="h-24 animate-pulse border-b border-border bg-secondary/60" />
           ))}
@@ -234,7 +234,7 @@ export function MessagesInbox({
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mt-6 rounded-3xl border-2 border-border bg-card p-8 text-center sm:mx-6"
+          className="mt-6 border-y border-border bg-background px-4 py-8 text-center sm:px-6"
           role="alert"
         >
           <p className="font-medium">We couldn&apos;t load your conversations</p>
@@ -255,7 +255,7 @@ export function MessagesInbox({
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mx-4 mt-6 rounded-3xl border-2 border-border bg-card p-10 text-center sm:mx-6"
+          className="mt-6 border-y border-border bg-background px-4 py-10 text-center sm:px-6"
         >
           <Sparkles className="mx-auto size-8 text-primary" />
           <p className="mt-4 font-medium">No conversations yet</p>
@@ -264,7 +264,7 @@ export function MessagesInbox({
           </p>
         </motion.div>
       ) : matchingConversations.length === 0 ? (
-        <div className="mx-4 mt-6 rounded-3xl border-2 border-border bg-card p-8 text-center sm:mx-6">
+        <div className="mt-6 border-y border-border bg-background px-4 py-8 text-center sm:px-6">
           <Search className="mx-auto size-6 text-muted-foreground" />
           <p className="mt-3 font-semibold">No chats match “{search.trim()}”</p>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -274,8 +274,8 @@ export function MessagesInbox({
       ) : (
         <ul
           className={cn(
-            "mx-4 mt-6 overflow-hidden rounded-3xl border-2 border-border bg-card sm:mx-6",
-            embedded && "mx-0 mt-4 rounded-2xl border",
+            "mt-6 border-y border-border bg-background",
+            embedded && "mt-4",
           )}
         >
           <AnimatePresence initial={false}>

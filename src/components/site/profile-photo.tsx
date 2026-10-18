@@ -4,6 +4,7 @@ import { Camera, Eye, ImagePlus, Loader2, RotateCcw, Upload, X } from "lucide-re
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -92,6 +93,7 @@ export function ProfileCoverPicker({
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
 
   async function upload(file?: File) {
     setError(null);
@@ -139,48 +141,78 @@ export function ProfileCoverPicker({
   const imageUrl = coverDeliveryUrl(coverUrl || DEFAULT_PROFILE_COVER_URL);
 
   return (
-    <div className="absolute inset-0">
-      <img src={imageUrl} alt="" className="size-full scale-[1.03] object-cover blur-[2px]" />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/15" />
-      {editable ? (
-        <>
-          <input
-            ref={inputRef}
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            onChange={(event) => {
-              void upload(event.target.files?.[0]);
-              event.currentTarget.value = "";
-            }}
-          />
-          <Button
-            type="button"
-            size="sm"
-            variant="secondary"
-            disabled={uploading}
-            onClick={() => inputRef.current?.click()}
-            aria-label={coverUrl ? "Change cover photo" : "Add cover photo"}
-            className="absolute bottom-3 right-3 h-9 rounded-full border border-white/20 bg-background/90 px-3 shadow-lg backdrop-blur"
-          >
-            {uploading ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <ImagePlus className="size-4" />
-            )}
-            <span className="hidden sm:inline">{coverUrl ? "Edit cover" : "Add cover"}</span>
-          </Button>
-        </>
-      ) : null}
-      {error ? (
-        <p
-          role="alert"
-          className="absolute bottom-14 right-3 max-w-[80%] rounded-lg bg-destructive px-3 py-2 text-xs text-destructive-foreground shadow-lg"
+    <>
+      <div className="absolute inset-0">
+        <button
+          type="button"
+          onClick={() => setViewerOpen(true)}
+          className="absolute inset-0 z-0 cursor-zoom-in focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          aria-label="View cover photo full screen"
         >
-          {error}
-        </p>
-      ) : null}
-    </div>
+          <img src={imageUrl} alt="" className="size-full object-cover" />
+        </button>
+        <div className="pointer-events-none absolute inset-0 z-[1] bg-gradient-to-t from-black/45 via-black/5 to-black/15" />
+        {editable ? (
+          <>
+            <input
+              ref={inputRef}
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              onChange={(event) => {
+                void upload(event.target.files?.[0]);
+                event.currentTarget.value = "";
+              }}
+            />
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={uploading}
+              onClick={() => inputRef.current?.click()}
+              aria-label={coverUrl ? "Change cover photo" : "Add cover photo"}
+              className="absolute bottom-3 right-3 z-10 h-9 rounded-full border border-white/20 bg-background/90 px-3 shadow-lg backdrop-blur"
+            >
+              {uploading ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <ImagePlus className="size-4" />
+              )}
+              <span className="hidden sm:inline">{coverUrl ? "Edit cover" : "Add cover"}</span>
+            </Button>
+          </>
+        ) : null}
+        {error ? (
+          <p
+            role="alert"
+            className="absolute bottom-14 right-3 z-10 max-w-[80%] rounded-lg bg-destructive px-3 py-2 text-xs text-destructive-foreground shadow-lg"
+          >
+            {error}
+          </p>
+        ) : null}
+      </div>
+      <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
+        <DialogContent
+          hideCloseButton
+          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:rounded-none"
+        >
+          <DialogTitle className="sr-only">Cover photo</DialogTitle>
+          <DialogDescription className="sr-only">A full-screen cover photo.</DialogDescription>
+          <DialogClose asChild>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 rounded-full"
+              aria-label="Close cover photo"
+            >
+              <X className="size-5" />
+            </Button>
+          </DialogClose>
+          <img src={imageUrl} alt="Your cover photo" className="h-full w-full object-contain" />
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }
 
@@ -392,23 +424,30 @@ export function ProfilePhotoPicker({
       }
     >
       <div className="flex items-center gap-4">
-        <button
-          type="button"
-          aria-label="View or update profile photo"
-          aria-haspopup="dialog"
-          onPointerUp={() => setActionsOpen(true)}
-          onClick={() => setActionsOpen(true)}
-          className="group relative z-10 shrink-0 cursor-pointer pointer-events-auto rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-        >
-          <ProfileAvatar
-            photoUrl={previewUrl ?? photoUrl}
-            initials={initials}
-            className={`${avatarClassName || (compact ? "size-14 border border-border" : "size-20 border-2 border-border")} transition-opacity group-hover:opacity-80`}
-          />
-          <span className="absolute bottom-0 right-0 grid size-6 place-items-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-sm">
+        <div className="group relative z-10 shrink-0">
+          <button
+            type="button"
+            aria-label={photoUrl ? "View profile photo full screen" : "Add a profile photo"}
+            aria-haspopup={photoUrl ? undefined : "dialog"}
+            onClick={() => (photoUrl ? setViewerOpen(true) : setActionsOpen(true))}
+            className="block cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <ProfileAvatar
+              photoUrl={previewUrl ?? photoUrl}
+              initials={initials}
+              className={`${avatarClassName || (compact ? "size-14 border border-border" : "size-20 border-2 border-border")} transition-opacity group-hover:opacity-80`}
+            />
+          </button>
+          <button
+            type="button"
+            aria-label={photoUrl ? "Update profile photo" : "Add a profile photo"}
+            aria-haspopup="dialog"
+            onClick={() => setActionsOpen(true)}
+            className="absolute bottom-0 right-0 grid size-6 place-items-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+          >
             <Camera className="size-3" />
-          </span>
-        </button>
+          </button>
+        </div>
         {!avatarOnly ? (
           <div className="min-w-0">
             <p className="font-medium">{photoUrl ? "Profile photo" : "Add a profile photo"}</p>
@@ -545,39 +584,30 @@ export function ProfilePhotoPicker({
         </DialogContent>
       </Dialog>
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>Profile photo</DialogTitle>
-            <DialogDescription>
-              This is the photo shown publicly on your Candid profile, beside your posts and
-              comments.
-            </DialogDescription>
-          </DialogHeader>
-          <p
-            role="note"
-            className="rounded-xl border border-border bg-secondary/50 p-3 text-sm leading-relaxed text-muted-foreground"
-          >
-            A real photo could make you recognizable even when you use an alias. Photos are
-            optional; you can use an illustration or leave yours blank.
-          </p>
+        <DialogContent
+          hideCloseButton
+          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:rounded-none"
+        >
+          <DialogTitle className="sr-only">Profile photo</DialogTitle>
+          <DialogDescription className="sr-only">A full-screen profile photo.</DialogDescription>
+          <DialogClose asChild>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 rounded-full"
+              aria-label="Close profile photo"
+            >
+              <X className="size-5" />
+            </Button>
+          </DialogClose>
           {photoUrl ? (
             <img
               src={photoUrl}
               alt="Your profile photo"
-              className="mx-auto max-h-[65dvh] max-w-full rounded-xl object-contain"
+              className="h-full w-full object-contain"
             />
           ) : null}
-          <DialogFooter>
-            <Button
-              type="button"
-              onClick={() => {
-                setViewerOpen(false);
-                setActionsOpen(true);
-              }}
-            >
-              <Camera className="size-4" /> Update photo or avatar
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

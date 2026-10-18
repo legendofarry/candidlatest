@@ -21,6 +21,13 @@ import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/messages/$id")({
   head: () => ({
@@ -91,6 +98,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const [draft, setDraft] = useState("");
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
+  const [openImageUrl, setOpenImageUrl] = useState<string | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageReceipt, setImageReceipt] = useState<ChatImageReceipt | null>(null);
   const [imageTicketId, setImageTicketId] = useState<string | null>(null);
@@ -442,7 +450,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   return (
     <div
       className={cn(
-        "flex h-full min-h-0 w-full flex-col",
+        "flex h-full min-h-0 w-full flex-col overflow-hidden",
         inSidebar ? "mx-auto max-w-2xl md:mx-0 md:max-w-none" : "bg-background",
       )}
     >
@@ -453,7 +461,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
             void navigate({ to: "/u/$username", params: { username: partner.username } });
         }}
         className={cn(
-          "sticky top-0 z-20 flex shrink-0 items-center gap-3 text-left transition-colors hover:bg-secondary/40",
+          "sticky top-0 z-30 flex shrink-0 items-center gap-3 text-left transition-colors hover:bg-secondary/40",
           inSidebar
             ? "glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur"
             : "border-b border-border bg-background/95 px-5 py-3.5 backdrop-blur",
@@ -480,7 +488,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
 
       <div
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto",
+          "min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           inSidebar ? "space-y-3 pb-4" : "px-4 py-5 sm:px-6",
         )}
       >
@@ -532,12 +540,19 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                     ) : (
                       <>
                         {message.image?.delivery_url ? (
-                          <img
-                            src={message.image.delivery_url}
-                            alt="Image shared in chat"
-                            loading="lazy"
-                            className="max-h-80 max-w-full rounded-xl object-contain"
-                          />
+                          <button
+                            type="button"
+                            onClick={() => setOpenImageUrl(message.image!.delivery_url)}
+                            className="max-w-full overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                            aria-label="View shared image full screen"
+                          >
+                            <img
+                              src={message.image.delivery_url}
+                              alt="Image shared in chat"
+                              loading="lazy"
+                              className="max-h-80 max-w-full cursor-zoom-in object-contain"
+                            />
+                          </button>
                         ) : null}
                         {message.body ? (
                           <div
@@ -741,6 +756,34 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           </div>
         </div>
       )}
+
+      <Dialog open={Boolean(openImageUrl)} onOpenChange={(open) => !open && setOpenImageUrl(null)}>
+        <DialogContent
+          hideCloseButton
+          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:rounded-none"
+        >
+          <DialogTitle className="sr-only">Shared image</DialogTitle>
+          <DialogDescription className="sr-only">A full-screen image shared in this conversation.</DialogDescription>
+          <DialogClose asChild>
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 rounded-full"
+              aria-label="Close image"
+            >
+              <X className="size-5" />
+            </Button>
+          </DialogClose>
+          {openImageUrl ? (
+            <img
+              src={openImageUrl}
+              alt="Full-screen shared image"
+              className="h-full w-full object-contain"
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

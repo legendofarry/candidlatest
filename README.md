@@ -43,9 +43,10 @@ Push alerts are opt-in per browser/device from Settings. They use Firebase Cloud
 
 Before deploying push notifications:
 
-1. In Firebase Console, open Project settings → Cloud Messaging → Web configuration and create a Web Push certificate key pair.
-2. Set the public key as `VITE_FIREBASE_VAPID_KEY` in the Main App's build environment, then rebuild and deploy the Main App.
-3. Set `PUBLIC_APP_URL` to the deployed Main App origin in both app environments. The Main App also needs its existing Firebase service account credentials so it can send FCM messages.
-4. Deploy the Owner Admin App with its existing Firebase Admin service account. Both apps must use the same Firebase project.
+1. In Google Cloud Console, select the same project used by the Firebase web app and enable **Firebase Cloud Messaging Registration API** under APIs & Services → Library. Current Firebase web SDKs require it.
+2. In the Main App's build environment, set `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, and `VITE_FIREBASE_APP_ID` from that project's Firebase web app configuration.
+3. In Firebase Console, open Project settings → Cloud Messaging → Web configuration and create a Web Push certificate key pair. Set its public key as `VITE_FIREBASE_VAPID_KEY` in the Main App's build environment.
+4. Rebuild and deploy the Main App after changing any `VITE_` values; they are embedded in the browser bundle. Set `PUBLIC_APP_URL` to the deployed Main App origin in both app environments. The Main App also needs its Firebase service account credentials to send FCM messages.
+5. Deploy the Owner Admin App with its Firebase Admin service account. Both apps and all browser configuration values must use the same Firebase project.
 
 Members must allow notifications in their browser. On iPhone and iPad, install Candid to the Home Screen first; iOS web push is available for installed web apps. Push alerts preview the sender and message text or notification title and description. These previews may be visible on the device lock screen; members can change lock-screen preview behavior in their device settings.

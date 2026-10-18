@@ -4,6 +4,7 @@ import { getFirestoreDb } from "./firebase.server";
 export type ServerNotificationRecord = {
   id: string;
   user_id: string;
+  category?: "activity" | "message";
   kind: "success" | "error" | "info" | "warning";
   title: string;
   description: string | null;
@@ -15,6 +16,7 @@ export type ServerNotificationRecord = {
 export async function pushServerNotification(input: {
   id?: string;
   userId: string;
+  category?: ServerNotificationRecord["category"];
   kind: ServerNotificationRecord["kind"];
   title: string;
   description?: string | null;
@@ -24,6 +26,7 @@ export async function pushServerNotification(input: {
   const record: ServerNotificationRecord = {
     id: input.id ?? generateId(),
     user_id: input.userId,
+    category: input.category ?? "activity",
     kind: input.kind,
     title: input.title.slice(0, 140),
     description: input.description?.slice(0, 300) ?? null,
@@ -73,8 +76,9 @@ export async function listServerNotifications(
     for (const doc of snap.docs) {
       const item = { ...(doc.data() as ServerNotificationRecord), id: doc.id };
       scanCursor = { createdAt: item.created_at, id: item.id };
-      // Messages own their unread state and badge in the Messages workspace.
-      if (!item.link?.startsWith("/messages/")) items.push(item);
+      // New messages own their unread state and badge in the Messages workspace.
+      // Reactions and other activity relating to a chat still belong in Notifications.
+      if (item.category !== "message") items.push(item);
       if (items.length > limit) break;
     }
     exhausted = snap.size < limit * 2 || snap.docs.length === 0;

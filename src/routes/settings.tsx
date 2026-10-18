@@ -183,7 +183,18 @@ function SettingsPage() {
       setPushEnabled(true);
       notify.success("Notifications are enabled on this device.");
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : "Could not update notification settings.");
+      const code =
+        error && typeof error === "object" && "code" in error
+          ? String((error as { code?: unknown }).code ?? "")
+          : "";
+      if (code === "messaging/token-subscribe-failed") {
+        notify.error("Firebase could not register this device", {
+          description:
+            "Check that FCM Registration API is enabled and that this deployment’s Firebase web config and VAPID key all belong to the same Firebase project.",
+        });
+      } else {
+        notify.error(error instanceof Error ? error.message : "Could not update notification settings.");
+      }
     } finally {
       setPushBusy(false);
     }

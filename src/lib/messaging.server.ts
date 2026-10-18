@@ -979,15 +979,41 @@ export async function toggleReaction(userId: string, messageId: string, emoji: s
     throw new Error("Not your conversation");
   }
   const current = message.reactions?.[emoji] ?? [];
+  const addedReaction = !current.includes(userId);
   const batch = db.batch();
   batch.update(ref, {
-    [`reactions.${emoji}`]: current.includes(userId)
+    [`reactions.${emoji}`]: !addedReaction
       ? FieldValue.arrayRemove(userId)
       : FieldValue.arrayUnion(userId),
   });
   batch.update(conversationSnap.ref, { activity_at: now() });
   await batch.commit();
-  return { ok: true };
+
+  if (addedReaction && message.sender_id !== userId) {
+    try {
+      const [{ pushServerNotification }, actorSnap] = await Promise.all([
+        import("./notifications.server"),
+        db.collection("profiles").doc(userId).get(),
+      ]);
+      const actor = (actorSnap.data() as { username?: string | null } | undefined)?.username;
+      const target = message.image ? "photo" : "message";
+      await pushServerNotification({
+        userId: message.sender_id,
+        kind: "info",
+        title: `Your ${target} got a reaction`,
+        description: `${actor ? `@${actor}` : "Someone"} reacted ${emoji} to your ${target}.`,
+        link: `/messages/${message.conversation_id}`,
+      });
+    } catch (error) {
+      // The reaction is already saved; notifying the recipient is best-effort.
+      console.warn(
+        "[message reaction] Could not notify recipient",
+        error instanceof Error ? error.message : "unknown error",
+      );
+    }
+  }
+
+  return { ok: true, reacted: addedReaction };
 }
 
 /** Public-facing profile used by the chat header and profile detail screen. */
