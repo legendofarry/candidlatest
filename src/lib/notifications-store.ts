@@ -74,7 +74,6 @@ function hydrate() {
         notifications = parsed
           // Remove synthetic notifications left in this browser by the retired preview build.
           .filter((item) => !item.id.startsWith("demo-notification-"))
-          .filter((item) => !item.link?.href.startsWith("/messages/"))
           .slice(0, MAX_STORED);
         if (notifications.length !== previousCount) persist();
         pruneExpired();
@@ -342,6 +341,7 @@ export function clearArchived() {
 export function ingestServerNotifications(
   items: {
     id: string;
+    category?: "activity" | "message";
     kind: NotifyKind;
     title: string;
     description?: string | undefined;
@@ -353,7 +353,7 @@ export function ingestServerNotifications(
     notifications.map((n) => n.dedupeKey).filter((key): key is string => Boolean(key)),
   );
   const fresh = items
-    .filter((item) => !item.link?.startsWith("/messages/"))
+    .filter((item) => item.category !== "message")
     .filter((item) => !known.has(`srv:${item.id}`))
     .map<AppNotification>((item) => ({
       id: `srv-${item.id}`,

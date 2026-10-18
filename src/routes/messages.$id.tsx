@@ -3,7 +3,17 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { BadgeCheck, CheckCheck, ImagePlus, Loader2, Send, Smile, Trash2, X } from "lucide-react";
+import {
+  BadgeCheck,
+  CheckCheck,
+  Download,
+  ImagePlus,
+  Loader2,
+  Send,
+  Smile,
+  Trash2,
+  X,
+} from "lucide-react";
 import type { ConversationView } from "@/lib/messaging.server";
 import {
   discardChatImageUpload,
@@ -77,7 +87,7 @@ function clock(iso: string) {
 function ChatScreen() {
   const { id } = useParams({ from: "/messages/$id" });
   return (
-    <div className="h-[calc(100dvh-4rem)] min-h-[30rem] xl:hidden">
+    <div className="h-full min-h-0 xl:hidden">
       <MessagesThread id={id} />
     </div>
   );
@@ -99,6 +109,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [openImageUrl, setOpenImageUrl] = useState<string | null>(null);
+  const [downloadingImage, setDownloadingImage] = useState(false);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [imageReceipt, setImageReceipt] = useState<ChatImageReceipt | null>(null);
   const [imageTicketId, setImageTicketId] = useState<string | null>(null);
@@ -229,6 +240,37 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     const timer = window.setInterval(() => setClockNow(Date.now()), 5000);
     return () => window.clearInterval(timer);
   }, []);
+
+  async function downloadSharedImage(imageUrl: string) {
+    setDownloadingImage(true);
+    try {
+      const response = await fetch(imageUrl);
+      if (!response.ok) throw new Error("Image download failed.");
+      const blob = await response.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      const extension = ["jpeg", "jpg", "png", "webp"].includes(blob.type.split("/")[1] ?? "")
+        ? (blob.type.split("/")[1] ?? "jpg").replace("jpeg", "jpg")
+        : "jpg";
+      link.download = `candid-chat-photo-${Date.now()}.${extension}`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 1_000);
+    } catch {
+      const link = document.createElement("a");
+      link.href = imageUrl;
+      link.target = "_blank";
+      link.rel = "noreferrer";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      toast.info("The photo opened in a new tab so you can save it there.");
+    } finally {
+      setDownloadingImage(false);
+    }
+  }
 
   async function clearImageAttachment() {
     if (imageTicketId) {
@@ -769,12 +811,26 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               type="button"
               variant="secondary"
               size="icon"
-              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 rounded-full"
+              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 !size-12 rounded-full bg-card text-foreground shadow-lg"
               aria-label="Close image"
             >
               <X className="size-5" />
             </Button>
           </DialogClose>
+          {openImageUrl ? (
+            <Button
+              type="button"
+              variant="secondary"
+              size="icon"
+              disabled={downloadingImage}
+              onClick={() => void downloadSharedImage(openImageUrl)}
+              className="absolute right-20 top-[calc(1rem+env(safe-area-inset-top))] z-10 !size-12 rounded-full bg-card text-foreground shadow-lg"
+              aria-label="Download image"
+              title="Download image"
+            >
+              {downloadingImage ? <Loader2 className="size-5 animate-spin" /> : <Download className="size-5" />}
+            </Button>
+          ) : null}
           {openImageUrl ? (
             <img
               src={openImageUrl}

@@ -203,7 +203,7 @@ export function ProfileCoverPicker({
               type="button"
               variant="secondary"
               size="icon"
-              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 rounded-full"
+              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 !size-12 rounded-full bg-card text-foreground shadow-lg"
               aria-label="Close cover photo"
             >
               <X className="size-5" />
@@ -595,7 +595,7 @@ export function ProfilePhotoPicker({
               type="button"
               variant="secondary"
               size="icon"
-              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 rounded-full"
+              className="absolute right-4 top-[calc(1rem+env(safe-area-inset-top))] z-10 !size-12 rounded-full bg-card text-foreground shadow-lg"
               aria-label="Close profile photo"
             >
               <X className="size-5" />

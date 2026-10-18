@@ -19,6 +19,7 @@ export const syncMyNotifications = createServerFn({ method: "POST" })
     return {
       items: page.items.map((item) => ({
         id: item.id,
+        category: item.category ?? "activity",
         kind: item.kind,
         title: item.title,
         description: item.description ?? undefined,

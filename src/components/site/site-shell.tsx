@@ -545,7 +545,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             !fullscreenRoute &&
               pathname !== "/support" &&
               !messagesInboxRoute &&
+              !directConversationRoute &&
               (showDock ? "pb-32" : "pb-10"),
+            directConversationRoute && "h-[calc(100dvh-4rem)] overflow-hidden xl:h-auto xl:overflow-visible",
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
