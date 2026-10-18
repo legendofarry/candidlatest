@@ -115,9 +115,6 @@ export function FollowedStories() {
           <Bookmark className="size-5" />
         </div>
         <div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-            Your activity
-          </p>
           <h2 className="mt-0.5 font-display text-lg font-semibold">Your story follow-up</h2>
         </div>
       </div>

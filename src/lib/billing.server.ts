@@ -28,7 +28,7 @@ const FALLBACK_PACKAGES = {
   premium: {
     name: "Premium",
     price_kes: 500,
-    billing_period: "One month",
+    billing_period: "",
     enabled: true,
     benefits: [
       "Everything in Basic",
@@ -39,7 +39,7 @@ const FALLBACK_PACKAGES = {
   gold: {
     name: "Gold",
     price_kes: 1000,
-    billing_period: "One month",
+    billing_period: "",
     enabled: true,
     benefits: [
       "Everything in Premium",

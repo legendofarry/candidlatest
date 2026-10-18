@@ -213,9 +213,6 @@ function ProfilePage() {
                   />
                 )}
                 <div className="min-w-0">
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                    Your account
-                  </p>
                   <h1 className="mt-1 flex items-center gap-1.5 truncate text-xl font-semibold md:text-2xl">
                     {onboarding.data?.username ? (
                       <Link
@@ -240,7 +237,7 @@ function ProfilePage() {
                     {loading
                       ? "Checking your session…"
                       : user
-                        ? "Your Candid identity"
+                        ? ""
                         : "Not signed in"}
                   </p>
                 </div>
@@ -485,13 +482,7 @@ function ContributionsPanel() {
         <PenLine className="size-5" />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-          Your activity
-        </span>
         <span className="mt-1 block text-lg font-semibold">My contributions</span>
-        <span className="mt-0.5 block text-sm text-muted-foreground">
-          View, organize, edit, or remove the stories and comments you’ve shared.
-        </span>
       </span>
       <ChevronRight className="size-5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-primary" />
     </Link>
