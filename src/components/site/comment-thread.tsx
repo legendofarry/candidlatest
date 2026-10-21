@@ -103,6 +103,7 @@ export function CommentThread({
   sortMode = "top",
   panelMode = false,
   fitContent = false,
+  fullWidth = false,
 }: {
   storyId: string;
   comments: ThreadComment[];
@@ -113,6 +114,8 @@ export function CommentThread({
   focusCommentId?: string | undefined;
   sortMode?: CommentSortMode;
   panelMode?: boolean;
+  /** Render comments as a full-width section on the story page, without a card frame. */
+  fullWidth?: boolean;
   /** Let short mobile sheets size to their comments, with a capped scroll region for long threads. */
   fitContent?: boolean;
 }) {
@@ -248,6 +251,7 @@ export function CommentThread({
     <section
       className={cn(
         "rounded-2xl border border-border bg-card",
+        fullWidth && "rounded-none border-x-0 border-y border-border/70 bg-transparent",
         panelMode &&
           !fitContent &&
           "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
@@ -259,6 +263,7 @@ export function CommentThread({
       <header
         className={cn(
           "sticky top-16 z-20 flex items-center gap-2 border-b border-border bg-card/95 px-4 py-3 backdrop-blur-md",
+          fullWidth && "bg-background/95",
           panelMode && "hidden",
         )}
       >
@@ -354,6 +359,7 @@ export function CommentThread({
       <div
         className={cn(
           "sticky bottom-0 rounded-b-2xl border-t border-border bg-card/95 p-3 backdrop-blur",
+          fullWidth && "rounded-none bg-background/95",
           panelMode && "relative shrink-0 rounded-none",
         )}
       >

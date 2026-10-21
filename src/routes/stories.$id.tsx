@@ -98,7 +98,7 @@ function StoryPage() {
   const votedKinds = engagement.data?.votedKinds ?? [];
 
   return (
-    <article className="mx-auto w-full max-w-3xl space-y-6 md:mx-0 md:max-w-none">
+    <article className="w-full space-y-6">
       <div className="animate-fade">
         {isAnnouncement ? (
           <header className="flex items-center gap-3 border-b border-border/70 pb-5">
@@ -192,7 +192,7 @@ function StoryPage() {
         className={
           isAnnouncement
             ? "whitespace-pre-line text-base leading-relaxed"
-            : "whitespace-pre-line rounded-2xl border border-border bg-card p-6 leading-relaxed"
+            : "whitespace-pre-line py-1 leading-relaxed"
         }
       >
         {story.body}
@@ -200,10 +200,10 @@ function StoryPage() {
 
       {isAnnouncement && story.media?.length ? (
         <div
-          className={`grid gap-2 overflow-hidden rounded-2xl bg-secondary ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+          className={`grid gap-px overflow-hidden bg-border ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
         >
           {story.media.map((media, index) => (
-            <div key={`${media.url}-${index}`} className="overflow-hidden bg-black/5">
+            <div key={`${media.url}-${index}`} className="overflow-hidden bg-background">
               {media.resource_type === "video" ? (
                 <video
                   src={media.url}
@@ -276,6 +276,7 @@ function StoryPage() {
         commentsHasMore={commentsHasMore}
         commentsCursor={commentsCursor}
         focusCommentId={focusCommentId}
+        fullWidth
       />
 
       {!isAnnouncement ? (

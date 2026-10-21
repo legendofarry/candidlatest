@@ -146,8 +146,8 @@ export function MobileDock({
       </div>
 
       <Drawer open={sheet === "you"} onOpenChange={(open) => setSheet(open ? "you" : null)}>
-        <DrawerContent className="md:hidden">
-          <DrawerHeader className="text-left">
+        <DrawerContent className="mt-0 h-[calc(100dvh-4.75rem)] max-h-[calc(100dvh-4.75rem)] overflow-hidden rounded-t-3xl md:hidden">
+          <DrawerHeader className="shrink-0 text-left">
             <DrawerTitle>{signedIn ? "Your account" : "Join Candid"}</DrawerTitle>
             <DrawerDescription>
               {signedIn
@@ -155,7 +155,7 @@ export function MobileDock({
                 : "Sign in to post stories, comment and follow employers."}
             </DrawerDescription>
           </DrawerHeader>
-          <div className="space-y-1.5 px-4 pb-8">
+          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 pb-[max(2rem,env(safe-area-inset-bottom))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               type="button"
               onClick={() => {
