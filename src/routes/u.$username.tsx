@@ -683,7 +683,7 @@ function PublicProfilePage() {
       >
         <DialogContent
           hideCloseButton
-          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:rounded-none"
+          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:p-10 lg:p-16"
         >
           <DialogTitle className="sr-only">Profile image</DialogTitle>
           <DialogDescription className="sr-only">
@@ -704,7 +704,7 @@ function PublicProfilePage() {
             <img
               src={openProfileImage.url}
               alt={openProfileImage.alt}
-              className="h-full w-full object-contain"
+              className="mx-auto h-full w-full rounded-lg object-contain shadow-2xl"
             />
           ) : null}
         </DialogContent>

@@ -1,7 +1,7 @@
-import { Heart, Sparkles } from "lucide-react";
+import { BadgeCheck } from "lucide-react";
 import { getMembershipEntitlements, type MembershipTier } from "@/lib/membership";
 
-/** Paid membership is shown as support for Candid, never as identity verification. */
+/** The one public membership badge used everywhere Candid shows an account. */
 export function MembershipBadge({
   tier,
   official = false,
@@ -13,19 +13,18 @@ export function MembershipBadge({
 }) {
   if (official || !tier || !getMembershipEntitlements(tier).membershipBadge) return null;
 
-  const isGold = tier === "gold";
-  const Icon = isGold ? Sparkles : Heart;
-  const label = isGold ? "Gold supporter" : "Premium supporter";
+  const label = tier === "gold" ? "Gold member" : "Premium member";
 
   return (
     <span
       title={label}
-      className={`ml-1 inline-flex translate-y-[0.04em] align-middle ${isGold ? "text-amber-500" : "text-primary"}`}
+      className="ml-1 inline-flex translate-y-[0.04em] align-middle text-verified"
     >
-      <Icon
+      <BadgeCheck
         aria-label={label}
         role="img"
-        className={`inline-block size-3.5 shrink-0 ${className ?? ""}`}
+        strokeWidth={3}
+        className={`inline-block size-5 shrink-0 ${className ?? ""}`}
       />
     </span>
   );

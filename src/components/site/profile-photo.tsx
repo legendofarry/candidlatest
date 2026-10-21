@@ -194,7 +194,7 @@ export function ProfileCoverPicker({
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
         <DialogContent
           hideCloseButton
-          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:rounded-none"
+          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:p-10 lg:p-16"
         >
           <DialogTitle className="sr-only">Cover photo</DialogTitle>
           <DialogDescription className="sr-only">A full-screen cover photo.</DialogDescription>
@@ -209,7 +209,7 @@ export function ProfileCoverPicker({
               <X className="size-5" />
             </Button>
           </DialogClose>
-          <img src={imageUrl} alt="Your cover photo" className="h-full w-full object-contain" />
+          <img src={imageUrl} alt="Your cover photo" className="mx-auto h-full w-full rounded-lg object-contain shadow-2xl" />
         </DialogContent>
       </Dialog>
     </>
@@ -586,7 +586,7 @@ export function ProfilePhotoPicker({
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
         <DialogContent
           hideCloseButton
-          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:rounded-none"
+          className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:p-10 lg:p-16"
         >
           <DialogTitle className="sr-only">Profile photo</DialogTitle>
           <DialogDescription className="sr-only">A full-screen profile photo.</DialogDescription>
@@ -605,7 +605,7 @@ export function ProfilePhotoPicker({
             <img
               src={photoUrl}
               alt="Your profile photo"
-              className="h-full w-full object-contain"
+              className="mx-auto h-full w-full rounded-lg object-contain shadow-2xl"
             />
           ) : null}
         </DialogContent>
