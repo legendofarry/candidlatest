@@ -421,12 +421,11 @@ export const createStory = createServerFn({ method: "POST" })
     // Tell the company's claimed account it was tagged in a new live story.
     if (created.status === "published") {
       try {
-        const owners = await db
-          .collection("account_verifications")
-          .where("company_id", "==", company.id)
-          .get();
+        const [{ pushServerNotification, resolveMentionedUserIds }, owners] = await Promise.all([
+          import("./notifications.server"),
+          db.collection("account_verifications").where("company_id", "==", company.id).get(),
+        ]);
         if (!owners.empty) {
-          const { pushServerNotification } = await import("./notifications.server");
           await Promise.all(
             owners.docs.map((doc) =>
               pushServerNotification({
@@ -439,8 +438,20 @@ export const createStory = createServerFn({ method: "POST" })
             ),
           );
         }
+        const mentioned = await resolveMentionedUserIds(created.body, context.userId);
+        await Promise.all(
+          mentioned.map((userId) =>
+            pushServerNotification({
+              userId,
+              kind: "info",
+              title: "You were mentioned in a story",
+              description: `“${created.title}”`,
+              link: `/stories/${created.id}`,
+            }),
+          ),
+        );
       } catch (error) {
-        console.error("[createStory] company tag notification failed", error);
+        console.error("[createStory] tagged account notification failed", error);
       }
     }
 

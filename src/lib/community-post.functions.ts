@@ -195,5 +195,23 @@ export const createCommunityPost = createServerFn({ method: "POST" })
       );
     }
     await batch.commit();
+    try {
+      const { pushServerNotification, resolveMentionedUserIds } =
+        await import("./notifications.server");
+      const mentioned = await resolveMentionedUserIds(body, context.userId);
+      await Promise.all(
+        mentioned.map((userId) =>
+          pushServerNotification({
+            userId,
+            kind: "info",
+            title: "You were mentioned in a Candid update",
+            description: body.slice(0, 140),
+            link: `/stories/${storyId}`,
+          }),
+        ),
+      );
+    } catch (error) {
+      console.error("[community post] mention notifications failed", error);
+    }
     return { id: storyId };
   });

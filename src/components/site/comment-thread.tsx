@@ -38,6 +38,7 @@ import { MembershipBadge } from "@/components/site/membership-badge";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { ConfirmDialog } from "@/components/site/confirm-dialog";
+import { MentionText, MentionTextarea } from "@/components/site/mention-textarea";
 import type { MembershipTier } from "@/lib/membership";
 
 export type ThreadComment = {
@@ -396,10 +397,10 @@ export function CommentThread({
               </div>
             ) : null}
             <div className="flex items-end gap-2">
-              <Textarea
+              <MentionTextarea
                 rows={1}
                 value={body}
-                onChange={(event) => setBody(event.target.value)}
+                onValueChange={setBody}
                 placeholder="Add a comment…"
                 className="min-h-10 resize-none bg-background"
               />
@@ -596,7 +597,7 @@ function CommentRow({
             </div>
           ) : (
             <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">
-              {comment.body}
+              <MentionText text={comment.body} />
               {comment.edited_at && !comment.is_deleted ? (
                 <span className="ml-1 text-xs text-muted-foreground">(edited)</span>
               ) : null}

@@ -46,6 +46,7 @@ import {
   coverDeliveryUrl,
 } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { MentionText } from "@/components/site/mention-textarea";
 import { ProfileCommunity } from "@/components/site/profile-community";
 import { ProfileStoryComments } from "@/components/site/profile-story-comments";
 
@@ -521,7 +522,7 @@ function PublicProfilePage() {
                     {story.post_type === "announcement" ? "Candid update" : story.title}
                   </Link>
                   <p className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">
-                    {story.body}
+                    <MentionText text={story.body} />
                   </p>
                 </article>
               ))}
@@ -597,7 +598,7 @@ function PublicProfilePage() {
                         {story.post_type === "announcement" ? "Candid update" : story.title}
                       </h3>
                       <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                        {story.body}
+                        <MentionText text={story.body} linkMentions={false} />
                       </p>
                     </Link>
                     {story.media.length ? (

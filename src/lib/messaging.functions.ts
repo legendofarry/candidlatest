@@ -223,3 +223,30 @@ export const getPublicProfileFollowers = createServerFn({ method: "POST" })
     const { readPublicProfileFollowers } = await import("./messaging.server");
     return readPublicProfileFollowers(data.username, data.cursor);
   });
+
+/** Small, authenticated lookup used by the @mention picker. */
+export const getMentionSuggestions = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ query: z.string().trim().toLowerCase().min(2).max(20) }).parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const db = (await import("./firebase.server")).getFirestoreDb();
+    const snapshot = await db
+      .collection("profiles")
+      .where("username", ">=", data.query)
+      .where("username", "<=", `${data.query}\uf8ff`)
+      .orderBy("username")
+      .limit(9)
+      .get();
+    return {
+      users: snapshot.docs
+        .filter((doc) => doc.id !== context.userId && doc.get("banned") !== true)
+        .slice(0, 8)
+        .flatMap((doc) => {
+          const username = doc.get("username");
+          if (typeof username !== "string") return [];
+          return [{ username, photoUrl: doc.get("photo_url") ?? null }];
+        }),
+    };
+  });

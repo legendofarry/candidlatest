@@ -5,6 +5,7 @@ import { StoryActions } from "@/components/site/story-actions";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { ProfileAvatar } from "@/components/site/profile-photo";
+import { MentionText } from "@/components/site/mention-textarea";
 import { StoryLocationDialog } from "@/components/site/story-location-dialog";
 import type { MembershipTier } from "@/lib/membership";
 
@@ -102,7 +103,9 @@ export function StoryCard({
           </div>
         </header>
         {story.body ? (
-          <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed">{story.body}</p>
+          <p className="mt-4 whitespace-pre-line text-[15px] leading-relaxed">
+            <MentionText text={story.body} />
+          </p>
         ) : null}
         {story.media?.length ? (
           <div
@@ -205,7 +208,9 @@ export function StoryCard({
 
       <h3 className="mt-2 text-lg font-semibold leading-snug">{story.title}</h3>
 
-      <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">{story.body}</p>
+      <p className="mt-2 line-clamp-3 text-sm text-muted-foreground">
+        <MentionText text={story.body ?? ""} linkMentions={false} />
+      </p>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {(story.reasons ?? []).map((reason) => (

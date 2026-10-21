@@ -40,6 +40,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { MentionTextarea } from "@/components/site/mention-textarea";
 import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { cn } from "@/lib/utils";
@@ -1040,11 +1041,11 @@ function WorkplaceStoryComposer() {
                       </div>
                       <div className="space-y-2">
                         <Label htmlFor="body">Your story</Label>
-                        <Textarea
+                        <MentionTextarea
                           id="body"
                           rows={10}
                           value={body}
-                          onChange={(event) => setBody(event.target.value)}
+                          onValueChange={setBody}
                           placeholder="What happened, how it affected you, and what a job seeker should know. Describe roles, not names."
                         />
                         <p className="text-xs text-muted-foreground">

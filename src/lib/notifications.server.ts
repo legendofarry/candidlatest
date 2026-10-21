@@ -97,7 +97,11 @@ export async function listServerNotifications(
 /** Resolves @usernames in a text body to user ids via the usernames collection. */
 export async function resolveMentionedUserIds(body: string, excludeUserId?: string) {
   const handles = [
-    ...new Set((body.match(/@([a-z0-9_]{2,24})/gi) ?? []).map((m) => m.slice(1).toLowerCase())),
+    ...new Set(
+      [...body.matchAll(/(?:^|[\s(])@([a-z0-9_]+(?:\.[a-z0-9_]+)*)/gi)]
+        .map((mention) => mention[1]!.toLowerCase())
+        .filter((handle) => handle.length >= 2 && handle.length <= 20),
+    ),
   ];
   if (handles.length === 0) return [];
   const db = getFirestoreDb();

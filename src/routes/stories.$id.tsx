@@ -24,6 +24,7 @@ import { StorySocial } from "@/components/site/story-social";
 import { StoryLocationDialog } from "@/components/site/story-location-dialog";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { ProfileAvatar } from "@/components/site/profile-photo";
+import { MentionText } from "@/components/site/mention-textarea";
 
 const storyQuery = (id: string) =>
   queryOptions({
@@ -195,7 +196,7 @@ function StoryPage() {
             : "whitespace-pre-line py-1 leading-relaxed"
         }
       >
-        {story.body}
+        <MentionText text={story.body} />
       </div>
 
       {isAnnouncement && story.media?.length ? (
