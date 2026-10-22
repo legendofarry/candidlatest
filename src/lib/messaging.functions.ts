@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
+import { optionalFirebaseAuth, requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 
 export const getConversations = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
@@ -9,12 +9,24 @@ export const getConversations = createServerFn({ method: "POST" })
       .object({
         limit: z.number().int().min(1).max(50).default(20),
         cursor: z.object({ lastMessageAt: z.string(), id: z.string() }).nullable().default(null),
+        archived: z.boolean().default(false),
       })
       .parse(input ?? {}),
   )
   .handler(async ({ context, data }) => {
     const { listConversationPage } = await import("./messaging.server");
-    return listConversationPage(context.userId, data.limit, data.cursor);
+    return listConversationPage(context.userId, data.limit, data.cursor, data.archived);
+  });
+
+export const updateConversationPreference = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    conversation_id: z.string().min(1),
+    action: z.enum(["archive", "unarchive", "mute", "unmute", "pin", "unpin", "delete", "follow"]),
+  }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { applyConversationAction } = await import("./messaging.server");
+    return applyConversationAction(context.userId, data.conversation_id, data.action);
   });
 
 export const getUnreadMessages = createServerFn({ method: "POST" })
@@ -171,11 +183,32 @@ export const getPrivacySettings = createServerFn({ method: "POST" })
 export const updatePrivacySettings = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>
-    z.object({ who_can_message: z.enum(["everyone", "followers", "nobody"]) }).parse(input),
+    z.object({
+      who_can_message: z.enum(["everyone", "followers", "nobody"]).optional(),
+      profile_visibility: z.enum(["public", "private"]).optional(),
+    }).refine((data) => data.who_can_message || data.profile_visibility, "Choose a privacy setting.").parse(input),
   )
   .handler(async ({ data, context }) => {
     const { savePrivacySettings } = await import("./messaging.server");
-    return savePrivacySettings(context.userId, data.who_can_message);
+    return savePrivacySettings(context.userId, {
+      whoCanMessage: data.who_can_message,
+      profileVisibility: data.profile_visibility,
+    });
+  });
+
+export const getFollowRequests = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    const { listFollowRequests } = await import("./messaging.server");
+    return { requests: await listFollowRequests(context.userId) };
+  });
+
+export const respondToFollowRequest = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ follow_id: z.string().min(1), approve: z.boolean() }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { respondToFollowRequest: respond } = await import("./messaging.server");
+    return respond(context.userId, data.follow_id, data.approve);
   });
 
 export const toggleBlockAccount = createServerFn({ method: "POST" })
@@ -187,7 +220,7 @@ export const toggleBlockAccount = createServerFn({ method: "POST" })
   });
 
 export const getPublicProfile = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) => z.object({ username: z.string().min(1) }).parse(input))
   .handler(async ({ data, context }) => {
     const { readPublicProfile } = await import("./messaging.server");
@@ -195,7 +228,7 @@ export const getPublicProfile = createServerFn({ method: "POST" })
   });
 
 export const getPublicProfileStories = createServerFn({ method: "POST" })
-  .middleware([requireFirebaseAuth])
+  .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -204,9 +237,9 @@ export const getPublicProfileStories = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { readPublicProfileStories } = await import("./messaging.server");
-    return readPublicProfileStories(data.username, data.cursor);
+    return readPublicProfileStories(data.username, data.cursor, context.userId);
   });
 
 export const getPublicProfileFollowers = createServerFn({ method: "POST" })
@@ -241,7 +274,13 @@ export const getMentionSuggestions = createServerFn({ method: "POST" })
       .get();
     return {
       users: snapshot.docs
-        .filter((doc) => doc.id !== context.userId && doc.get("banned") !== true)
+        .filter((doc) =>
+          doc.id !== context.userId &&
+          doc.get("banned") !== true &&
+          !["deactivated", "deletion_pending", "deletion_in_progress"].includes(
+            String(doc.get("account_status") ?? "active"),
+          ),
+        )
         .slice(0, 8)
         .flatMap((doc) => {
           const username = doc.get("username");

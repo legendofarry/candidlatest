@@ -39,7 +39,7 @@ function BillingPage() {
     onError: (error) => window.alert(error instanceof Error ? error.message : "Could not update renewal settings."),
   });
   const switchMutation = useMutation({
-    mutationFn: (tier: "basic" | "premium" | "gold") => switchPackage({ data: { tier, requestId: crypto.randomUUID(), expectedVersion: membership?.version ?? 0 } }),
+    mutationFn: (tier: "basic" | "premium") => switchPackage({ data: { tier, requestId: crypto.randomUUID(), expectedVersion: membership?.version ?? 0 } }),
     onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ["billing"] }); },
     onError: (error) => window.alert(error instanceof Error ? error.message : "Could not update your package."),
   });
@@ -125,8 +125,10 @@ function BillingPage() {
                   Paid access starts after manual payment verification.
                 </p>
               </div>
-              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                {(Object.entries(plans ?? {}) as ["basic" | "premium" | "gold", NonNullable<typeof plans>["basic"]][]).map(([tier, plan]) => {
+              <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
+                {(["basic", "premium"] as const).map((tier) => {
+                  const plan = plans?.[tier];
+                  if (!plan) return null;
                   const current = currentTier === tier;
                   const renew = tier === membership?.assignedTier && canRenewPremium && membership?.status === "expired";
                   const pending = data.payments.some((payment) => payment.package_id === tier && ["awaiting_payment", "pending_verification"].includes(payment.status));
@@ -144,7 +146,7 @@ function BillingPage() {
                       void navigate({ to: "/billing/checkout", search: { tier, renewal: renew || (tier === membership?.assignedTier && canRenewPremium) } });
                     }
                   };
-                  const Icon = tier === "basic" ? Flame : tier === "premium" ? Sparkles : BadgeCheck;
+                  const Icon = tier === "basic" ? Flame : Sparkles;
                   return <article key={tier} className={cn("flex min-h-[300px] flex-col rounded-[1.6rem] border bg-card p-6 shadow-sm", current && "border-primary/60 ring-1 ring-primary/20", !available && "opacity-60")}>
                     <div className="flex items-center gap-3"><span className="flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary"><Icon className="size-5" /></span><div><h3 className="font-display text-xl font-semibold">{plan.name}</h3><p className="text-xs text-muted-foreground">{plan.billing_period}</p></div></div>
                     <p className="mt-6 font-display text-3xl font-semibold">{plan.price_kes === 0 ? "Free" : `KSh ${plan.price_kes.toLocaleString("en-KE")}`}<span className="ml-1 text-sm font-normal text-muted-foreground">{plan.price_kes > 0 ? "/ month" : ""}</span></p>

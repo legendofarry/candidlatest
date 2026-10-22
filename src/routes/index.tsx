@@ -2,7 +2,8 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useInfiniteQuery, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
-import { Activity, Flame, PenLine, TrendingUp, Users } from "lucide-react";
+import { Activity, Flame, PenLine, Sparkles, TrendingUp, Users, X } from "lucide-react";
+import { useServerFn } from "@tanstack/react-start";
 import { getFilterOptions, getPulse, listStories, listStoryPage } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
 import type { PublicStory } from "@/components/site/story-card";
@@ -13,6 +14,8 @@ import { CandidPulse } from "@/components/site/candid-pulse";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
+import { getOnboardingState } from "@/lib/onboarding.functions";
+import { useAuth } from "@/hooks/useAuth";
 import { formatCount } from "@/lib/utils";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import {
@@ -169,6 +172,8 @@ function FeedPage() {
           </div>
         </div>
       </section>
+
+      <ComplimentaryPremiumBanner />
 
       <button
         type="button"
@@ -369,6 +374,59 @@ function FeedPage() {
         </aside>
       ) : null}
     </div>
+  );
+}
+
+function ComplimentaryPremiumBanner() {
+  const { user, loading } = useAuth();
+  const getOnboarding = useServerFn(getOnboardingState);
+  const [dismissed, setDismissed] = useState(false);
+  const { data } = useQuery({
+    queryKey: ["onboarding-state", user?.uid ?? null],
+    queryFn: () => getOnboarding(),
+    enabled: Boolean(user) && !loading,
+    staleTime: 60_000,
+  });
+
+  useEffect(() => {
+    if (!user || typeof window === "undefined") return;
+    setDismissed(window.localStorage.getItem("candid-premium-welcome:" + user.uid) === "dismissed");
+  }, [user?.uid]);
+
+  if (
+    dismissed ||
+    !user ||
+    data?.membership.tier !== "premium" ||
+    data.membership.source !== "complimentary" ||
+    data.accountType === "official"
+  ) return null;
+
+  return (
+    <section className="relative flex items-center gap-3 border-y border-primary/25 bg-primary/10 px-4 py-3 sm:rounded-2xl sm:border sm:px-5">
+      <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+        <Sparkles className="size-5" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="font-semibold">Premium is on us</p>
+        <p className="text-sm text-muted-foreground">
+          Your account includes Premium features at no cost, including up to 3 pinned stories.
+        </p>
+      </div>
+      <Button asChild size="sm" variant="outline" className="hidden shrink-0 rounded-full sm:inline-flex">
+        <Link to="/billing">View membership</Link>
+      </Button>
+      <button
+        type="button"
+        aria-label="Dismiss Premium welcome"
+        className="shrink-0 rounded-full p-2 text-muted-foreground hover:bg-background"
+        onClick={() => {
+          window.localStorage.setItem("candid-premium-welcome:" + user.uid, "dismissed");
+          setDismissed(true);
+        }}
+      >
+        <X className="size-4" />
+      </button>
+    </section>
   );
 }
 

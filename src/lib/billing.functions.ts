@@ -17,7 +17,7 @@ export const getMyBilling = createServerFn({ method: "POST" })
 
 export const createMyPaymentRequest = createServerFn({ method: "POST" })
   .middleware([requireVerifiedFirebaseAuth])
-  .inputValidator((input: unknown) => z.object({ tier: z.enum(["premium", "gold"]), renewal: z.boolean().default(false) }).parse(input))
+  .inputValidator((input: unknown) => z.object({ tier: z.literal("premium"), renewal: z.boolean().default(false) }).parse(input))
   .handler(async ({ data, context }) => {
     const { createManualPaymentRequest } = await import("./billing.server");
     return createManualPaymentRequest(context.userId, data.tier, data.renewal);

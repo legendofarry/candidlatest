@@ -14,6 +14,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { SiteShell } from "@/components/site/site-shell";
 import { Toaster } from "@/components/ui/sonner";
+import { PresenceTracker } from "@/components/site/presence";
 
 function NotFoundComponent() {
   return (
@@ -143,6 +144,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <SiteShell>
+        <PresenceTracker />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         <Outlet />
       </SiteShell>

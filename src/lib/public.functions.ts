@@ -12,6 +12,7 @@ import {
   getStoryCommentsPage as readStoryCommentsPage,
   searchData,
 } from "./firebase-data.server";
+import { optionalFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 
 function isFirebaseReadUnavailable(error: unknown) {
   return (
@@ -34,12 +35,14 @@ const FeedInput = z.object({
 });
 
 export const listStories = createServerFn({ method: "GET" })
+  .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) => FeedInput.parse(input ?? {}))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
       if (data.sort === "new") {
         const page = await getPublicStoryPage({
           limit: data.limit,
+          viewerId: context.userId,
           cursor: data.cursor ?? null,
           industry: data.industry,
           county: data.county,
@@ -55,6 +58,7 @@ export const listStories = createServerFn({ method: "GET" })
         reason: data.reason,
         companySlug: data.companySlug,
         limit: 0,
+        viewerId: context.userId,
       });
       const cursorIndex = data.cursor
         ? allStories.findIndex((story) => story.id === data.cursor?.id)
@@ -82,6 +86,7 @@ export const listStories = createServerFn({ method: "GET" })
   });
 
 export const listStoryPage = createServerFn({ method: "GET" })
+  .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -93,9 +98,9 @@ export const listStoryPage = createServerFn({ method: "GET" })
       })
       .parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
-      return { ...(await getPublicStoryPage(data)), error: null as string | null };
+      return { ...(await getPublicStoryPage({ ...data, viewerId: context.userId })), error: null as string | null };
     } catch (error) {
       if (!isFirebaseReadUnavailable(error)) throw error;
       console.warn("[listStoryPage] Firebase public read unavailable", error);
@@ -152,10 +157,11 @@ export const getCompany = createServerFn({ method: "GET" })
   });
 
 export const getStory = createServerFn({ method: "GET" })
+  .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
-      return await getStoryView(data.id);
+      return await getStoryView(data.id, context.userId);
     } catch (error) {
       if (!isFirebaseReadUnavailable(error)) throw error;
       console.warn("[getStory] Firebase public read unavailable", error);
@@ -164,6 +170,7 @@ export const getStory = createServerFn({ method: "GET" })
   });
 
 export const getStoryComments = createServerFn({ method: "GET" })
+  .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -172,13 +179,14 @@ export const getStoryComments = createServerFn({ method: "GET" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => readStoryCommentsPage(data.id, data.cursor));
+  .handler(async ({ data, context }) => readStoryCommentsPage(data.id, data.cursor, context.userId));
 
 export const getStoryCommentContext = createServerFn({ method: "GET" })
+  .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ story_id: z.string().uuid(), comment_id: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data }) => readStoryCommentContext(data.story_id, data.comment_id));
+  .handler(async ({ data, context }) => readStoryCommentContext(data.story_id, data.comment_id, context.userId));
 
 export const getLeaderboards = createServerFn({ method: "GET" }).handler(async () => {
   try {

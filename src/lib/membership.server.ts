@@ -31,6 +31,7 @@ export async function switchMembership(
   requestId: string,
   expectedVersion: number,
 ) {
+  if (tier === "gold") throw new Error("Gold is no longer a separate package. Choose Premium instead.");
   const db = getFirestoreDb();
   const profileRef = db.collection("profiles").doc(userId);
   const eventRef = db.collection("subscription_change_events").doc(requestId);
@@ -61,7 +62,7 @@ export async function switchMembership(
     }
     const profile = profileSnapshot.data() as MembershipRecord;
     if (profile.account_type === "official") {
-      throw new Error("The official Candid account permanently uses Gold access.");
+      throw new Error("The official Candid account permanently uses complimentary Premium access.");
     }
     const currentTier = profile.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier;
     const switchUnlocked = canSelfSwitch(profile, currentTier);
@@ -75,7 +76,7 @@ export async function switchMembership(
       );
     }
     if (tier !== "basic" && !switchUnlocked) {
-      throw new Error("Premium and Gold are not available for this account yet.");
+      throw new Error("Premium is not available for this account yet.");
     }
     if (currentTier === tier) {
       return {

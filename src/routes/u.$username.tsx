@@ -12,10 +12,12 @@ import {
   Heart,
   Image,
   Link2,
+  LockKeyhole,
   MapPin,
   MessageSquare,
   Pin,
   Plus,
+  Share2,
   UserRound,
   UserPlus,
   UserCheck,
@@ -91,6 +93,7 @@ function PublicProfilePage() {
   const [busy, setBusy] = useState(false);
   const [activeTab, setActiveTab] = useState<"All" | "Stories" | "About">("All");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
+  const [signUpPromptOpen, setSignUpPromptOpen] = useState(false);
   const [commentStory, setCommentStory] = useState<ProfileStory | null>(null);
   const [openProfileImage, setOpenProfileImage] = useState<{
     url: string;
@@ -106,7 +109,7 @@ function PublicProfilePage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["public-profile", username, user?.uid ?? null],
     queryFn: () => fetchProfile({ data: { username } }),
-    enabled: Boolean(user),
+    enabled: !authLoading,
     staleTime: 30_000,
   });
   const [profileStories, setProfileStories] = useState<ProfileStory[]>([]);
@@ -124,22 +127,21 @@ function PublicProfilePage() {
     setHasMoreProfileStories(data.storiesHasMore);
   }, [data]);
 
-  if (authLoading || (isLoading && Boolean(user))) {
+  useEffect(() => {
+    if (authLoading || user || !data || typeof window === "undefined") return;
+    if (!window.matchMedia("(max-width: 767px)").matches) return;
+    const key = `candid-profile-signup-prompt:${username}`;
+    if (window.sessionStorage.getItem(key)) return;
+    window.sessionStorage.setItem(key, "shown");
+    setSignUpPromptOpen(true);
+  }, [authLoading, data, user, username]);
+
+  if (authLoading || isLoading) {
     return (
       <div className="mx-auto max-w-xl space-y-4">
         <div className="h-40 animate-pulse rounded-3xl bg-secondary" />
         <div className="h-24 animate-pulse rounded-2xl bg-secondary" />
       </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <EmptyState
-        title="Sign in to view profiles"
-        body="Candid profiles are only visible to members."
-        action={<Button onClick={() => navigate({ to: "/auth" })}>Sign in</Button>}
-      />
     );
   }
 
@@ -217,6 +219,20 @@ function PublicProfilePage() {
     }
   }
 
+  async function shareProfile() {
+    const url = window.location.href;
+    try {
+      if (navigator.share) await navigator.share({ title: `@${profile.username} on Candid`, url });
+      else {
+        await navigator.clipboard.writeText(url);
+        notify.success("Profile link copied.");
+      }
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") return;
+      notify.error("Could not share this profile link.");
+    }
+  }
+
   const socialLinks = profile.socials
     ? (Object.entries(profile.socials) as [string, string | null][])
         .map(([key, value]) => [key, profileLink(key, value)] as const)
@@ -266,6 +282,13 @@ function PublicProfilePage() {
                 </Button>
                 {profileMenuOpen ? (
                   <div className="absolute right-0 top-12 z-20 min-w-44 rounded-xl border border-border bg-card p-1.5 text-foreground shadow-xl">
+                    <button
+                      type="button"
+                      onClick={() => { setProfileMenuOpen(false); void shareProfile(); }}
+                      className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary"
+                    >
+                      <Share2 className="size-4" /> Share profile
+                    </button>
                     {profile.isSelf ? (
                       <Link
                         to="/profile"
@@ -338,8 +361,8 @@ function PublicProfilePage() {
                   />
                 </h1>
                 <p className="text-xs text-muted-foreground sm:text-sm">
-                  {formatCount(profile.followers)} followers · {formatCount(profile.following)}{" "}
-                  following · {formatCount(profile.contributions.stories)} stories
+                  {formatCount(profile.followers)} followers · {formatCount(profile.following)} following
+                  {profile.can_view_contributions ? ` · ${formatCount(profile.contributions.stories)} stories` : " · Private profile"}
                 </p>
                 {profile.official ? (
                   <p className="text-xs font-medium text-primary">Official Candid account</p>
@@ -362,21 +385,25 @@ function PublicProfilePage() {
                       "h-10 flex-1 rounded-lg sm:flex-none",
                       profile.isFollowing && "bg-secondary text-foreground hover:bg-secondary/80",
                     )}
-                    onClick={() => void run(() => follow({ data: { user_id: profile.id } }))}
+                    onClick={() => {
+                      if (!user) { void navigate({ to: "/auth" }); return; }
+                      void run(() => follow({ data: { user_id: profile.id } }));
+                    }}
                   >
                     {profile.isFollowing ? (
                       <UserCheck className="size-4" />
                     ) : (
                       <UserPlus className="size-4" />
                     )}
-                    {profile.isFollowing ? "Following" : "Follow"}
+                    {profile.isFollowing ? "Following" : profile.followStatus === "pending" ? "Requested" : user ? "Follow" : "Sign in to follow"}
                   </Button>
                   <Button
                     variant="secondary"
                     className="h-10 flex-1 rounded-lg sm:flex-none"
-                    disabled={busy || profile.isBlocked || !profile.messaging.allowed}
+                    disabled={busy || profile.isBlocked || Boolean(user && !profile.messaging.allowed)}
                     onClick={() =>
                       void (async () => {
+                        if (!user) { void navigate({ to: "/auth" }); return; }
                         setBusy(true);
                         try {
                           const result = await openChat({ data: { user_id: profile.id } });
@@ -391,7 +418,7 @@ function PublicProfilePage() {
                       })()
                     }
                   >
-                    <MessageSquare className="size-4" /> Message
+                    <MessageSquare className="size-4" /> {user ? "Message" : "Sign in to message"}
                   </Button>
                 </>
               )}
@@ -492,7 +519,15 @@ function PublicProfilePage() {
       ) : null}
 
       {activeTab !== "About" ? (
-        pinnedStories.length ? (
+        !profile.can_view_contributions ? (
+          <section className="border-y border-border bg-background px-5 py-10 text-center sm:mx-5 sm:rounded-2xl sm:border">
+            <LockKeyhole className="mx-auto size-7 text-primary" />
+            <h2 className="mt-3 font-semibold">This profile is private</h2>
+            <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
+              Follow @{profile.username} and wait for approval to see their stories and contributions.
+            </p>
+          </section>
+        ) : pinnedStories.length ? (
           <section className="mx-4 mb-3 overflow-hidden rounded-2xl border border-primary/25 bg-primary/[0.035] sm:mx-5">
             <div className="flex items-center justify-between gap-3 border-b border-primary/10 px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2">
@@ -532,7 +567,7 @@ function PublicProfilePage() {
       ) : null}
 
       {activeTab !== "About" ? (
-        <div className="bg-background pb-3 sm:px-5">
+        profile.can_view_contributions ? <div className="bg-background pb-3 sm:px-5">
           <section className="overflow-hidden border-y border-border/70 bg-card sm:rounded-xl sm:border">
             <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4">
               <div>
@@ -668,7 +703,7 @@ function PublicProfilePage() {
               </div>
             ) : null}
           </section>
-        </div>
+        </div> : null
       ) : null}
 
       <ProfileStoryComments
@@ -708,6 +743,18 @@ function PublicProfilePage() {
               className="mx-auto h-full w-full rounded-lg object-contain shadow-2xl"
             />
           ) : null}
+        </DialogContent>
+      </Dialog>
+      <Dialog open={signUpPromptOpen} onOpenChange={setSignUpPromptOpen}>
+        <DialogContent className="!fixed !left-0 !right-0 !top-auto !bottom-0 !translate-x-0 !translate-y-0 rounded-t-3xl rounded-b-none p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!bottom-auto sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:rounded-3xl sm:pb-6 sm:max-w-md">
+          <DialogTitle className="font-display text-xl">Join Candid?</DialogTitle>
+          <DialogDescription>
+            You can keep browsing @{profile.username}’s public profile, or create an account to follow, comment and message.
+          </DialogDescription>
+          <div className="mt-3 flex gap-2">
+            <Button className="flex-1 rounded-xl" onClick={() => { setSignUpPromptOpen(false); void navigate({ to: "/auth" }); }}>Create account</Button>
+            <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setSignUpPromptOpen(false)}>Maybe later</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

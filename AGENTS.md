@@ -8,3 +8,7 @@
 > Commits you push to the connected branch sync back to Lovable and show up in
 > the editor, so keep the branch in a working state.
 <!-- LOVABLE:END -->
+
+## Interface design
+
+- Favor full-width, edge-to-edge layouts. Avoid card-based forms and inset card containers unless explicitly requested.

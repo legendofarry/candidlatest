@@ -32,15 +32,16 @@ const FALLBACK_PACKAGES = {
     enabled: true,
     benefits: [
       "Everything in Basic",
-      "Pin 1 published story to your profile",
+      "Pin up to 3 published stories to your profile",
       "Premium supporter badge",
     ],
   },
+  // Kept to render historical billing records only; users cannot purchase Gold.
   gold: {
     name: "Gold",
     price_kes: 1000,
     billing_period: "",
-    enabled: true,
+    enabled: false,
     benefits: [
       "Everything in Premium",
       "Pin up to 3 published stories to your profile",
@@ -198,7 +199,7 @@ export async function readBillingConfig(): Promise<BillingConfig> {
       },
     ]),
   ) as BillingConfig["packages"];
-  packages.gold = { ...packages.gold, enabled: true };
+  packages.gold = { ...packages.gold, enabled: false };
   return {
     packages,
     manual_mpesa: { ...FALLBACK_CONFIG.manual_mpesa, ...(saved?.manual_mpesa ?? {}) },
@@ -219,7 +220,10 @@ export async function getMyBillingSummary(userId: string) {
       canSelfSwitch: canSelfSwitchMembership(profile),
       version: Number.isInteger(profile.subscription_version) ? profile.subscription_version : 0,
       tier: getEffectiveMembershipTier(profile),
-      assignedTier: profile.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
+      assignedTier:
+        profile.subscription_tier === "gold"
+          ? "premium"
+          : profile.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
       status: profile.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
       source: profile.subscription_source ?? DEFAULT_MEMBERSHIP.subscription_source,
       startedAt:
@@ -245,6 +249,7 @@ export async function createManualPaymentRequest(
   tier: MembershipTier,
   renewal: boolean,
 ) {
+  if (tier === "gold") throw new Error("Gold is no longer sold separately. Choose Premium.");
   const db = getFirestoreDb();
   const [profileSnapshot, config] = await Promise.all([
     db.collection("profiles").doc(userId).get(),
@@ -271,8 +276,9 @@ export async function createManualPaymentRequest(
     throw new Error("This package is not currently available for purchase.");
   }
   const effectiveTier = getEffectiveMembershipTier(profile);
+  const normalizedAssignedTier = profile.subscription_tier === "gold" ? "premium" : profile.subscription_tier;
   if (renewal) {
-    if (tier !== profile.subscription_tier || profile.subscription_source !== "paid")
+    if (tier !== normalizedAssignedTier || profile.subscription_source !== "paid")
       throw new Error("This subscription cannot be renewed from this account.");
   } else if (tier === effectiveTier) {
     throw new Error("This is already your current package. Choose Renew if you want to extend it.");

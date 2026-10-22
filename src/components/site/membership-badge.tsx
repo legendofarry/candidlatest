@@ -13,7 +13,7 @@ export function MembershipBadge({
 }) {
   if (official || !tier || !getMembershipEntitlements(tier).membershipBadge) return null;
 
-  const label = tier === "gold" ? "Gold member" : "Premium member";
+  const label = "Premium member";
 
   return (
     <span

@@ -43,6 +43,8 @@ Push alerts are opt-in per browser/device from Settings. They use Firebase Cloud
 
 Before deploying push notifications:
 
+For presence indicators, create a Firebase Realtime Database, deploy \`database.rules.json\`, and set \`VITE_FIREBASE_DATABASE_URL\` to the database URL in Firebase Console. Rebuild and redeploy after setting this value.
+
 1. In Google Cloud Console, select the same project used by the Firebase web app and enable **Firebase Cloud Messaging Registration API** under APIs & Services → Library. Current Firebase web SDKs require it.
 2. In the Main App's build environment, set `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, and `VITE_FIREBASE_APP_ID` from that project's Firebase web app configuration.
 3. In Firebase Console, open Project settings → Cloud Messaging → Web configuration and create a Web Push certificate key pair. Set its public key as `VITE_FIREBASE_VAPID_KEY` in the Main App's build environment.

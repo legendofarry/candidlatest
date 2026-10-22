@@ -3,8 +3,8 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { ArrowLeft, BadgeCheck, Search, Sparkles, SquarePen } from "lucide-react";
-import { getConversations, startConversationByUsername } from "@/lib/messaging.functions";
+import { Archive, ArrowLeft, BadgeCheck, BellOff, Inbox, MoreHorizontal, Pin, Search, Sparkles, SquarePen, Trash2, UserPlus } from "lucide-react";
+import { getConversations, startConversationByUsername, updateConversationPreference } from "@/lib/messaging.functions";
 import { readInboxScroll, saveInboxScroll } from "@/lib/message-panel-state";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,8 @@ import { MembershipBadge } from "@/components/site/membership-badge";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/site/theme-toggle";
+import { notify } from "@/lib/notifications-store";
+import { useOnlineUsers } from "@/components/site/presence";
 import {
   Dialog,
   DialogContent,
@@ -72,7 +74,12 @@ export function MessagesInbox({
   const [username, setUsername] = useState("");
   const [composeError, setComposeError] = useState("");
   const [startingConversation, setStartingConversation] = useState(false);
+  const [showArchived, setShowArchived] = useState(false);
+  const [actionConversationId, setActionConversationId] = useState<string | null>(null);
+  const longPressTimer = useRef<number | null>(null);
+  const longPressTriggered = useRef(false);
   const embedded = Boolean(onSelectConversation);
+  const updatePreference = useServerFn(updateConversationPreference);
 
   const {
     data,
@@ -84,9 +91,9 @@ export function MessagesInbox({
     fetchNextPage,
     refetch,
   } = useInfiniteQuery({
-    queryKey: ["conversations", user?.uid],
+    queryKey: ["conversations", user?.uid, showArchived],
     initialPageParam: null as { lastMessageAt: string; id: string } | null,
-    queryFn: ({ pageParam }) => fetchConversations({ data: { limit: 20, cursor: pageParam } }),
+    queryFn: ({ pageParam }) => fetchConversations({ data: { limit: 20, cursor: pageParam, archived: showArchived } }),
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
     enabled: Boolean(user),
     staleTime: 30_000,
@@ -118,6 +125,7 @@ export function MessagesInbox({
   }, []);
 
   const conversations = data?.pages.flatMap((page) => page.items) ?? [];
+  const onlineUsers = useOnlineUsers(conversations.map((item) => item.with?.id));
   const matchingConversations = useMemo(() => {
     const query = search.trim().replace(/^@/, "").toLowerCase();
     if (!query) return conversations;
@@ -126,6 +134,40 @@ export function MessagesInbox({
     );
   }, [conversations, search]);
   const visibleConversations = matchingConversations.slice(0, visibleCount);
+  const actionConversation = conversations.find((item) => item.id === actionConversationId) ?? null;
+
+  function cancelLongPress() {
+    if (longPressTimer.current !== null) window.clearTimeout(longPressTimer.current);
+    longPressTimer.current = null;
+  }
+
+  function beginLongPress(id: string) {
+    cancelLongPress();
+    longPressTriggered.current = false;
+    longPressTimer.current = window.setTimeout(() => {
+      longPressTriggered.current = true;
+      setActionConversationId(id);
+    }, 520);
+  }
+
+  async function runConversationAction(
+    conversationId: string,
+    action: "archive" | "unarchive" | "mute" | "unmute" | "pin" | "unpin" | "delete" | "follow",
+  ) {
+    try {
+      const result = await updatePreference({ data: { conversation_id: conversationId, action } });
+      await queryClient.invalidateQueries({ queryKey: ["conversations", user?.uid] });
+      if (action === "follow") {
+        notify.success("requested" in result && result.requested ? "Follow request sent." : "You’re following this account.");
+      } else {
+        notify.success(action === "delete" ? "Conversation removed from your inbox." : "Conversation updated.");
+      }
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not update this conversation.");
+    } finally {
+      setActionConversationId(null);
+    }
+  }
 
   async function handleStartConversation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -197,6 +239,32 @@ export function MessagesInbox({
       ) : null}
 
       <div className={cn("px-4 pt-5 sm:px-6", !embedded && "md:pt-6")}>
+        {!embedded && user ? (
+          <div className="mb-3 flex items-center gap-2" role="tablist" aria-label="Conversation folders">
+            <Button
+              type="button"
+              size="sm"
+              variant={showArchived ? "outline" : "default"}
+              role="tab"
+              aria-selected={!showArchived}
+              onClick={() => { setShowArchived(false); setActionConversationId(null); }}
+              className="rounded-full"
+            >
+              <Inbox className="mr-1.5 size-4" /> Inbox
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={showArchived ? "default" : "outline"}
+              role="tab"
+              aria-selected={showArchived}
+              onClick={() => { setShowArchived(true); setActionConversationId(null); }}
+              className="rounded-full"
+            >
+              <Archive className="mr-1.5 size-4" /> Archive
+            </Button>
+          </div>
+        ) : null}
         <label className="relative block">
           <Search className="pointer-events-none absolute left-5 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -258,9 +326,9 @@ export function MessagesInbox({
           className="mt-6 border-y border-border bg-background px-4 py-10 text-center sm:px-6"
         >
           <Sparkles className="mx-auto size-8 text-primary" />
-          <p className="mt-4 font-medium">No conversations yet</p>
+          <p className="mt-4 font-medium">{showArchived ? "No archived conversations" : "No conversations yet"}</p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Open someone&apos;s profile and tap Message to start a chat.
+            {showArchived ? "Conversations you archive will appear here." : "Open someone's profile and tap Message to start a chat."}
           </p>
         </motion.div>
       ) : matchingConversations.length === 0 ? (
@@ -291,7 +359,19 @@ export function MessagesInbox({
                   item.unread > 0 && "border-l-4 border-l-primary bg-primary/[0.07]",
                 )}
               >
-                <div className="flex min-h-24 w-full items-center gap-4 px-4 py-4 transition-colors hover:bg-secondary/30 sm:px-5">
+                <div
+                  className="flex min-h-24 w-full items-center gap-4 px-4 py-4 transition-colors hover:bg-secondary/30 sm:px-5"
+                  onTouchStart={() => beginLongPress(item.id)}
+                  onTouchEnd={cancelLongPress}
+                  onTouchMove={cancelLongPress}
+                  onContextMenu={(event) => { event.preventDefault(); setActionConversationId(item.id); }}
+                  onClickCapture={(event) => {
+                    if (!longPressTriggered.current) return;
+                    event.preventDefault();
+                    event.stopPropagation();
+                    longPressTriggered.current = false;
+                  }}
+                >
                   <button
                     type="button"
                     aria-label={`Open conversation with @${item.with?.username ?? "member"}`}
@@ -301,11 +381,16 @@ export function MessagesInbox({
                     }}
                     className="shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <ProfileAvatar
-                      photoUrl={item.with?.photo_url}
-                      initials={item.with?.username?.slice(0, 2) ?? "??"}
-                      className="size-14 border border-border/70 text-lg uppercase"
-                    />
+                    <span className="relative block">
+                      <ProfileAvatar
+                        photoUrl={item.with?.photo_url}
+                        initials={item.with?.username?.slice(0, 2) ?? "??"}
+                        className="size-14 border border-border/70 text-lg uppercase"
+                      />
+                      {item.with?.id && onlineUsers.has(item.with.id) ? (
+                        <span className="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-background bg-emerald-500" aria-label="Online" />
+                      ) : null}
+                    </span>
                   </button>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center gap-1.5">
@@ -354,6 +439,20 @@ export function MessagesInbox({
                       {item.unread > 9 ? "9+" : item.unread}
                     </span>
                   ) : null}
+                  <span className="flex shrink-0 items-center gap-1">
+                    {item.pinned ? <Pin className="size-3.5 text-primary" aria-label="Pinned conversation" /> : null}
+                    {item.muted ? <BellOff className="size-3.5 text-muted-foreground" aria-label="Muted conversation" /> : null}
+                    <Button
+                      type="button"
+                      size="icon"
+                      variant="ghost"
+                      aria-label={"Conversation actions for @" + (item.with?.username ?? "member")}
+                      className="size-9 rounded-full"
+                      onClick={() => setActionConversationId(item.id)}
+                    >
+                      <MoreHorizontal className="size-5" />
+                    </Button>
+                  </span>
                 </div>
               </motion.li>
             ))}
@@ -436,6 +535,33 @@ export function MessagesInbox({
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={Boolean(actionConversation)} onOpenChange={(open) => !open && setActionConversationId(null)}>
+        <DialogContent className="rounded-t-3xl p-5 sm:max-w-sm sm:rounded-3xl">
+          <DialogHeader>
+            <DialogTitle>Chat with @{actionConversation?.with?.username ?? "member"}</DialogTitle>
+            <DialogDescription>Manage this conversation in your inbox.</DialogDescription>
+          </DialogHeader>
+          {actionConversation ? (
+            <div className="grid gap-2">
+              <Button variant="outline" className="justify-start rounded-xl" onClick={() => void runConversationAction(actionConversation.id, actionConversation.pinned ? "unpin" : "pin")}>
+                <Pin className="mr-2 size-4" /> {actionConversation.pinned ? "Unpin conversation" : "Pin conversation"}
+              </Button>
+              <Button variant="outline" className="justify-start rounded-xl" onClick={() => void runConversationAction(actionConversation.id, actionConversation.muted ? "unmute" : "mute")}>
+                <BellOff className="mr-2 size-4" /> {actionConversation.muted ? "Unmute conversation" : "Mute conversation"}
+              </Button>
+              <Button variant="outline" className="justify-start rounded-xl" onClick={() => void runConversationAction(actionConversation.id, showArchived ? "unarchive" : "archive")}>
+                <Archive className="mr-2 size-4" /> {showArchived ? "Move to inbox" : "Archive conversation"}
+              </Button>
+              <Button variant="outline" className="justify-start rounded-xl" onClick={() => void runConversationAction(actionConversation.id, "follow")}>
+                <UserPlus className="mr-2 size-4" /> Follow @{actionConversation.with?.username ?? "member"}
+              </Button>
+              <Button variant="ghost" className="justify-start rounded-xl text-destructive hover:text-destructive" onClick={() => void runConversationAction(actionConversation.id, "delete")}>
+                <Trash2 className="mr-2 size-4" /> Remove from my inbox
+              </Button>
+            </div>
+          ) : null}
         </DialogContent>
       </Dialog>
     </div>

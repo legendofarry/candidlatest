@@ -1,14 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Archive,
   Check,
   Clock3,
-  Grid2X2,
-  LayoutGrid,
-  LayoutList,
   LoaderCircle,
   LockKeyhole,
   MessageSquareText,
@@ -64,7 +61,6 @@ export const Route = createFileRoute("/my-contributions")({
 
 type Category = "all" | "stories" | "comments";
 type StatusFilter = "all" | "published" | "pending" | "hidden";
-type ViewMode = "list" | "grid" | "tiles";
 type Contribution = {
   id: string;
   type: "story" | "comment";
@@ -97,7 +93,6 @@ function MyContributionsPage() {
   const updateComment = useServerFn(editComment);
   const [category, setCategory] = useState<Category>("all");
   const [status, setStatus] = useState<StatusFilter>("all");
-  const [view, setView] = useState<ViewMode>("list");
   const [search, setSearch] = useState("");
   const [editing, setEditing] = useState<Contribution | null>(null);
   const [editBody, setEditBody] = useState("");
@@ -136,15 +131,6 @@ function MyContributionsPage() {
     }
   }
 
-  useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem("candid:contribution-view");
-      if (saved === "list" || saved === "grid" || saved === "tiles") setView(saved);
-    } catch {
-      /* Keep the default view if local storage is unavailable. */
-    }
-  }, []);
-
   const contributions = useInfiniteQuery({
     queryKey: ["my-contributions", user?.uid ?? null, category, status],
     queryFn: ({ pageParam }) =>
@@ -166,15 +152,6 @@ function MyContributionsPage() {
     [contributions.data, search],
   );
   const counts = contributions.data?.pages[0]?.counts;
-
-  function setViewMode(next: ViewMode) {
-    setView(next);
-    try {
-      window.localStorage.setItem("candid:contribution-view", next);
-    } catch {
-      /* View still updates for this session. */
-    }
-  }
 
   async function confirmDelete() {
     if (!deleting) return;
@@ -285,7 +262,7 @@ function MyContributionsPage() {
         </header>
 
         {category !== "comments" ? (
-          <div className="mx-4 mb-4 flex flex-wrap items-center gap-3 border-y border-border bg-card/50 px-4 py-3 sm:mx-6 sm:rounded-xl sm:border md:mx-8">
+          <div className="mb-4 flex w-full flex-wrap items-center gap-3 border-y border-border px-4 py-3 sm:px-6 md:px-8">
             <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
               <Pin className="size-4" />
             </span>
@@ -293,8 +270,8 @@ function MyContributionsPage() {
               <p className="text-sm font-semibold">Profile pins</p>
               <p className="text-xs text-muted-foreground">
                 {maxPinnedStories === 0
-                  ? "Premium lets you pin 1 published story. Gold lets you pin 3."
-                  : `${pinnedStoryIds.size} of ${maxPinnedStories} story ${maxPinnedStories === 1 ? "pin" : "pins"} used`}
+                  ? "Premium members can pin up to 3 published stories."
+                  : `${pinnedStoryIds.size} of ${maxPinnedStories} pins used`}
               </p>
             </div>
             <Button asChild variant="outline" size="sm" className="rounded-xl">
@@ -306,47 +283,34 @@ function MyContributionsPage() {
         ) : null}
 
         <section className="w-full min-w-0">
-          <div className="sticky top-16 z-30 space-y-4 border-y border-border bg-background/95 px-4 py-3 shadow-sm backdrop-blur-md sm:top-16 sm:rounded-xl sm:border-x sm:px-6 sm:py-5 md:px-8">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="flex w-full gap-1 overflow-x-auto rounded-xl bg-secondary/70 p-1 lg:w-auto">
+          <div className="sticky top-16 z-30 space-y-3 border-y border-border bg-background/95 px-4 py-3 backdrop-blur-md sm:top-16 sm:px-6 sm:py-4 md:px-8">
+            <div className="flex flex-col gap-3">
+              <div className="flex w-full gap-5 overflow-x-auto border-b border-border">
                 {(["all", "stories", "comments"] as const).map((item) => (
                   <button
                     key={item}
                     type="button"
                     onClick={() => setCategory(item)}
-                    className={`min-h-10 flex-1 whitespace-nowrap rounded-lg px-4 text-sm font-medium capitalize transition-colors lg:flex-none ${category === item ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"}`}
+                    aria-pressed={category === item}
+                    className={`min-h-10 shrink-0 border-b-2 px-1 text-sm font-medium capitalize transition-colors ${category === item ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground"}`}
                   >
                     {item === "all" ? "Everything" : item}
                   </button>
                 ))}
               </div>
-              <div className="flex gap-2">
-                <label className="relative min-w-0 flex-1 lg:w-72 lg:flex-none">
+              <div className="flex w-full gap-3">
+                <label className="relative min-w-0 flex-1">
                   <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
                     placeholder="Search loaded items"
-                    className="h-10 rounded-xl pl-9"
+                    className="h-11 rounded-lg pl-9 shadow-none"
                   />
                 </label>
-                <div
-                  className="flex shrink-0 rounded-xl border border-border p-1"
-                  aria-label="View options"
-                >
-                  <ViewButton value="list" current={view} onClick={setViewMode} label="List view">
-                    <LayoutList className="size-4" />
-                  </ViewButton>
-                  <ViewButton value="grid" current={view} onClick={setViewMode} label="Grid view">
-                    <Grid2X2 className="size-4" />
-                  </ViewButton>
-                  <ViewButton value="tiles" current={view} onClick={setViewMode} label="Tile view">
-                    <LayoutGrid className="size-4" />
-                  </ViewButton>
-                </div>
               </div>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-0.5">
+            <div className="flex w-full gap-2 overflow-x-auto pb-0.5">
               {(
                 [
                   ["all", "All statuses", Archive],
@@ -407,20 +371,11 @@ function MyContributionsPage() {
               ) : null}
             </div>
           ) : (
-            <div
-              className={
-                view === "list"
-                  ? "divide-y divide-border"
-                  : view === "grid"
-                    ? "grid gap-3 p-3 sm:grid-cols-2 sm:p-5 xl:grid-cols-3"
-                    : "columns-1 gap-3 p-3 sm:columns-2 sm:p-5 xl:columns-3"
-              }
-            >
+            <div className="divide-y divide-border">
               {items.map((item) => (
-                <ContributionCard
+                <ContributionRow
                   key={`${item.type}-${item.id}`}
                   item={item}
-                  view={view}
                   isPinned={pinnedStoryIds.has(item.id)}
                   pinnedCount={pinnedStoryIds.size}
                   maxPinnedStories={maxPinnedStories}
@@ -532,35 +487,8 @@ function MyContributionsPage() {
   );
 }
 
-function ViewButton({
-  value,
-  current,
-  onClick,
-  label,
-  children,
-}: {
-  value: ViewMode;
-  current: ViewMode;
-  onClick: (view: ViewMode) => void;
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={current === value}
-      onClick={() => onClick(value)}
-      className={`flex size-8 items-center justify-center rounded-lg transition-colors ${current === value ? "bg-primary/15 text-primary" : "text-muted-foreground hover:bg-secondary hover:text-foreground"}`}
-    >
-      {children}
-    </button>
-  );
-}
-
-function ContributionCard({
+function ContributionRow({
   item,
-  view,
   isPinned,
   pinnedCount,
   maxPinnedStories,
@@ -571,7 +499,6 @@ function ContributionCard({
   onDelete,
 }: {
   item: Contribution;
-  view: ViewMode;
   isPinned: boolean;
   pinnedCount: number;
   maxPinnedStories: number;
@@ -581,7 +508,6 @@ function ContributionCard({
   onEdit: () => void;
   onDelete: () => void;
 }) {
-  const isList = view === "list";
   const isStory = item.type === "story";
   const isRemoved = item.isDeleted || item.authorDeleted || item.status === "hidden";
   const statusLabel =
@@ -603,10 +529,8 @@ function ContributionCard({
   const canEdit = isStory ? !item.authorDeleted : !item.isDeleted && item.status === "published";
   const pinLimitReached = !isPinned && pinnedCount >= maxPinnedStories;
   return (
-    <article
-      className={`${isList ? "group flex flex-col gap-3 px-3 py-4 sm:flex-row sm:items-center sm:px-5" : `mb-3 break-inside-avoid rounded-2xl border border-border bg-background p-4 transition-shadow hover:shadow-md ${view === "tiles" ? "border-l-2 border-l-primary/50" : ""}`}`}
-    >
-      <div className={`flex min-w-0 items-start gap-3 ${isList ? "flex-1" : ""}`}>
+    <article className="group flex w-full flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6 md:px-8">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
         <span
           className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${isStory ? "bg-primary/10 text-primary" : "bg-sky-500/10 text-sky-600 dark:text-sky-300"}`}
         >
@@ -625,13 +549,11 @@ function ContributionCard({
             {item.isDeleted ? "Comment removed" : item.title}
           </h2>
           {!isStory && !item.isDeleted ? (
-            <p
-              className={`mt-1 text-sm leading-relaxed text-muted-foreground ${view === "tiles" ? "line-clamp-2" : "line-clamp-3"}`}
-            >
+            <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
               {item.body}
             </p>
           ) : null}
-          {isStory && view !== "tiles" ? (
+          {isStory ? (
             <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
               {item.body}
             </p>
@@ -652,9 +574,7 @@ function ContributionCard({
           </p>
         </div>
       </div>
-      <div
-        className={`flex flex-wrap items-center gap-2 ${isList ? "pl-[3.25rem] sm:pl-0" : "mt-4 border-t border-border pt-3"}`}
-      >
+      <div className="flex flex-wrap items-center gap-2 pl-[3.25rem] sm:pl-0">
         {canView ? (
           <Button
             asChild

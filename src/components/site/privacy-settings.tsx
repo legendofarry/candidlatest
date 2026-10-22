@@ -2,9 +2,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "motion/react";
-import { Ban, BadgeCheck, MessageSquareLock } from "lucide-react";
+import { Ban, BadgeCheck, Globe2, LockKeyhole, MessageSquareLock, UserRoundCheck } from "lucide-react";
 import {
+  getFollowRequests,
   getPrivacySettings,
+  respondToFollowRequest,
   toggleBlockAccount,
   updatePrivacySettings,
 } from "@/lib/messaging.functions";
@@ -19,16 +21,28 @@ const OPTIONS = [
   { value: "nobody", label: "No one" },
 ] as const;
 
+const VISIBILITY = [
+  { value: "public", label: "Public", detail: "Anyone can see your contributions.", Icon: Globe2 },
+  { value: "private", label: "Private", detail: "Approve followers before they see your contributions.", Icon: LockKeyhole },
+] as const;
+
 export function PrivacySettings() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fetchSettings = useServerFn(getPrivacySettings);
   const saveSettings = useServerFn(updatePrivacySettings);
   const unblock = useServerFn(toggleBlockAccount);
+  const getRequests = useServerFn(getFollowRequests);
+  const respond = useServerFn(respondToFollowRequest);
 
   const { data, isLoading } = useQuery({
     queryKey: ["privacy-settings", user?.uid ?? null],
     queryFn: () => fetchSettings(),
+    enabled: Boolean(user),
+  });
+  const { data: requestsData, refetch: refetchRequests } = useQuery({
+    queryKey: ["profile-follow-requests", user?.uid ?? null],
+    queryFn: () => getRequests(),
     enabled: Boolean(user),
   });
 
@@ -43,18 +57,98 @@ export function PrivacySettings() {
     }
   }
 
+  async function chooseVisibility(value: (typeof VISIBILITY)[number]["value"]) {
+    try {
+      await saveSettings({ data: { profile_visibility: value } });
+      await queryClient.invalidateQueries({ queryKey: ["privacy-settings"] });
+      notify.success(value === "private" ? "Your profile is now private." : "Your profile is now public.");
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not update profile visibility.");
+    }
+  }
+
+  async function handleFollowRequest(followId: string, approve: boolean) {
+    try {
+      await respond({ data: { follow_id: followId, approve } });
+      await Promise.all([
+        refetchRequests(),
+        queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
+        queryClient.invalidateQueries({ queryKey: ["follow-stats"] }),
+      ]);
+      notify.success(approve ? "Follower approved." : "Follow request declined.");
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not update that request.");
+    }
+  }
+
   return (
     <section className="animate-fade space-y-1">
       <h2 className="px-1 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         Privacy & messages
       </h2>
       <div className="space-y-4 border-y border-border bg-transparent py-4 md:rounded-2xl md:border md:bg-card md:p-4">
+        <div>
+          <div className="flex items-start gap-3">
+            <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+              {data?.profile_visibility === "private" ? <LockKeyhole className="size-4" /> : <Globe2 className="size-4" />}
+            </span>
+            <div>
+              <p className="text-sm font-medium">Profile visibility</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">Your handle, photo and cover remain visible either way.</p>
+            </div>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            {VISIBILITY.map(({ value, label, detail, Icon }) => {
+              const active = (data?.profile_visibility ?? "public") === value;
+              return (
+                <button
+                  key={value}
+                  type="button"
+                  disabled={isLoading}
+                  onClick={() => void chooseVisibility(value)}
+                  className={cn(
+                    "flex min-h-16 items-start gap-3 rounded-xl border p-3 text-left transition-colors",
+                    active ? "border-primary bg-primary/10" : "border-border hover:bg-secondary/60",
+                  )}
+                >
+                  <Icon className="mt-0.5 size-4 shrink-0 text-primary" />
+                  <span>
+                    <span className="flex items-center gap-1.5 text-sm font-medium">{label}{active ? <BadgeCheck className="size-3.5 text-primary" /> : null}</span>
+                    <span className="mt-0.5 block text-xs text-muted-foreground">{detail}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
         <div className="flex items-start gap-3">
           <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
             <MessageSquareLock className="size-4" />
           </span>
           <p className="text-sm font-medium">Who can message you</p>
         </div>
+
+        {(requestsData?.requests.length ?? 0) > 0 ? (
+          <div className="border-t border-border pt-4">
+            <div className="flex items-center gap-2">
+              <UserRoundCheck className="size-4 text-primary" />
+              <p className="text-sm font-medium">Follow requests</p>
+              <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs text-primary">{requestsData!.requests.length}</span>
+            </div>
+            <ul className="mt-2 divide-y divide-border">
+              {requestsData!.requests.map((request) => (
+                <li key={request.id} className="flex items-center gap-3 py-3">
+                  <Link to="/u/$username" params={{ username: request.username }} className="flex min-w-0 flex-1 items-center gap-2 hover:text-primary">
+                    <span className="truncate text-sm font-medium">@{request.username}</span>
+                  </Link>
+                  <Button size="sm" onClick={() => void handleFollowRequest(request.id, true)}>Approve</Button>
+                  <Button size="sm" variant="ghost" onClick={() => void handleFollowRequest(request.id, false)}>Decline</Button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
 
         <div className="grid gap-0 md:grid-cols-3 md:gap-2">
           {OPTIONS.map((option) => {

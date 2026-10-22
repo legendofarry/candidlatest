@@ -69,6 +69,10 @@ export type ProfileRecord = {
   username_changed_at?: string | null;
   socials?: ProfileSocials | null;
   account_type?: "individual" | "company" | "official" | "unknown";
+  profile_visibility?: "public" | "private";
+  account_status?: "active" | "deletion_pending" | "deactivated";
+  account_action_at?: string | null;
+  account_action_expires_at?: string | null;
   onboarded_at?: string | null;
   subscription_tier?: "basic" | "premium" | "gold";
   subscription_status?: "active" | "cancelled" | "expired" | "past_due";
@@ -1142,16 +1146,32 @@ export function getCompanyView(slug: string) {
   return cacheServerRead(`public:company:${slug}`, 30_000, () => calculateCompanyView(slug));
 }
 
-async function calculateStoryView(id: string) {
+async function canViewAuthorContributions(authorId: string | null | undefined, viewerId: string | null) {
+  if (!authorId) return true;
+  const profile = await readDocument<ProfileRecord>("profiles", authorId);
+  if (
+    !profile ||
+    profile.banned ||
+    profile.account_status === "deactivated" ||
+    profile.account_status === "deletion_pending" ||
+    profile.account_status === "deletion_in_progress"
+  ) return false;
+  if (profile.profile_visibility !== "private" || viewerId === authorId) return true;
+  if (!viewerId) return false;
+  const follow = await getFirestoreDb().collection("follows").doc(viewerId + ":" + authorId).get();
+  return follow.exists && follow.get("status") !== "pending";
+}
+
+async function calculateStoryView(id: string, viewerId: string | null = null) {
   const storySnapshot = await getFirestoreDb().collection("stories").doc(id).get();
   const story = storySnapshot.exists
     ? ({ ...(storySnapshot.data() as StoryRecord), id } as StoryRecord)
     : null;
   if (!story || story.status !== "published") return null;
+  if (!(await canViewAuthorContributions(story.author_id, viewerId))) return null;
 
-  const [company, authorProfile, commentSnapshot, storedCommentTotal] = await Promise.all([
+  const [company, commentSnapshot, storedCommentTotal] = await Promise.all([
     story.company_id ? readDocument<CompanyRecord>("companies", story.company_id) : null,
-    story.author_id ? readDocument<ProfileRecord>("profiles", story.author_id) : null,
     getFirestoreDb()
       .collection("comments")
       .where("story_id", "==", id)
@@ -1162,6 +1182,9 @@ async function calculateStoryView(id: string) {
       .get(),
     getTopLevelCommentCount(story, storySnapshot.updateTime),
   ]);
+  const authorProfile = story.author_id
+    ? await readDocument<ProfileRecord>("profiles", story.author_id)
+    : null;
   const commentRows = commentSnapshot.docs.slice(0, 50);
   const rawComments = commentRows
     .map((doc) => doc.data() as CommentRecord)
@@ -1300,17 +1323,20 @@ async function calculateStoryView(id: string) {
   };
 }
 
-export function getStoryView(id: string) {
-  return calculateStoryView(id);
+export function getStoryView(id: string, viewerId: string | null = null) {
+  return calculateStoryView(id, viewerId);
 }
 
 export async function getStoryCommentsPage(
   storyId: string,
   cursor: { createdAt: string; id: string } | null,
+  viewerId: string | null = null,
 ) {
   const db = getFirestoreDb();
   const story = await readDocument<StoryRecord>("stories", storyId);
   if (!story || story.status !== "published")
+    return { comments: [], hasMore: false, nextCursor: null };
+  if (!(await canViewAuthorContributions(story.author_id, viewerId)))
     return { comments: [], hasMore: false, nextCursor: null };
 
   let query = db
@@ -1378,10 +1404,11 @@ export async function getStoryCommentsPage(
 }
 
 /** Loads the ancestor chain for a notification-linked comment outside the newest page. */
-export async function getStoryCommentContext(storyId: string, commentId: string) {
+export async function getStoryCommentContext(storyId: string, commentId: string, viewerId: string | null = null) {
   const db = getFirestoreDb();
   const story = await readDocument<StoryRecord>("stories", storyId);
   if (!story || story.status !== "published") return null;
+  if (!(await canViewAuthorContributions(story.author_id, viewerId))) return null;
 
   const chain: CommentRecord[] = [];
   const visited = new Set<string>();

@@ -7,6 +7,7 @@ export type FollowRecord = {
   follower_id: string;
   following_id: string;
   created_at: string;
+  status?: "pending" | "accepted";
 };
 
 export type StoryFollowRecord = {
@@ -32,38 +33,72 @@ export async function toggleAccountFollow(followerId: string, followingId: strin
   const db = getFirestoreDb();
   const id = `${followerId}:${followingId}`;
   const ref = db.collection("follows").doc(id);
-  const snap = await ref.get();
+  const [snap, targetSnap] = await Promise.all([
+    ref.get(),
+    db.collection("profiles").doc(followingId).get(),
+  ]);
+  const target = targetSnap.data() as { banned?: boolean; account_status?: string; profile_visibility?: string } | undefined;
+  if (!targetSnap.exists || target?.banned || target?.account_status === "deactivated") {
+    throw new Error("This account is unavailable.");
+  }
 
   if (snap.exists) {
     await ref.delete();
-    return { following: false };
+    return { following: false, requested: false, status: "none" as const };
   }
 
+  const requested = target.profile_visibility === "private";
   const record: FollowRecord = {
     id,
     follower_id: followerId,
     following_id: followingId,
     created_at: now(),
+    status: requested ? "pending" : "accepted",
   };
   await ref.set(record);
-  return { following: true };
+  if (requested) {
+    try {
+      const [{ pushServerNotification }, actorSnap] = await Promise.all([
+        import("./notifications.server"),
+        db.collection("profiles").doc(followerId).get(),
+      ]);
+      const actor = (actorSnap.data() as { username?: string } | undefined)?.username;
+      await pushServerNotification({
+        userId: followingId,
+        kind: "info",
+        title: "New follow request",
+        description: `${actor ? `@${actor}` : "Someone"} asked to follow your private profile.`,
+        link: "/settings",
+      });
+    } catch (error) {
+      console.warn("[follow request] notification failed", error);
+    }
+  }
+  return {
+    following: !requested,
+    requested,
+    status: requested ? ("pending" as const) : ("accepted" as const),
+  };
 }
 
 /** Follower / following counts for a profile, plus the viewer's own relationship. */
 export async function readFollowStats(profileId: string, viewerId: string | null) {
   const db = getFirestoreDb();
-  const [followers, following, viewerFollow] = await Promise.all([
+  const [allFollowers, allFollowing, pendingFollowers, pendingFollowing, viewerFollow] = await Promise.all([
     db.collection("follows").where("following_id", "==", profileId).count(),
     db.collection("follows").where("follower_id", "==", profileId).count(),
+    db.collection("follows").where("following_id", "==", profileId).where("status", "==", "pending").count(),
+    db.collection("follows").where("follower_id", "==", profileId).where("status", "==", "pending").count(),
     viewerId
       ? db.collection("follows").doc(`${viewerId}:${profileId}`).get()
       : Promise.resolve(null),
   ]);
 
   return {
-    followers,
-    following,
-    isFollowing: Boolean(viewerFollow?.exists),
+    followers: Math.max(0, allFollowers - pendingFollowers),
+    following: Math.max(0, allFollowing - pendingFollowing),
+    isFollowing: Boolean(viewerFollow?.exists && viewerFollow.get("status") !== "pending"),
+    followStatus: viewerFollow?.exists ? (viewerFollow.get("status") === "pending" ? "pending" : "accepted") : "none",
   };
 }
 

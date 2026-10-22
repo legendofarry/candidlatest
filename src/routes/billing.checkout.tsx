@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/billing/checkout")({
-  validateSearch: z.object({ tier: z.enum(["premium", "gold"]), renewal: z.boolean().catch(false) }),
+  validateSearch: z.object({ tier: z.literal("premium"), renewal: z.boolean().catch(false) }),
   head: () => ({ meta: [{ title: "Checkout | Candid" }] }),
   component: CheckoutPage,
 });

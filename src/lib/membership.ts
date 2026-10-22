@@ -1,6 +1,7 @@
 export const MEMBERSHIP_PLANS = {
   basic: { name: "Basic", priceKes: 0, interval: "Free" },
   premium: { name: "Premium", priceKes: 500, interval: "per month" },
+  // Kept only to read existing records. Gold is no longer offered as a package.
   gold: { name: "Gold", priceKes: 1000, interval: "per month" },
 } as const;
 
@@ -31,7 +32,7 @@ export const DEFAULT_MEMBERSHIP = {
 /** Feature limits are defined once here and enforced by both UI and server actions. */
 export const MEMBERSHIP_ENTITLEMENTS = {
   basic: { membershipBadge: false, maxPinnedStories: 0 },
-  premium: { membershipBadge: true, maxPinnedStories: 1 },
+  premium: { membershipBadge: true, maxPinnedStories: 3 },
   gold: { membershipBadge: true, maxPinnedStories: 3 },
 } as const satisfies Record<MembershipTier, { membershipBadge: boolean; maxPinnedStories: number }>;
 
@@ -43,7 +44,7 @@ export function getEffectiveMembershipTier(
   profile: MembershipProfile | null | undefined,
   now = Date.now(),
 ): MembershipTier {
-  if (profile?.account_type === "official") return "gold";
+  if (profile?.account_type === "official") return "premium";
   const currentTier = profile?.subscription_tier ?? "basic";
   const source = profile?.subscription_source ?? (currentTier === "basic" ? "default" : "manual");
   return getMembershipBadgeTier(
@@ -79,5 +80,5 @@ export function getMembershipBadgeTier(
   const active =
     (currentStatus === "active" && (source !== "paid" || !periodEndsAt || periodEnd > now)) ||
     (currentStatus === "cancelled" && source === "paid" && periodEnd > now);
-  return active ? currentTier : "basic";
+  return active ? (currentTier === "gold" ? "premium" : currentTier) : "basic";
 }

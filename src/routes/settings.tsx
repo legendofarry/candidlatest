@@ -10,19 +10,17 @@ import {
   BellRing,
   BookOpen,
   Fingerprint,
-  Gauge,
   Headset,
-  Moon,
   ScrollText,
   Settings2,
   ShieldCheck,
-  Sun,
   DatabaseZap,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { PrivacySettings } from "@/components/site/privacy-settings";
+import { AccountLifecycleSettings } from "@/components/site/account-lifecycle-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { notify } from "@/lib/notifications-store";
 import { setPreference, usePreferences } from "@/lib/preferences";
@@ -58,6 +56,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -428,11 +432,10 @@ function SettingsPage() {
                 <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="font-medium">
-                      {profile.data?.membership?.tier === "gold"
-                        ? "Gold"
-                        : profile.data?.membership?.tier === "premium"
-                          ? "Premium"
-                          : "Basic"}{" "}
+                      {profile.data?.membership?.tier === "premium" ||
+                      profile.data?.membership?.tier === "gold"
+                        ? "Premium"
+                        : "Basic"}{" "}
                       plan
                     </p>
                   </div>
@@ -453,10 +456,10 @@ function SettingsPage() {
                     Security
                   </a>
                   <a
-                    href="#appearance"
+                    href="#advanced"
                     className="block py-2 text-sm text-muted-foreground hover:text-foreground"
                   >
-                    Appearance
+                    Advanced
                   </a>
                   <a
                     href="#privacy"
@@ -505,62 +508,47 @@ function SettingsPage() {
                     ) : null}
                   </SettingsGroup>
                   <div className="mt-4">
-                  <SettingsGroup title="Security & access">
-                    <ToggleRow
-                      icon={<Fingerprint className="size-4" />}
-                      title="Fingerprint / face unlock"
-                      description={
-                        !user
-                          ? "Sign in first to set up biometric unlock."
-                          : bioAvailable
-                            ? "Unlock Candid on this device without typing your password."
-                            : "This device has no browser supported biometric sensor."
-                      }
-                      checked={prefs.biometricUnlock && enrolled}
-                      disabled={!user || !bioAvailable}
-                      onCheckedChange={(next) => void toggleBiometric(next)}
-                    />
-                    {enrolled ? (
-                      <p className="px-4 pb-3 text-xs text-muted-foreground">
-                        Registered: {getCredentials()[0]?.label}
-                      </p>
-                    ) : null}
-                  </SettingsGroup>
+                    <SettingsGroup title="Security & access">
+                      <ToggleRow
+                        icon={<Fingerprint className="size-4" />}
+                        title="Fingerprint / face unlock"
+                        description={
+                          !user
+                            ? "Sign in first to set up biometric unlock."
+                            : bioAvailable
+                              ? "Unlock Candid on this device without typing your password."
+                              : "This device has no browser supported biometric sensor."
+                        }
+                        checked={prefs.biometricUnlock && enrolled}
+                        disabled={!user || !bioAvailable}
+                        onCheckedChange={(next) => void toggleBiometric(next)}
+                      />
+                      {enrolled ? (
+                        <p className="px-4 pb-3 text-xs text-muted-foreground">
+                          Registered: {getCredentials()[0]?.label}
+                        </p>
+                      ) : null}
+                    </SettingsGroup>
                   </div>
                   <div className="mt-4">
                     <SignInMethods user={user} />
                   </div>
                 </div>
 
-                <div id="appearance">
-                  <SettingsGroup title="Appearance & feed">
-                    <ToggleRow
-                      icon={
-                        prefs.theme === "dark" ? (
-                          <Moon className="size-4" />
-                        ) : (
-                          <Sun className="size-4" />
-                        )
-                      }
-                      title="Dark theme"
-                      description="Candid pulse always stays dark for readability."
-                      checked={prefs.theme === "dark"}
-                      onCheckedChange={(next) => setPreference("theme", next ? "dark" : "light")}
-                    />
-                    <ToggleRow
-                      icon={<Gauge className="size-4" />}
-                      title="Reduce motion"
-                      description="Tone down interface animations."
-                      checked={prefs.reduceMotion}
-                      onCheckedChange={(next) => setPreference("reduceMotion", next)}
-                    />
-                    <ToggleRow
-                      icon={<ScrollText className="size-4" />}
-                      title="Compact feed cards"
-                      description="Show shorter previews so more stories fit on screen."
-                      checked={prefs.compactFeed}
-                      onCheckedChange={(next) => setPreference("compactFeed", next)}
-                    />
+                <div id="advanced">
+                  <SettingsGroup title="Advanced">
+                    <Accordion type="single" collapsible className="w-full px-0">
+                      <AccordionItem value="advanced-actions" className="border-b-0">
+                        <AccordionTrigger className="px-4 py-3 text-left text-sm font-medium text-foreground hover:no-underline">
+                          Account actions
+                        </AccordionTrigger>
+                        <AccordionContent className="px-0 pb-0">
+                          <div className="px-4 pb-4 pt-2">
+                            <AccountLifecycleSettings />
+                          </div>
+                        </AccordionContent>
+                      </AccordionItem>
+                    </Accordion>
                   </SettingsGroup>
                 </div>
 
@@ -820,9 +808,19 @@ function ToggleRow({
   onCheckedChange: (next: boolean) => void;
 }) {
   return (
-    <Row {...row}>
-      <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
-    </Row>
+    <button
+      type="button"
+      className={cn(
+        "flex w-full items-center gap-3 p-4 text-left transition-colors hover:bg-secondary/40 disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:bg-transparent",
+      )}
+      disabled={disabled}
+      aria-pressed={checked}
+      onClick={() => onCheckedChange(!checked)}
+    >
+      <Row {...row}>
+        <Switch checked={checked} disabled={disabled} onCheckedChange={onCheckedChange} />
+      </Row>
+    </button>
   );
 }
 

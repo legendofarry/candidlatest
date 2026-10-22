@@ -38,10 +38,14 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
           subscription_status?: string;
           subscription_source?: string;
           subscription_version?: number;
+          account_status?: string;
         }
       | undefined;
     if (profileData?.banned) {
       throw new Error("This account has been restricted.");
+    }
+    if (profileData?.account_status === "deletion_pending" || profileData?.account_status === "deactivated" || profileData?.account_status === "deletion_in_progress") {
+      throw new Error("ACCOUNT_UNAVAILABLE");
     }
     const investigationHold = profileData?.investigation_hold;
     if (
@@ -92,6 +96,23 @@ export const requireFirebaseAuth = createMiddleware({ type: "function" }).server
         claims: decoded,
       },
     });
+  },
+);
+
+/** Verifies a Firebase session when present, while allowing anonymous public reads. */
+export const optionalFirebaseAuth = createMiddleware({ type: "function" }).server(
+  async ({ next }) => {
+    const request = getRequest();
+    const authHeader = request?.headers.get("authorization");
+    let userId: string | null = null;
+    if (authHeader?.startsWith("Bearer ")) {
+      const token = authHeader.slice("Bearer ".length).trim();
+      if (token) {
+        const decoded = await getFirebaseAuth().verifyIdToken(token);
+        userId = decoded.uid || null;
+      }
+    }
+    return next({ context: { userId } });
   },
 );
 

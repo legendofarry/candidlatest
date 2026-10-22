@@ -5,7 +5,7 @@ import { requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 export const switchMyMembership = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) => z.object({
-    tier: z.enum(["basic", "premium", "gold"]),
+    tier: z.enum(["basic", "premium"]),
     requestId: z.string().uuid(),
     expectedVersion: z.number().int().nonnegative(),
   }).parse(input))

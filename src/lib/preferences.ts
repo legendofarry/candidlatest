@@ -7,8 +7,6 @@ export type Preferences = {
   autoLockMinutes: number;
   /** Answer to the one-time "remember me next time?" question at sign-out. */
   sessionMemory: "ask" | "lock" | "signout";
-  reduceMotion: boolean;
-  compactFeed: boolean;
   autoplayInsights: boolean;
 };
 
@@ -29,8 +27,6 @@ const DEFAULTS: Preferences = {
   biometricUnlock: false,
   autoLockMinutes: 5,
   sessionMemory: "ask",
-  reduceMotion: false,
-  compactFeed: false,
   autoplayInsights: true,
 };
 
@@ -65,7 +61,6 @@ export function hydratePreferences() {
 function applySideEffects(next: Preferences) {
   if (typeof document === "undefined") return;
   document.documentElement.classList.toggle("dark", next.theme === "dark");
-  document.documentElement.classList.toggle("reduce-motion", next.reduceMotion);
   document
     .querySelector('meta[name="theme-color"]')
     ?.setAttribute("content", next.theme === "dark" ? "#08070e" : "#fbfafc");

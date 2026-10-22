@@ -31,7 +31,7 @@ test("effective package falls back to Basic when an assigned tier is inactive", 
       subscription_source: "paid",
       subscription_period_ends_at: "2099-01-01",
     }),
-    "gold",
+    "premium",
   );
 });
 
@@ -58,7 +58,7 @@ test("package entitlements provide profile pins without limiting core community 
   });
   assert.deepEqual(getMembershipEntitlements("premium"), {
     membershipBadge: true,
-    maxPinnedStories: 1,
+    maxPinnedStories: 3,
   });
   assert.deepEqual(getMembershipEntitlements("gold"), {
     membershipBadge: true,
