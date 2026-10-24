@@ -66,7 +66,7 @@ function BillingPage() {
           <header className="max-w-3xl">
             <div className="flex items-center gap-2 text-sm font-medium text-primary"><WalletCards className="size-4" /> Billing &amp; packages</div>
             <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl">{isOfficial ? "Official Candid access" : "Your membership"}</h1>
-            <p className="mt-3 text-sm text-muted-foreground">{isOfficial ? "Gold access is complimentary for the official Candid account." : "Manage your package and payment history."}</p>
+            <p className="mt-3 text-sm text-muted-foreground">{isOfficial ? "Premium access is complimentary for the official Candid account." : "Manage your package and payment history."}</p>
           </header>
 
           {billing.isLoading ? <div className="mt-8 rounded-3xl border bg-card p-8 text-sm text-muted-foreground">Loading billing details…</div> : null}

@@ -1,10 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useInfiniteQuery, useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { AnimatePresence, motion } from "motion/react";
-import { Activity, Flame, PenLine, Sparkles, TrendingUp, Users, X } from "lucide-react";
+import { useEffect, useState } from "react";
+import { AnimatePresence } from "motion/react";
+import { Activity, Flame, PenLine, Sparkles, TrendingUp, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
-import { getFilterOptions, getPulse, listStories, listStoryPage } from "@/lib/public.functions";
+import { getFilterOptions, listStories, listStoryPage } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
 import type { PublicStory } from "@/components/site/story-card";
 import { FeedDiscussionPanel } from "@/components/site/feed-discussion-panel";
@@ -16,7 +16,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { useAuth } from "@/hooks/useAuth";
-import { formatCount } from "@/lib/utils";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import {
   Drawer,
@@ -69,6 +68,7 @@ const SORTS = [
 ] as const;
 
 function FeedPage() {
+  const { user } = useAuth();
   const { data: filters } = useSuspenseQuery(filtersQuery);
   const { data: initialFeed } = useSuspenseQuery(feedQuery);
   const [sort, setSort] = useState<"new" | "top" | "trending">("new");
@@ -89,14 +89,14 @@ function FeedPage() {
   useEffect(() => resetVisibleCount(), [sort, industry, county, area, q, resetVisibleCount]);
 
   const feedPages = useInfiniteQuery({
-    queryKey: ["story-pages", sort, industry, county, area],
+    queryKey: ["story-pages", user?.uid ?? null, sort, industry, county, area],
     initialPageParam: null as { createdAt: string; id: string } | null,
     queryFn: ({ pageParam }) =>
       sort === "new"
         ? listStoryPage({ data: { limit: 20, cursor: pageParam, industry, county, area } })
         : listStories({ data: { sort, industry, county, area, cursor: pageParam } }),
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
-    ...(isDefaultView ? { initialData: { pages: [initialFeed], pageParams: [null] } } : {}),
+    ...(!user && isDefaultView ? { initialData: { pages: [initialFeed], pageParams: [null] } } : {}),
   });
   const areaOptions = county ? (filters.areasByCounty[county] ?? []) : filters.areas;
 
@@ -129,8 +129,7 @@ function FeedPage() {
       <section className="mesh-hero animate-fade relative overflow-hidden rounded-3xl border border-border p-4 sm:p-6 md:p-12">
         <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
           <div>
-            <LiveMemberCounter />
-            <h1 className="mt-3 max-w-3xl text-3xl font-semibold leading-[1.05] sm:mt-4 sm:text-4xl md:text-6xl">
+            <h1 className="max-w-3xl text-3xl font-semibold leading-[1.05] sm:text-4xl md:text-6xl">
               The <span className="text-gradient">real reasons</span> Kenyans left their jobs.
             </h1>
             <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:text-base md:text-lg">
@@ -427,99 +426,5 @@ function ComplimentaryPremiumBanner() {
         <X className="size-4" />
       </button>
     </section>
-  );
-}
-
-function LiveMemberCounter() {
-  const { data } = useQuery({
-    queryKey: ["pulse"],
-    queryFn: () => getPulse(),
-    staleTime: 30_000,
-    refetchInterval: 60_000,
-  });
-  const count = data?.voices ?? null;
-  const [animatedCount, setAnimatedCount] = useState(0);
-  const currentCount = useRef(0);
-
-  useEffect(() => {
-    if (count === null || count === currentCount.current) return;
-
-    const from = currentCount.current;
-    const difference = count - from;
-    const duration = Math.min(1800, Math.max(500, Math.abs(difference) * 24));
-    let frame = 0;
-    let startTime = 0;
-
-    const tick = (time: number) => {
-      if (!startTime) startTime = time;
-      const progress = Math.min(1, (time - startTime) / duration);
-      const eased = 1 - (1 - progress) ** 3;
-      const next = Math.round(from + difference * eased);
-      currentCount.current = next;
-      setAnimatedCount(next);
-
-      if (progress < 1) frame = window.requestAnimationFrame(tick);
-    };
-
-    frame = window.requestAnimationFrame(tick);
-    return () => window.cancelAnimationFrame(frame);
-  }, [count]);
-
-  const displayCount = count === null ? "—" : formatCount(animatedCount);
-
-  return (
-    <div
-      aria-label={
-        count === null
-          ? "Candid member count unavailable"
-          : `${count.toLocaleString("en-KE")} members on Candid`
-      }
-      aria-live="polite"
-      className="relative mb-2 flex h-11 items-center justify-between overflow-visible text-foreground sm:mb-3 sm:h-auto sm:min-h-32"
-    >
-      <div className="relative z-10 max-w-[58%]">
-        <div className="flex items-center gap-2 text-[9px] font-semibold uppercase tracking-[0.18em] text-muted-foreground sm:text-[10px]">
-          <Users className="size-3.5 text-primary sm:size-4" />
-          The Candid community
-        </div>
-        <p className="mt-2 hidden text-lg font-semibold leading-tight tracking-tight text-foreground sm:block sm:text-xl md:text-2xl">
-          Real people.
-          <br />A growing voice.
-        </p>
-        <p className="mt-1.5 hidden text-[10px] text-muted-foreground sm:block sm:text-xs">
-          Every story starts with someone.
-        </p>
-      </div>
-
-      <div
-        className="pointer-events-none absolute inset-y-0 right-0 flex w-[45%] items-center justify-end"
-        aria-hidden="true"
-      >
-        <span className="absolute inset-x-0 top-[28%] h-px bg-foreground/10" />
-        <span className="absolute inset-x-0 top-1/2 h-px bg-foreground/10" />
-        <span className="absolute inset-x-0 top-[72%] h-px bg-foreground/10" />
-        <AnimatePresence initial={false} mode="popLayout">
-          <motion.span
-            key={displayCount}
-            initial={{ y: 14, opacity: 0, filter: "blur(6px)" }}
-            animate={{ y: 0, opacity: 1, filter: "blur(0px)" }}
-            exit={{ y: -14, opacity: 0, filter: "blur(6px)" }}
-            transition={{ duration: 0.4, ease: "easeOut" }}
-            className="relative z-10 whitespace-nowrap text-4xl font-black leading-none tracking-[-0.025em] tabular-nums sm:text-7xl md:text-8xl lg:text-9xl"
-          >
-            <span className="font-black text-foreground drop-shadow-[3px_3px_0_rgba(163,208,0,0.35)]">
-              {displayCount}
-            </span>
-          </motion.span>
-        </AnimatePresence>
-        <span className="absolute -bottom-1 right-0 flex items-center gap-1.5 whitespace-nowrap text-[9px] text-muted-foreground sm:text-[10px]">
-          <span className="relative flex size-1.5">
-            <span className="absolute inline-flex size-full animate-ping rounded-full bg-emerald-500/60" />
-            <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-          </span>
-          members on Candid
-        </span>
-      </div>
-    </div>
   );
 }

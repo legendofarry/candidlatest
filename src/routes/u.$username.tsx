@@ -545,7 +545,7 @@ function PublicProfilePage() {
                 <article key={story.id} className="px-4 py-3 sm:px-5">
                   <p className="text-xs text-muted-foreground">
                     {story.post_type === "announcement"
-                      ? "Candid update"
+                      ? "Candid"
                       : story.company_name || "Workplace story"}
                     {story.county ? ` · ${story.county}${story.area ? `, ${story.area}` : ""}` : ""}
                   </p>
@@ -554,7 +554,7 @@ function PublicProfilePage() {
                     params={{ id: story.id }}
                     className="mt-1 block font-semibold hover:text-primary"
                   >
-                    {story.post_type === "announcement" ? "Candid update" : story.title}
+                    {story.post_type === "announcement" ? "Candid" : story.title}
                   </Link>
                   <p className="mt-1 line-clamp-2 whitespace-pre-line text-sm text-muted-foreground">
                     <MentionText text={story.body} />
@@ -615,7 +615,7 @@ function PublicProfilePage() {
                         <p className="font-semibold">@{profile.username}</p>
                         <p className="text-xs text-muted-foreground">
                           {story.post_type === "announcement"
-                            ? "Candid update"
+                            ? "Candid"
                             : story.company_name || "Workplace story"}
                           {story.post_type !== "announcement" && story.county
                             ? ` · ${story.county}${story.area ? `, ${story.area}` : ""}`
@@ -630,7 +630,7 @@ function PublicProfilePage() {
                       className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                     >
                       <h3 className="mt-3 text-base font-semibold">
-                        {story.post_type === "announcement" ? "Candid update" : story.title}
+                        {story.post_type === "announcement" ? "Candid" : story.title}
                       </h3>
                       <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
                         <MentionText text={story.body} linkMentions={false} />
@@ -653,7 +653,7 @@ function PublicProfilePage() {
                             <img
                               key={`${media.url}-${index}`}
                               src={media.url}
-                              alt={`Candid update attachment ${index + 1}`}
+                              alt={`Candid attachment ${index + 1}`}
                               loading="lazy"
                               className="max-h-[60vh] min-h-32 w-full object-contain"
                             />

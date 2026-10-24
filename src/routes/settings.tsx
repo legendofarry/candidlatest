@@ -15,6 +15,8 @@ import {
   Settings2,
   ShieldCheck,
   DatabaseZap,
+  EyeOff,
+  RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -46,6 +48,7 @@ import {
 } from "@/lib/push.functions";
 import { firebaseApp, registerFirebaseServiceWorker } from "@/integrations/firebase/client";
 import { hasPushOptIn, setPushOptIn } from "@/lib/push-preference";
+import { getMyFeedPreferences, updateFeedPreference } from "@/lib/social.functions";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -97,12 +100,33 @@ function SettingsPage() {
   const registerPush = useServerFn(registerMyPushToken);
   const unregisterPush = useServerFn(unregisterMyPushToken);
   const sendPushTest = useServerFn(sendMyPushTestNotification);
+  const readFeedPreferences = useServerFn(getMyFeedPreferences);
+  const changeFeedPreference = useServerFn(updateFeedPreference);
   const developerMode = import.meta.env.DEV || import.meta.env["VITE_DEVELOPER_MODE"] === "true";
   const profile = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
     enabled: Boolean(user),
   });
+  const feedPreferences = useQuery({
+    queryKey: ["feed-preferences", user?.uid ?? null],
+    queryFn: () => readFeedPreferences(),
+    enabled: Boolean(user),
+  });
+
+  async function restoreFeedItem(item: NonNullable<typeof feedPreferences.data>[number]) {
+    if (!user) return;
+    try {
+      const items = await changeFeedPreference({
+        data: { kind: item.kind, target_id: item.target_id, hidden: false },
+      });
+      queryClient.setQueryData(["feed-preferences", user.uid], items);
+      void queryClient.invalidateQueries({ queryKey: ["story-pages", user.uid] });
+      notify.success("Feed preference removed.");
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not restore this feed content.");
+    }
+  }
 
   useEffect(() => {
     void isPlatformAuthenticatorAvailable().then(setBioAvailable);
@@ -553,6 +577,31 @@ function SettingsPage() {
                 </div>
 
                 <div id="privacy">
+                  <div className="mb-4">
+                    <SettingsGroup title="Not interested">
+                      <p className="px-4 pt-4 text-sm text-muted-foreground">
+                        Posts you hide and accounts or employers you mute can be restored here.
+                      </p>
+                      {feedPreferences.isLoading ? (
+                        <p className="p-4 text-sm text-muted-foreground">Loading preferences…</p>
+                      ) : feedPreferences.data?.length ? (
+                        <ul className="divide-y divide-border/70">
+                          {feedPreferences.data.map((item) => (
+                            <li key={`${item.kind}:${item.target_id}`} className="flex items-center gap-3 px-4 py-3">
+                              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"><EyeOff className="size-4" /></span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium">{item.label}</span>
+                                <span className="block text-xs text-muted-foreground">{item.kind === "story" ? "Hidden post" : item.kind === "author" ? "Muted account" : "Muted employer"}</span>
+                              </span>
+                              <Button type="button" size="sm" variant="outline" onClick={() => void restoreFeedItem(item)}><RotateCcw className="size-4" /> Show again</Button>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : (
+                        <p className="p-4 text-sm text-muted-foreground">You have no hidden posts or muted accounts and employers.</p>
+                      )}
+                    </SettingsGroup>
+                  </div>
                   <PrivacySettings />
                 </div>
 

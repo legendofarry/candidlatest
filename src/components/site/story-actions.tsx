@@ -2,13 +2,12 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowBigUp, Flag, Loader2, MessageSquare, Send, Users } from "lucide-react";
+import { ArrowBigUp, Loader2, MessageSquare, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { notify as toast } from "@/lib/notifications-store";
 import { addComment, castVote } from "@/lib/actions.functions";
-import { ReportDialog } from "@/components/site/report-dialog";
 import { CommentThread } from "@/components/site/comment-thread";
 import { getStory } from "@/lib/public.functions";
 import { useAuth } from "@/hooks/useAuth";
@@ -47,8 +46,6 @@ export function StoryActions({
   const comment = useServerFn(addComment);
   const [open, setOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
-  const [reported, setReported] = useState(false);
   const [body, setBody] = useState("");
   const [optimistic, setOptimistic] = useState<{ up: number; metoo: number; comments: number }>({
     up: 0,
@@ -103,7 +100,7 @@ export function StoryActions({
   return (
     <div onClick={stop} className="relative z-10">
       <div
-        className={`mt-3 grid items-center gap-1 border-t border-border pt-3 sm:flex sm:flex-wrap sm:gap-1.5 ${announcement ? "grid-cols-4" : "grid-cols-6"}`}
+        className={`mt-3 grid items-center gap-1 pt-3 sm:flex sm:flex-wrap sm:gap-1.5 ${announcement ? "grid-cols-4" : "grid-cols-5"}`}
       >
         {!announcement ? (
           <>
@@ -149,27 +146,7 @@ export function StoryActions({
           className="contents sm:flex"
         />
 
-        {!announcement ? (
-          <ActionChip
-            icon={<Flag className="size-4" />}
-            label={reported ? "Reported" : ""}
-            hint={reported ? "Already reported" : "Report"}
-            disabled={!user || reported}
-            className="text-danger sm:ml-auto"
-            onClick={() => setReportOpen(true)}
-          />
-        ) : null}
       </div>
-
-      {!announcement ? (
-        <ReportDialog
-          open={reportOpen}
-          onOpenChange={setReportOpen}
-          targetType="story"
-          targetId={storyId}
-          onReported={() => setReported(true)}
-        />
-      ) : null}
 
       {open ? (
         <div className="animate-fade mt-3 space-y-3 border-t border-border/70 pt-3">

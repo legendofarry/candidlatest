@@ -254,11 +254,11 @@ export function CommentThread({
         "rounded-2xl border border-border bg-card",
         fullWidth && "rounded-none border-x-0 border-y border-border/70 bg-transparent",
         panelMode &&
-          !fitContent &&
-          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
+        !fitContent &&
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
         panelMode &&
-          fitContent &&
-          "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
+        fitContent &&
+        "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
       )}
     >
       <header
@@ -463,7 +463,7 @@ function CommentRow({
   const remove = useServerFn(deleteComment);
   const [open, setOpen] = useState(
     (depth === 0 && comment.replies.some((r) => r.is_official)) ||
-      (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
+    (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
   );
   const [reportOpen, setReportOpen] = useState(false);
   const [localLiked, setLocalLiked] = useState<boolean | null>(null);
@@ -566,11 +566,6 @@ function CommentRow({
               tier={comment.author_membership_tier}
               official={comment.author_username?.toLowerCase() === "candid"}
             />
-            {comment.is_official ? (
-              <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                Official reply
-              </span>
-            ) : null}
             <span className="text-muted-foreground">· {timeAgo(comment.created_at)}</span>
           </div>
 
@@ -701,21 +696,21 @@ function CommentRow({
       <AnimatePresence initial={false}>
         {open
           ? comment.replies
-              .slice(0, visibleReplies)
-              .map((reply) => (
-                <CommentRow
-                  key={reply.id}
-                  comment={reply}
-                  storyId={storyId}
-                  depth={depth + 1}
-                  liked={liked}
-                  reported={reported}
-                  focusCommentId={focusCommentId}
-                  onReply={onReply}
-                  onChanged={onChanged}
-                  onDeleted={onDeleted}
-                />
-              ))
+            .slice(0, visibleReplies)
+            .map((reply) => (
+              <CommentRow
+                key={reply.id}
+                comment={reply}
+                storyId={storyId}
+                depth={depth + 1}
+                liked={liked}
+                reported={reported}
+                focusCommentId={focusCommentId}
+                onReply={onReply}
+                onChanged={onChanged}
+                onDeleted={onDeleted}
+              />
+            ))
           : null}
       </AnimatePresence>
 

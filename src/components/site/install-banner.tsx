@@ -1,15 +1,15 @@
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { motion } from "motion/react";
-import { ArrowDownToLine, Check, Flame, Share, Smartphone, X } from "lucide-react";
+import { ArrowDownToLine, Check, CheckCircle2, Flame, Loader2, Share, Smartphone, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { registerFirebaseServiceWorker } from "@/integrations/firebase/client";
+import { isPwaInstalled, markPwaInstalled, rememberInstallPrompt, requestPwaInstall, type InstallProgress } from "@/lib/pwa-install";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 const DISMISS_KEY = "candid-install-banner-dismissed-at";
 const LOGIN_SESSION_KEY = "candid-install-prompt-login-session";
-const INSTALLED_KEY = "candid-pwa-installed";
 const COOLDOWN_MS = 2 * 60 * 1000;
 
 type InstallPromptEvent = Event & {
@@ -30,20 +30,12 @@ function isPreviewOrLocal() {
   );
 }
 
-function isInstalled() {
-  try {
-    if (localStorage.getItem(INSTALLED_KEY) === "true") return true;
-  } catch {
-    // The browser's display mode check below still works without storage.
-  }
-  return (
-    window.matchMedia("(display-mode: standalone)").matches ||
-    ("standalone" in navigator && navigator.standalone === true)
-  );
+function isIosBrowser() {
+  return isIosDevice() && !isPwaInstalled();
 }
 
-function isIosBrowser() {
-  return /iphone|ipad|ipod/i.test(navigator.userAgent) && !isInstalled();
+function isIosDevice() {
+  return typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
 }
 
 /** A recurring install invitation, backed by the browser's real PWA prompt. */
@@ -54,6 +46,7 @@ export function InstallBanner() {
   const [iosInstructions, setIosInstructions] = useState(false);
   const [promptEvent, setPromptEvent] = useState<InstallPromptEvent | null>(null);
   const [installError, setInstallError] = useState(false);
+  const [installProgress, setInstallProgress] = useState<InstallProgress | null>(null);
   const [loginAt, setLoginAt] = useState(0);
   const [dismissCycle, setDismissCycle] = useState(0);
 
@@ -81,22 +74,26 @@ export function InstallBanner() {
   useEffect(() => {
     const capturePrompt = (event: Event) => {
       event.preventDefault();
+      rememberInstallPrompt(event);
       setPromptEvent(event as InstallPromptEvent);
     };
     const installed = () => {
-      try {
-        localStorage.setItem(INSTALLED_KEY, "true");
-      } catch {
-        // The browser's standalone display mode remains the source of truth.
-      }
+      markPwaInstalled();
       setOpen(false);
       setPromptEvent(null);
+      setInstallProgress("installed");
     };
+    const promptConsumed = () => setPromptEvent(null);
     window.addEventListener("beforeinstallprompt", capturePrompt);
     window.addEventListener("appinstalled", installed);
+    window.addEventListener("candid:pwa-prompt-consumed", promptConsumed);
+    const onProgress = (event: Event) => setInstallProgress((event as CustomEvent<InstallProgress>).detail);
+    window.addEventListener("candid:pwa-install-progress", onProgress);
     return () => {
       window.removeEventListener("beforeinstallprompt", capturePrompt);
       window.removeEventListener("appinstalled", installed);
+      window.removeEventListener("candid:pwa-prompt-consumed", promptConsumed);
+      window.removeEventListener("candid:pwa-install-progress", onProgress);
     };
   }, []);
 
@@ -112,7 +109,7 @@ export function InstallBanner() {
       setOpen(false);
       return;
     }
-    if (isPreviewOrLocal() || isInstalled()) return;
+    if (isPreviewOrLocal() || isPwaInstalled()) return;
     try {
       const dismissedAt = Number(localStorage.getItem(DISMISS_KEY) ?? 0);
       const elapsed = Date.now() - dismissedAt;
@@ -150,16 +147,10 @@ export function InstallBanner() {
     if (!promptEvent) return;
     setInstallError(false);
     try {
-      await promptEvent.prompt();
-      const choice = await promptEvent.userChoice;
-      if (choice.outcome === "accepted") {
-        try {
-          localStorage.setItem(INSTALLED_KEY, "true");
-        } catch {
-          // The browser's display mode remains the source of truth.
-        }
+      const outcome = await requestPwaInstall();
+      if (outcome === "accepted" || outcome === "installed") {
         setOpen(false);
-      } else {
+      } else if (outcome === "dismissed") {
         dismiss();
       }
     } catch (error) {
@@ -171,6 +162,23 @@ export function InstallBanner() {
   }
 
   return (
+    <>
+    <Dialog open={installProgress !== null} onOpenChange={(next) => { if (!next) setInstallProgress(null); }}>
+      <DialogContent className="fixed inset-x-0 bottom-0 top-auto left-0 z-[150] w-full max-w-none translate-x-0 translate-y-0 rounded-t-3xl border-border bg-background p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:inset-auto sm:left-1/2 sm:top-1/2 sm:max-w-md sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-3xl">
+        <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-primary/15 text-primary">
+          {installProgress === "installed" ? <CheckCircle2 className="size-7" /> : installProgress === "opening" || installProgress === "accepted" ? <Loader2 className="size-7 animate-spin" /> : <Smartphone className="size-7" />}
+        </div>
+        <DialogTitle className="mt-4 text-center font-display text-xl font-bold">
+          {installProgress === "installed" ? "Candid is installed" : installProgress === "opening" ? "Starting installation" : installProgress === "accepted" ? "Finish installing Candid" : installProgress === "dismissed" ? "Installation cancelled" : isPwaInstalled() ? "Candid is already installed" : "Install from your browser"}
+        </DialogTitle>
+        <DialogDescription className="mt-2 text-center leading-relaxed">
+          {installProgress === "installed" || isPwaInstalled() ? "Open Candid from your home screen or apps list." : installProgress === "opening" ? "Confirm the install request in the browser prompt." : installProgress === "accepted" ? "Your browser accepted the request. Complete any final confirmation it shows." : isIosDevice() ? "In Safari, tap Share, then choose Add to Home Screen. The browser controls this step." : "This browser did not offer an automatic install prompt. Open its menu and choose Install app or Add to Home screen."}
+        </DialogDescription>
+        {installProgress === "opening" || installProgress === "accepted" ? <div className="mt-5 h-1.5 overflow-hidden rounded-full bg-muted"><motion.div className="h-full w-1/3 rounded-full bg-primary" animate={{ x: ["-100%", "300%"] }} transition={{ duration: 1.5, repeat: Infinity, ease: "easeInOut" }} /></div> : null}
+        {installProgress !== "opening" && installProgress !== "accepted" ? <Button className="mt-5 w-full" onClick={() => setInstallProgress(null)}>Done</Button> : null}
+        {installProgress === "accepted" ? <Button variant="ghost" className="mt-3 w-full" onClick={() => setInstallProgress(null)}>Close</Button> : null}
+      </DialogContent>
+    </Dialog>
     <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : dismiss())}>
       <DialogContent
         aria-describedby="install-candid-description"
@@ -284,5 +292,6 @@ export function InstallBanner() {
         </motion.div>
       </DialogContent>
     </Dialog>
+    </>
   );
 }

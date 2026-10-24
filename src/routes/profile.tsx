@@ -10,7 +10,6 @@ import {
   PenLine,
   Settings,
   ShieldCheck,
-  Smartphone,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -407,27 +406,6 @@ function ProfilePage() {
                     <span className="block font-medium">Account settings</span>
                     <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
                       Privacy and preferences
-                    </span>
-                  </span>
-                </span>
-                <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-              </Link>
-            </Button>
-
-            <Button
-              asChild
-              variant="outline"
-              className="h-auto min-h-14 justify-between rounded-none border-0 bg-transparent px-0 py-3 text-left shadow-none hover:bg-secondary/30 md:min-h-16 md:rounded-xl md:border md:bg-background md:px-4"
-            >
-              <Link to="/download">
-                <span className="flex min-w-0 items-center gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                    <Smartphone className="size-4" />
-                  </span>
-                  <span className="min-w-0">
-                    <span className="block font-medium">Install Candid</span>
-                    <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">
-                      Add the web app to your device
                     </span>
                   </span>
                 </span>

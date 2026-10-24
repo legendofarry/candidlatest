@@ -356,9 +356,6 @@ export const createStory = createServerFn({ method: "POST" })
     const storyRef = db.collection("stories").doc(storyId);
     if ((await storyRef.get()).exists) throw new Error("This story has already been submitted.");
     batch.set(storyRef, created);
-    if (autoApproved) {
-      batch.update(db.collection("companies").doc(company.id), { is_public: true });
-    }
     batch.set(db.collection("story_ai_reviews").doc(storyId), {
       id: storyId,
       story_id: storyId,

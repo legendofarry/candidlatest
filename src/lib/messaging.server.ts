@@ -236,7 +236,7 @@ export async function ensureCandidAccount() {
       username: CANDID_USERNAME,
       account_type: "official",
       verified: true,
-      subscription_tier: "gold",
+      subscription_tier: "premium",
       subscription_status: "active",
       subscription_source: "complimentary",
       subscription_period_ends_at: null,

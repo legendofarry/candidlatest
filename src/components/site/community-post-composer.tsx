@@ -140,12 +140,12 @@ export function CommunityPostComposer() {
         queryClient.invalidateQueries({ queryKey: ["stories"] }),
         queryClient.invalidateQueries({ queryKey: ["story", result.id] }),
       ]);
-      toast.success("Update published");
+      toast.success("Post published");
       await navigate({ to: "/stories/$id", params: { id: result.id } });
     } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Could not publish the update.";
+      const message = cause instanceof Error ? cause.message : "Could not publish the post.";
       setError(message);
-      toast.error("Could not publish update", { description: message });
+      toast.error("Could not publish post", { description: message });
     } finally {
       setSubmitting(false);
     }
@@ -163,7 +163,7 @@ export function CommunityPostComposer() {
           Candid community
         </p>
         <h1 className="mt-2 font-display text-3xl font-semibold tracking-tight sm:text-4xl">
-          Share an update
+          Share a post
         </h1>
         <p className="mt-2 text-sm text-muted-foreground">
           News, announcements and moments from Candid.
@@ -176,7 +176,7 @@ export function CommunityPostComposer() {
         <p className="py-8 text-sm text-muted-foreground">Checking account…</p>
       ) : !canPublish ? (
         <p className="py-8 text-sm text-muted-foreground">
-          Community updates can only be published from the official Candid account.
+          Candid posts can only be published from the official Candid account.
         </p>
       ) : (
         <section className="py-6">
@@ -184,9 +184,9 @@ export function CommunityPostComposer() {
             <ProfileAvatar initials="C" photoUrl={null} className="size-11" />
             <div>
               <p className="font-semibold">
-                Candid <span className="text-primary">✓</span>
+                Candid
               </p>
-              <p className="text-xs text-muted-foreground">Official community update</p>
+              <p className="text-xs text-muted-foreground">Candid</p>
             </div>
           </div>
           <Textarea
@@ -269,7 +269,7 @@ export function CommunityPostComposer() {
               ) : (
                 <Send className="size-4" />
               )}
-              {submitting ? "Publishing…" : "Publish update"}
+              {submitting ? "Publishing…" : "Publish post"}
             </Button>
           </div>
           {error ? (

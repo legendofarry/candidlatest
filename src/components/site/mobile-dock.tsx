@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
   Bell,
   Building2,
@@ -11,6 +11,7 @@ import {
   Search,
   Scale,
   Settings,
+  Smartphone,
   Trophy,
   UserRound,
   Wallet,
@@ -25,6 +26,8 @@ import {
 import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
+import { requestPwaInstall } from "@/lib/pwa-install";
+import { notify } from "@/lib/notifications-store";
 
 type DockSheet = "you" | null;
 
@@ -53,6 +56,7 @@ export function MobileDock({
   messageUnread?: number;
   onLeave: () => void;
 }) {
+  const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const unread = useUnreadCount();
   const [sheet, setSheet] = useState<DockSheet>(null);
@@ -156,6 +160,18 @@ export function MobileDock({
             </DrawerDescription>
           </DrawerHeader>
           <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 pb-[max(2rem,env(safe-area-inset-bottom))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {signedIn ? <button
+              type="button"
+              onClick={() => {
+                setSheet(null);
+                void requestPwaInstall().catch(() => notify.error("Your browser could not open the install prompt. Try the browser menu."));
+              }}
+              className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary px-3 py-3.5 text-left text-primary-foreground shadow-[0_0_28px_hsl(var(--primary)/0.32)] transition hover:brightness-105 active:scale-[0.99]"
+            >
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-black/10"><Smartphone className="size-5" /></span>
+              <span className="min-w-0 flex-1"><span className="block text-sm font-bold">Install Candid app</span><span className="mt-0.5 block text-xs text-primary-foreground/80">Check this device and install from your browser</span></span>
+              <span aria-hidden className="rounded-full bg-black/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">App</span>
+            </button> : null}
             <button
               type="button"
               onClick={() => {

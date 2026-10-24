@@ -8,6 +8,25 @@ import { getFirestoreDb } from "./firebase.server";
 
 const storyInput = (input: unknown) => z.object({ story_id: z.string().min(1) }).parse(input);
 
+export const getMyFeedPreferences = createServerFn({ method: "GET" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    const { readFeedPreferences } = await import("./social.server");
+    return readFeedPreferences(context.userId);
+  });
+
+export const updateFeedPreference = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    kind: z.enum(["story", "author", "company"]),
+    target_id: z.string().min(1).max(200),
+    hidden: z.boolean(),
+  }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { setFeedPreference } = await import("./social.server");
+    return setFeedPreference(context.userId, data.kind, data.target_id, data.hidden);
+  });
+
 export const followAccount = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) => z.object({ user_id: z.string().min(1) }).parse(input))

@@ -43,7 +43,11 @@ Push alerts are opt-in per browser/device from Settings. They use Firebase Cloud
 
 Before deploying push notifications:
 
-For presence indicators, create a Firebase Realtime Database, deploy \`database.rules.json\`, and set \`VITE_FIREBASE_DATABASE_URL\` to the database URL in Firebase Console. Rebuild and redeploy after setting this value.
+For presence and calls, create a Firebase Realtime Database, deploy \`database.rules.json\`, and set \`VITE_FIREBASE_DATABASE_URL\` to the database URL in Firebase Console. Set \`FIREBASE_DATABASE_URL\` in the server environment too, then rebuild and redeploy.
+
+Call cleanup and expired-account deletion run as Netlify Scheduled Functions; Firebase Cloud Functions are not used. They run only on a published Netlify deploy. The call cleanup runs every two minutes and the account purge runs every fifteen minutes. Configure the Main App's Firebase service-account JSON (or the server-side client email/private key variables) in Netlify's runtime environment, never in a `VITE_` variable. The service account must be allowed to manage the app's Realtime Database, Firestore, and Firebase Authentication users. Netlify's Free plan has a shared monthly credit cap; reaching it pauses the site until the next billing cycle rather than charging over the cap.
+
+Voice and video calling need a TURN relay to work reliably across mobile carriers and restrictive networks. Configure \`VITE_TURN_SERVER_URL\`, \`VITE_TURN_USERNAME\`, and \`VITE_TURN_CREDENTIAL\` with short-lived credentials from your TURN provider. The browser can only install a web app when its native install prompt is available; otherwise Candid shows platform-specific instructions.
 
 1. In Google Cloud Console, select the same project used by the Firebase web app and enable **Firebase Cloud Messaging Registration API** under APIs & Services → Library. Current Firebase web SDKs require it.
 2. In the Main App's build environment, set `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, and `VITE_FIREBASE_APP_ID` from that project's Firebase web app configuration.

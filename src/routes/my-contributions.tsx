@@ -635,19 +635,13 @@ function ContributionRow({
                 <LockKeyhole className="size-4" /> Pin
               </Link>
             </Button>
-          ) : pinLimitReached && membershipTier === "premium" ? (
-            <Button asChild size="sm" variant="outline" className="min-h-9 rounded-xl">
-              <Link to="/billing" title="Upgrade to Gold to pin more stories">
-                <LockKeyhole className="size-4" /> Gold pins
-              </Link>
-            </Button>
           ) : pinLimitReached ? (
             <Button
               size="sm"
               variant="outline"
               className="min-h-9 rounded-xl"
               disabled
-              title="Your Gold package has reached its 3 story pin limit"
+              title="Premium includes up to 3 pinned stories"
             >
               <LockKeyhole className="size-4" /> Pin limit
             </Button>

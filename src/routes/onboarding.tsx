@@ -586,8 +586,8 @@ function OnboardingPage() {
                   <div>
                     <p className="text-sm font-medium">Your cover photo</p>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      This appears softly blurred at the top of your public profile. You can change
-                      it anytime.
+                      This appears across the top of your public profile. You can change it
+                      anytime.
                     </p>
                   </div>
                   <div className="relative h-32 overflow-hidden rounded-2xl border border-border bg-secondary sm:h-40">

@@ -15,6 +15,7 @@ import {
   Search,
   Settings,
   ShieldAlert,
+  Smartphone,
   Trophy,
   UserRound,
   Wallet,
@@ -36,8 +37,10 @@ import { MobileDock } from "@/components/site/mobile-dock";
 import { InstallBanner } from "@/components/site/install-banner";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MechanicEasterEgg } from "@/components/site/mechanic-easter-egg";
+import { CallCenter } from "@/components/site/call-center";
 
 import {
+  notify,
   toggleNotifications,
   useNotificationsOverlay,
   useUnreadCount,
@@ -69,6 +72,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import { requestPwaInstall } from "@/lib/pwa-install";
 
 const primaryNav = [
   { to: "/", label: "Feed", icon: Home },
@@ -342,6 +346,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           standaloneDesktopRoute && "md:hidden",
           fullscreenRoute && "hidden",
           messagesInboxRoute && "hidden",
+          directConversationRoute && "max-md:hidden",
         )}
       >
         <div className="app-shell flex h-16 items-center gap-3">
@@ -415,10 +420,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         className={cn(
           "relative",
           !fullscreenRoute &&
-            pathname !== "/post" &&
-            pathname !== "/profile" &&
-            !pathname.startsWith("/u/") &&
-            "app-shell",
+          pathname !== "/post" &&
+          pathname !== "/profile" &&
+          !pathname.startsWith("/u/") &&
+          (directConversationRoute ? "w-full md:app-shell" : "app-shell"),
         )}
       >
         <aside
@@ -490,6 +495,18 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 </button>
                 {userMenuOpen ? (
                   <div className="absolute bottom-full left-0 z-10 mb-2 w-full rounded-xl border border-border bg-popover p-1.5 text-sm shadow-2xl">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setUserMenuOpen(false);
+                        void requestPwaInstall().catch(() => {
+                          notify.error("Your browser could not open the install prompt. Try the browser menu.");
+                        });
+                      }}
+                      className="mb-1 flex w-full items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-left font-semibold text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.35)] transition hover:brightness-105"
+                    >
+                      <Smartphone className="size-4" /> Install Candid app
+                    </button>
                     <Link
                       to="/profile"
                       onClick={() => setUserMenuOpen(false)}
@@ -543,13 +560,13 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               ? "p-0 md:pb-0"
               : "pt-6",
             !fullscreenRoute &&
-              pathname !== "/support" &&
-              !messagesInboxRoute &&
-              !directConversationRoute &&
-              (showDock ? "pb-32" : "pb-10"),
-            directConversationRoute && "h-[calc(100dvh-4rem)] overflow-hidden xl:h-auto xl:overflow-visible",
+            pathname !== "/support" &&
+            !messagesInboxRoute &&
+            !directConversationRoute &&
+            (showDock ? "pb-32" : "pb-10"),
+            directConversationRoute && "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
             standaloneDesktopRoute &&
-              "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
+            "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
         >
           <BiometricGate>{children}</BiometricGate>
@@ -573,9 +590,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <Link to="/support" className="hover:text-foreground">
                 Help &amp; support
               </Link>
-              <span className="w-full pt-2 text-xs">
-                Stories are personal opinions shared by members. Employers have a right of reply.
-              </span>
             </div>
           </footer>
         ) : null}
@@ -621,6 +635,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         />
       ) : null}
       <InstallBanner />
+      <CallCenter />
 
       <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
         <AlertDialogContent>

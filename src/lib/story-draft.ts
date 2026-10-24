@@ -56,7 +56,7 @@ export function buildStoryDraft(input: StoryDraftInputs) {
     `I worked${roleDescription} at ${company}${location}${time}.`,
     reasonsSentence,
     returnSentence,
-    "That is why I decided to leave. This summary sticks to the details I selected in the earlier steps.",
+    "That is why I decided to leave.",
   ]
     .filter(Boolean)
     .join(" ");

@@ -144,21 +144,9 @@ export const Route = createFileRoute("/api/public/owner/actions")({
                 : input.moderation_note,
             moderated_at: timestamp,
           };
-          if (input.status === "published" && typeof story["company_id"] === "string") {
-            const companyRef = db.collection("companies").doc(String(story["company_id"]));
-            const companySnap = await companyRef.get();
-            const batch = db.batch();
-            batch.update(storyRef, storyPatch);
-            if (companySnap.exists)
-              batch.update(
-                companyRef,
-                { is_public: true },
-                companySnap.updateTime ? { updateTime: companySnap.updateTime } : undefined,
-              );
-            await batch.commit();
-          } else {
-            await storyRef.update(storyPatch);
-          }
+          // Publishing a story approves that report. It does not certify or
+          // publish the employer as a company-directory listing.
+          await storyRef.update(storyPatch);
           await auditOwnerAction({
             action: `story.${input.status}`,
             targetType: "story",

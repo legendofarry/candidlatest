@@ -4,15 +4,19 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  ArrowLeft,
   BadgeCheck,
+  Camera,
   CheckCheck,
   Download,
   ImagePlus,
   Loader2,
+  Phone,
   Send,
   Smile,
   Trash2,
   X,
+  Video,
 } from "lucide-react";
 import type { ConversationView } from "@/lib/messaging.server";
 import {
@@ -31,6 +35,9 @@ import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { requestConversationCall } from "@/components/site/call-center";
+import { onValue, ref } from "firebase/database";
+import { firebaseRealtimeDb } from "@/integrations/firebase/client";
 import {
   Dialog,
   DialogClose,
@@ -84,6 +91,14 @@ function clock(iso: string) {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+function formatElapsed(timestamp: number) {
+  const elapsed = Math.max(0, Date.now() - timestamp);
+  if (elapsed < 60_000) return "just now";
+  if (elapsed < 60 * 60_000) return `${Math.floor(elapsed / 60_000)}m ago`;
+  if (elapsed < 24 * 60 * 60_000) return `${Math.floor(elapsed / (60 * 60_000))}h ago`;
+  return `${Math.floor(elapsed / (24 * 60 * 60_000))}d ago`;
+}
+
 function ChatScreen() {
   const { id } = useParams({ from: "/messages/$id" });
   return (
@@ -115,6 +130,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const [imageTicketId, setImageTicketId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [clockNow, setClockNow] = useState(Date.now());
+  const [partnerPresence, setPartnerPresence] = useState<{ online: boolean; lastChanged: number | null }>({ online: false, lastChanged: null });
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageTicketRef = useRef<string | null>(null);
   const discardUploadRef = useRef(discardImageUpload);
@@ -205,7 +221,28 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   });
 
   const conversation = data;
+  const partner = conversation?.with;
   const messages = useMemo(() => conversation?.messages ?? [], [conversation]);
+
+  useEffect(() => {
+    const db = firebaseRealtimeDb;
+    if (!db || !partner?.id) {
+      setPartnerPresence({ online: false, lastChanged: null });
+      return;
+    }
+    return onValue(ref(db, `presence/${partner.id}`), (snapshot) => {
+      setPartnerPresence({
+        online: snapshot.child("state").val() === "online",
+        lastChanged: Number(snapshot.child("last_changed").val()) || null,
+      });
+    });
+  }, [partner?.id]);
+
+  const partnerActivity = partnerPresence.online
+    ? "Active now"
+    : partnerPresence.lastChanged
+      ? `Active ${formatElapsed(partnerPresence.lastChanged)}`
+      : "Candid member";
 
   async function loadOlderMessages() {
     const cursor = conversation?.nextCursor;
@@ -487,54 +524,42 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     );
   }
 
-  const partner = conversation?.with;
-
   return (
     <div
       className={cn(
         "flex h-full min-h-0 w-full flex-col overflow-hidden",
-        inSidebar ? "mx-auto max-w-2xl md:mx-0 md:max-w-none" : "bg-background",
+        inSidebar ? "mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none" : "bg-black sm:bg-background",
       )}
     >
-      <button
-        type="button"
-        onClick={() => {
-          if (partner)
-            void navigate({ to: "/u/$username", params: { username: partner.username } });
-        }}
-        className={cn(
-          "sticky top-0 z-30 flex shrink-0 items-center gap-3 text-left transition-colors hover:bg-secondary/40",
-          inSidebar
-            ? "glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur"
-            : "border-b border-border bg-background/95 px-5 py-3.5 backdrop-blur",
-        )}
-        disabled={!partner}
-        aria-label={partner ? `View @${partner.username}'s profile` : undefined}
-      >
-        <ProfileAvatar
-          photoUrl={partner?.photo_url}
-          initials={partner?.username?.slice(0, 2) ?? "··"}
-          className="size-10 shrink-0 font-display uppercase"
-        />
-        <span className="min-w-0">
-          <span className="flex items-center gap-1.5 font-medium">
-            {partner ? `@${partner.username}` : isLoading ? "Loading conversation…" : "Member"}
-            {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
-            <MembershipBadge tier={partner?.membership_tier} official={partner?.official} />
+      <header className={cn(
+        "sticky top-0 z-30 flex shrink-0 items-center gap-2 transition-colors",
+        inSidebar ? "glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur" : "border-b border-zinc-800 bg-zinc-950 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white sm:border-border sm:bg-background/95 sm:px-5 sm:py-3.5 sm:text-foreground sm:backdrop-blur",
+      )}>
+        {!inSidebar ? <Button type="button" variant="ghost" size="icon" aria-label="Back to messages" className="size-9 shrink-0 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => void navigate({ to: "/messages" })}><ArrowLeft className="size-5" /></Button> : null}
+        <button type="button" onClick={() => { if (partner) void navigate({ to: "/u/$username", params: { username: partner.username } }); }} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={!partner} aria-label={partner ? `View @${partner.username}'s profile` : undefined}>
+          <ProfileAvatar photoUrl={partner?.photo_url} initials={partner?.username?.slice(0, 2) ?? "··"} className="size-10 shrink-0 font-display uppercase" />
+          <span className="min-w-0">
+            <span className="flex items-center gap-1.5 font-semibold">
+              {partner ? `@${partner.username}` : isLoading ? "Loading conversation…" : "Member"}
+              {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
+              <MembershipBadge tier={partner?.membership_tier} official={partner?.official} />
+            </span>
+            <span className="flex items-center gap-1.5 text-xs text-zinc-400 sm:text-muted-foreground">{partnerPresence.online ? <span className="size-2 rounded-full bg-emerald-500" /> : null}{partner?.official ? "Official Candid account" : partnerActivity}</span>
           </span>
-          <span className="block text-xs text-muted-foreground">
-            {partner?.official ? "Official Candid account" : "Tap to view profile"}
-          </span>
-        </span>
-      </button>
+        </button>
+        {partner ? <div className="flex shrink-0 items-center gap-1">
+          <Button type="button" variant="ghost" size="icon" aria-label="Start voice call" title="Voice call" className="size-10 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => requestConversationCall(id, "audio")}><Phone className="size-5" /></Button>
+          <Button type="button" variant="ghost" size="icon" aria-label="Start video call" title="Video call" className="size-10 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => requestConversationCall(id, "video")}><Video className="size-5" /></Button>
+        </div> : null}
+      </header>
 
       <div
         className={cn(
           "min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          inSidebar ? "space-y-3 pb-4" : "px-4 py-5 sm:px-6",
+          inSidebar ? "space-y-3 pb-4" : "bg-black px-3 py-5 text-white sm:bg-background sm:px-6 sm:text-foreground",
         )}
       >
-        <div className={cn("flex flex-col gap-3", !inSidebar && "mx-auto max-w-2xl")}>
+          <div className={cn("flex flex-col gap-3", !inSidebar && "mx-auto w-full max-w-2xl")}>
           {conversation?.hasOlder ? (
             <div className="flex justify-center">
               <Button
@@ -554,13 +579,15 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
             </div>
           ) : messages.length === 0 ? (
             <div className="flex min-h-40 flex-1 items-center justify-center py-10 text-center">
-              <p className="text-sm text-muted-foreground">No messages yet — say hello.</p>
+              <p className="text-sm text-zinc-400 sm:text-muted-foreground">No messages yet — say hello.</p>
             </div>
           ) : null}
 
           <AnimatePresence initial={false}>
-            {messages.map((message) => {
+            {messages.map((message, messageIndex) => {
               const mine = message.sender_id === user?.uid;
+              const nextMessage = messages[messageIndex + 1];
+              const showPartnerAvatar = !mine && (!nextMessage || nextMessage.sender_id !== message.sender_id);
               const reactions = Object.entries(message.reactions ?? {}).filter(
                 ([, ids]) => ids.length > 0,
               );
@@ -572,11 +599,12 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   className={cn("flex", mine ? "justify-end" : "justify-start")}
                 >
+                  {!mine && showPartnerAvatar ? <ProfileAvatar photoUrl={partner?.photo_url} initials={partner?.username?.slice(0, 2) ?? "··"} className="mb-5 mr-2 size-7 shrink-0 self-end sm:hidden" /> : null}
                   <div
                     className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start")}
                   >
                     {message.is_deleted ? (
-                      <div className="rounded-3xl border border-border/70 px-4 py-2.5 text-sm italic text-muted-foreground">
+                      <div className="rounded-3xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm italic text-zinc-400 sm:border-border/70 sm:bg-transparent sm:text-muted-foreground">
                         This message was deleted
                       </div>
                     ) : (
@@ -599,10 +627,10 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                         {message.body ? (
                           <div
                             className={cn(
-                              "rounded-3xl px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+                              "rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-relaxed shadow-sm sm:rounded-3xl sm:text-sm",
                               mine
-                                ? "rounded-br-md bg-primary text-primary-foreground"
-                                : "rounded-bl-md border border-border bg-card",
+                                ? "rounded-br-md bg-gradient-to-br from-primary to-lime-400 text-zinc-950 sm:bg-primary sm:text-primary-foreground"
+                                : "rounded-bl-md bg-[#262626] text-white sm:border sm:border-border sm:bg-card sm:text-foreground",
                             )}
                           >
                             <p className="whitespace-pre-wrap">{message.body}</p>
@@ -613,7 +641,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
 
                     <div
                       className={cn(
-                        "mt-1 flex items-center gap-1.5 px-1 text-[11px] text-muted-foreground",
+                        "mt-1 flex items-center gap-1.5 px-1 text-[11px] text-zinc-500 sm:text-muted-foreground",
                         mine ? "justify-end" : "justify-start",
                       )}
                     >
@@ -681,7 +709,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                             key={emoji}
                             type="button"
                             onClick={() => toggleReaction.mutate({ message_id: message.id, emoji })}
-                            className="rounded-full border border-border bg-card px-2 py-0.5 text-xs"
+                            className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-white sm:border-border sm:bg-card sm:text-foreground"
                           >
                             {emoji} {ids.length}
                           </button>
@@ -699,7 +727,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
 
       {conversation && !conversation.can_send ? (
         <div className={cn("shrink-0", !inSidebar && "border-t border-border bg-background p-4")}>
-          <p className="rounded-2xl border border-border bg-secondary/40 p-4 text-center text-sm text-muted-foreground">
+          <p className="border-y border-zinc-800 bg-zinc-950 p-4 text-center text-sm text-zinc-400 sm:rounded-2xl sm:border sm:border-border sm:bg-secondary/40 sm:text-muted-foreground">
             {conversation.blocked_reason}
           </p>
         </div>
@@ -709,14 +737,14 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
             "shrink-0",
             inSidebar
               ? "glass-card rounded-3xl p-2"
-              : "border-t border-border bg-background/95 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 backdrop-blur sm:px-6",
+              : "border-t border-zinc-800 bg-zinc-950 px-3 pb-[calc(0.6rem+env(safe-area-inset-bottom))] pt-2 text-white sm:border-border sm:bg-background/95 sm:px-6 sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pt-3 sm:text-foreground sm:backdrop-blur",
           )}
         >
           <div
             className={cn(
               "flex flex-col gap-2",
               !inSidebar &&
-                "mx-auto max-w-2xl rounded-2xl border border-border bg-card p-1.5 shadow-sm",
+                "mx-auto w-full max-w-2xl rounded-full bg-[#262626] p-1 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-1.5 sm:shadow-sm",
             )}
           >
             {imagePreview ? (
@@ -763,9 +791,10 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 title="Attach image"
                 disabled={uploadingImage || send.isPending || !conversation?.can_send}
                 onClick={() => imageInputRef.current?.click()}
-                className="shrink-0 rounded-full"
+                className="size-11 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground sm:size-10 sm:bg-transparent sm:text-foreground sm:hover:bg-accent"
               >
-                <ImagePlus className="size-5" />
+                <Camera className="size-5 sm:hidden" />
+                <ImagePlus className="hidden size-5 sm:block" />
               </Button>
               <Textarea
                 value={draft}
@@ -778,7 +807,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 }}
                 rows={1}
                 placeholder="Write a message"
-                className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 focus-visible:ring-0"
+                className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-white placeholder:text-zinc-400 focus-visible:ring-0 sm:text-foreground sm:placeholder:text-muted-foreground"
               />
               <Button
                 type="button"

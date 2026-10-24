@@ -40,7 +40,7 @@ export const Route = createFileRoute("/stories/$id")({
     const data = await context.queryClient.ensureQueryData(storyQuery(params.id));
     if (!data) throw notFound();
     return {
-      title: data.story.post_type === "announcement" ? "Candid update" : data.story.title,
+      title: data.story.post_type === "announcement" ? "Candid" : data.story.title,
       company: data.story.post_type === "announcement" ? "Community" : data.story.company_name,
       body: data.story.body,
     };
@@ -109,12 +109,12 @@ function StoryPage() {
               className="size-12 shrink-0"
             />
             <div>
-              <h1 className="sr-only">Candid update</h1>
+              <h1 className="sr-only">Candid</h1>
               <p className="font-semibold">
-                Candid <span className="text-primary">✓</span>
+                Candid
               </p>
               <p className="text-xs text-muted-foreground">
-                Official update · {formatDate(story.created_at)}
+                Candid · {formatDate(story.created_at)}
               </p>
             </div>
           </header>
@@ -215,7 +215,7 @@ function StoryPage() {
               ) : (
                 <img
                   src={media.url}
-                  alt={`Candid update attachment ${index + 1}`}
+                  alt={`Candid attachment ${index + 1}`}
                   className={`w-full ${story.media!.length > 1 ? "aspect-square object-cover" : "max-h-[75vh] min-h-40 object-contain"}`}
                 />
               )}

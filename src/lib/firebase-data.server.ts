@@ -23,7 +23,7 @@ export type CompanyRecord = {
   lng?: number | null;
   map_url?: string | null;
   verified: boolean;
-  /** New employers remain private until a public story is approved or an owner lists them. */
+  /** New employers remain private in the directory until an owner lists them. */
   is_public?: boolean;
   created_at: string;
   aliases?: string[];
@@ -428,11 +428,10 @@ function isPlaceholderCompanyName(name: string | null | undefined) {
   return /^(n\/?a|none|unknown|not applicable|confidential)$/i.test(name?.trim() ?? "");
 }
 
-function isDiscoverableCompany(company: CompanyRecord, publishedCompanyIds: ReadonlySet<string>) {
-  return (
-    !isPlaceholderCompanyName(company.name) &&
-    (isPublicCompany(company) || publishedCompanyIds.has(company.id))
-  );
+function isDiscoverableCompany(company: CompanyRecord) {
+  // A worker story can reference an employer without putting that business
+  // in the public company directory. Moderators explicitly publish listings.
+  return isPublicCompany(company);
 }
 
 async function calculateCompanyScores() {
@@ -481,13 +480,9 @@ async function calculateCompanyScores() {
   const profileByCompany = new Map(
     profiles.map((profile) => [profile.company_id, profile] as const),
   );
-  const publishedCompanyIds = new Set(storiesByCompany.keys());
-
-  // A published story is itself a public reference to its employer. This also
-  // repairs older approval flows that published the story without flipping the
-  // company's is_public flag.
+  // Stories stay visible in the feed. Directory listings require moderator approval.
   return companies
-    .filter((company) => isDiscoverableCompany(company, publishedCompanyIds))
+    .filter(isDiscoverableCompany)
     .map<CompanyScoreRecord>((company) => {
       const companyStories = storiesByCompany.get(company.id) ?? [];
       const companyRatings = ratingsByCompany.get(company.id) ?? [];
@@ -690,19 +685,8 @@ async function calculateCompanySalaryDetail(slug: string) {
   const db = getFirestoreDb();
   const companySnapshot = await db.collection("companies").where("slug", "==", slug).limit(1).get();
   const company = companySnapshot.docs[0] ? toRecord<CompanyRecord>(companySnapshot.docs[0]) : null;
-  const hasPublishedStory = Boolean(
-    company &&
-    (
-      await db
-        .collection("stories")
-        .where("company_id", "==", company.id)
-        .where("status", "==", "published")
-        .limit(1)
-        .get()
-    ).size,
-  );
   if (company && isPlaceholderCompanyName(company.name)) return null;
-  if (company && !isPublicCompany(company) && !hasPublishedStory) return null;
+  if (company && !isPublicCompany(company)) return null;
   if (!company) return null;
 
   const reports = (
@@ -915,6 +899,33 @@ function normalizeCountyFilter(value: string | null | undefined) {
     .replace(/\s+(city\s+)?county$/i, "");
 }
 
+async function readFeedExclusions(viewerId: string | null | undefined) {
+  if (!viewerId) return { stories: new Set<string>(), authors: new Set<string>(), companies: new Set<string>() };
+  const db = getFirestoreDb();
+  const [preferences, blockedAuthors] = await Promise.all([
+    db.collection("feed_preferences").doc(viewerId).get(),
+    cacheServerRead(`feed:blocked-authors:${viewerId}`, 15_000, async () => {
+      const [blockedByViewer, blockedViewer] = await Promise.all([
+        db.collection("blocks").where("blocker_id", "==", viewerId).limit(500).get(),
+        db.collection("blocks").where("blocked_id", "==", viewerId).limit(500).get(),
+      ]);
+      return [
+        ...blockedByViewer.docs.map((doc) => String(doc.get("blocked_id"))),
+        ...blockedViewer.docs.map((doc) => String(doc.get("blocker_id"))),
+      ];
+    }),
+  ]);
+  const items = (preferences.data()?.["items"] as Array<{ kind: string; target_id: string }> | undefined) ?? [];
+  return {
+    stories: new Set(items.filter((item) => item.kind === "story").map((item) => item.target_id)),
+    authors: new Set([
+      ...items.filter((item) => item.kind === "author").map((item) => item.target_id),
+      ...blockedAuthors,
+    ]),
+    companies: new Set(items.filter((item) => item.kind === "company").map((item) => item.target_id)),
+  };
+}
+
 async function calculatePublicStories(input: {
   sort: "new" | "top" | "trending";
   industry?: string | null;
@@ -923,8 +934,10 @@ async function calculatePublicStories(input: {
   reason?: string | null;
   companySlug?: string | null;
   limit?: number;
+  viewerId?: string | null;
 }) {
   const db = getFirestoreDb();
+  const exclusions = await readFeedExclusions(input.viewerId);
   const sortField = input.sort === "new" ? "created_at" : "upvotes";
   const storySnapshot = await db
     .collection("stories")
@@ -935,6 +948,7 @@ async function calculatePublicStories(input: {
   const candidates = storySnapshot.docs
     .map((doc) => ({ story: toRecord<StoryRecord>(doc), updateTime: doc.updateTime }))
     .filter(({ story }) => story.status === "published")
+    .filter(({ story }) => !exclusions.stories.has(story.id) && !exclusions.authors.has(story.author_id ?? "") && !exclusions.companies.has(story.company_id))
     .filter(({ story }) => (input.industry ? story.industry === input.industry : true))
     .filter(({ story }) =>
       input.county
@@ -956,10 +970,26 @@ async function calculatePublicStories(input: {
     );
   const limit = input.limit ?? 20;
   const selected = limit <= 0 ? candidates : candidates.slice(0, limit);
+  const authorIds = [...new Set(selected.map(({ story }) => story.author_id).filter((id): id is string => Boolean(id)))];
+  const authorProfiles = await Promise.all(authorIds.map((id) => readDocument<ProfileRecord>("profiles", id)));
+  const allowedAuthorIds = new Set<string>();
+  await Promise.all(authorIds.map(async (authorId, index) => {
+    const profile = authorProfiles[index];
+    if (!profile || profile.banned || profile.account_status === "deactivated" || profile.account_status === "deletion_pending" || profile.account_status === "deletion_in_progress") return;
+    if (profile.profile_visibility !== "private" || input.viewerId === authorId) {
+      allowedAuthorIds.add(authorId);
+      return;
+    }
+    if (!input.viewerId) return;
+    const follow = await db.collection("follows").doc(input.viewerId + ":" + authorId).get();
+    if (follow.exists && follow.get("status") !== "pending") allowedAuthorIds.add(authorId);
+  }));
+  const visibleSelected = selected.filter(({ story }) => story.author_id && allowedAuthorIds.has(story.author_id));
   await Promise.all(
-    selected.map(({ story, updateTime }) => getTopLevelCommentCount(story, updateTime)),
+    visibleSelected.map(({ story, updateTime }) => getTopLevelCommentCount(story, updateTime)),
   );
-  return selected.map(({ story }) => ({
+  const profilesById = new Map(authorProfiles.filter((profile): profile is ProfileRecord => Boolean(profile)).map((profile) => [profile.id, profile]));
+  return visibleSelected.map(({ story }) => ({
     ...publicStoryFields(story),
     title: story.title,
     body: story.body,
@@ -969,7 +999,7 @@ async function calculatePublicStories(input: {
     id: story.id,
     company_id: story.company_id,
     company_name: story.company_name ?? null,
-    company_slug: story.company_slug ?? null,
+    company_slug: null,
     company_verified: Boolean(story.company_verified),
     area: story.area ?? null,
     likes: Number(story.likes ?? 0),
@@ -979,8 +1009,9 @@ async function calculatePublicStories(input: {
     metoo: story.metoo,
     upvotes: story.upvotes,
     would_work_again: story.would_work_again,
-    author_username: story.author_username ?? null,
-    author_membership_tier: story.author_membership_tier ?? "basic",
+    author_username: story.author_username ?? (story.author_id ? profilesById.get(story.author_id)?.username : null) ?? null,
+    author_photo_url: story.author_photo_url ?? (story.author_id ? profilesById.get(story.author_id)?.photo_url : null) ?? null,
+    author_membership_tier: membershipBadgeTier(story.author_id ? profilesById.get(story.author_id) ?? undefined : undefined),
   }));
 }
 
@@ -992,7 +1023,11 @@ export function getPublicStories(input: {
   reason?: string | null;
   companySlug?: string | null;
   limit?: number;
+  viewerId?: string | null;
 }) {
+  // Personalized feed preferences change immediately; do not serve a cached feed
+  // page after a member hides a post, author, or employer.
+  if (input.viewerId) return calculatePublicStories(input);
   const cacheKey = `public:stories:${JSON.stringify(input)}`;
   return cacheServerRead(cacheKey, 30_000, () => calculatePublicStories(input));
 }
@@ -1004,8 +1039,10 @@ export async function getPublicStoryPage(input: {
   industry?: string | null;
   county?: string | null;
   area?: string | null;
+  viewerId?: string | null;
 }) {
   const db = getFirestoreDb();
+  const exclusions = await readFeedExclusions(input.viewerId);
   let baseQuery = db
     .collection("stories")
     .where("status", "==", "published")
@@ -1039,9 +1076,6 @@ export async function getPublicStoryPage(input: {
   const hasMore = pageRows.length > input.limit;
   const storyRows = pageRows.slice(0, input.limit);
   const stories = storyRows.map(({ story }) => story);
-  await Promise.all(
-    storyRows.map(({ story, updateTime }) => getTopLevelCommentCount(story, updateTime)),
-  );
   const [companies, authors] = await Promise.all([
     Promise.all(
       [...new Set(stories.map((story) => story.company_id).filter(Boolean))].map((id) =>
@@ -1060,7 +1094,19 @@ export async function getPublicStoryPage(input: {
     companies.filter(Boolean).map((company) => [company!.id, company!]),
   );
   const authorsById = new Map(authors.filter(Boolean).map((profile) => [profile!.id, profile!]));
-  const publicStories = stories.map<PublicStoryRecord>((story) => {
+  const visibleStories = await Promise.all(stories.map(async (story) => {
+    if (exclusions.stories.has(story.id) || exclusions.authors.has(story.author_id ?? "") || exclusions.companies.has(story.company_id)) return false;
+    const author = story.author_id ? authorsById.get(story.author_id) : null;
+    if (!author || author.banned || author.account_status === "deactivated" || author.account_status === "deletion_pending" || author.account_status === "deletion_in_progress") return false;
+    if (author.profile_visibility !== "private" || input.viewerId === author.id) return true;
+    if (!input.viewerId) return false;
+    const follow = await db.collection("follows").doc(input.viewerId + ":" + author.id).get();
+    return follow.exists && follow.get("status") !== "pending";
+  }));
+  const visibleStoryRows = storyRows.filter((_, index) => visibleStories[index]);
+  const visibleStoryRecords = visibleStoryRows.map(({ story }) => story);
+  await Promise.all(visibleStoryRows.map(({ story, updateTime }) => getTopLevelCommentCount(story, updateTime)));
+  const publicStories = visibleStoryRecords.map<PublicStoryRecord>((story) => {
     const company = companiesById.get(story.company_id);
     const author = story.author_id ? authorsById.get(story.author_id) : null;
     return {
@@ -1068,7 +1114,7 @@ export async function getPublicStoryPage(input: {
       ...publicWorkplaceCoordinates(story),
       company_location_suggestion: null,
       company_name: company?.name ?? story.company_name ?? null,
-      company_slug: story.company_slug ?? company?.slug ?? null,
+      company_slug: company && isPublicCompany(company) ? story.company_slug ?? company.slug : null,
       company_verified: Boolean(company?.verified),
       area: story.area ?? null,
       likes: Number(story.likes ?? 0),
@@ -1093,7 +1139,7 @@ async function calculateCompanyView(slug: string) {
   const db = getFirestoreDb();
   const companySnapshot = await db.collection("companies").where("slug", "==", slug).limit(1).get();
   const company = companySnapshot.docs[0] ? toRecord<CompanyRecord>(companySnapshot.docs[0]) : null;
-  if (!company) return null;
+  if (!company || !isPublicCompany(company)) return null;
 
   const [storiesSnapshot, scores, profile] = await Promise.all([
     db
@@ -1107,12 +1153,17 @@ async function calculateCompanyView(slug: string) {
     readDocument<CompanyAIProfileRecord>("company_ai_profiles", company.id),
   ]);
   const storyDocs = storiesSnapshot.docs.slice(0, 50);
-  const stories = storyDocs.map((doc) => toRecord<StoryRecord>(doc));
-  await Promise.all(
-    storyDocs.map((doc, index) => getTopLevelCommentCount(stories[index]!, doc.updateTime)),
-  );
-  if (!isPublicCompany(company) && stories.length === 0) return null;
-
+  const queriedStories = storyDocs.map((doc) => toRecord<StoryRecord>(doc));
+  const storyAuthors = await Promise.all([...new Set(queriedStories.map((story) => story.author_id).filter((id): id is string => Boolean(id)))].map((id) => readDocument<ProfileRecord>("profiles", id)));
+  const storyAuthorsById = new Map(storyAuthors.filter((profile): profile is ProfileRecord => Boolean(profile)).map((profile) => [profile.id, profile]));
+  const stories = queriedStories.filter((story) => {
+    const author = story.author_id ? storyAuthorsById.get(story.author_id) : null;
+    return Boolean(author && !author.banned && author.profile_visibility !== "private" && !["deactivated", "deletion_pending", "deletion_in_progress"].includes(author.account_status ?? ""));
+  });
+  await Promise.all(stories.map((story) => {
+    const source = storyDocs.find((doc) => doc.id === story.id);
+    return getTopLevelCommentCount(story, source?.updateTime);
+  }));
   return {
     company,
     score: scores.find((entry) => entry.company_id === company.id) ?? null,
@@ -1297,7 +1348,7 @@ async function calculateStoryView(id: string, viewerId: string | null = null) {
       company_location_suggestion: null,
       company_id: story.company_id,
       company_name: company?.name ?? story.company_name ?? null,
-      company_slug: story.company_slug ?? company?.slug ?? null,
+      company_slug: company && isPublicCompany(company) ? story.company_slug ?? company.slug : null,
       company_verified: Boolean(company?.verified),
       area: story.area ?? null,
       likes: Number(story.likes ?? 0),
@@ -1503,6 +1554,7 @@ async function calculateSearchData(queryText: string) {
         .includes(q),
     )
     .slice(0, 10);
+  const companiesById = new Map(companies.map((company) => [company.id, company] as const));
 
   const matchingRows = stories
     .filter(({ story }) => story.status === "published")
@@ -1514,9 +1566,6 @@ async function calculateSearchData(queryText: string) {
     )
     .slice(0, 15);
   const matchingStories = matchingRows.map(({ story }) => story);
-  await Promise.all(
-    matchingRows.map(({ story, updateTime }) => getTopLevelCommentCount(story, updateTime)),
-  );
   const authors = await Promise.all(
     [
       ...new Set(
@@ -1527,8 +1576,14 @@ async function calculateSearchData(queryText: string) {
   const authorsById = new Map(
     authors.filter((author) => author).map((author) => [author!.id, author!] as const),
   );
-  const storyMatches = matchingStories.map<PublicStoryRecord>((story) => {
+  const visibleMatchingRows = matchingRows.filter(({ story }) => {
     const author = story.author_id ? authorsById.get(story.author_id) : null;
+    return Boolean(author && !author.banned && author.profile_visibility !== "private" && !["deactivated", "deletion_pending", "deletion_in_progress"].includes(author.account_status ?? ""));
+  });
+  await Promise.all(visibleMatchingRows.map(({ story, updateTime }) => getTopLevelCommentCount(story, updateTime)));
+  const storyMatches = visibleMatchingRows.map<PublicStoryRecord>(({ story }) => {
+    const author = story.author_id ? authorsById.get(story.author_id) : null;
+    const storyCompany = story.company_id ? companiesById.get(story.company_id) : null;
     return {
       ...publicStoryFields(story),
       title: story.title,
@@ -1539,7 +1594,7 @@ async function calculateSearchData(queryText: string) {
       id: story.id,
       company_id: story.company_id,
       company_name: story.company_name ?? null,
-      company_slug: story.company_slug ?? null,
+      company_slug: storyCompany && isPublicCompany(storyCompany) ? storyCompany.slug : null,
       company_verified: Boolean(story.company_verified),
       area: story.area ?? null,
       likes: Number(story.likes ?? 0),

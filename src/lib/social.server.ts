@@ -1,4 +1,54 @@
 import { getFirestoreDb } from "./firebase.server";
+
+export type FeedPreferenceKind = "story" | "author" | "company";
+export type FeedPreference = {
+  kind: FeedPreferenceKind;
+  target_id: string;
+  label: string;
+  updated_at: string;
+};
+
+const FEED_PREFERENCE_LIMIT = 200;
+
+export async function readFeedPreferences(userId: string) {
+  const snapshot = await getFirestoreDb().collection("feed_preferences").doc(userId).get();
+  return (snapshot.data()?.["items"] as FeedPreference[] | undefined) ?? [];
+}
+
+export async function setFeedPreference(
+  userId: string,
+  kind: FeedPreferenceKind,
+  targetId: string,
+  hidden: boolean,
+) {
+  const db = getFirestoreDb();
+  const ref = db.collection("feed_preferences").doc(userId);
+  const key = `${kind}:${targetId}`;
+  let label = targetId;
+  if (hidden) {
+    if (kind === "story") {
+      const story = await db.collection("stories").doc(targetId).get();
+      label = String(story.get("title") ?? story.get("company_name") ?? "Post");
+    } else if (kind === "author") {
+      const profile = await db.collection("profiles").doc(targetId).get();
+      label = `@${String(profile.get("username") ?? "member")}`;
+    } else {
+      const company = await db.collection("companies").doc(targetId).get();
+      label = String(company.get("name") ?? "Employer");
+    }
+  }
+  const updatedAt = new Date().toISOString();
+  await db.runTransaction(async (transaction) => {
+    const snapshot = await transaction.get(ref);
+    const current = (snapshot.data()?.["items"] as FeedPreference[] | undefined) ?? [];
+    const remaining = current.filter((item) => `${item.kind}:${item.target_id}` !== key);
+    const items = hidden
+      ? [...remaining, { kind, target_id: targetId, label, updated_at: updatedAt }].slice(-FEED_PREFERENCE_LIMIT)
+      : remaining;
+    transaction.set(ref, { user_id: userId, items, updated_at: updatedAt });
+  });
+  return readFeedPreferences(userId);
+}
 import { type CommentRecord, type StoryRecord } from "./firebase-data.server";
 import { getEffectiveMembershipTier, getMembershipEntitlements } from "./membership";
 
@@ -247,11 +297,11 @@ export async function toggleProfileStoryPin(storyId: string, userId: string) {
     const tier = getEffectiveMembershipTier(profile);
     const limit = getMembershipEntitlements(tier).maxPinnedStories;
     if (limit === 0) {
-      throw new Error("Story pins are included with Premium and Gold. Upgrade from Billing.");
+      throw new Error("Story pins are included with Premium. Upgrade from Billing.");
     }
     if (pinnedIds.length >= limit) {
       throw new Error(
-        `Your ${tier === "gold" ? "Gold" : "Premium"} package allows up to ${limit} pinned ${limit === 1 ? "story" : "stories"}.`,
+        `Your Premium package allows up to ${limit} pinned ${limit === 1 ? "story" : "stories"}.`,
       );
     }
 

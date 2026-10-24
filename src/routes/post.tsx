@@ -679,14 +679,14 @@ function WorkplaceStoryComposer() {
   ][step];
 
   return (
-    <div className="min-h-[calc(100dvh-4rem)] w-full bg-background md:h-dvh md:overflow-hidden">
+    <div className="h-[calc(100dvh-4rem)] min-h-0 w-full overflow-hidden bg-background md:h-dvh">
       <div className="relative min-h-[calc(100dvh-4rem)] w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/85 md:shadow-2xl md:backdrop-blur-xl">
         <FloatingBackButton
           onClick={() => navigate({ to: "/" })}
           className="hidden md:inline-flex"
         />
 
-        <div className="grid min-h-[calc(100dvh-4rem)] md:h-dvh md:min-h-0 md:grid-cols-[1.05fr_1.2fr]">
+        <div className="grid h-full min-h-0 md:grid-cols-[1.05fr_1.2fr]">
           <div className="relative hidden overflow-hidden border-r border-border/80 bg-[linear-gradient(135deg,#0f172a_0%,#111827_30%,#0f172a_100%)] md:flex md:h-dvh md:items-center md:justify-center md:p-12">
             <motion.div
               initial={{ opacity: 0, y: 18 }}
@@ -728,9 +728,9 @@ function WorkplaceStoryComposer() {
             </motion.div>
           </div>
 
-          <div className="flex items-start p-4 pt-3 md:h-dvh md:items-center md:overflow-y-auto md:p-8">
-            <div className="w-full space-y-6">
-              <header>
+          <div className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:items-center md:p-8">
+            <div className="flex min-h-0 w-full flex-1 flex-col">
+              <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background px-4 pb-3 pt-3 md:static md:border-0 md:px-0 md:pb-0 md:pt-0">
                 {account?.accountType === "official" &&
                 account.username === "candid" &&
                 !isEditing ? (
@@ -759,8 +759,8 @@ function WorkplaceStoryComposer() {
                 </p>
               </header>
 
-              <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="space-y-5 rounded-none border-0 bg-transparent p-0 md:rounded-3xl md:border md:border-border md:bg-card md:p-6">
+              <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto overscroll-contain px-4 py-4 md:px-0 md:py-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="space-y-5 bg-transparent p-0 md:p-0">
                   {step === 0 ? (
                     <>
                       <div className="space-y-2">
@@ -1256,7 +1256,7 @@ function WorkplaceStoryComposer() {
                     </div>
                   ) : null}
 
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+                  <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
                     <Button
                       variant="ghost"
                       disabled={step === 0}

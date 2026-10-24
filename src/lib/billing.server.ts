@@ -258,7 +258,7 @@ export async function createManualPaymentRequest(
   if (!profileSnapshot.exists) throw new Error("Could not find your Candid account.");
   const profile = profileSnapshot.data() ?? {};
   if (profile.account_type === "official")
-    throw new Error("The official Candid account already has complimentary Gold access.");
+    throw new Error("The official Candid account already has complimentary Premium access.");
   if (
     !config.manual_mpesa.enabled ||
     !config.manual_mpesa.business_number ||
@@ -674,7 +674,7 @@ export async function requestBasicDowngrade(userId: string) {
   if (!snapshot.exists) throw new Error("Could not find your Candid account.");
   const profile = snapshot.data() ?? {};
   if (profile.account_type === "official")
-    throw new Error("The official Candid account permanently uses complimentary Gold access.");
+    throw new Error("The official Candid account permanently uses complimentary Premium access.");
   if (profile.subscription_source !== "paid" || !profile.subscription_period_ends_at)
     throw new Error("There is no paid subscription to cancel.");
   await ref.update(

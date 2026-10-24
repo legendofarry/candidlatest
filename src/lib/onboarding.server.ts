@@ -367,7 +367,7 @@ export async function claimOfficialCandidAccount(userId: string, email: string) 
         role_label: "Candid team",
         account_type: "official",
         verified: true,
-        subscription_tier: "gold",
+        subscription_tier: "premium",
         subscription_status: "active",
         subscription_source: "complimentary",
         subscription_provider: null,
