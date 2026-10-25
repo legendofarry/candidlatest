@@ -7,7 +7,7 @@ import {
   useSuspenseQuery,
 } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowBigUp, Flag, Users } from "lucide-react";
 import { notify as toast } from "@/lib/notifications-store";
 import { getStory } from "@/lib/public.functions";
@@ -76,6 +76,8 @@ function StoryPage() {
   const engagementFn = useServerFn(getMyEngagement);
   const [reportOpen, setReportOpen] = useState(false);
   const [locallyReported, setLocallyReported] = useState(false);
+  const [storyPaneRatio, setStoryPaneRatio] = useState(42);
+  const splitRef = useRef<HTMLDivElement>(null);
 
   const isAnnouncement = data?.story.post_type === "announcement";
   const engagement = useQuery({
@@ -99,186 +101,242 @@ function StoryPage() {
   const votedKinds = engagement.data?.votedKinds ?? [];
 
   return (
-    <article className="w-full space-y-6">
-      <div className="animate-fade">
-        {isAnnouncement ? (
-          <header className="flex items-center gap-3 border-b border-border/70 pb-5">
-            <ProfileAvatar
-              initials="C"
-              photoUrl={story.author_photo_url}
-              className="size-12 shrink-0"
-            />
-            <div>
-              <h1 className="sr-only">Candid</h1>
-              <p className="font-semibold">
-                Candid
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Candid · {formatDate(story.created_at)}
-              </p>
-            </div>
-          </header>
-        ) : (
-          <>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              {story.company_slug ? (
-                <Link
-                  to="/companies/$slug"
-                  params={{ slug: story.company_slug }}
-                  className="font-semibold text-foreground hover:text-primary"
-                >
-                  {story.company_name}
-                  {story.company_verified ? <CompanyVerifiedBadge /> : null}
-                </Link>
-              ) : null}
-              <span>· {story.industry}</span>
-              <StoryLocationDialog
-                storyId={id}
-                county={story.county}
-                area={story.area ?? null}
-                initialCoordinates={
-                  typeof story.workplace_lat === "number" && typeof story.workplace_lng === "number"
-                    ? { lat: story.workplace_lat, lng: story.workplace_lng }
-                    : null
-                }
-                authorId={story.author_id ?? null}
-              />
-              <span>· {story.tenure}</span>
-              <span>· {story.role_level}</span>
-            </div>
-            <h1 className="mt-3 text-3xl font-semibold leading-tight md:text-4xl">{story.title}</h1>
-            <p className="mt-2 text-xs text-muted-foreground">
-              {story.author_username ? (
-                <>
-                  <Link
-                    to="/u/$username"
-                    params={{ username: story.author_username }}
-                    className="hover:text-primary"
-                  >
-                    @{story.author_username}
-                  </Link>
-                  <MembershipBadge
-                    tier={story.author_membership_tier}
-                    official={story.author_username?.toLowerCase() === "candid"}
-                  />
-                </>
-              ) : (
-                "Candid member"
-              )}{" "}
-              · {formatDate(story.created_at)}
-            </p>
-          </>
-        )}
-      </div>
-
-      {!isAnnouncement ? (
-        <div className="flex flex-wrap gap-1.5">
-          {(story.reasons ?? []).map((reason) => (
-            <Badge
-              key={reason}
-              variant="outline"
-              className={
-                reasonTone(reason) === "verified"
-                  ? "border-verified/40 text-verified"
-                  : "border-danger/40 text-danger"
-              }
-            >
-              {reason}
-            </Badge>
-          ))}
-        </div>
-      ) : null}
-
+    <article className="flex h-full min-h-0 w-full flex-col overflow-hidden">
       <div
-        className={
-          isAnnouncement
-            ? "whitespace-pre-line text-base leading-relaxed"
-            : "whitespace-pre-line py-1 leading-relaxed"
-        }
+        ref={splitRef}
+        className="grid min-h-0 flex-1 grid-cols-1 overflow-hidden"
+        style={{ gridTemplateRows: `${storyPaneRatio}fr 12px ${100 - storyPaneRatio}fr` }}
       >
-        <MentionText text={story.body} />
-      </div>
-
-      {isAnnouncement && story.media?.length ? (
-        <div
-          className={`grid gap-px overflow-hidden bg-border ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
-        >
-          {story.media.map((media, index) => (
-            <div key={`${media.url}-${index}`} className="overflow-hidden bg-background">
-              {media.resource_type === "video" ? (
-                <video
-                  src={media.url}
-                  controls
-                  playsInline
-                  className="max-h-[75vh] min-h-40 w-full object-contain"
-                />
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6">
+          <div className="mx-auto w-full max-w-4xl space-y-6">
+            <div className="animate-fade">
+              {isAnnouncement ? (
+                <header className="flex items-center gap-3 border-b border-border/70 pb-5">
+                  <ProfileAvatar
+                    initials="C"
+                    photoUrl={story.author_photo_url}
+                    className="size-12 shrink-0"
+                  />
+                  <div>
+                    <h1 className="sr-only">Candid</h1>
+                    <p className="font-semibold">Candid</p>
+                    <p className="text-xs text-muted-foreground">
+                      Candid · {formatDate(story.created_at)}
+                    </p>
+                  </div>
+                </header>
               ) : (
-                <img
-                  src={media.url}
-                  alt={`Candid attachment ${index + 1}`}
-                  className={`w-full ${story.media!.length > 1 ? "aspect-square object-cover" : "max-h-[75vh] min-h-40 object-contain"}`}
-                />
+                <>
+                  <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    {story.company_slug ? (
+                      <Link
+                        to="/companies/$slug"
+                        params={{ slug: story.company_slug }}
+                        className="font-semibold text-foreground hover:text-primary"
+                      >
+                        {story.company_name}
+                        {story.company_verified ? <CompanyVerifiedBadge /> : null}
+                      </Link>
+                    ) : null}
+                    <span>· {story.industry}</span>
+                    <StoryLocationDialog
+                      storyId={id}
+                      county={story.county}
+                      area={story.area ?? null}
+                      initialCoordinates={
+                        typeof story.workplace_lat === "number" &&
+                        typeof story.workplace_lng === "number"
+                          ? { lat: story.workplace_lat, lng: story.workplace_lng }
+                          : null
+                      }
+                      authorId={story.author_id ?? null}
+                    />
+                    <span>· {story.tenure}</span>
+                    <span>· {story.role_level}</span>
+                  </div>
+                  <h1 className="mt-3 text-3xl font-semibold leading-tight md:text-4xl">
+                    {story.title}
+                  </h1>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    {story.author_username ? (
+                      <>
+                        <Link
+                          to="/u/$username"
+                          params={{ username: story.author_username }}
+                          className="hover:text-primary"
+                        >
+                          @{story.author_username}
+                        </Link>
+                        <MembershipBadge
+                          tier={story.author_membership_tier}
+                          official={story.author_username?.toLowerCase() === "candid"}
+                        />
+                      </>
+                    ) : (
+                      "Candid member"
+                    )}{" "}
+                    · {formatDate(story.created_at)}
+                  </p>
+                </>
               )}
             </div>
-          ))}
+
+            {!isAnnouncement ? (
+              <div className="flex flex-wrap gap-1.5">
+                {(story.reasons ?? []).map((reason) => (
+                  <Badge
+                    key={reason}
+                    variant="outline"
+                    className={
+                      reasonTone(reason) === "verified"
+                        ? "border-verified/40 text-verified"
+                        : "border-danger/40 text-danger"
+                    }
+                  >
+                    {reason}
+                  </Badge>
+                ))}
+              </div>
+            ) : null}
+
+            <div
+              className={
+                isAnnouncement
+                  ? "whitespace-pre-line text-base leading-relaxed"
+                  : "whitespace-pre-line py-1 leading-relaxed"
+              }
+            >
+              <MentionText text={story.body} />
+            </div>
+
+            {isAnnouncement && story.media?.length ? (
+              <div
+                className={`grid gap-px overflow-hidden bg-border ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+              >
+                {story.media.map((media, index) => (
+                  <div key={`${media.url}-${index}`} className="overflow-hidden bg-background">
+                    {media.resource_type === "video" ? (
+                      <video
+                        src={media.url}
+                        controls
+                        playsInline
+                        className="max-h-[75vh] min-h-40 w-full object-contain"
+                      />
+                    ) : (
+                      <img
+                        src={media.url}
+                        alt={`Candid attachment ${index + 1}`}
+                        className={`w-full ${story.media!.length > 1 ? "aspect-square object-cover" : "max-h-[75vh] min-h-40 object-contain"}`}
+                      />
+                    )}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+            <div className="flex flex-wrap items-center gap-2">
+              {!isAnnouncement ? (
+                <Button
+                  variant={votedKinds.includes("up") ? "default" : "outline"}
+                  disabled={!user || voteMutation.isPending}
+                  onClick={() => voteMutation.mutate("up")}
+                >
+                  <ArrowBigUp className="size-4" /> Upvote {formatCount(story.upvotes ?? 0)}
+                </Button>
+              ) : null}
+              {!isAnnouncement ? (
+                <Button
+                  variant={votedKinds.includes("metoo") ? "default" : "outline"}
+                  disabled={!user || voteMutation.isPending}
+                  onClick={() => voteMutation.mutate("metoo")}
+                >
+                  <Users className="size-4" /> This happened to me too{" "}
+                  {formatCount(story.metoo ?? 0)}
+                </Button>
+              ) : null}
+              <StorySocial
+                storyId={id}
+                likes={story.likes ?? 0}
+                followers={story.follower_count ?? 0}
+                variant={isAnnouncement ? "announcement" : "story"}
+              />
+              {!isAnnouncement ? (
+                <Button
+                  variant="ghost"
+                  className="ml-auto text-danger"
+                  disabled={!user || isReported}
+                  onClick={() => setReportOpen(true)}
+                >
+                  <Flag className="size-4" /> {isReported ? "Reported" : "Report"}
+                </Button>
+              ) : null}
+            </div>
+
+            {!user && !isAnnouncement ? (
+              <p className="rounded-2xl border border-border p-4 text-sm text-muted-foreground">
+                <Link to="/auth" className="font-medium text-primary">
+                  Sign in
+                </Link>{" "}
+                to upvote, add “me too” or comment.
+              </p>
+            ) : null}
+
+            <CommentThread
+              storyId={id}
+              comments={comments}
+              total={commentTotal}
+              commentsHasMore={commentsHasMore}
+              commentsCursor={commentsCursor}
+              focusCommentId={focusCommentId}
+              fullWidth
+            />
+          </div>
         </div>
-      ) : null}
 
-      <div className="flex flex-wrap items-center gap-2">
-        {!isAnnouncement ? (
-          <Button
-            variant={votedKinds.includes("up") ? "default" : "outline"}
-            disabled={!user || voteMutation.isPending}
-            onClick={() => voteMutation.mutate("up")}
-          >
-            <ArrowBigUp className="size-4" /> Upvote {formatCount(story.upvotes ?? 0)}
-          </Button>
-        ) : null}
-        {!isAnnouncement ? (
-          <Button
-            variant={votedKinds.includes("metoo") ? "default" : "outline"}
-            disabled={!user || voteMutation.isPending}
-            onClick={() => voteMutation.mutate("metoo")}
-          >
-            <Users className="size-4" /> This happened to me too {formatCount(story.metoo ?? 0)}
-          </Button>
-        ) : null}
-        <StorySocial
-          storyId={id}
-          likes={story.likes ?? 0}
-          followers={story.follower_count ?? 0}
-          variant={isAnnouncement ? "announcement" : "story"}
-        />
-        {!isAnnouncement ? (
-          <Button
-            variant="ghost"
-            className="ml-auto text-danger"
-            disabled={!user || isReported}
-            onClick={() => setReportOpen(true)}
-          >
-            <Flag className="size-4" /> {isReported ? "Reported" : "Report"}
-          </Button>
-        ) : null}
+        <div
+          role="separator"
+          aria-label="Resize story and comments panels"
+          aria-orientation="horizontal"
+          aria-valuemin={25}
+          aria-valuemax={75}
+          aria-valuenow={storyPaneRatio}
+          tabIndex={0}
+          className="group relative z-10 flex cursor-row-resize touch-none items-center justify-center border-y border-border bg-background/90 outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+          onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)}
+          onPointerMove={(event) => {
+            if (event.buttons !== 1 || !splitRef.current) return;
+            const bounds = splitRef.current.getBoundingClientRect();
+            const nextRatio = ((event.clientY - bounds.top) / bounds.height) * 100;
+            setStoryPaneRatio(Math.max(25, Math.min(75, nextRatio)));
+          }}
+          onKeyDown={(event) => {
+            const adjustment = event.key === "ArrowUp" ? -5 : event.key === "ArrowDown" ? 5 : 0;
+            if (!adjustment) return;
+            event.preventDefault();
+            setStoryPaneRatio((current) => Math.max(25, Math.min(75, current + adjustment)));
+          }}
+        >
+          <span className="h-1 w-10 rounded-full bg-muted-foreground/40 transition-colors group-hover:bg-primary/70 group-focus-visible:bg-primary" />
+        </div>
+
+        <section className="flex min-h-0 flex-col overflow-hidden">
+          <header className="flex shrink-0 items-center gap-2 border-b border-border px-4 py-3 sm:px-6">
+            <h2 className="text-sm font-semibold">{formatCount(commentTotal)} comments</h2>
+            <span className="ml-auto text-[11px] text-muted-foreground">
+              Official replies pinned first
+            </span>
+          </header>
+          <CommentThread
+            storyId={id}
+            comments={comments}
+            total={commentTotal}
+            commentsHasMore={commentsHasMore}
+            commentsCursor={commentsCursor}
+            focusCommentId={focusCommentId}
+            panelMode
+          />
+        </section>
       </div>
-
-      {!user && !isAnnouncement ? (
-        <p className="rounded-2xl border border-border p-4 text-sm text-muted-foreground">
-          <Link to="/auth" className="font-medium text-primary">
-            Sign in
-          </Link>{" "}
-          to upvote, add “me too” or comment.
-        </p>
-      ) : null}
-
-      <CommentThread
-        storyId={id}
-        comments={comments}
-        total={commentTotal}
-        commentsHasMore={commentsHasMore}
-        commentsCursor={commentsCursor}
-        focusCommentId={focusCommentId}
-        fullWidth
-      />
 
       {!isAnnouncement ? (
         <ReportDialog

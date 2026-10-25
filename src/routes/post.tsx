@@ -453,7 +453,7 @@ function WorkplaceStoryComposer() {
         setPinningLocation(false);
         toast.error("Could not get your location. Check your browser permission and try again.");
       },
-        { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
+      { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
     );
   }
   const exactMatch = matches.some((m) => m.name.toLowerCase() === companyName.trim().toLowerCase());
@@ -730,7 +730,7 @@ function WorkplaceStoryComposer() {
 
           <div className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:items-center md:p-8">
             <div className="flex min-h-0 w-full flex-1 flex-col">
-              <header className="sticky top-0 z-20 shrink-0 border-b border-border bg-background px-4 pb-3 pt-3 md:static md:border-0 md:px-0 md:pb-0 md:pt-0">
+              <header className="z-20 shrink-0 border-b border-border bg-background px-4 pb-3 pt-3 md:border-0 md:px-0 md:pb-0 md:pt-0">
                 {account?.accountType === "official" &&
                 account.username === "candid" &&
                 !isEditing ? (
@@ -759,504 +759,513 @@ function WorkplaceStoryComposer() {
                 </p>
               </header>
 
-              <div className="grid min-h-0 flex-1 gap-6 overflow-y-auto overscroll-contain px-4 py-4 md:px-0 md:py-5 xl:grid-cols-[minmax(0,1fr)_20rem]">
-                <div className="space-y-5 bg-transparent p-0 md:p-0">
-                  {step === 0 ? (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="company">Who was your employer?</Label>
-                        <Input
-                          id="company"
-                          value={companyName}
-                          onChange={(event) => setCompanyName(event.target.value)}
-                          placeholder="e.g. Sky Minimart, Naivas, a boda stage"
-                          autoComplete="off"
-                        />
-                        <p className="rounded-xl border border-border bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
-                          The company name always appears on a published story. Your Candid username
-                          appears as the author; your account email and legal name are not shown.
-                          Avoid details that could identify you personally.
-                        </p>
-
-                        {matches.length > 0 && !exactMatch ? (
-                          <div className="space-y-1.5 rounded-2xl border border-border bg-secondary/40 p-3">
-                            <p className="text-xs font-medium text-muted-foreground">
-                              {matches.length === 1
-                                ? "Possible existing employer — is this the same business?"
-                                : "Possible existing employers — is one of these the same business?"}
+              <div className="grid min-h-0 flex-1 gap-6 px-4 md:px-0 xl:grid-cols-[minmax(0,1fr)_20rem]">
+                <div className="flex min-h-0 flex-col bg-transparent p-0 md:p-0">
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-4 md:py-5">
+                    <div className="space-y-5">
+                      {step === 0 ? (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="company">Who was your employer?</Label>
+                            <Input
+                              id="company"
+                              value={companyName}
+                              onChange={(event) => setCompanyName(event.target.value)}
+                              placeholder="e.g. Sky Minimart, Naivas, a boda stage"
+                              autoComplete="off"
+                            />
+                            <p className="rounded-xl border border-border bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
+                              The company name always appears on a published story. Your Candid
+                              username appears as the author; your account email and legal name are
+                              not shown. Avoid details that could identify you personally.
                             </p>
+
+                            {matches.length > 0 && !exactMatch ? (
+                              <div className="space-y-1.5 rounded-2xl border border-border bg-secondary/40 p-3">
+                                <p className="text-xs font-medium text-muted-foreground">
+                                  {matches.length === 1
+                                    ? "Possible existing employer — is this the same business?"
+                                    : "Possible existing employers — is one of these the same business?"}
+                                </p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {matches.map((match) => (
+                                    <button
+                                      key={match.slug}
+                                      type="button"
+                                      onClick={() => setCompanyName(match.name)}
+                                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm hover:border-primary/50"
+                                    >
+                                      <Building2 className="size-3.5 text-primary" />
+                                      {match.name}
+                                      {match.verified ? <CompanyVerifiedBadge /> : null}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
+                          </div>
+                          <ChipField
+                            label="What kind of work do they do? (industry)"
+                            options={filters.industries}
+                            value={industry}
+                            onChange={setIndustry}
+                          />
+                          <ChipField
+                            label="Which county is this?"
+                            options={filters.counties}
+                            value={county}
+                            onChange={setCounty}
+                          />
+                          <div className="space-y-2">
+                            <Label htmlFor="work-area">
+                              Which area did you work in? (optional)
+                            </Label>
+                            <Input
+                              id="work-area"
+                              value={area}
+                              onChange={(event) => setArea(event.target.value)}
+                              list="candid-work-areas"
+                              maxLength={100}
+                              placeholder="Choose a suggestion or type an area"
+                            />
+                            <datalist id="candid-work-areas">
+                              {(areaSuggestions ?? []).map((suggestion) => (
+                                <option key={suggestion} value={suggestion} />
+                              ))}
+                            </datalist>
+                            <p className="text-xs text-muted-foreground">
+                              Suggestions follow your county. You can enter another area or leave it
+                              blank.
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="company-map">Public workplace map pin (optional)</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                id="company-map"
+                                value={companyMapUrl}
+                                onChange={(event) => setCompanyMapUrl(event.target.value)}
+                                maxLength={500}
+                                placeholder="Paste a Google Maps link"
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                disabled={pinningLocation}
+                                onClick={pinCurrentLocation}
+                                className="shrink-0"
+                              >
+                                {pinningLocation ? (
+                                  <LoaderCircle className="size-4 animate-spin" />
+                                ) : (
+                                  <MapPin className="size-4" />
+                                )}
+                                <span className="hidden sm:inline">Use location</span>
+                              </Button>
+                            </div>
+                            <p className="text-xs text-muted-foreground">
+                              If you add a pin, its exact location is shown on the published story
+                              map. County and area are shown separately either way.
+                            </p>
+                          </div>
+                        </>
+                      ) : null}
+
+                      {step === 1 ? (
+                        <div className="space-y-4">
+                          <div className="space-y-2">
+                            <Label>Why did you leave? Pick all that apply</Label>
                             <div className="flex flex-wrap gap-1.5">
-                              {matches.map((match) => (
+                              {REASONS.map((reason) => (
                                 <button
-                                  key={match.slug}
+                                  key={reason}
                                   type="button"
-                                  onClick={() => setCompanyName(match.name)}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm hover:border-primary/50"
+                                  onClick={() =>
+                                    setReasons((current) =>
+                                      current.includes(reason)
+                                        ? current.filter((item) => item !== reason)
+                                        : [...current, reason],
+                                    )
+                                  }
+                                  className={cn(
+                                    "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
+                                    reasons.includes(reason) &&
+                                      "border-primary/50 bg-primary/10 text-foreground",
+                                  )}
                                 >
-                                  <Building2 className="size-3.5 text-primary" />
-                                  {match.name}
-                                  {match.verified ? <CompanyVerifiedBadge /> : null}
+                                  {reason}
                                 </button>
                               ))}
                             </div>
                           </div>
-                        ) : null}
-                      </div>
-                      <ChipField
-                        label="What kind of work do they do? (industry)"
-                        options={filters.industries}
-                        value={industry}
-                        onChange={setIndustry}
-                      />
-                      <ChipField
-                        label="Which county is this?"
-                        options={filters.counties}
-                        value={county}
-                        onChange={setCounty}
-                      />
-                      <div className="space-y-2">
-                        <Label htmlFor="work-area">Which area did you work in? (optional)</Label>
-                        <Input
-                          id="work-area"
-                          value={area}
-                          onChange={(event) => setArea(event.target.value)}
-                          list="candid-work-areas"
-                          maxLength={100}
-                          placeholder="Choose a suggestion or type an area"
-                        />
-                        <datalist id="candid-work-areas">
-                          {(areaSuggestions ?? []).map((suggestion) => (
-                            <option key={suggestion} value={suggestion} />
-                          ))}
-                        </datalist>
-                        <p className="text-xs text-muted-foreground">
-                          Suggestions follow your county. You can enter another area or leave it
-                          blank.
-                        </p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="company-map">Public workplace map pin (optional)</Label>
-                        <div className="flex gap-2">
-                          <Input
-                            id="company-map"
-                            value={companyMapUrl}
-                            onChange={(event) => setCompanyMapUrl(event.target.value)}
-                            maxLength={500}
-                            placeholder="Paste a Google Maps link"
-                          />
-                          <Button
-                            type="button"
-                            variant="outline"
-                            disabled={pinningLocation}
-                            onClick={pinCurrentLocation}
-                            className="shrink-0"
-                          >
-                            {pinningLocation ? (
-                              <LoaderCircle className="size-4 animate-spin" />
-                            ) : (
-                              <MapPin className="size-4" />
-                            )}
-                            <span className="hidden sm:inline">Use location</span>
-                          </Button>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          If you add a pin, its exact location is shown on the published story map. County and area are shown separately either way.
-                        </p>
-                      </div>
-                    </>
-                  ) : null}
 
-                  {step === 1 ? (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <Label>Why did you leave? Pick all that apply</Label>
-                        <div className="flex flex-wrap gap-1.5">
-                          {REASONS.map((reason) => (
-                            <button
-                              key={reason}
-                              type="button"
-                              onClick={() =>
-                                setReasons((current) =>
-                                  current.includes(reason)
-                                    ? current.filter((item) => item !== reason)
-                                    : [...current, reason],
-                                )
-                              }
-                              className={cn(
-                                "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
-                                reasons.includes(reason) &&
-                                  "border-primary/50 bg-primary/10 text-foreground",
-                              )}
-                            >
-                              {reason}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="custom-reason">Or type your own</Label>
-                        <Input
-                          id="custom-reason"
-                          value={customReason}
-                          onChange={(event) => {
-                            const value = event.target.value;
-                            if (value.endsWith(",")) {
-                              addCustomReason(value);
-                            } else {
-                              setCustomReason(value);
-                            }
-                          }}
-                          onKeyDown={(event) => {
-                            if (event.key === "Enter") {
-                              event.preventDefault();
-                              addCustomReason(customReason);
-                            }
-                          }}
-                          placeholder="Type a reason, then press Enter or comma"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Each comma or Enter saves it as its own reason.
-                        </p>
-                        {reasons.filter((r) => !(REASONS as readonly string[]).includes(r)).length >
-                        0 ? (
-                          <div className="flex flex-wrap gap-1.5 pt-1">
-                            {reasons
-                              .filter((r) => !(REASONS as readonly string[]).includes(r))
-                              .map((reason) => (
-                                <span
-                                  key={reason}
-                                  className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm"
-                                >
-                                  {reason}
-                                  <button
-                                    type="button"
-                                    aria-label={`Remove ${reason}`}
-                                    onClick={() =>
-                                      setReasons((current) =>
-                                        current.filter((item) => item !== reason),
-                                      )
-                                    }
-                                  >
-                                    <X className="size-3.5" />
-                                  </button>
-                                </span>
-                              ))}
+                          <div className="space-y-2">
+                            <Label htmlFor="custom-reason">Or type your own</Label>
+                            <Input
+                              id="custom-reason"
+                              value={customReason}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                if (value.endsWith(",")) {
+                                  addCustomReason(value);
+                                } else {
+                                  setCustomReason(value);
+                                }
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === "Enter") {
+                                  event.preventDefault();
+                                  addCustomReason(customReason);
+                                }
+                              }}
+                              placeholder="Type a reason, then press Enter or comma"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Each comma or Enter saves it as its own reason.
+                            </p>
+                            {reasons.filter((r) => !(REASONS as readonly string[]).includes(r))
+                              .length > 0 ? (
+                              <div className="flex flex-wrap gap-1.5 pt-1">
+                                {reasons
+                                  .filter((r) => !(REASONS as readonly string[]).includes(r))
+                                  .map((reason) => (
+                                    <span
+                                      key={reason}
+                                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm"
+                                    >
+                                      {reason}
+                                      <button
+                                        type="button"
+                                        aria-label={`Remove ${reason}`}
+                                        onClick={() =>
+                                          setReasons((current) =>
+                                            current.filter((item) => item !== reason),
+                                          )
+                                        }
+                                      >
+                                        <X className="size-3.5" />
+                                      </button>
+                                    </span>
+                                  ))}
+                              </div>
+                            ) : null}
                           </div>
-                        ) : null}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {step === 2 ? (
-                    <>
-                      <div className="space-y-2">
-                        <Label htmlFor="position">What was your job title there?</Label>
-                        <Input
-                          id="position"
-                          value={position}
-                          onChange={(event) => setPosition(event.target.value)}
-                          placeholder="e.g. Cashier, Graphic Designer, Accountant, Rider"
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Different positions are paid and treated differently — this keeps your
-                          story (and salary data) accurate.
-                        </p>
-                      </div>
-                      <ChipField
-                        label="How long did you work there?"
-                        options={TENURES}
-                        value={tenure}
-                        onChange={setTenure}
-                      />
-                      <ChipField
-                        label="How senior were you?"
-                        options={LEVELS}
-                        value={roleLevel}
-                        onChange={setRoleLevel}
-                      />
-                      <div className="space-y-2">
-                        <Label>Would you work here again?</Label>
-                        <div className="flex gap-2">
-                          {[
-                            { label: "Yes", value: true },
-                            { label: "No", value: false },
-                          ].map((option) => (
-                            <button
-                              key={option.label}
-                              type="button"
-                              onClick={() => setWouldReturn(option.value)}
-                              className={cn(
-                                "rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground",
-                                wouldReturn === option.value &&
-                                  "border-primary/50 bg-primary/10 text-foreground",
-                              )}
-                            >
-                              {option.label}
-                            </button>
-                          ))}
                         </div>
-                      </div>
-                    </>
-                  ) : null}
+                      ) : null}
 
-                  {step === 3 ? (
-                    <>
-                      <div className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                          <div>
-                            <h2 className="flex items-center gap-2 text-sm font-semibold">
-                              <FileText className="size-4 text-primary" /> Smart draft from your
-                              answers
-                            </h2>
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              This draft uses a local writing helper, so no AI service is called to
-                              create it. Add details only you know, then edit it below.
+                      {step === 2 ? (
+                        <>
+                          <div className="space-y-2">
+                            <Label htmlFor="position">What was your job title there?</Label>
+                            <Input
+                              id="position"
+                              value={position}
+                              onChange={(event) => setPosition(event.target.value)}
+                              placeholder="e.g. Cashier, Graphic Designer, Accountant, Rider"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              Different positions are paid and treated differently — this keeps your
+                              story (and salary data) accurate.
                             </p>
                           </div>
-                          <Button
-                            type="button"
-                            variant="outline"
-                            size="sm"
-                            onClick={generateFromEarlierAnswers}
-                          >
-                            <FileText className="size-4" /> Rebuild from answers
-                          </Button>
-                        </div>
-                        {storyDraftedFromAnswers ? (
-                          <p className="mt-3 text-xs text-muted-foreground">
-                            Draft created from your answers. Check it for accuracy before
-                            continuing.
-                          </p>
-                        ) : null}
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="title">Headline</Label>
-                        <Input
-                          id="title"
-                          value={title}
-                          onChange={(event) => setTitle(event.target.value)}
-                          placeholder="Three months of salary paid late, every time"
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label htmlFor="body">Your story</Label>
-                        <MentionTextarea
-                          id="body"
-                          rows={10}
-                          value={body}
-                          onValueChange={setBody}
-                          placeholder="What happened, how it affected you, and what a job seeker should know. Describe roles, not names."
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {body.trim().length} characters (min 60)
-                        </p>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {step === 4 ? (
-                    <div className="space-y-4 text-sm">
-                      <h2 className="text-lg font-semibold">
-                        {isEditing ? "Review your changes" : "Before you publish"}
-                      </h2>
-                      {isEditing ? (
-                        <p className="rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
-                          Editing the employer is allowed. Any change will send the full story for
-                          moderator approval, and it will be hidden until approved. Existing private
-                          evidence, if any, will be retained.
-                        </p>
-                      ) : null}
-                      <ul className="space-y-2 text-muted-foreground">
-                        <li>
-                          · Your Candid handle appears with the story. Your email and legal name are
-                          never shown.
-                        </li>
-                        <li>· Do not name individual colleagues, managers or clients.</li>
-                        <li>· Stick to what you experienced or can describe factually.</li>
-                        <li>
-                          · Automated AI reads each full story. Clear, low-risk stories may go live
-                          right away; uncertain or sensitive cases wait for moderator review.
-                        </li>
-                      </ul>
-
-                      {!isEditing ? (
-                        <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
-                          <h3 className="flex items-center gap-2 font-semibold">
-                            <Lock className="size-4 text-primary" /> Prove you worked there
-                            (optional, private)
-                          </h3>
-                          <p className="text-xs text-muted-foreground">
-                            Add a document or image that can help moderators review your story.
-                            Proof is uploaded to restricted Cloudinary storage, is{" "}
-                            <span className="font-medium text-foreground">never published</span>,
-                            and is never shown to the employer. If attached, AI checks it for
-                            relevance and exposed sensitive details; this does not verify that the
-                            story is true.
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            Paid via M-Pesa from your boss's personal number? That's normal for
-                            small businesses — just add a short note below telling us.
-                          </p>
-
-                          <Textarea
-                            rows={2}
-                            value={evidenceNote}
-                            onChange={(event) => setEvidenceNote(event.target.value)}
-                            placeholder="Optional private note, e.g. “Salary came from the owner's personal M-Pesa.”"
+                          <ChipField
+                            label="How long did you work there?"
+                            options={TENURES}
+                            value={tenure}
+                            onChange={setTenure}
                           />
+                          <ChipField
+                            label="How senior were you?"
+                            options={LEVELS}
+                            value={roleLevel}
+                            onChange={setRoleLevel}
+                          />
+                          <div className="space-y-2">
+                            <Label>Would you work here again?</Label>
+                            <div className="flex gap-2">
+                              {[
+                                { label: "Yes", value: true },
+                                { label: "No", value: false },
+                              ].map((option) => (
+                                <button
+                                  key={option.label}
+                                  type="button"
+                                  onClick={() => setWouldReturn(option.value)}
+                                  className={cn(
+                                    "rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground",
+                                    wouldReturn === option.value &&
+                                      "border-primary/50 bg-primary/10 text-foreground",
+                                  )}
+                                >
+                                  {option.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        </>
+                      ) : null}
 
-                          <div className="space-y-3 border-t border-border/70 pt-3">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
+                      {step === 3 ? (
+                        <>
+                          <div className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-4">
+                            <div className="flex flex-wrap items-center justify-between gap-3">
                               <div>
-                                <p className="text-sm font-medium">Attach proof (optional)</p>
-                                <p className="text-xs text-muted-foreground">
-                                  JPG, PNG, WebP, or PDF · up to 5 MB
+                                <h2 className="flex items-center gap-2 text-sm font-semibold">
+                                  <FileText className="size-4 text-primary" /> Smart draft from your
+                                  answers
+                                </h2>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  This draft uses a local writing helper, so no AI service is called
+                                  to create it. Add details only you know, then edit it below.
                                 </p>
                               </div>
-                              <label
-                                className={cn(
-                                  "inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium hover:border-primary/50",
-                                  uploadingEvidence && "pointer-events-none opacity-60",
-                                  evidenceUpload && "pointer-events-none opacity-60",
-                                )}
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={generateFromEarlierAnswers}
                               >
-                                <Paperclip className="size-4" />
-                                {evidenceFile
-                                  ? evidenceUpload
-                                    ? "Uploaded"
-                                    : "Choose another"
-                                  : "Choose file"}
-                                <input
-                                  type="file"
-                                  className="sr-only"
-                                  accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
-                                  disabled={
-                                    uploadingEvidence || submitting || Boolean(evidenceUpload)
-                                  }
-                                  onChange={(event) => {
-                                    void selectEvidenceFile(event.currentTarget.files?.[0]);
-                                    event.currentTarget.value = "";
-                                  }}
-                                />
-                              </label>
+                                <FileText className="size-4" /> Rebuild from answers
+                              </Button>
                             </div>
-
-                            {evidenceFile ? (
-                              <div className="flex items-center gap-3 rounded-xl border border-border bg-background/70 p-3">
-                                {evidenceFile.type.startsWith("image/") && evidencePreviewUrl ? (
-                                  <img
-                                    src={evidencePreviewUrl}
-                                    alt="Selected proof preview"
-                                    className="size-14 rounded-lg object-cover"
-                                  />
-                                ) : (
-                                  <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-                                    <FileText className="size-6" />
-                                  </span>
-                                )}
-                                <div className="min-w-0 flex-1">
-                                  <p className="truncate text-sm font-medium">
-                                    {evidenceFile.name}
-                                  </p>
-                                  <p className="text-xs text-muted-foreground">
-                                    {(evidenceFile.size / (1024 * 1024)).toFixed(2)} MB
-                                  </p>
-                                </div>
-                                {uploadingEvidence ? (
-                                  <button
-                                    type="button"
-                                    className="text-xs text-muted-foreground underline underline-offset-4"
-                                    onClick={() => uploadAbortController.current?.abort()}
-                                  >
-                                    Cancel
-                                  </button>
-                                ) : evidenceUpload ? (
-                                  <button
-                                    type="button"
-                                    aria-label="Remove proof file"
-                                    disabled={submitting}
-                                    onClick={() => void removeEvidenceFile()}
-                                    className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                                  >
-                                    <X className="size-4" />
-                                  </button>
-                                ) : evidenceTicketId ? (
-                                  <button
-                                    type="button"
-                                    aria-label="Remove proof file"
-                                    disabled={submitting}
-                                    onClick={() => void removeEvidenceFile()}
-                                    className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                                  >
-                                    <X className="size-4" />
-                                  </button>
-                                ) : (
-                                  <>
-                                    <ImageIcon className="size-5 shrink-0 text-muted-foreground" />
-                                    <button
-                                      type="button"
-                                      aria-label="Remove selected proof file"
-                                      disabled={submitting}
-                                      onClick={() => void removeEvidenceFile()}
-                                      className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                                    >
-                                      <X className="size-4" />
-                                    </button>
-                                  </>
-                                )}
-                              </div>
-                            ) : null}
-
-                            {evidenceError ? (
-                              <p role="alert" className="text-xs text-danger">
-                                {evidenceError}
-                              </p>
-                            ) : null}
-                            {evidenceUpload ? (
-                              <p className="text-xs text-primary">
-                                Proof uploaded securely. It will be attached when you submit the
-                                story.
-                              </p>
-                            ) : evidenceFile ? (
-                              <p className="text-xs text-muted-foreground">
-                                It will upload securely when you publish. Remove it above to publish
-                                without proof.
+                            {storyDraftedFromAnswers ? (
+                              <p className="mt-3 text-xs text-muted-foreground">
+                                Draft created from your answers. Check it for accuracy before
+                                continuing.
                               </p>
                             ) : null}
                           </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="title">Headline</Label>
+                            <Input
+                              id="title"
+                              value={title}
+                              onChange={(event) => setTitle(event.target.value)}
+                              placeholder="Three months of salary paid late, every time"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label htmlFor="body">Your story</Label>
+                            <MentionTextarea
+                              id="body"
+                              rows={10}
+                              value={body}
+                              onValueChange={setBody}
+                              placeholder="What happened, how it affected you, and what a job seeker should know. Describe roles, not names."
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {body.trim().length} characters (min 60)
+                            </p>
+                          </div>
+                        </>
+                      ) : null}
+
+                      {step === 4 ? (
+                        <div className="space-y-4 text-sm">
+                          <h2 className="text-lg font-semibold">
+                            {isEditing ? "Review your changes" : "Before you publish"}
+                          </h2>
+                          {isEditing ? (
+                            <p className="rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
+                              Editing the employer is allowed. Any change will send the full story
+                              for moderator approval, and it will be hidden until approved. Existing
+                              private evidence, if any, will be retained.
+                            </p>
+                          ) : null}
+                          <ul className="space-y-2 text-muted-foreground">
+                            <li>
+                              · Your Candid handle appears with the story. Your email and legal name
+                              are never shown.
+                            </li>
+                            <li>· Do not name individual colleagues, managers or clients.</li>
+                            <li>· Stick to what you experienced or can describe factually.</li>
+                            <li>
+                              · Automated AI reads each full story. Clear, low-risk stories may go
+                              live right away; uncertain or sensitive cases wait for moderator
+                              review.
+                            </li>
+                          </ul>
+
+                          {!isEditing ? (
+                            <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
+                              <h3 className="flex items-center gap-2 font-semibold">
+                                <Lock className="size-4 text-primary" /> Prove you worked there
+                                (optional, private)
+                              </h3>
+                              <p className="text-xs text-muted-foreground">
+                                Add a document or image that can help moderators review your story.
+                                Proof is uploaded to restricted Cloudinary storage, is{" "}
+                                <span className="font-medium text-foreground">never published</span>
+                                , and is never shown to the employer. If attached, AI checks it for
+                                relevance and exposed sensitive details; this does not verify that
+                                the story is true.
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Paid via M-Pesa from your boss's personal number? That's normal for
+                                small businesses — just add a short note below telling us.
+                              </p>
+
+                              <Textarea
+                                rows={2}
+                                value={evidenceNote}
+                                onChange={(event) => setEvidenceNote(event.target.value)}
+                                placeholder="Optional private note, e.g. “Salary came from the owner's personal M-Pesa.”"
+                              />
+
+                              <div className="space-y-3 border-t border-border/70 pt-3">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <div>
+                                    <p className="text-sm font-medium">Attach proof (optional)</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      JPG, PNG, WebP, or PDF · up to 5 MB
+                                    </p>
+                                  </div>
+                                  <label
+                                    className={cn(
+                                      "inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium hover:border-primary/50",
+                                      uploadingEvidence && "pointer-events-none opacity-60",
+                                      evidenceUpload && "pointer-events-none opacity-60",
+                                    )}
+                                  >
+                                    <Paperclip className="size-4" />
+                                    {evidenceFile
+                                      ? evidenceUpload
+                                        ? "Uploaded"
+                                        : "Choose another"
+                                      : "Choose file"}
+                                    <input
+                                      type="file"
+                                      className="sr-only"
+                                      accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
+                                      disabled={
+                                        uploadingEvidence || submitting || Boolean(evidenceUpload)
+                                      }
+                                      onChange={(event) => {
+                                        void selectEvidenceFile(event.currentTarget.files?.[0]);
+                                        event.currentTarget.value = "";
+                                      }}
+                                    />
+                                  </label>
+                                </div>
+
+                                {evidenceFile ? (
+                                  <div className="flex items-center gap-3 rounded-xl border border-border bg-background/70 p-3">
+                                    {evidenceFile.type.startsWith("image/") &&
+                                    evidencePreviewUrl ? (
+                                      <img
+                                        src={evidencePreviewUrl}
+                                        alt="Selected proof preview"
+                                        className="size-14 rounded-lg object-cover"
+                                      />
+                                    ) : (
+                                      <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+                                        <FileText className="size-6" />
+                                      </span>
+                                    )}
+                                    <div className="min-w-0 flex-1">
+                                      <p className="truncate text-sm font-medium">
+                                        {evidenceFile.name}
+                                      </p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {(evidenceFile.size / (1024 * 1024)).toFixed(2)} MB
+                                      </p>
+                                    </div>
+                                    {uploadingEvidence ? (
+                                      <button
+                                        type="button"
+                                        className="text-xs text-muted-foreground underline underline-offset-4"
+                                        onClick={() => uploadAbortController.current?.abort()}
+                                      >
+                                        Cancel
+                                      </button>
+                                    ) : evidenceUpload ? (
+                                      <button
+                                        type="button"
+                                        aria-label="Remove proof file"
+                                        disabled={submitting}
+                                        onClick={() => void removeEvidenceFile()}
+                                        className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                                      >
+                                        <X className="size-4" />
+                                      </button>
+                                    ) : evidenceTicketId ? (
+                                      <button
+                                        type="button"
+                                        aria-label="Remove proof file"
+                                        disabled={submitting}
+                                        onClick={() => void removeEvidenceFile()}
+                                        className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                                      >
+                                        <X className="size-4" />
+                                      </button>
+                                    ) : (
+                                      <>
+                                        <ImageIcon className="size-5 shrink-0 text-muted-foreground" />
+                                        <button
+                                          type="button"
+                                          aria-label="Remove selected proof file"
+                                          disabled={submitting}
+                                          onClick={() => void removeEvidenceFile()}
+                                          className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+                                        >
+                                          <X className="size-4" />
+                                        </button>
+                                      </>
+                                    )}
+                                  </div>
+                                ) : null}
+
+                                {evidenceError ? (
+                                  <p role="alert" className="text-xs text-danger">
+                                    {evidenceError}
+                                  </p>
+                                ) : null}
+                                {evidenceUpload ? (
+                                  <p className="text-xs text-primary">
+                                    Proof uploaded securely. It will be attached when you submit the
+                                    story.
+                                  </p>
+                                ) : evidenceFile ? (
+                                  <p className="text-xs text-muted-foreground">
+                                    It will upload securely when you publish. Remove it above to
+                                    publish without proof.
+                                  </p>
+                                ) : null}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          <Button
+                            className="w-full glow-primary"
+                            disabled={submitting || uploadingEvidence}
+                            onClick={submit}
+                          >
+                            {uploadingEvidence ? (
+                              <>
+                                <LoaderCircle className="size-4 animate-spin" /> Uploading proof…
+                              </>
+                            ) : submitting ? (
+                              "Screening and publishing…"
+                            ) : isEditing ? (
+                              "Submit changes for approval"
+                            ) : (
+                              "Publish story"
+                            )}
+                          </Button>
+                          {publishError ? (
+                            <p
+                              role="alert"
+                              className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger"
+                            >
+                              {publishError}
+                            </p>
+                          ) : null}
                         </div>
                       ) : null}
-
-                      <Button
-                        className="w-full glow-primary"
-                        disabled={submitting || uploadingEvidence}
-                        onClick={submit}
-                      >
-                        {uploadingEvidence ? (
-                          <>
-                            <LoaderCircle className="size-4 animate-spin" /> Uploading proof…
-                          </>
-                        ) : submitting ? (
-                          "Screening and publishing…"
-                        ) : isEditing ? (
-                          "Submit changes for approval"
-                        ) : (
-                          "Publish story"
-                        )}
-                      </Button>
-                      {publishError ? (
-                        <p
-                          role="alert"
-                          className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger"
-                        >
-                          {publishError}
-                        </p>
-                      ) : null}
                     </div>
-                  ) : null}
+                  </div>
 
-                  <div className="sticky bottom-0 flex flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                  <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
                     <Button
                       variant="ghost"
                       disabled={step === 0}

@@ -180,6 +180,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/forgot-password",
   ].includes(pathname);
   const directConversationRoute = /^\/messages\/[^/]+$/.test(pathname);
+  const storyDetailRoute = /^\/stories\/[^/]+$/.test(pathname);
   const headerBack =
     (nested && (!standaloneDesktopRoute || pathname === "/support" || pathname === "/settings")) ||
     pathname === "/profile" ||
@@ -420,10 +421,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         className={cn(
           "relative",
           !fullscreenRoute &&
-          pathname !== "/post" &&
-          pathname !== "/profile" &&
-          !pathname.startsWith("/u/") &&
-          (directConversationRoute ? "w-full md:app-shell" : "app-shell"),
+            pathname !== "/post" &&
+            pathname !== "/profile" &&
+            !pathname.startsWith("/u/") &&
+            (directConversationRoute ? "w-full md:app-shell" : "app-shell"),
         )}
       >
         <aside
@@ -500,7 +501,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                       onClick={() => {
                         setUserMenuOpen(false);
                         void requestPwaInstall().catch(() => {
-                          notify.error("Your browser could not open the install prompt. Try the browser menu.");
+                          notify.error(
+                            "Your browser could not open the install prompt. Try the browser menu.",
+                          );
                         });
                       }}
                       className="mb-1 flex w-full items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-left font-semibold text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.35)] transition hover:brightness-105"
@@ -560,13 +563,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               ? "p-0 md:pb-0"
               : "pt-6",
             !fullscreenRoute &&
-            pathname !== "/support" &&
-            !messagesInboxRoute &&
-            !directConversationRoute &&
-            (showDock ? "pb-32" : "pb-10"),
-            directConversationRoute && "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
+              pathname !== "/support" &&
+              !messagesInboxRoute &&
+              !directConversationRoute &&
+              (showDock ? "pb-32" : "pb-10"),
+            directConversationRoute &&
+              "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
+            storyDetailRoute && "h-[calc(100dvh-4rem)] overflow-hidden p-0 md:pb-0",
             standaloneDesktopRoute &&
-            "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
+              "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
         >
           <BiometricGate>{children}</BiometricGate>
