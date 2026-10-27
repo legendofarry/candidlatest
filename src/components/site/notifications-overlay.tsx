@@ -1,20 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
-  Archive,
-  ArchiveRestore,
   ArrowLeft,
   Bell,
   CheckCheck,
   CheckCircle2,
+  Check,
   ChevronRight,
+  ListFilter,
   Info,
-  MailOpen,
-  MoreVertical,
+  Search,
   Trash2,
   X,
   XCircle,
@@ -30,12 +29,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   archiveNotification,
   backToNotificationList,
@@ -53,6 +46,7 @@ import {
   useNotifications,
   useNotificationsOverlay,
   type AppNotification,
+  type NotificationActivityType,
   type NotifyKind,
 } from "@/lib/notifications-store";
 import { cn, formatCount } from "@/lib/utils";
@@ -61,6 +55,22 @@ import { syncMyNotifications } from "@/lib/notification-sync.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { requiresEmailVerification } from "@/lib/email-verification";
+import { Input } from "@/components/ui/input";
+import { ProfileAvatar } from "@/components/site/profile-photo";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const kindMeta: Record<NotifyKind, { icon: typeof Info; tint: string; ring: string }> = {
   success: {
@@ -98,16 +108,69 @@ type PendingAction =
   | { type: "clear" }
   | { type: "emptyArchive" };
 
+type NotificationFilter =
+  "all" | "unread" | "follows" | "likes" | "comments" | "mentions" | "messages" | "other";
+
+const notificationFilters: { id: NotificationFilter; label: string }[] = [
+  { id: "all", label: "All notifications" },
+  { id: "unread", label: "Unread" },
+  { id: "follows", label: "Follows and requests" },
+  { id: "likes", label: "Likes" },
+  { id: "comments", label: "Comments and replies" },
+  { id: "mentions", label: "Mentions" },
+  { id: "messages", label: "Message reactions" },
+  { id: "other", label: "Other" },
+];
+
+function inferActivityType(notification: AppNotification): NotificationActivityType {
+  if (notification.activityType && notification.activityType !== "other") {
+    return notification.activityType;
+  }
+  const text = `${notification.title} ${notification.description ?? ""}`.toLowerCase();
+  if (text.includes("follow request") || text.includes("requested to follow"))
+    return "follow_request";
+  if (text.includes("followed you") || text.includes("new follower")) return "follow";
+  if (text.includes("like") || text.includes("liked")) {
+    return text.includes("comment") ? "comment_like" : "post_like";
+  }
+  if (text.includes("repl")) return "reply";
+  if (text.includes("comment")) return "comment";
+  if (text.includes("mention")) return "mention";
+  if (text.includes("message") || text.includes("photo") || text.includes("reacted")) {
+    return "message_reaction";
+  }
+  return "other";
+}
+
+function matchesNotificationFilter(notification: AppNotification, filter: NotificationFilter) {
+  if (filter === "all") return true;
+  if (filter === "unread") return !notification.read;
+  const activity = inferActivityType(notification);
+  if (filter === "follows") return activity === "follow" || activity === "follow_request";
+  if (filter === "likes") return activity === "post_like" || activity === "comment_like";
+  if (filter === "comments") return activity === "comment" || activity === "reply";
+  if (filter === "mentions") return activity === "mention";
+  if (filter === "messages") return activity === "message_reaction";
+  return activity === "other";
+}
+
 export function NotificationsOverlay() {
   const { open, view } = useNotificationsOverlay();
   const all = useNotifications();
   const { user } = useAuth();
+  const isMobile = useIsMobile();
   const fetchNotificationPage = useServerFn(syncMyNotifications);
   const navigate = useNavigate();
   const [pending, setPending] = useState<PendingAction | null>(null);
   const [tab, setTab] = useState<"inbox" | "archive">("inbox");
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState<NotificationFilter>("all");
+  const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(20);
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const pullStartRef = useRef<number | null>(null);
+  const [pullDistance, setPullDistance] = useState(0);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const serverPages = useInfiniteQuery({
     queryKey: ["notification-pages", user?.uid ?? "anon"],
@@ -123,6 +186,14 @@ export function NotificationsOverlay() {
   }, [serverPages.data]);
 
   const notifications = all.filter((n) => (tab === "archive" ? n.archived : !n.archived));
+  const matchingNotifications = useMemo(() => {
+    const query = search.trim().toLowerCase();
+    return notifications.filter((n) => {
+      const matchesSearch =
+        !query || `${n.title} ${n.description ?? ""}`.toLowerCase().includes(query);
+      return matchesSearch && matchesNotificationFilter(n, filter);
+    });
+  }, [notifications, search, filter]);
   const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
 
   const unread = all.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0);
@@ -159,11 +230,11 @@ export function NotificationsOverlay() {
     startOfToday.setHours(0, 0, 0, 0);
     const today: AppNotification[] = [];
     const earlier: AppNotification[] = [];
-    for (const n of notifications.slice(0, visibleCount)) {
+    for (const n of matchingNotifications.slice(0, visibleCount)) {
       (n.createdAt >= startOfToday.getTime() ? today : earlier).push(n);
     }
     return { today, earlier };
-  }, [notifications, visibleCount]);
+  }, [matchingNotifications, visibleCount]);
 
   const detail =
     view.name === "detail" ? (notifications.find((n) => n.id === view.id) ?? null) : null;
@@ -195,21 +266,84 @@ export function NotificationsOverlay() {
     setPending(null);
   }
 
+  function handleRefreshStart(event: TouchEvent<HTMLDivElement>) {
+    if (event.currentTarget.scrollTop > 0 || !open) return;
+    pullStartRef.current = event.touches[0]?.clientY ?? null;
+  }
+
+  function handleRefreshMove(event: TouchEvent<HTMLDivElement>) {
+    if (pullStartRef.current === null || event.currentTarget.scrollTop > 0 || !open) return;
+    const delta = (event.touches[0]?.clientY ?? pullStartRef.current) - pullStartRef.current;
+    if (delta > 0) {
+      setPullDistance(Math.min(delta * 0.6, 96));
+    }
+  }
+
+  function handleRefreshEnd() {
+    const shouldRefresh = pullDistance >= 72;
+    pullStartRef.current = null;
+    if (!shouldRefresh) {
+      setPullDistance(0);
+      return;
+    }
+    setIsRefreshing(true);
+    void serverPages.refetch().finally(() => {
+      setPullDistance(0);
+      setIsRefreshing(false);
+    });
+  }
+
   function renderNotificationList() {
-    return notifications.length === 0 ? (
-      <div className="rounded-3xl border border-dashed border-border p-12 text-center">
+    return matchingNotifications.length === 0 ? (
+      <div className="border-y border-border bg-background px-4 py-12 text-center sm:px-6">
         <Bell className="mx-auto size-6 text-muted-foreground" />
-        <p className="mt-3 text-sm font-medium">
-          {tab === "archive" ? "Archive is empty" : "You're all caught up"}
+        <p className="mt-3 text-sm font-medium text-foreground">
+          {search.trim()
+            ? "No notifications match your search"
+            : tab === "archive"
+              ? "Archive is empty"
+              : "No new notifications"}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          {tab === "archive"
-            ? "Archived notifications land here. You can restore or delete them."
-            : "Replies, mentions, followers and messages from Candid land here. Everyday confirmations stay as quick toasts."}
+          {search.trim()
+            ? "Try another word or phrase."
+            : tab === "archive"
+              ? "Archived notifications will show up here."
+              : "Fresh activity will appear here as it happens."}
         </p>
+        {serverPages.hasNextPage ? (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={serverPages.isFetchingNextPage}
+            className="mt-4"
+            onClick={() => void serverPages.fetchNextPage()}
+          >
+            {serverPages.isFetchingNextPage ? "Loading notifications…" : "Load more notifications"}
+          </Button>
+        ) : null}
       </div>
     ) : (
-      <div className="space-y-6">
+      <div className="space-y-3">
+        {pullDistance > 0 || isRefreshing ? (
+          <div
+            className="flex items-center justify-center py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+            style={{ transform: `translateY(${Math.min(pullDistance * 0.35, 18)}px)` }}
+          >
+            <span className={cn("flex items-center gap-2", isRefreshing && "text-primary")}>
+              {isRefreshing ? (
+                <Bell className="size-3.5 animate-spin" />
+              ) : (
+                <Bell className="size-3.5" />
+              )}
+              {isRefreshing
+                ? "Refreshing"
+                : pullDistance >= 72
+                  ? "Release to refresh"
+                  : "Pull to refresh"}
+            </span>
+          </div>
+        ) : null}
         <Group label="Today" items={groups.today} onActivate={activate} onRequest={setPending} />
         <Group
           label="Earlier"
@@ -217,18 +351,18 @@ export function NotificationsOverlay() {
           onActivate={activate}
           onRequest={setPending}
         />
-        {notifications.length > visibleCount || serverPages.hasNextPage ? (
+        {matchingNotifications.length > visibleCount || serverPages.hasNextPage ? (
           <div className="flex flex-col items-center gap-2 pt-1">
             <p className="text-xs text-muted-foreground">
-              Showing {formatCount(visibleCount)} of {formatCount(notifications.length)}{" "}
-              notifications
+              Showing {formatCount(Math.min(visibleCount, matchingNotifications.length))} of{" "}
+              {formatCount(matchingNotifications.length)} notifications
             </p>
             <Button
               variant="outline"
               size="sm"
               disabled={serverPages.isFetchingNextPage}
               onClick={(event) => {
-                if (visibleCount < notifications.length) {
+                if (visibleCount < matchingNotifications.length) {
                   expandBy(20, event.currentTarget);
                 } else if (serverPages.hasNextPage) {
                   const anchor = event.currentTarget;
@@ -240,7 +374,7 @@ export function NotificationsOverlay() {
             >
               {serverPages.isFetchingNextPage
                 ? "Loading notifications…"
-                : visibleCount < notifications.length
+                : visibleCount < matchingNotifications.length
                   ? "Show 20 more"
                   : "Load next 20 notifications"}
             </Button>
@@ -252,7 +386,7 @@ export function NotificationsOverlay() {
 
   function renderTabs() {
     return (
-      <div className="flex gap-2 border-b border-border bg-background px-4 py-3 sm:px-6">
+      <div className="flex gap-2 bg-background px-4 pb-3 pt-4 sm:px-6">
         {(
           [
             { key: "inbox", label: "Inbox", count: all.length - archivedCount },
@@ -267,18 +401,19 @@ export function NotificationsOverlay() {
               resetVisibleCount();
             }}
             className={cn(
-              "inline-flex min-h-12 items-center gap-1.5 rounded-full border-2 px-5 text-sm font-semibold transition-colors",
-              tab === item.key && "border-foreground bg-foreground text-background",
-              tab !== item.key && "border-border bg-card text-foreground hover:bg-secondary/60",
+              "inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3.5 text-sm font-medium transition-colors",
+              tab === item.key && "border-primary bg-primary text-primary-foreground",
+              tab !== item.key &&
+                "border-border bg-transparent text-foreground hover:bg-secondary/60",
             )}
           >
             {item.label}
             {item.count > 0 ? (
               <span
                 className={cn(
-                  "ml-1 flex size-7 items-center justify-center rounded-full text-xs font-bold",
+                  "ml-1 flex size-5 items-center justify-center rounded-full text-[11px] font-bold",
                   tab === item.key
-                    ? "bg-primary text-primary-foreground"
+                    ? "bg-background text-foreground"
                     : "bg-secondary text-muted-foreground",
                 )}
                 aria-label={item.count.toLocaleString()}
@@ -288,6 +423,73 @@ export function NotificationsOverlay() {
             ) : null}
           </button>
         ))}
+      </div>
+    );
+  }
+
+  function renderSearch() {
+    return (
+      <div className="flex items-center gap-3 bg-background px-4 pb-4 sm:px-6">
+        <label className="relative block min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 size-5 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              resetVisibleCount();
+            }}
+            placeholder="Search notifications"
+            aria-label="Search notifications"
+            className="h-14 rounded-full border-2 bg-card pl-12 text-base shadow-sm placeholder:text-muted-foreground/80"
+          />
+        </label>
+        {isMobile ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="icon"
+            aria-label="Filter notifications"
+            className="relative size-12 shrink-0 rounded-full border-primary/50 bg-primary/5"
+            onClick={() => setFilterSheetOpen(true)}
+          >
+            <ListFilter className="size-5" />
+            {filter !== "all" ? (
+              <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
+            ) : null}
+          </Button>
+        ) : (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Filter notifications"
+                className="relative size-12 shrink-0 rounded-full border-primary/50 bg-primary/5"
+              >
+                <ListFilter className="size-5" />
+                {filter !== "all" ? (
+                  <span className="absolute right-2 top-2 size-2 rounded-full bg-primary" />
+                ) : null}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="z-[110] w-56">
+              {notificationFilters.map((item) => (
+                <DropdownMenuItem
+                  key={item.id}
+                  onSelect={() => {
+                    setFilter(item.id);
+                    resetVisibleCount();
+                  }}
+                  className="justify-between"
+                >
+                  {item.label}
+                  {filter === item.id ? <Check className="size-4 text-primary" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
       </div>
     );
   }
@@ -328,46 +530,27 @@ export function NotificationsOverlay() {
               transition={{ type: "spring", stiffness: 320, damping: 30 }}
             >
               <header className="flex shrink-0 items-center gap-3 border-b border-border bg-background px-4 py-4 sm:px-6 sm:py-5">
-                {view.name === "list" ? (
-                  <div className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                    <Bell className="size-6" />
-                  </div>
-                ) : (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      aria-label="Back to notifications"
-                      className="!size-12 rounded-full border-2 xl:hidden"
-                      onClick={backToNotificationList}
-                    >
-                      <ArrowLeft className="size-4" />
-                    </Button>
-                    <div className="hidden size-14 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground xl:flex">
-                      <Bell className="size-6" />
-                    </div>
-                  </>
-                )}
+                <Button
+                  variant="outline"
+                  size="icon"
+                  aria-label={
+                    view.name === "list" ? "Close notifications" : "Back to notifications"
+                  }
+                  className="!size-12 shrink-0 rounded-full border-2"
+                  onClick={() =>
+                    view.name === "list" ? closeNotifications() : backToNotificationList()
+                  }
+                >
+                  <ArrowLeft className="size-4" />
+                </Button>
 
                 <div className="min-w-0">
                   <h2 className="font-display text-2xl font-bold tracking-tight sm:text-3xl">
-                    <span className={view.name === "detail" ? "xl:hidden" : ""}>
-                      {view.name === "list" ? "Notifications" : "Notification"}
-                    </span>
-                    {view.name === "detail" ? (
-                      <span className="hidden xl:inline">Notifications</span>
-                    ) : null}
+                    {view.name === "list" ? "Notifications" : "Notification"}
                   </h2>
-                  {view.name === "list" || view.name === "detail" ? (
-                    <p
-                      className={cn(
-                        "text-sm font-medium text-muted-foreground",
-                        view.name === "detail" && "hidden xl:block",
-                      )}
-                    >
-                      {unread > 0 ? `${unread} unread` : "You're all caught up"}
-                    </p>
-                  ) : null}
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {unread > 0 ? `${unread} unread` : "You're all caught up"}
+                  </p>
                 </div>
 
                 <div
@@ -400,34 +583,54 @@ export function NotificationsOverlay() {
                       <Trash2 className="size-4" />
                     </Button>
                   </>
-                  <Button
-                    variant="outline"
-                    size="icon"
-                    aria-label="Close notifications"
-                    className="!size-10 rounded-full border-2 bg-foreground text-background hover:bg-foreground/90 hover:text-background sm:!size-12"
-                    onClick={closeNotifications}
-                  >
-                    <X className="size-4" />
-                  </Button>
+                  {view.name !== "list" ? (
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      aria-label="Close notifications"
+                      className="!size-10 rounded-full border-2 sm:!size-12"
+                      onClick={closeNotifications}
+                    >
+                      <X className="size-4" />
+                    </Button>
+                  ) : null}
                 </div>
               </header>
 
               {view.name === "list" ? (
-                renderTabs()
+                <>
+                  {renderTabs()}
+                  {renderSearch()}
+                </>
               ) : (
-                <div className="hidden xl:block">{renderTabs()}</div>
+                <div className="hidden xl:block">
+                  {renderTabs()}
+                  {renderSearch()}
+                </div>
               )}
 
               {view.name === "list" ? (
-                <div className="flex-1 overflow-y-auto bg-secondary/30 px-4 pb-10 pt-5 sm:px-6">
+                <div
+                  className="flex-1 overflow-y-auto bg-background pb-10 pt-1"
+                  onTouchStart={handleRefreshStart}
+                  onTouchMove={handleRefreshMove}
+                  onTouchEnd={handleRefreshEnd}
+                  onTouchCancel={handleRefreshEnd}
+                >
                   {renderNotificationList()}
                 </div>
               ) : (
                 <>
-                  <div className="hidden flex-1 overflow-y-auto bg-secondary/30 px-4 pb-10 pt-5 sm:px-6 xl:block">
+                  <div className="hidden flex-1 overflow-y-auto bg-background pb-10 pt-1 xl:block">
                     {renderNotificationList()}
                   </div>
-                  <div className="flex-1 overflow-y-auto bg-secondary/30 px-4 pb-10 pt-5 sm:px-6 xl:hidden">
+                  <div
+                    className="flex-1 overflow-y-auto bg-background px-4 pb-10 pt-1 sm:px-6 xl:hidden"
+                    onTouchStart={handleRefreshStart}
+                    onTouchMove={handleRefreshMove}
+                    onTouchEnd={handleRefreshEnd}
+                    onTouchCancel={handleRefreshEnd}
+                  >
                     <AnimatePresence mode="wait" initial={false}>
                       {detail ? (
                         <motion.div
@@ -533,6 +736,54 @@ export function NotificationsOverlay() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Drawer open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
+        <DrawerContent overlayClassName="z-[105]" className="z-[110] max-h-[85dvh]">
+          <DrawerHeader className="border-b border-border pb-4 text-left">
+            <DrawerTitle className="font-display text-xl">Filter notifications</DrawerTitle>
+            <DrawerDescription>Choose which activity appears in your inbox.</DrawerDescription>
+          </DrawerHeader>
+          <div className="grid grid-cols-2 gap-2 overflow-y-auto px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            {notificationFilters.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                aria-pressed={filter === item.id}
+                onClick={() => {
+                  setFilter(item.id);
+                  resetVisibleCount();
+                  setFilterSheetOpen(false);
+                }}
+                className={cn(
+                  "flex min-h-12 items-center justify-between gap-2 rounded-xl border px-3 py-2 text-left text-sm font-medium transition-colors",
+                  filter === item.id
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border bg-background hover:bg-secondary",
+                )}
+              >
+                <span>{item.label}</span>
+                {filter === item.id ? <Check className="size-4 shrink-0" /> : null}
+              </button>
+            ))}
+          </div>
+          {filter !== "all" ? (
+            <div className="border-t border-border px-4 py-3">
+              <Button
+                type="button"
+                variant="ghost"
+                className="w-full"
+                onClick={() => {
+                  setFilter("all");
+                  resetVisibleCount();
+                  setFilterSheetOpen(false);
+                }}
+              >
+                Clear filters
+              </Button>
+            </div>
+          ) : null}
+        </DrawerContent>
+      </Drawer>
     </>
   );
 }
@@ -551,10 +802,10 @@ function Group({
   if (items.length === 0) return null;
   return (
     <section>
-      <h3 className="px-1 pb-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+      <h3 className="px-4 pb-2 pt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
         {label}
       </h3>
-      <div className="space-y-2">
+      <div className="border-y border-border bg-background">
         <AnimatePresence initial={false}>
           {items.map((n) => (
             <Row key={n.id} notification={n} onActivate={onActivate} onRequest={onRequest} />
@@ -576,16 +827,6 @@ function Row({
 }) {
   const meta = kindMeta[n.kind];
   const Icon = meta.icon;
-  const [menuOpen, setMenuOpen] = useState(false);
-  const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  function startHold() {
-    holdTimer.current = setTimeout(() => setMenuOpen(true), 480);
-  }
-  function cancelHold() {
-    if (holdTimer.current) clearTimeout(holdTimer.current);
-    holdTimer.current = null;
-  }
 
   return (
     <motion.div
@@ -603,84 +844,55 @@ function Row({
         else if (info.offset.x > 90) onRequest({ type: n.read ? "unread" : "read", id: n.id });
       }}
       className={cn(
-        "group relative overflow-hidden rounded-3xl border-2 border-border bg-card transition-colors hover:border-primary/40",
-        !n.read && "border-primary/25 bg-primary/[0.08]",
+        "group relative border-b border-border last:border-b-0 transition-colors hover:bg-secondary/30",
+        !n.read && "bg-primary/[0.07]",
       )}
     >
       <button
         type="button"
         onClick={() => onActivate(n)}
-        onPointerDown={startHold}
-        onPointerUp={cancelHold}
-        onPointerLeave={cancelHold}
-        onContextMenu={(e) => {
-          e.preventDefault();
-          setMenuOpen(true);
-        }}
-        className="flex min-h-32 w-full items-start gap-3 p-4 pr-12 text-left sm:gap-4 sm:p-5 sm:pr-14"
+        className="flex min-h-20 w-full items-center gap-4 px-4 py-4 text-left sm:px-5"
       >
-        <span className={cn("mt-0.5 flex size-12 shrink-0 items-center justify-center rounded-full", meta.ring)}>
-          <Icon className={cn("size-6", meta.tint)} />
-        </span>
+        {n.actor?.username || n.actor?.photoUrl ? (
+          <ProfileAvatar
+            photoUrl={n.actor.photoUrl}
+            initials={n.actor.username?.slice(0, 2) ?? "U"}
+            className="size-14 shrink-0 border border-border/70 text-base uppercase"
+          />
+        ) : (
+          <span
+            className={cn(
+              "flex size-11 shrink-0 items-center justify-center rounded-full",
+              meta.ring,
+            )}
+          >
+            <Icon className={cn("size-5", meta.tint)} />
+          </span>
+        )}
+
         <span className="min-w-0 flex-1">
-          <span className="flex items-start justify-between gap-3 pr-1">
-            <span className="flex min-w-0 items-center gap-2">
-              <span className="line-clamp-2 text-base font-bold leading-snug sm:text-lg">{n.title}</span>
-              {!n.read ? <span className="size-2 shrink-0 rounded-full bg-primary" /> : null}
+          <span className="flex items-center gap-3">
+            <span className="block min-w-0 flex-1 truncate text-base font-bold leading-snug text-foreground">
+              {n.title}
             </span>
-            <span className="shrink-0 pt-0.5 text-sm font-semibold text-muted-foreground">
+            <span className="shrink-0 text-sm font-medium text-muted-foreground">
               {timeAgo(n.createdAt)}
             </span>
           </span>
           {n.description ? (
-            <span className="mt-2 block text-sm leading-relaxed text-muted-foreground">{n.description}</span>
+            <span className="mt-1 block truncate text-sm text-muted-foreground">
+              {n.description}
+            </span>
           ) : null}
-          <span className="mt-3 inline-flex min-h-9 items-center gap-1 rounded-full bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm">
-            {n.link?.label ?? "Open"} <ChevronRight className="size-4" />
-          </span>
         </span>
+
+        {!n.read ? (
+          <span className="size-2.5 shrink-0 rounded-full bg-primary" aria-label="Unread" />
+        ) : null}
       </button>
 
-      <div className="absolute right-2 top-3">
-        <DropdownMenu open={menuOpen} onOpenChange={setMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Notification options"
-              className="size-9 rounded-full bg-background/75 text-muted-foreground"
-            >
-              <MoreVertical className="size-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="z-[95] w-48">
-            <DropdownMenuItem
-              onSelect={() => onRequest({ type: n.read ? "unread" : "read", id: n.id })}
-            >
-              <MailOpen className="size-4" /> Mark as {n.read ? "unread" : "read"}
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={() => onRequest({ type: n.archived ? "unarchive" : "archive", id: n.id })}
-            >
-              {n.archived ? (
-                <>
-                  <ArchiveRestore className="size-4" /> Move to inbox
-                </>
-              ) : (
-                <>
-                  <Archive className="size-4" /> Archive
-                </>
-              )}
-            </DropdownMenuItem>
-            <DropdownMenuItem onSelect={() => onRequest({ type: "delete", id: n.id })}>
-              <Trash2 className="size-4" /> Delete
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
       {!n.read ? (
-        <span className="pointer-events-none absolute inset-y-0 left-0 w-1.5 bg-primary" />
+        <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-primary" />
       ) : null}
     </motion.div>
   );
@@ -702,9 +914,6 @@ function DetailCard({
       </span>
       <h3 className="mt-4 font-display text-xl font-semibold tracking-tight">{n.title}</h3>
       <p className="mt-1 text-xs text-muted-foreground">{timeAgo(n.createdAt)}</p>
-      {n.description ? (
-        <p className="mt-4 text-sm leading-relaxed text-muted-foreground">{n.description}</p>
-      ) : null}
       {actions ? (
         <div className="mt-6 flex gap-2">
           <Button variant="outline" size="sm" onClick={backToNotificationList}>

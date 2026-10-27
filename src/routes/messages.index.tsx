@@ -3,8 +3,13 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { Archive, ArrowLeft, BadgeCheck, BellOff, Inbox, MoreHorizontal, Pin, Search, Sparkles, SquarePen, Trash2, UserPlus } from "lucide-react";
-import { getConversations, startConversationByUsername, updateConversationPreference } from "@/lib/messaging.functions";
+import { Archive, ArrowLeft, BadgeCheck, BellOff, Inbox, MoreHorizontal, Pin, Search, Sparkles, Trash2, UserPlus } from "lucide-react";
+import {
+  getConversations,
+  getMentionSuggestions,
+  startConversationByUsername,
+  updateConversationPreference,
+} from "@/lib/messaging.functions";
 import { readInboxScroll, saveInboxScroll } from "@/lib/message-panel-state";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -13,7 +18,6 @@ import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { Input } from "@/components/ui/input";
-import { ThemeToggle } from "@/components/site/theme-toggle";
 import { notify } from "@/lib/notifications-store";
 import { useOnlineUsers } from "@/components/site/presence";
 import {
@@ -74,6 +78,9 @@ export function MessagesInbox({
   const [username, setUsername] = useState("");
   const [composeError, setComposeError] = useState("");
   const [startingConversation, setStartingConversation] = useState(false);
+  const [suggestions, setSuggestions] = useState<Array<{ username: string; photoUrl: string | null }>>([]);
+  const [suggestionsLoading, setSuggestionsLoading] = useState(false);
+  const suggestionSearch = useServerFn(getMentionSuggestions);
   const [showArchived, setShowArchived] = useState(false);
   const [actionConversationId, setActionConversationId] = useState<string | null>(null);
   const longPressTimer = useRef<number | null>(null);
@@ -126,6 +133,34 @@ export function MessagesInbox({
 
   const conversations = data?.pages.flatMap((page) => page.items) ?? [];
   const onlineUsers = useOnlineUsers(conversations.map((item) => item.with?.id));
+
+  useEffect(() => {
+    const value = username.trim().replace(/^@/, "");
+    if (!composeOpen || value.length < 2 || !user) {
+      setSuggestions([]);
+      setSuggestionsLoading(false);
+      return;
+    }
+    let active = true;
+    setSuggestionsLoading(true);
+    const timer = window.setTimeout(() => {
+      void suggestionSearch({ data: { query: value.toLowerCase() } })
+        .then((result) => {
+          if (!active) return;
+          setSuggestions((result.users as Array<{ username: string; photoUrl: string | null }>) ?? []);
+        })
+        .catch(() => {
+          if (active) setSuggestions([]);
+        })
+        .finally(() => {
+          if (active) setSuggestionsLoading(false);
+        });
+    }, 220);
+    return () => {
+      active = false;
+      window.clearTimeout(timer);
+    };
+  }, [composeOpen, suggestionSearch, user, username]);
   const matchingConversations = useMemo(() => {
     const query = search.trim().replace(/^@/, "").toLowerCase();
     if (!query) return conversations;
@@ -218,22 +253,6 @@ export function MessagesInbox({
             <h1 className="min-w-0 flex-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">
               Messages
             </h1>
-            <ThemeToggle prominent className="!size-12 shrink-0" />
-            <Button
-              type="button"
-              size="icon"
-              aria-label={user ? "Start a new conversation" : "Sign in to message"}
-              className="!size-14 shrink-0 rounded-full bg-primary text-primary-foreground shadow-sm hover:bg-primary/90"
-              onClick={() => {
-                if (!user) void navigate({ to: "/auth" });
-                else {
-                  setComposeError("");
-                  setComposeOpen(true);
-                }
-              }}
-            >
-              <SquarePen className="!size-6" />
-            </Button>
           </div>
         </header>
       ) : null}
@@ -277,7 +296,6 @@ export function MessagesInbox({
         </label>
         {!embedded ? (
           <p className="mt-4 max-w-3xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-            Private one-to-one chats. Candid can always reach you with important updates.
           </p>
         ) : null}
         {!user && !loading && !embedded ? (
@@ -460,8 +478,8 @@ export function MessagesInbox({
         </ul>
       )}
       {!search.trim() &&
-      visibleConversations.length > 0 &&
-      (conversations.length > visibleConversations.length || hasNextPage) ? (
+        visibleConversations.length > 0 &&
+        (conversations.length > visibleConversations.length || hasNextPage) ? (
         <div className="flex flex-col items-center gap-2 px-4 py-5 sm:px-6">
           <p className="text-xs text-muted-foreground">
             {hasNextPage
@@ -496,45 +514,104 @@ export function MessagesInbox({
         open={composeOpen}
         onOpenChange={(open) => {
           if (!startingConversation) setComposeOpen(open);
-          if (!open) setComposeError("");
+          if (!open) {
+            setComposeError("");
+            setUsername("");
+            setSuggestions([]);
+          }
         }}
       >
-        <DialogContent className="rounded-3xl p-6 sm:max-w-md">
-          <DialogHeader>
-            <DialogTitle className="font-display text-2xl">New message</DialogTitle>
-            <DialogDescription>
-              Enter a member’s Candid username to start a private chat.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={(event) => void handleStartConversation(event)} className="space-y-4">
-            <Input
-              autoFocus
-              value={username}
-              onChange={(event) => {
-                setUsername(event.target.value);
-                setComposeError("");
-              }}
-              placeholder="@username"
-              aria-label="Candid username"
-              className="h-12 rounded-xl"
-              maxLength={21}
-            />
-            {composeError ? <p className="text-sm text-destructive">{composeError}</p> : null}
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                className="rounded-full"
-                disabled={startingConversation}
-                onClick={() => setComposeOpen(false)}
-              >
-                Cancel
+        <DialogContent className="rounded-t-[2rem] border-0 p-0 sm:max-w-md sm:rounded-[2rem]">
+          <div className="flex h-[min(88dvh,42rem)] flex-col bg-background">
+            <div className="flex items-center justify-between border-b border-border px-4 pb-3 pt-4">
+              <div>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">New message</p>
+                <DialogTitle className="mt-1 font-display text-2xl">Who to message</DialogTitle>
+              </div>
+              <Button type="button" variant="ghost" size="icon" aria-label="Close new message" onClick={() => setComposeOpen(false)} className="rounded-full">
+                <Trash2 className="size-4" />
               </Button>
-              <Button type="submit" className="rounded-full" disabled={startingConversation}>
-                {startingConversation ? "Opening chat…" : "Start chat"}
-              </Button>
-            </DialogFooter>
-          </form>
+            </div>
+
+            <div className="border-b border-border bg-background px-4 pb-4 pt-4">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={username}
+                  onChange={(event) => {
+                    setUsername(event.target.value);
+                    setComposeError("");
+                  }}
+                  placeholder="Search by @username"
+                  aria-label="Search users to message"
+                  className="h-12 rounded-full border-2 bg-card pl-11 text-base"
+                  maxLength={21}
+                />
+              </div>
+            </div>
+
+            <form onSubmit={(event) => void handleStartConversation(event)} className="flex min-h-0 flex-1 flex-col">
+              <div className="flex-1 overflow-y-auto px-3 py-3">
+                {suggestionsLoading ? (
+                  <div className="space-y-2 px-1 py-2">
+                    <div className="h-10 animate-pulse rounded-xl bg-secondary/70" />
+                    <div className="h-10 animate-pulse rounded-xl bg-secondary/70" />
+                  </div>
+                ) : suggestions.length > 0 ? (
+                  <div className="space-y-1">
+                    {suggestions.map((suggestion) => (
+                      <button
+                        key={suggestion.username}
+                        type="button"
+                        onClick={() => {
+                          setUsername(suggestion.username);
+                          setSuggestions([]);
+                        }}
+                        className="flex w-full items-center gap-3 rounded-2xl px-3 py-2 text-left transition-colors hover:bg-secondary/70"
+                      >
+                        <ProfileAvatar
+                          photoUrl={suggestion.photoUrl}
+                          initials={suggestion.username.slice(0, 1).toUpperCase()}
+                          className="size-9 text-xs"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="truncate font-medium">@{suggestion.username}</div>
+                        </div>
+                        <span className="text-xs text-muted-foreground">Message</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : username.trim() && !suggestionsLoading ? (
+                  <div className="flex min-h-full items-center justify-center px-6 py-10 text-center">
+                    <p className="text-sm text-muted-foreground">No matching account found.</p>
+                  </div>
+                ) : (
+                  <div className="flex min-h-full items-center justify-center px-6 py-10 text-center">
+                    <p className="text-sm text-muted-foreground">Type a username to find someone.</p>
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t border-border bg-background px-4 py-3">
+                {composeError ? <p className="mb-3 text-sm text-destructive">{composeError}</p> : null}
+                <DialogFooter className="sm:justify-between">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="rounded-full"
+                    disabled={startingConversation}
+                    onClick={() => setComposeOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                  <Button type="submit" className="rounded-full" disabled={startingConversation || !username.trim()}>
+                    {startingConversation ? "Opening chat…" : "Start chat"}
+                  </Button>
+                </DialogFooter>
+              </div>
+            </form>
+          </div>
         </DialogContent>
       </Dialog>
       <Dialog open={Boolean(actionConversation)} onOpenChange={(open) => !open && setActionConversationId(null)}>

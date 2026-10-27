@@ -148,7 +148,7 @@ export function StorySocial({
         type="button"
         title={liked ? "Unlike" : "Like"}
         aria-label={liked ? "Unlike" : "Like"}
-        disabled={!user || likeMutation.isPending}
+        disabled={!user}
         onClick={() => likeMutation.mutate()}
         className={cn(
           "inline-flex h-9 min-w-0 items-center justify-center gap-1 rounded-full px-1 text-xs font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground active:scale-95 disabled:opacity-50 sm:px-2",
@@ -178,9 +178,7 @@ export function StorySocial({
               ? "Save post"
               : "Follow story"
         }
-        disabled={
-          !user || (variant === "announcement" ? saveMutation.isPending : followMutation.isPending)
-        }
+        disabled={!user}
         onClick={() =>
           variant === "announcement" ? saveMutation.mutate() : followMutation.mutate()
         }

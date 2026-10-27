@@ -12,6 +12,10 @@ import {
   type StoryRecord,
 } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
+import {
+  getUserParticipatingCompanyIds,
+  userParticipatedWithCompany,
+} from "./company-participation.server";
 import { FieldValue } from "./firestore-rest.server";
 import { getEffectiveMembershipTier } from "./membership";
 import { isValidMapCoordinates } from "./map-location";
@@ -418,10 +422,19 @@ export const createStory = createServerFn({ method: "POST" })
     // Tell the company's claimed account it was tagged in a new live story.
     if (created.status === "published") {
       try {
-        const [{ pushServerNotification, resolveMentionedUserIds }, owners] = await Promise.all([
+        const [{ pushServerNotification, resolveMentionedUserIds }, owners, actorSnap] = await Promise.all([
           import("./notifications.server"),
           db.collection("account_verifications").where("company_id", "==", company.id).get(),
+          db.collection("profiles").doc(context.userId).get(),
         ]);
+        const actorProfile = actorSnap.data() as
+          | { username?: string | null; photo_url?: string | null }
+          | undefined;
+        const actor = {
+          id: context.userId,
+          username: actorProfile?.username ?? null,
+          photoUrl: actorProfile?.photo_url ?? null,
+        };
         if (!owners.empty) {
           await Promise.all(
             owners.docs.map((doc) =>
@@ -431,6 +444,8 @@ export const createStory = createServerFn({ method: "POST" })
                 title: `${company.name} was tagged in a new story`,
                 description: `“${created.title}”`,
                 link: `/stories/${created.id}`,
+                actor,
+                activityType: "mention",
               }),
             ),
           );
@@ -444,6 +459,8 @@ export const createStory = createServerFn({ method: "POST" })
               title: "You were mentioned in a story",
               description: `“${created.title}”`,
               link: `/stories/${created.id}`,
+              actor,
+              activityType: "mention",
             }),
           ),
         );
@@ -646,28 +663,34 @@ export const castVote = createServerFn({ method: "POST" })
     const db = context.db ?? getFirestoreDb();
     const voteId = `${data.story_id}:${context.userId}:${data.kind}`;
     const voteRef = db.collection("votes").doc(voteId);
-    const existing = await voteRef.get();
     const storyRef = db.collection("stories").doc(data.story_id);
     const field = data.kind === "up" ? "upvotes" : "metoo";
-    const storySnap = await storyRef.get();
-    const currentStory = storySnap.exists ? storySnap.data() : null;
-    if (existing.exists) {
-      await voteRef.delete();
-      await storyRef.update({
-        [field]: Math.max(0, Number(currentStory?.[field] ?? 0) - 1),
+    return db.runTransaction(async (transaction) => {
+      const [existing, storySnap] = await Promise.all([
+        transaction.get(voteRef),
+        transaction.get(storyRef),
+      ]);
+      if (!storySnap.exists || storySnap.get("status") !== "published") {
+        throw new Error("This post is no longer available.");
+      }
+      const current = Math.max(0, Number(storySnap.get(field) ?? 0));
+      if (existing.exists) {
+        const count = Math.max(0, current - 1);
+        transaction.delete(voteRef);
+        transaction.update(storyRef, { [field]: count });
+        return { voted: false, count };
+      }
+      const count = current + 1;
+      transaction.create(voteRef, {
+        id: voteId,
+        story_id: data.story_id,
+        user_id: context.userId,
+        kind: data.kind,
+        created_at: new Date().toISOString(),
       });
-      return { voted: false };
-    }
-
-    await voteRef.set({
-      id: voteId,
-      story_id: data.story_id,
-      user_id: context.userId,
-      kind: data.kind,
-      created_at: new Date().toISOString(),
+      transaction.update(storyRef, { [field]: count });
+      return { voted: true, count };
     });
-    await storyRef.update({ [field]: Number(currentStory?.[field] ?? 0) + 1 });
-    return { voted: true };
   });
 
 export const addComment = createServerFn({ method: "POST" })
@@ -748,23 +771,33 @@ export const addComment = createServerFn({ method: "POST" })
       const { pushServerNotification, resolveMentionedUserIds } =
         await import("./notifications.server");
       const authorName = profile?.username ? `@${profile.username}` : "Someone";
+      const actor = {
+        id: context.userId,
+        username: profile?.username ?? null,
+        photoUrl: profile?.photo_url ?? null,
+      };
       const storyTitle =
         typeof currentStory?.["title"] === "string" ? currentStory["title"] : "a story";
-      const targets = new Map<string, { title: string; description: string }>();
+      const targets = new Map<
+        string,
+        { title: string; description: string; activityType: "comment" | "reply" }
+      >();
       const storyAuthorId =
         typeof currentStory?.["author_id"] === "string" ? currentStory["author_id"] : null;
       const parentAuthorId =
         typeof parentComment?.["author_id"] === "string" ? parentComment["author_id"] : null;
       if (storyAuthorId && storyAuthorId !== context.userId) {
         targets.set(storyAuthorId, {
-          title: "New reply on your story",
-          description: `${authorName} commented on “${storyTitle}”.`,
+          title: `${authorName} ${data.parent_id ? "replied to" : "commented on"} your post`,
+          description: `“${storyTitle}”`,
+          activityType: data.parent_id ? "reply" : "comment",
         });
       }
       if (parentAuthorId && parentAuthorId !== context.userId) {
         targets.set(parentAuthorId, {
-          title: "Someone replied to your comment",
-          description: `${authorName} replied in “${storyTitle}”.`,
+          title: `${authorName} replied to your comment`,
+          description: `On “${storyTitle}”`,
+          activityType: "reply",
         });
       }
       await Promise.all(
@@ -775,6 +808,8 @@ export const addComment = createServerFn({ method: "POST" })
             title: notification.title,
             description: notification.description,
             link: `/stories/${data.story_id}?comment=${commentId}`,
+            actor,
+            activityType: notification.activityType,
           }),
         ),
       );
@@ -794,6 +829,8 @@ export const addComment = createServerFn({ method: "POST" })
               title: `${authorName} mentioned you`,
               description: `In a comment on “${storyTitle}”`,
               link: `/stories/${data.story_id}?comment=${commentId}`,
+              actor,
+              activityType: "mention",
             }),
           ),
       );
@@ -839,14 +876,23 @@ export const likeComment = createServerFn({ method: "POST" })
             ? db.collection("stories").doc(comment.story_id).get()
             : Promise.resolve(null),
         ]);
-        const actor = (actorSnap.data() as { username?: string | null } | undefined)?.username;
+        const actorProfile = actorSnap.data() as
+          | { username?: string | null; photo_url?: string | null }
+          | undefined;
+        const actorName = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
         const story = storySnap?.data() as { title?: string } | undefined;
         await pushServerNotification({
           userId: comment.author_id,
           kind: "info",
-          title: "Your comment got a like",
-          description: `${actor ? `@${actor}` : "Someone"} liked your comment${story?.title ? ` on “${story.title}”` : ""}.`,
+          title: `${actorName} liked your comment`,
+          description: story?.title ? `On “${story.title}”` : null,
           link: comment.story_id ? `/stories/${comment.story_id}?comment=${data.comment_id}` : null,
+          actor: {
+            id: context.userId,
+            username: actorProfile?.username ?? null,
+            photoUrl: actorProfile?.photo_url ?? null,
+          },
+          activityType: "comment_like",
         });
       } catch (error) {
         console.error("[likeComment] author notification failed", error);
@@ -1070,6 +1116,11 @@ export const rateCompany = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
+    if (!(await userParticipatedWithCompany(context.userId, data.company_id))) {
+      throw new Error(
+        "Share a story about this employer, or leave a comment that clearly describes your own work experience there, before rating it.",
+      );
+    }
     const ratingId = `${data.company_id}:${context.userId}`;
     await db
       .collection("company_ratings")
@@ -1088,7 +1139,7 @@ export const submitSalary = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
       .object({
-        company_id: z.string().uuid().nullable().default(null),
+        company_id: z.string().uuid(),
         role_title: z.string().min(2).max(80),
         industry: z.string().max(80).nullable().default(null),
         county: z.string().max(60).nullable().default(null),
@@ -1099,6 +1150,11 @@ export const submitSalary = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
+    if (!(await userParticipatedWithCompany(context.userId, data.company_id))) {
+      throw new Error(
+        "Share a story about this employer, or leave a comment that clearly describes your own work experience there, before adding a salary range.",
+      );
+    }
     const reports = db.collection("salary_reports");
     const salaryId = `${data.company_id}:${context.userId}`;
     await db.runTransaction(async (transaction) => {
@@ -1115,6 +1171,10 @@ export const submitSalary = createServerFn({ method: "POST" })
     });
     return { ok: true };
   });
+
+export const getMyParticipatingCompanyIds = createServerFn({ method: "GET" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .handler(async ({ context }) => getUserParticipatingCompanyIds(context.userId));
 
 export const getMySalaryCompanyIds = createServerFn({ method: "GET" })
   .middleware([requireVerifiedFirebaseAuth])

@@ -43,7 +43,9 @@ export async function setFeedPreference(
     const current = (snapshot.data()?.["items"] as FeedPreference[] | undefined) ?? [];
     const remaining = current.filter((item) => `${item.kind}:${item.target_id}` !== key);
     const items = hidden
-      ? [...remaining, { kind, target_id: targetId, label, updated_at: updatedAt }].slice(-FEED_PREFERENCE_LIMIT)
+      ? [...remaining, { kind, target_id: targetId, label, updated_at: updatedAt }].slice(
+          -FEED_PREFERENCE_LIMIT,
+        )
       : remaining;
     transaction.set(ref, { user_id: userId, items, updated_at: updatedAt });
   });
@@ -87,8 +89,9 @@ export async function toggleAccountFollow(followerId: string, followingId: strin
     ref.get(),
     db.collection("profiles").doc(followingId).get(),
   ]);
-  const target = targetSnap.data() as { banned?: boolean; account_status?: string; profile_visibility?: string } | undefined;
-  if (!targetSnap.exists || target?.banned || target?.account_status === "deactivated") {
+  const target = targetSnap.data() as
+    { banned?: boolean; account_status?: string; profile_visibility?: string } | undefined;
+  if (!targetSnap.exists || !target || target.banned || target.account_status === "deactivated") {
     throw new Error("This account is unavailable.");
   }
 
@@ -112,16 +115,52 @@ export async function toggleAccountFollow(followerId: string, followingId: strin
         import("./notifications.server"),
         db.collection("profiles").doc(followerId).get(),
       ]);
-      const actor = (actorSnap.data() as { username?: string } | undefined)?.username;
+      const actorProfile = actorSnap.data() as
+        | { username?: string | null; photo_url?: string | null }
+        | undefined;
+      const actorName = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
       await pushServerNotification({
         userId: followingId,
         kind: "info",
-        title: "New follow request",
-        description: `${actor ? `@${actor}` : "Someone"} asked to follow your private profile.`,
+        title: `${actorName} requested to follow you`,
+        description: "Your profile is private. Review this request to choose whether to accept it.",
         link: "/settings",
+        activityType: "follow_request",
+        actor: {
+          id: followerId,
+          username: actorProfile?.username ?? null,
+          photoUrl: actorProfile?.photo_url ?? null,
+        },
       });
     } catch (error) {
       console.warn("[follow request] notification failed", error);
+    }
+  }
+  if (!requested) {
+    try {
+      const [{ pushServerNotification }, actorSnap] = await Promise.all([
+        import("./notifications.server"),
+        db.collection("profiles").doc(followerId).get(),
+      ]);
+      const actorProfile = actorSnap.data() as
+        | { username?: string | null; photo_url?: string | null }
+        | undefined;
+      const actorName = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
+      await pushServerNotification({
+        userId: followingId,
+        kind: "info",
+        title: `${actorName} followed you`,
+        description: "Open their profile to see who joined your community.",
+        actor: {
+          id: followerId,
+          username: actorProfile?.username ?? null,
+          photoUrl: actorProfile?.photo_url ?? null,
+        },
+        link: actorProfile?.username ? `/u/${encodeURIComponent(actorProfile.username)}` : null,
+        activityType: "follow",
+      });
+    } catch (error) {
+      console.warn("[follow] notification failed", error);
     }
   }
   return {
@@ -134,21 +173,34 @@ export async function toggleAccountFollow(followerId: string, followingId: strin
 /** Follower / following counts for a profile, plus the viewer's own relationship. */
 export async function readFollowStats(profileId: string, viewerId: string | null) {
   const db = getFirestoreDb();
-  const [allFollowers, allFollowing, pendingFollowers, pendingFollowing, viewerFollow] = await Promise.all([
-    db.collection("follows").where("following_id", "==", profileId).count(),
-    db.collection("follows").where("follower_id", "==", profileId).count(),
-    db.collection("follows").where("following_id", "==", profileId).where("status", "==", "pending").count(),
-    db.collection("follows").where("follower_id", "==", profileId).where("status", "==", "pending").count(),
-    viewerId
-      ? db.collection("follows").doc(`${viewerId}:${profileId}`).get()
-      : Promise.resolve(null),
-  ]);
+  const [allFollowers, allFollowing, pendingFollowers, pendingFollowing, viewerFollow] =
+    await Promise.all([
+      db.collection("follows").where("following_id", "==", profileId).count(),
+      db.collection("follows").where("follower_id", "==", profileId).count(),
+      db
+        .collection("follows")
+        .where("following_id", "==", profileId)
+        .where("status", "==", "pending")
+        .count(),
+      db
+        .collection("follows")
+        .where("follower_id", "==", profileId)
+        .where("status", "==", "pending")
+        .count(),
+      viewerId
+        ? db.collection("follows").doc(`${viewerId}:${profileId}`).get()
+        : Promise.resolve(null),
+    ]);
 
   return {
     followers: Math.max(0, allFollowers - pendingFollowers),
     following: Math.max(0, allFollowing - pendingFollowing),
     isFollowing: Boolean(viewerFollow?.exists && viewerFollow.get("status") !== "pending"),
-    followStatus: viewerFollow?.exists ? (viewerFollow.get("status") === "pending" ? "pending" : "accepted") : "none",
+    followStatus: viewerFollow?.exists
+      ? viewerFollow.get("status") === "pending"
+        ? "pending"
+        : "accepted"
+      : "none",
   };
 }
 
@@ -157,46 +209,58 @@ export async function toggleStoryLike(storyId: string, userId: string) {
   const db = getFirestoreDb();
   const ref = db.collection("story_likes").doc(`${storyId}:${userId}`);
   const storyRef = db.collection("stories").doc(storyId);
-  const [snap, storySnap] = await Promise.all([ref.get(), storyRef.get()]);
-  const story = storySnap.data() as
-    { likes?: number; author_id?: string | null; title?: string } | undefined;
-  const current = Number(story?.likes ?? 0);
+  const result = await db.runTransaction(async (transaction) => {
+    const [snap, storySnap] = await Promise.all([transaction.get(ref), transaction.get(storyRef)]);
+    if (!storySnap.exists || storySnap.get("status") !== "published") {
+      throw new Error("This post is no longer available.");
+    }
+    const story = storySnap.data() as { likes?: number; author_id?: string | null; title?: string };
+    const current = Math.max(0, Number(story.likes ?? 0));
+    if (snap.exists) {
+      const likes = Math.max(0, current - 1);
+      transaction.delete(ref);
+      transaction.update(storyRef, { likes });
+      return { liked: false, likes, story };
+    }
+    const likes = current + 1;
+    transaction.create(ref, {
+      id: ref.id,
+      story_id: storyId,
+      user_id: userId,
+      created_at: now(),
+    } satisfies StoryLikeRecord);
+    transaction.update(storyRef, { likes });
+    return { liked: true, likes, story };
+  });
 
-  if (snap.exists) {
-    await ref.delete();
-    const likes = Math.max(0, current - 1);
-    await storyRef.update({ likes });
-    return { liked: false, likes };
-  }
-
-  const record: StoryLikeRecord = {
-    id: ref.id,
-    story_id: storyId,
-    user_id: userId,
-    created_at: now(),
-  };
-  await ref.set(record);
-  await storyRef.update({ likes: current + 1 });
-
-  if (story?.author_id && story.author_id !== userId) {
+  if (result.liked && result.story.author_id && result.story.author_id !== userId) {
     try {
       const [{ pushServerNotification }, actorSnap] = await Promise.all([
         import("./notifications.server"),
         db.collection("profiles").doc(userId).get(),
       ]);
-      const actor = (actorSnap.data() as { username?: string | null } | undefined)?.username;
+      const actorProfile = actorSnap.data() as
+        | { username?: string | null; photo_url?: string | null }
+        | undefined;
+      const actorName = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
       await pushServerNotification({
-        userId: story.author_id,
+        userId: result.story.author_id,
         kind: "info",
-        title: "Your story got a like",
-        description: `${actor ? `@${actor}` : "Someone"} liked “${story.title ?? "your story"}”.`,
+        title: `${actorName} liked your post`,
+        description: `“${result.story.title ?? "your story"}”`,
         link: `/stories/${storyId}`,
+        activityType: "post_like",
+        actor: {
+          id: userId,
+          username: actorProfile?.username ?? null,
+          photoUrl: actorProfile?.photo_url ?? null,
+        },
       });
     } catch (error) {
       console.error("[toggleStoryLike] author notification failed", error);
     }
   }
-  return { liked: true, likes: current + 1 };
+  return { liked: result.liked, likes: result.likes };
 }
 
 /** Follows / unfollows a story so the user can track how it develops. */
@@ -361,15 +425,17 @@ export async function listSavedCommunityPosts(
 /** Everything the viewer has engaged with on a story. */
 export async function readStoryEngagement(storyId: string, userId: string) {
   const db = getFirestoreDb();
-  const [like, follow, save] = await Promise.all([
+  const [like, follow, save, votes] = await Promise.all([
     db.collection("story_likes").doc(`${storyId}:${userId}`).get(),
     db.collection("story_follows").doc(`${storyId}:${userId}`).get(),
     db.collection("story_saves").doc(`${storyId}:${userId}`).get(),
+    db.collection("votes").where("story_id", "==", storyId).where("user_id", "==", userId).get(),
   ]);
   return {
     liked: like.exists,
     following: follow.exists,
     saved: save.exists,
+    votedKinds: votes.docs.map((doc) => (doc.data() as { kind: string }).kind),
   };
 }
 

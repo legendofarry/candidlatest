@@ -6,16 +6,14 @@ import { motion } from "motion/react";
 import type { User } from "firebase/auth";
 import { EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import {
-  ArrowLeft,
   BellRing,
-  BookOpen,
+  ChevronRight,
   Fingerprint,
-  Headset,
-  ScrollText,
   Settings2,
   ShieldCheck,
   DatabaseZap,
   EyeOff,
+  Gem,
   RotateCcw,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -36,6 +34,13 @@ import {
   registerBiometric,
 } from "@/lib/biometrics";
 import { cn } from "@/lib/utils";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { claimOfficialCandidAccount, getOnboardingState } from "@/lib/onboarding.functions";
@@ -85,12 +90,15 @@ function SettingsPage() {
   const [bioAvailable, setBioAvailable] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
   const [developerResetOpen, setDeveloperResetOpen] = useState(false);
+  const [notInterestedOpen, setNotInterestedOpen] = useState(false);
   const [developerResetText, setDeveloperResetText] = useState("");
   const [developerResetting, setDeveloperResetting] = useState(false);
   const [claimingCandid, setClaimingCandid] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [pushAvailable, setPushAvailable] = useState(false);
-  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">(
+    "default",
+  );
   const [pushBusy, setPushBusy] = useState(false);
   const [pushTestBusy, setPushTestBusy] = useState(false);
   const [pushToken, setPushToken] = useState<string | null>(null);
@@ -137,7 +145,11 @@ function SettingsPage() {
     let active = true;
     void (async () => {
       if (!user || typeof Notification === "undefined" || !("serviceWorker" in navigator)) {
-        if (active) { setPushAvailable(false); setPushEnabled(false); setPushPermission("unsupported"); }
+        if (active) {
+          setPushAvailable(false);
+          setPushEnabled(false);
+          setPushPermission("unsupported");
+        }
         return;
       }
       try {
@@ -146,13 +158,22 @@ function SettingsPage() {
         if (!active) return;
         setPushAvailable(supported);
         setPushPermission(Notification.permission);
-        if (!supported || Notification.permission !== "granted") { setPushEnabled(false); return; }
-        if (!hasPushOptIn(Notification.permission)) { setPushEnabled(false); return; }
+        if (!supported || Notification.permission !== "granted") {
+          setPushEnabled(false);
+          return;
+        }
+        if (!hasPushOptIn(Notification.permission)) {
+          setPushEnabled(false);
+          return;
+        }
         const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
         if (!vapidKey) return;
         const registration = await registerFirebaseServiceWorker();
         const messaging = messagingSdk.getMessaging(firebaseApp);
-        const token = await messagingSdk.getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+        const token = await messagingSdk.getToken(messaging, {
+          vapidKey,
+          serviceWorkerRegistration: registration,
+        });
         if (!token || !active) return;
         setPushToken(token);
         setPushEnabled(true);
@@ -160,7 +181,9 @@ function SettingsPage() {
         console.warn("[push settings] Could not restore this device", error);
       }
     })();
-    return () => { active = false; };
+    return () => {
+      active = false;
+    };
   }, [user]);
 
   async function togglePushNotifications(next: boolean) {
@@ -168,33 +191,45 @@ function SettingsPage() {
     setPushBusy(true);
     try {
       const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
-      if (!vapidKey) throw new Error("Push notifications are not configured for this Candid site yet.");
+      if (!vapidKey)
+        throw new Error("Push notifications are not configured for this Candid site yet.");
       const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      const installed = window.matchMedia("(display-mode: standalone)").matches || (navigator as Navigator & { standalone?: boolean }).standalone === true;
-      if (next && ios && !installed) throw new Error("On iPhone or iPad, add Candid to your Home Screen before enabling notifications.");
+      const installed =
+        window.matchMedia("(display-mode: standalone)").matches ||
+        (navigator as Navigator & { standalone?: boolean }).standalone === true;
+      if (next && ios && !installed)
+        throw new Error(
+          "On iPhone or iPad, add Candid to your Home Screen before enabling notifications.",
+        );
 
       if (next) {
-        if (typeof Notification === "undefined") throw new Error("This browser does not support notifications.");
+        if (typeof Notification === "undefined")
+          throw new Error("This browser does not support notifications.");
         let permission = Notification.permission;
         // Ask before any async setup so the browser still recognizes the user's click.
         if (permission === "default") permission = await Notification.requestPermission();
         setPushPermission(permission);
         if (permission !== "granted") {
-          throw new Error(permission === "denied"
-            ? "Notifications are blocked by your browser. Allow them in the browser's site settings."
-            : "Allow notifications to enable Candid alerts.");
+          throw new Error(
+            permission === "denied"
+              ? "Notifications are blocked by your browser. Allow them in the browser's site settings."
+              : "Allow notifications to enable Candid alerts.",
+          );
         }
       }
 
       const messagingSdk = await import("firebase/messaging");
-      if (!await messagingSdk.isSupported()) throw new Error("This browser does not support web push notifications.");
+      if (!(await messagingSdk.isSupported()))
+        throw new Error("This browser does not support web push notifications.");
       const messaging = messagingSdk.getMessaging(firebaseApp);
       if (!next) {
         const registration = await registerFirebaseServiceWorker();
-        const token = pushToken || await messagingSdk.getToken(messaging, {
-          vapidKey,
-          serviceWorkerRegistration: registration,
-        });
+        const token =
+          pushToken ||
+          (await messagingSdk.getToken(messaging, {
+            vapidKey,
+            serviceWorkerRegistration: registration,
+          }));
         if (token) await unregisterPush({ data: { token } });
         await messagingSdk.deleteToken(messaging);
         setPushOptIn(false);
@@ -203,7 +238,10 @@ function SettingsPage() {
         return;
       }
       const registration = await registerFirebaseServiceWorker();
-      const token = await messagingSdk.getToken(messaging, { vapidKey, serviceWorkerRegistration: registration });
+      const token = await messagingSdk.getToken(messaging, {
+        vapidKey,
+        serviceWorkerRegistration: registration,
+      });
       if (!token) throw new Error("This device did not return a notification token. Try again.");
       await registerPush({ data: { token } });
       setPushOptIn(true);
@@ -221,7 +259,9 @@ function SettingsPage() {
             "Check that FCM Registration API is enabled and that this deployment’s Firebase web config and VAPID key all belong to the same Firebase project.",
         });
       } else {
-        notify.error(error instanceof Error ? error.message : "Could not update notification settings.");
+        notify.error(
+          error instanceof Error ? error.message : "Could not update notification settings.",
+        );
       }
     } finally {
       setPushBusy(false);
@@ -313,6 +353,52 @@ function SettingsPage() {
     }
   }
 
+  const notInterestedContent = (
+    <>
+      <p className="px-4 pt-4 text-sm text-muted-foreground">
+        Posts you hide and accounts or employers you mute can be restored here.
+      </p>
+      {feedPreferences.isLoading ? (
+        <p className="p-4 text-sm text-muted-foreground">Loading preferences…</p>
+      ) : feedPreferences.data?.length ? (
+        <ul className="divide-y divide-border/70">
+          {feedPreferences.data.map((item) => (
+            <li
+              key={`${item.kind}:${item.target_id}`}
+              className="flex items-center gap-3 px-4 py-3"
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground">
+                <EyeOff className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">{item.label}</span>
+                <span className="block text-xs text-muted-foreground">
+                  {item.kind === "story"
+                    ? "Hidden post"
+                    : item.kind === "author"
+                      ? "Muted account"
+                      : "Muted employer"}
+                </span>
+              </span>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => void restoreFeedItem(item)}
+              >
+                <RotateCcw className="size-4" /> Show again
+              </Button>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="p-4 text-sm text-muted-foreground">
+          You have no hidden posts or muted accounts and employers.
+        </p>
+      )}
+    </>
+  );
+
   return (
     <div className="min-h-screen bg-background md:h-dvh md:overflow-hidden">
       <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
@@ -383,11 +469,25 @@ function SettingsPage() {
             className="mx-auto max-w-5xl space-y-8"
           >
             <header>
-              <p className="text-sm font-medium text-primary">Candid account</p>
-              <h2 className="mt-1 text-3xl font-semibold">Settings</h2>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Manage your preferences and account controls.
-              </p>
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-sm font-medium text-primary">Candid account</p>
+                  <h2 className="mt-1 text-3xl font-semibold">Settings</h2>
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    Manage your preferences and account controls.
+                  </p>
+                </div>
+                {user ? (
+                  <Link
+                    to="/billing"
+                    aria-label="Membership"
+                    title="Membership"
+                    className="hidden size-11 shrink-0 items-center justify-center rounded-full border border-border bg-card text-primary transition-colors hover:bg-primary/10 md:inline-flex"
+                  >
+                    <Gem className="size-5" />
+                  </Link>
+                ) : null}
+              </div>
             </header>
 
             {user ? (
@@ -451,25 +551,6 @@ function SettingsPage() {
               </SettingsGroup>
             ) : null}
 
-            {user ? (
-              <SettingsGroup title="Membership">
-                <div className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <p className="font-medium">
-                      {profile.data?.membership?.tier === "premium" ||
-                      profile.data?.membership?.tier === "gold"
-                        ? "Premium"
-                        : "Basic"}{" "}
-                      plan
-                    </p>
-                  </div>
-                  <Button asChild variant="outline" size="sm" className="shrink-0 rounded-xl">
-                    <Link to="/billing">View billing &amp; packages</Link>
-                  </Button>
-                </div>
-              </SettingsGroup>
-            ) : null}
-
             <div className="grid gap-8 lg:grid-cols-[10rem_minmax(0,1fr)]">
               <nav aria-label="Settings sections" className="hidden lg:block">
                 <div className="sticky top-8 space-y-1 border-l border-border pl-3">
@@ -491,12 +572,6 @@ function SettingsPage() {
                   >
                     Privacy
                   </a>
-                  <a
-                    href="#help"
-                    className="block py-2 text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Help & information
-                  </a>
                 </div>
               </nav>
               <div className="space-y-8">
@@ -507,7 +582,14 @@ function SettingsPage() {
                       title="Push notifications on this device"
                       description={pushDescription}
                       checked={pushEnabled}
-                      disabled={!user || !pushAvailable || pushBusy || pushPermission === "denied" || pushPermission === "unsupported" || !import.meta.env["VITE_FIREBASE_VAPID_KEY"]}
+                      disabled={
+                        !user ||
+                        !pushAvailable ||
+                        pushBusy ||
+                        pushPermission === "denied" ||
+                        pushPermission === "unsupported" ||
+                        !import.meta.env["VITE_FIREBASE_VAPID_KEY"]
+                      }
                       onCheckedChange={(next) => void togglePushNotifications(next)}
                     />
                     {pushEnabled ? (
@@ -578,60 +660,42 @@ function SettingsPage() {
 
                 <div id="privacy">
                   <div className="mb-4">
-                    <SettingsGroup title="Not interested">
-                      <p className="px-4 pt-4 text-sm text-muted-foreground">
-                        Posts you hide and accounts or employers you mute can be restored here.
-                      </p>
-                      {feedPreferences.isLoading ? (
-                        <p className="p-4 text-sm text-muted-foreground">Loading preferences…</p>
-                      ) : feedPreferences.data?.length ? (
-                        <ul className="divide-y divide-border/70">
-                          {feedPreferences.data.map((item) => (
-                            <li key={`${item.kind}:${item.target_id}`} className="flex items-center gap-3 px-4 py-3">
-                              <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-secondary text-muted-foreground"><EyeOff className="size-4" /></span>
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium">{item.label}</span>
-                                <span className="block text-xs text-muted-foreground">{item.kind === "story" ? "Hidden post" : item.kind === "author" ? "Muted account" : "Muted employer"}</span>
-                              </span>
-                              <Button type="button" size="sm" variant="outline" onClick={() => void restoreFeedItem(item)}><RotateCcw className="size-4" /> Show again</Button>
-                            </li>
-                          ))}
-                        </ul>
-                      ) : (
-                        <p className="p-4 text-sm text-muted-foreground">You have no hidden posts or muted accounts and employers.</p>
-                      )}
-                    </SettingsGroup>
+                    <div className="md:hidden">
+                      <button
+                        type="button"
+                        onClick={() => setNotInterestedOpen(true)}
+                        className="flex w-full items-center gap-3 border-y border-border py-4 text-left"
+                      >
+                        <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
+                          <EyeOff className="size-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block text-sm font-medium">Not interested</span>
+                          <span className="mt-0.5 block text-xs text-muted-foreground">
+                            Restore hidden posts and muted accounts
+                          </span>
+                        </span>
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      </button>
+                      <Drawer open={notInterestedOpen} onOpenChange={setNotInterestedOpen}>
+                        <DrawerContent className="h-[85dvh] max-h-[85dvh] rounded-t-3xl md:hidden">
+                          <DrawerHeader className="shrink-0 text-left">
+                            <DrawerTitle>Not interested</DrawerTitle>
+                            <DrawerDescription>
+                              Restore posts, accounts or employers you hid.
+                            </DrawerDescription>
+                          </DrawerHeader>
+                          <div className="min-h-0 flex-1 overflow-y-auto pb-[max(2rem,env(safe-area-inset-bottom))]">
+                            {notInterestedContent}
+                          </div>
+                        </DrawerContent>
+                      </Drawer>
+                    </div>
+                    <div className="hidden md:block">
+                      <SettingsGroup title="Not interested">{notInterestedContent}</SettingsGroup>
+                    </div>
                   </div>
                   <PrivacySettings />
-                </div>
-
-                <div id="help">
-                  <SettingsGroup title="Help & information">
-                    <LinkRow
-                      icon={<Headset className="size-4" />}
-                      title="Help & support"
-                      description="Get help with your account, a story or privacy."
-                      to="/support"
-                    />
-                    <LinkRow
-                      icon={<BookOpen className="size-4" />}
-                      title="Community guidelines"
-                      description="What you can and cannot post."
-                      to="/guidelines"
-                    />
-                    <LinkRow
-                      icon={<ShieldCheck className="size-4" />}
-                      title="Safety & your rights"
-                      description="Kenyan labour rights and how to stay safe."
-                      to="/rights"
-                    />
-                    <LinkRow
-                      icon={<ScrollText className="size-4" />}
-                      title="Privacy, terms & disclaimer"
-                      description="How your data is handled."
-                      to="/privacy"
-                    />
-                  </SettingsGroup>
                 </div>
 
                 {developerMode ? (
@@ -897,23 +961,5 @@ function ActionRow({
         {actionLabel}
       </Button>
     </Row>
-  );
-}
-
-function LinkRow({
-  to,
-  ...row
-}: {
-  icon: React.ReactNode;
-  title: string;
-  description: string;
-  to: "/support" | "/guidelines" | "/rights" | "/privacy";
-}) {
-  return (
-    <Link to={to} className="block transition-colors hover:bg-secondary/50">
-      <Row {...row}>
-        <ArrowLeft className="size-4 rotate-180 text-muted-foreground" />
-      </Row>
-    </Link>
   );
 }

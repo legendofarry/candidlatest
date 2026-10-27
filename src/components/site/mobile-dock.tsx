@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  Bell,
+  ArrowLeft,
+  BookOpen,
   Building2,
   Headset,
   Home,
   LogOut,
-  MessagesSquare,
   PenLine,
-  Search,
+  ScrollText,
   Scale,
+  ShieldCheck,
   Settings,
   Smartphone,
   Trophy,
@@ -23,16 +24,14 @@ import {
   DrawerHeader,
   DrawerTitle,
 } from "@/components/ui/drawer";
-import { toggleNotifications, useUnreadCount } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { requestPwaInstall } from "@/lib/pwa-install";
 import { notify } from "@/lib/notifications-store";
 
-type DockSheet = "you" | null;
+type DockSheet = "you" | "help" | null;
 
 const moreLinks = [
-  { to: "/search", label: "Search", icon: Search, hint: "Find a story or employer" },
   {
     to: "/compare",
     label: "Compare employers",
@@ -40,25 +39,20 @@ const moreLinks = [
     hint: "Review employers side by side",
   },
   { to: "/leaderboards", label: "Leaderboards", icon: Trophy, hint: "Most discussed workplaces" },
-  { to: "/support", label: "Help & support", icon: Headset, hint: "FAQs, email and WhatsApp" },
 ] as const;
 
 export function MobileDock({
   signedIn,
   userInitials,
   photoUrl,
-  messageUnread = 0,
   onLeave,
 }: {
   signedIn: boolean;
   userInitials: string;
   photoUrl?: string | null | undefined;
-  messageUnread?: number;
   onLeave: () => void;
 }) {
-  const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
-  const unread = useUnreadCount();
   const [sheet, setSheet] = useState<DockSheet>(null);
   const [hidden, setHidden] = useState(false);
   const lastY = useRef(0);
@@ -93,10 +87,11 @@ export function MobileDock({
     "/profile",
     "/my-contributions",
     "/settings",
-    "/notifications",
-    "/search",
     "/leaderboards",
     "/support",
+    "/guidelines",
+    "/rights",
+    "/privacy",
   ].some((root) => pathname.startsWith(root));
 
   return (
@@ -131,7 +126,6 @@ export function MobileDock({
               label="You"
               icon={UserRound}
               active={youActive}
-              badge={unread}
               initials={signedIn ? userInitials : undefined}
               photoUrl={signedIn ? photoUrl : undefined}
               onClick={() => setSheet("you")}
@@ -149,127 +143,180 @@ export function MobileDock({
         </nav>
       </div>
 
-      <Drawer open={sheet === "you"} onOpenChange={(open) => setSheet(open ? "you" : null)}>
+      <Drawer
+        open={sheet !== null}
+        onOpenChange={(open) => {
+          if (!open) setSheet(null);
+          else setSheet((current) => current ?? "you");
+        }}
+      >
         <DrawerContent className="mt-0 h-[calc(100dvh-4.75rem)] max-h-[calc(100dvh-4.75rem)] overflow-hidden rounded-t-3xl md:hidden">
           <DrawerHeader className="shrink-0 text-left">
-            <DrawerTitle>{signedIn ? "Your account" : "Join Candid"}</DrawerTitle>
+            <DrawerTitle>
+              {sheet === "help" ? "Help & information" : signedIn ? "Your account" : "Join Candid"}
+            </DrawerTitle>
             <DrawerDescription>
-              {signedIn
-                ? "Your Candid handle appears on your posts."
-                : "Sign in to post stories, comment and follow employers."}
+              {sheet === "help"
+                ? "Guidance, support and information about Candid."
+                : signedIn
+                  ? ""
+                  : "Sign in to post stories, comment and follow employers."}
             </DrawerDescription>
           </DrawerHeader>
-          <div className="min-h-0 flex-1 space-y-1.5 overflow-y-auto px-4 pb-[max(2rem,env(safe-area-inset-bottom))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            {signedIn ? <button
-              type="button"
-              onClick={() => {
-                setSheet(null);
-                void requestPwaInstall().catch(() => notify.error("Your browser could not open the install prompt. Try the browser menu."));
-              }}
-              className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary px-3 py-3.5 text-left text-primary-foreground shadow-[0_0_28px_hsl(var(--primary)/0.32)] transition hover:brightness-105 active:scale-[0.99]"
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-black/10"><Smartphone className="size-5" /></span>
-              <span className="min-w-0 flex-1"><span className="block text-sm font-bold">Install Candid app</span><span className="mt-0.5 block text-xs text-primary-foreground/80">Check this device and install from your browser</span></span>
-              <span aria-hidden className="rounded-full bg-black/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide">App</span>
-            </button> : null}
-            <button
-              type="button"
-              onClick={() => {
-                setSheet(null);
-                toggleNotifications();
-              }}
-              className="flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-colors active:bg-secondary"
-            >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary/70 text-muted-foreground">
-                <Bell className="size-5" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium text-foreground">
-                  Notifications
-                </span>
-                <span className="block truncate text-xs text-muted-foreground">
-                  {unread > 0 ? `${unread} unread` : "You are all caught up"}
-                </span>
-              </span>
-            </button>
-            {signedIn ? (
+          <div className="flex min-h-0 flex-1 flex-col space-y-1.5 overflow-y-auto px-4 pb-[max(2rem,env(safe-area-inset-bottom))] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            {sheet === "help" ? (
               <>
-                <SheetRow
-                  to="/profile"
-                  icon={UserRound}
-                  label="Profile"
-                  hint="Username, badges and unlock"
-                  active={pathname.startsWith("/profile")}
-                />
-                <SheetRow
-                  to="/my-contributions"
-                  icon={PenLine}
-                  label="My contributions"
-                  hint="Manage your stories and comments"
-                  active={pathname.startsWith("/my-contributions")}
-                />
-                <SheetRow
-                  to="/settings"
-                  icon={Settings}
-                  label="Settings"
-                  hint="Privacy, theme and lock delay"
-                  active={pathname.startsWith("/settings")}
-                />
                 <button
                   type="button"
-                  onClick={() => {
-                    setSheet(null);
-                    onLeave();
-                  }}
+                  onClick={() => setSheet("you")}
+                  className="mb-2 flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-medium text-muted-foreground active:bg-secondary"
+                >
+                  <ArrowLeft className="size-4" /> Back to your account
+                </button>
+                <SheetRow
+                  to="/support"
+                  icon={Headset}
+                  label="Help & support"
+                  hint="Get help with your account or Candid"
+                  active={pathname === "/support"}
+                />
+                <SheetRow
+                  to="/guidelines"
+                  icon={BookOpen}
+                  label="Community guidelines"
+                  hint="What you can and cannot post"
+                  active={pathname === "/guidelines"}
+                />
+                <SheetRow
+                  to="/rights"
+                  icon={ShieldCheck}
+                  label="Safety & your rights"
+                  hint="Your safety and workplace rights"
+                  active={pathname === "/rights"}
+                />
+                <SheetRow
+                  to="/privacy"
+                  icon={ScrollText}
+                  label="Privacy, terms & disclaimer"
+                  hint="How your data is handled"
+                  active={pathname === "/privacy"}
+                />
+              </>
+            ) : (
+              <>
+                {signedIn ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSheet(null);
+                      void requestPwaInstall().catch(() =>
+                        notify.error(
+                          "Your browser could not open the install prompt. Try the browser menu.",
+                        ),
+                      );
+                    }}
+                    className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary px-3 py-3.5 text-left text-primary-foreground shadow-[0_0_28px_hsl(var(--primary)/0.32)] transition hover:brightness-105 active:scale-[0.99]"
+                  >
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-black/10">
+                      <Smartphone className="size-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-bold">Install Candid app</span>
+                      <span className="mt-0.5 block text-xs text-primary-foreground/80">
+                        Check this device and install from your browser
+                      </span>
+                    </span>
+                    <span
+                      aria-hidden
+                      className="rounded-full bg-black/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide"
+                    >
+                      App
+                    </span>
+                  </button>
+                ) : null}
+                {signedIn ? (
+                  <>
+                    <SheetRow
+                      to="/profile"
+                      icon={UserRound}
+                      label="Profile"
+                      hint="Username, badges and unlock"
+                      active={pathname.startsWith("/profile")}
+                    />
+                    <SheetRow
+                      to="/my-contributions"
+                      icon={PenLine}
+                      label="My contributions"
+                      hint="Manage your stories and comments"
+                      active={pathname.startsWith("/my-contributions")}
+                    />
+                    <SheetRow
+                      to="/settings"
+                      icon={Settings}
+                      label="Settings"
+                      hint="Privacy, theme and lock delay"
+                      active={pathname.startsWith("/settings")}
+                    />
+                  </>
+                ) : (
+                  <SheetRow
+                    to="/auth"
+                    icon={UserRound}
+                    label="Sign in"
+                    hint="Your handle appears on posts"
+                    active={pathname.startsWith("/auth")}
+                  />
+                )}
+                <div className="my-2 border-t border-border" />
+                {moreLinks.map((item) => (
+                  <SheetRow
+                    key={item.to}
+                    to={item.to}
+                    icon={item.icon}
+                    label={item.label}
+                    hint={item.hint}
+                    active={pathname.startsWith(item.to)}
+                  />
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setSheet("help")}
                   className="flex w-full items-center gap-3 rounded-2xl border border-transparent px-3 py-3 text-left transition-colors active:bg-secondary"
                 >
                   <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-secondary/70 text-muted-foreground">
-                    <LogOut className="size-5" />
+                    <BookOpen className="size-5" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-foreground">
-                      Lock or sign out
+                      Help & information
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
-                      Keep your account hidden when you leave
+                      Support, guidelines and legal information
                     </span>
                   </span>
                 </button>
+                {signedIn ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSheet(null);
+                      onLeave();
+                    }}
+                    className="mt-auto flex w-full items-center gap-3 rounded-2xl border border-destructive/20 bg-destructive/5 px-3 py-3 text-left text-destructive transition-colors hover:bg-destructive/10 active:bg-destructive/15"
+                  >
+                    <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10">
+                      <LogOut className="size-5" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-semibold">Lock or sign out</span>
+                      <span className="block truncate text-xs text-destructive/75">
+                        Secure your account when you leave
+                      </span>
+                    </span>
+                  </button>
+                ) : null}
               </>
-            ) : (
-              <SheetRow
-                to="/auth"
-                icon={UserRound}
-                label="Sign in"
-                hint="Your handle appears on posts"
-                active={pathname.startsWith("/auth")}
-              />
             )}
-            <div className="my-2 border-t border-border" />
-            {signedIn ? (
-              <SheetRow
-                to="/messages"
-                icon={MessagesSquare}
-                label="Chats"
-                hint={
-                  messageUnread > 0
-                    ? `${messageUnread} unread message${messageUnread === 1 ? "" : "s"}`
-                    : "Private replies and follow-ups"
-                }
-                active={pathname.startsWith("/messages")}
-                badge={messageUnread}
-              />
-            ) : null}
-            {moreLinks.map((item) => (
-              <SheetRow
-                key={item.to}
-                to={item.to}
-                icon={item.icon}
-                label={item.label}
-                hint={item.hint}
-                active={pathname.startsWith(item.to)}
-              />
-            ))}
           </div>
         </DrawerContent>
       </Drawer>

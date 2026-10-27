@@ -4,7 +4,11 @@ import { useMemo, useState } from "react";
 import { Building2, ChevronRight, Loader2, Plus, Wallet, X } from "lucide-react";
 import { notify as toast } from "@/lib/notifications-store";
 import { getFilterOptions, getSalaryCompanies } from "@/lib/public.functions";
-import { getMySalaryCompanyIds, submitSalary } from "@/lib/actions.functions";
+import {
+  getMyParticipatingCompanyIds,
+  getMySalaryCompanyIds,
+  submitSalary,
+} from "@/lib/actions.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -159,6 +163,11 @@ function ContributeCard() {
     queryFn: () => getFilterOptions(),
     enabled: Boolean(user),
   });
+  const eligibleCompanies = useQuery({
+    queryKey: ["participating-companies", user?.uid],
+    queryFn: () => getMyParticipatingCompanyIds(),
+    enabled: Boolean(user),
+  });
   const mySubmissions = useQuery({
     queryKey: ["my-salary-companies", user?.uid],
     queryFn: () => getMySalaryCompanyIds(),
@@ -168,17 +177,38 @@ function ContributeCard() {
     () => new Set(mySubmissions.data ?? []),
     [mySubmissions.data],
   );
+  const eligibleCompanyIds = useMemo(
+    () => new Set(eligibleCompanies.data ?? []),
+    [eligibleCompanies.data],
+  );
 
   const matches = useMemo(() => {
     const list = (options.data?.companies ?? []).filter(
-      (item) => !submittedCompanyIds.has(item.id),
+      (item) => eligibleCompanyIds.has(item.id) && !submittedCompanyIds.has(item.id),
     );
     const needle = companyQuery.trim().toLowerCase();
     return (needle ? list.filter((item) => item.name.toLowerCase().includes(needle)) : list).slice(
       0,
       8,
     );
-  }, [options.data, companyQuery, submittedCompanyIds]);
+  }, [options.data, companyQuery, eligibleCompanyIds, submittedCompanyIds]);
+
+  if (!user || eligibleCompanies.isPending || mySubmissions.isPending || options.isPending) {
+    return null;
+  }
+  if (eligibleCompanies.isError || mySubmissions.isError || options.isError) {
+    return (
+      <aside className="rounded-2xl border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive">
+        Salary contribution eligibility could not be checked. Try again later.
+      </aside>
+    );
+  }
+  if (matches.length === 0 && !companyQuery.trim()) {
+    const hasAvailableEligibleCompany = (options.data?.companies ?? []).some(
+      (item) => eligibleCompanyIds.has(item.id) && !submittedCompanyIds.has(item.id),
+    );
+    if (!hasAvailableEligibleCompany) return null;
+  }
 
   async function submit(event: React.FormEvent) {
     event.preventDefault();
@@ -271,11 +301,13 @@ function ContributeCard() {
                   ))}
                   {matches.length === 0 ? (
                     <p className="px-1 py-2 text-xs text-muted-foreground">
-                      {options.data?.companies.some((item) =>
-                        item.name.toLowerCase().includes(companyQuery.trim().toLowerCase()),
+                      {options.data?.companies.some(
+                        (item) =>
+                          eligibleCompanyIds.has(item.id) &&
+                          item.name.toLowerCase().includes(companyQuery.trim().toLowerCase()),
                       )
                         ? "You’ve already submitted a salary range for this employer."
-                        : "No match. Employers are added when someone posts a story about them."}
+                        : "No eligible employer matches this search."}
                     </p>
                   ) : null}
                 </div>

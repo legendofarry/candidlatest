@@ -23,6 +23,15 @@ export const syncMyNotifications = createServerFn({ method: "POST" })
         kind: item.kind,
         title: item.title,
         description: item.description ?? undefined,
+        actor:
+          item.actor_id || item.actor_username || item.actor_photo_url
+            ? {
+                id: item.actor_id ?? "",
+                username: item.actor_username ?? undefined,
+                photoUrl: item.actor_photo_url ?? undefined,
+              }
+            : undefined,
+        activityType: item.activity_type ?? "other",
         link: item.link ?? undefined,
         createdAt: new Date(item.created_at).getTime(),
       })),

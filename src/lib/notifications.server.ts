@@ -1,5 +1,6 @@
 import { generateId } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
+import type { NotificationActivityType } from "./notifications-store";
 
 export type ServerNotificationRecord = {
   id: string;
@@ -8,6 +9,10 @@ export type ServerNotificationRecord = {
   kind: "success" | "error" | "info" | "warning";
   title: string;
   description: string | null;
+  actor_id?: string | null;
+  actor_username?: string | null;
+  actor_photo_url?: string | null;
+  activity_type?: NotificationActivityType;
   link: string | null;
   created_at: string;
 };
@@ -20,6 +25,8 @@ export async function pushServerNotification(input: {
   kind: ServerNotificationRecord["kind"];
   title: string;
   description?: string | null;
+  actor?: { id: string; username?: string | null; photoUrl?: string | null } | null;
+  activityType?: NotificationActivityType;
   link?: string | null;
 }) {
   const db = getFirestoreDb();
@@ -30,6 +37,10 @@ export async function pushServerNotification(input: {
     kind: input.kind,
     title: input.title.slice(0, 140),
     description: input.description?.slice(0, 300) ?? null,
+    actor_id: input.actor?.id ?? null,
+    actor_username: input.actor?.username?.slice(0, 40) ?? null,
+    actor_photo_url: input.actor?.photoUrl?.slice(0, 1000) ?? null,
+    activity_type: input.activityType ?? "other",
     link: input.link ?? null,
     created_at: new Date().toISOString(),
   };

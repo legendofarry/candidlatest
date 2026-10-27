@@ -1,9 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Link } from "@tanstack/react-router";
 import { Loader2, MapPin, Star, Users } from "lucide-react";
-import { getCompanyIntel, setCompanyLocation } from "@/lib/company.functions";
+import {
+  getCompanyIntel,
+  getMyCompanyRatingEligibility,
+  setCompanyLocation,
+} from "@/lib/company.functions";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -75,6 +78,12 @@ export function CompanyIntelPanel({
 }) {
   const { user } = useAuth();
   const intel = useCompanyIntel(companyId);
+  const checkRatingEligibility = useServerFn(getMyCompanyRatingEligibility);
+  const ratingEligibility = useQuery({
+    queryKey: ["company-rating-eligibility", user?.uid ?? null, companyId],
+    queryFn: () => checkRatingEligibility({ data: { company_id: companyId } }),
+    enabled: Boolean(user),
+  });
   const [rateOpen, setRateOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
 
@@ -91,16 +100,17 @@ export function CompanyIntelPanel({
               {data?.respondents ?? 0} people answered the questionnaire
             </p>
           </div>
-          {user ? (
+          {ratingEligibility.data ? (
             <Button size="sm" onClick={() => setRateOpen(true)}>
               <Star className="size-4" /> Rate
             </Button>
-          ) : (
-            <Button size="sm" variant="outline" asChild>
-              <Link to="/auth">Sign in to rate</Link>
-            </Button>
-          )}
+          ) : null}
         </div>
+        {ratingEligibility.isError ? (
+          <p className="mt-2 text-xs text-destructive">
+            Rating eligibility could not be checked. Try again later.
+          </p>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-2 gap-3 text-center">
           <div className="rounded-xl border border-border/60 p-3">

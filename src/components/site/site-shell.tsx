@@ -5,6 +5,7 @@ import {
   Building2,
   ChevronDown,
   Flame,
+  Gem,
   Headset,
   Home,
   LogOut,
@@ -180,7 +181,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/forgot-password",
   ].includes(pathname);
   const directConversationRoute = /^\/messages\/[^/]+$/.test(pathname);
-  const storyDetailRoute = /^\/stories\/[^/]+$/.test(pathname);
   const headerBack =
     (nested && (!standaloneDesktopRoute || pathname === "/support" || pathname === "/settings")) ||
     pathname === "/profile" ||
@@ -393,6 +393,19 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             >
               <Search className="size-4" />
             </Link>
+            {user ? (
+              <Link
+                to="/billing"
+                aria-label="Membership"
+                title="Membership"
+                className={cn(
+                  "inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-primary",
+                  pathname.startsWith("/billing") && "bg-secondary text-primary",
+                )}
+              >
+                <Gem className="size-4" />
+              </Link>
+            ) : null}
             <button
               type="button"
               onClick={toggleNotifications}
@@ -569,7 +582,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               (showDock ? "pb-32" : "pb-10"),
             directConversationRoute &&
               "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
-            storyDetailRoute && "h-[calc(100dvh-4rem)] overflow-hidden p-0 md:pb-0",
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
@@ -635,7 +647,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           signedIn={Boolean(user)}
           userInitials={userInitials}
           photoUrl={accountProfile?.photoUrl}
-          messageUnread={messageState?.unread ?? 0}
           onLeave={handleLeave}
         />
       ) : null}

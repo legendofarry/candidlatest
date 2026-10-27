@@ -265,6 +265,7 @@ export const getMentionSuggestions = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = (await import("./firebase.server")).getFirestoreDb();
+    const { canMessage } = await import("./messaging.server");
     const snapshot = await db
       .collection("profiles")
       .where("username", ">=", data.query)
@@ -272,20 +273,21 @@ export const getMentionSuggestions = createServerFn({ method: "POST" })
       .orderBy("username")
       .limit(9)
       .get();
-    return {
-      users: snapshot.docs
-        .filter((doc) =>
-          doc.id !== context.userId &&
-          doc.get("banned") !== true &&
-          !["deactivated", "deletion_pending", "deletion_in_progress"].includes(
-            String(doc.get("account_status") ?? "active"),
-          ),
-        )
-        .slice(0, 8)
-        .flatMap((doc) => {
-          const username = doc.get("username");
-          if (typeof username !== "string") return [];
-          return [{ username, photoUrl: doc.get("photo_url") ?? null }];
-        }),
-    };
+
+    const users: Array<{ username: string; photoUrl: string | null }> = [];
+    for (const doc of snapshot.docs) {
+      if (doc.id === context.userId) continue;
+      if (doc.get("banned") === true) continue;
+      if (["deactivated", "deletion_pending", "deletion_in_progress"].includes(String(doc.get("account_status") ?? "active"))) {
+        continue;
+      }
+      const username = doc.get("username");
+      if (typeof username !== "string") continue;
+      const gate = await canMessage(context.userId, doc.id);
+      if (!gate.allowed) continue;
+      users.push({ username, photoUrl: doc.get("photo_url") ?? null });
+      if (users.length >= 8) break;
+    }
+
+    return { users };
   });

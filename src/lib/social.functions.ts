@@ -35,6 +35,30 @@ export const followAccount = createServerFn({ method: "POST" })
     return toggleAccountFollow(context.userId, data.user_id);
   });
 
+/** Small on-demand relationship lookup for contextual follow/block menus. */
+export const getAccountRelationship = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ user_id: z.string().min(1) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const db = getFirestoreDb();
+    const [followsTarget, targetFollowsViewer, block] = await Promise.all([
+      db.collection("follows").doc(`${context.userId}:${data.user_id}`).get(),
+      db.collection("follows").doc(`${data.user_id}:${context.userId}`).get(),
+      db.collection("blocks").doc(`${context.userId}:${data.user_id}`).get(),
+    ]);
+    const followStatus = !followsTarget.exists
+      ? "none"
+      : followsTarget.get("status") === "pending"
+        ? "pending"
+        : "accepted";
+    return {
+      followStatus,
+      isFollowing: followStatus === "accepted",
+      followsYou: targetFollowsViewer.exists && targetFollowsViewer.get("status") !== "pending",
+      isBlocked: block.exists,
+    } as const;
+  });
+
 export const getFollowStats = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) =>

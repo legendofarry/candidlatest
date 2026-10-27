@@ -11,6 +11,7 @@ import {
   saveCompanyRating,
   type RatingMetricKey,
 } from "./company.server";
+import { userParticipatedWithCompany } from "./company-participation.server";
 
 function isFirebaseReadUnavailable(error: unknown) {
   return (
@@ -52,6 +53,13 @@ export const getMyCompanyRating = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => z.object({ company_id: z.string().min(1) }).parse(input))
   .handler(async ({ data, context }) => readMyCompanyRating(data.company_id, context.userId));
 
+export const getMyCompanyRatingEligibility = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ company_id: z.string().min(1) }).parse(input))
+  .handler(async ({ data, context }) =>
+    userParticipatedWithCompany(context.userId, data.company_id),
+  );
+
 export const rateCompanyFromQuestionnaire = createServerFn({ method: "POST" })
   .middleware([requireVerifiedFirebaseAuth])
   .inputValidator((input: unknown) =>
@@ -64,15 +72,20 @@ export const rateCompanyFromQuestionnaire = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data, context }) =>
-    saveCompanyRating({
+  .handler(async ({ data, context }) => {
+    if (!(await userParticipatedWithCompany(context.userId, data.company_id))) {
+      throw new Error(
+        "Share a story about this employer, or leave a comment that clearly describes your own work experience there, before rating it.",
+      );
+    }
+    return saveCompanyRating({
       companyId: data.company_id,
       userId: context.userId,
       metrics: data.metrics as Record<RatingMetricKey, number>,
       wouldWorkHere: data.would_work_here,
       reasons: data.reasons,
-    }),
-  );
+    });
+  });
 
 export const setCompanyLocation = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])

@@ -28,16 +28,12 @@ type CommunityMember = {
   photo_url: string | null;
 };
 
-type CommunityPreviewMember = CommunityMember;
-
 export function ProfileCommunity({
   username,
   followerCount,
-  preview,
 }: {
   username: string;
   followerCount: number;
-  preview: CommunityPreviewMember[];
 }) {
   const isMobile = useIsMobile();
   const fetchFollowers = useServerFn(getPublicProfileFollowers);
@@ -193,42 +189,12 @@ export function ProfileCommunity({
           </div>
         </div>
 
-        {preview.length ? (
-          <div className="mt-4 flex gap-2 overflow-x-auto pb-1">
-            {preview.slice(0, 6).map((member) => (
-              <Link
-                key={member.id}
-                to="/u/$username"
-                params={{ username: member.username }}
-                className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-full border border-border/80 bg-background py-1 pl-1 pr-3 transition-colors hover:bg-secondary"
-              >
-                <ProfileAvatar
-                  photoUrl={member.photo_url}
-                  initials={member.username.slice(0, 2)}
-                  className="size-9 border border-border"
-                />
-                <span className="max-w-28 truncate text-xs font-medium">@{member.username}</span>
-              </Link>
-            ))}
-          </div>
-        ) : (
-          <p className="mt-4 rounded-xl bg-secondary/50 px-3 py-3 text-sm text-muted-foreground">
-            No community members to show yet.
-          </p>
-        )}
-
-        {followerCount > 0 || preview.length > 0 ? (
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
-            <p className="text-xs text-muted-foreground">
-              {followerCount > 6
-                ? `A few of ${formatCount(followerCount)} members`
-                : "Your Candid community"}
-            </p>
-            <Button variant="outline" size="sm" className="rounded-full" onClick={openCommunity}>
-              <UsersRound className="size-4" /> View community
-            </Button>
-          </div>
-        ) : null}
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-border/70 pt-3">
+          <p className="text-xs text-muted-foreground">Your Candid community</p>
+          <Button variant="outline" size="sm" className="rounded-full" onClick={openCommunity}>
+            <UsersRound className="size-4" /> View community
+          </Button>
+        </div>
       </section>
 
       <Drawer open={open && isMobile} onOpenChange={setOpen}>

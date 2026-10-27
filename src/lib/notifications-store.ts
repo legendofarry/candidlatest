@@ -3,6 +3,16 @@ import { useSyncExternalStore } from "react";
 export type NotifyKind = "success" | "error" | "info" | "warning";
 
 export type NotifyCategory = "system" | "social" | "action";
+export type NotificationActivityType =
+  | "follow"
+  | "follow_request"
+  | "post_like"
+  | "comment"
+  | "reply"
+  | "comment_like"
+  | "mention"
+  | "message_reaction"
+  | "other";
 
 /** Where a notification should take the user when it is actionable. */
 export type NotifyLink = { href: string; label?: string };
@@ -12,6 +22,8 @@ export type AppNotification = {
   kind: NotifyKind;
   title: string;
   description?: string | undefined;
+  actor?: { id: string; username?: string | undefined; photoUrl?: string | undefined } | undefined;
+  activityType?: NotificationActivityType | undefined;
   createdAt: number;
   read: boolean;
   archived?: boolean | undefined;
@@ -345,6 +357,8 @@ export function ingestServerNotifications(
     kind: NotifyKind;
     title: string;
     description?: string | undefined;
+    actor?: AppNotification["actor"];
+    activityType?: NotificationActivityType;
     link?: string | undefined;
     createdAt: number;
   }[],
@@ -360,6 +374,8 @@ export function ingestServerNotifications(
       kind: item.kind,
       title: item.title,
       description: item.description,
+      actor: item.actor,
+      activityType: item.activityType,
       createdAt: item.createdAt,
       read: false,
       category: "action",

@@ -19,10 +19,19 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 - [x] Basic and Premium packages only; legacy Gold entitlements map to Premium.
 - [x] Shareable profile links and optional mobile sign-up prompt for signed-out visitors.
 - [x] Mobile long-press actions for conversations; notifications retain their own actions.
+- [x] Social notifications show the actor's handle and avatar for follows, follow requests, post/comment activity, mentions, and message reactions; system notices keep generic icons.
+- [x] Notifications can be filtered by unread state and activity type; mobile filters open in a slide-up sheet.
 - [x] Full-width Candid posts in feed, with no tick or “Update” label; Candid name and avatar open @candid.
 - [x] Three-dot menu on each feed post with report, share, direct follow, and block.
+- [x] Follow menus and public profiles reflect follow-back, unfollow, pending-request, block, and unblock states.
+- [x] Mobile feed-post options open in a slide-up action sheet.
 - [x] Reversible “Not interested” options for a single post, an author, or an employer; restore items in Settings.
 - [x] Candid-authored posts render edge to edge without a post card or rounded media card.
+- [x] Candid post media spans the full width of its story-detail pane.
+- [x] Story details show the post and comments together in a resizable split layout.
+- [x] Company ratings and salary submissions require a company story or an AI-assessed comment/reply that clearly describes the author's own work experience; assessments are cached against the exact comment text, and server functions enforce the rule.
+- [x] Feed post actions update optimistically, allow independent actions without waiting for another action to finish, and show the signed-in user's vote, like, save, and follow state.
+- [x] Membership is reached through a compact gem icon instead of a settings membership panel.
 - [x] Mobile chat uses an immersive, pinned Instagram-style conversation header and composer, with online/last-active status.
 - [x] Shared post links open the post directly.
 - [x] Industry entry allows a suggested category or custom typed value.

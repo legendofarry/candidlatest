@@ -207,6 +207,12 @@ export const createCommunityPost = createServerFn({ method: "POST" })
             title: "You were mentioned in a Candid update",
             description: body.slice(0, 140),
             link: `/stories/${storyId}`,
+            actor: {
+              id: context.userId,
+              username: profile?.username ?? null,
+              photoUrl: profile?.photo_url ?? null,
+            },
+            activityType: "mention",
           }),
         ),
       );

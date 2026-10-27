@@ -104,14 +104,14 @@ function FeedPage() {
   const stories = (feedPages.data?.pages.flatMap((page) => page.stories) ?? []).filter((story) =>
     needle
       ? [
-          story.title,
-          story.body,
-          story.company_name ?? "",
-          ...((story as { reasons?: string[] }).reasons ?? []),
-        ]
-          .join(" ")
-          .toLowerCase()
-          .includes(needle)
+        story.title,
+        story.body,
+        story.company_name ?? "",
+        ...((story as { reasons?: string[] }).reasons ?? []),
+      ]
+        .join(" ")
+        .toLowerCase()
+        .includes(needle)
       : true,
   );
 
@@ -358,17 +358,6 @@ function FeedPage() {
                 </li>
               ))}
             </ul>
-          </div>
-          <div className="rounded-2xl border border-danger/30 bg-danger/5 p-4 text-sm">
-            <h2 className="flex items-center gap-2 font-semibold">
-              <Flame className="size-4 text-danger" /> Know your rights
-            </h2>
-            <p className="mt-2 text-muted-foreground">
-              Unpaid salary, no contract or forced overtime? See what Kenyan labour law says.
-            </p>
-            <Link to="/rights" className="mt-2 inline-block font-medium text-danger">
-              Read the basics →
-            </Link>
           </div>
         </aside>
       ) : null}

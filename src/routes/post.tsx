@@ -680,7 +680,7 @@ function WorkplaceStoryComposer() {
 
   return (
     <div className="h-[calc(100dvh-4rem)] min-h-0 w-full overflow-hidden bg-background md:h-dvh">
-      <div className="relative min-h-[calc(100dvh-4rem)] w-full overflow-hidden border-0 bg-transparent shadow-none md:h-dvh md:min-h-0 md:bg-card/85 md:shadow-2xl md:backdrop-blur-xl">
+      <div className="relative h-full min-h-0 w-full overflow-hidden border-0 bg-transparent shadow-none md:bg-card/85 md:shadow-2xl md:backdrop-blur-xl">
         <FloatingBackButton
           onClick={() => navigate({ to: "/" })}
           className="hidden md:inline-flex"
@@ -761,7 +761,12 @@ function WorkplaceStoryComposer() {
 
               <div className="grid min-h-0 flex-1 gap-6 px-4 md:px-0 xl:grid-cols-[minmax(0,1fr)_20rem]">
                 <div className="flex min-h-0 flex-col bg-transparent p-0 md:p-0">
-                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-4 md:py-5">
+                  <div
+                    role="region"
+                    tabIndex={0}
+                    aria-label="Story answers"
+                    className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-4 md:py-5"
+                  >
                     <div className="space-y-5">
                       {step === 0 ? (
                         <>
@@ -1265,7 +1270,7 @@ function WorkplaceStoryComposer() {
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 py-3 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+                  <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/80">
                     <Button
                       variant="ghost"
                       disabled={step === 0}
@@ -1315,7 +1320,7 @@ function WorkplaceStoryComposer() {
                   />
                 </div>
 
-                <aside className="space-y-4 rounded-3xl border border-danger/30 bg-danger/5 p-5 text-sm">
+                <aside className="hidden space-y-4 rounded-3xl border border-danger/30 bg-danger/5 p-5 text-sm xl:block">
                   <h2 className="flex items-center gap-2 font-semibold">
                     <AlertTriangle className="size-4 text-danger" /> Keep yourself safe
                   </h2>

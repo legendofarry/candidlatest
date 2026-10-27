@@ -179,7 +179,6 @@ function PublicProfilePage() {
   }
 
   const profile = data;
-  const followerPreview = profile.follower_preview ?? [];
   const pinnedStories = (profile.pinnedStories ?? []) as ProfileStory[];
   const pinnedStoryIds = new Set<string>(profile.pinnedStoryIds ?? []);
   const visibleProfileStories = profileStories.filter((story) => !pinnedStoryIds.has(story.id));
@@ -211,7 +210,12 @@ function PublicProfilePage() {
     setBusy(true);
     try {
       await action();
-      await queryClient.invalidateQueries({ queryKey: ["public-profile", username] });
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["public-profile", username] }),
+        queryClient.invalidateQueries({
+          queryKey: ["account-relationship", user?.uid, profile.id],
+        }),
+      ]);
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Something went wrong");
     } finally {
@@ -284,7 +288,10 @@ function PublicProfilePage() {
                   <div className="absolute right-0 top-12 z-20 min-w-44 rounded-xl border border-border bg-card p-1.5 text-foreground shadow-xl">
                     <button
                       type="button"
-                      onClick={() => { setProfileMenuOpen(false); void shareProfile(); }}
+                      onClick={() => {
+                        setProfileMenuOpen(false);
+                        void shareProfile();
+                      }}
                       className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm hover:bg-secondary"
                     >
                       <Share2 className="size-4" /> Share profile
@@ -341,7 +348,9 @@ function PublicProfilePage() {
                 }}
                 disabled={!profile.photo_url}
                 aria-label={
-                  profile.photo_url ? "View profile photo full screen" : "Profile photo not available"
+                  profile.photo_url
+                    ? "View profile photo full screen"
+                    : "Profile photo not available"
                 }
                 className="-mt-9 shrink-0 rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:cursor-default sm:-mt-12"
               >
@@ -361,8 +370,11 @@ function PublicProfilePage() {
                   />
                 </h1>
                 <p className="text-xs text-muted-foreground sm:text-sm">
-                  {formatCount(profile.followers)} followers · {formatCount(profile.following)} following
-                  {profile.can_view_contributions ? ` · ${formatCount(profile.contributions.stories)} stories` : " · Private profile"}
+                  {formatCount(profile.followers)} followers · {formatCount(profile.following)}{" "}
+                  following
+                  {profile.can_view_contributions
+                    ? ` · ${formatCount(profile.contributions.stories)} stories`
+                    : " · Private profile"}
                 </p>
                 {profile.official ? (
                   <p className="text-xs font-medium text-primary">Official Candid account</p>
@@ -380,13 +392,16 @@ function PublicProfilePage() {
               ) : (
                 <>
                   <Button
-                    disabled={busy}
+                    disabled={busy || profile.isBlocked}
                     className={cn(
                       "h-10 flex-1 rounded-lg sm:flex-none",
                       profile.isFollowing && "bg-secondary text-foreground hover:bg-secondary/80",
                     )}
                     onClick={() => {
-                      if (!user) { void navigate({ to: "/auth" }); return; }
+                      if (!user) {
+                        void navigate({ to: "/auth" });
+                        return;
+                      }
                       void run(() => follow({ data: { user_id: profile.id } }));
                     }}
                   >
@@ -395,15 +410,28 @@ function PublicProfilePage() {
                     ) : (
                       <UserPlus className="size-4" />
                     )}
-                    {profile.isFollowing ? "Following" : profile.followStatus === "pending" ? "Requested" : user ? "Follow" : "Sign in to follow"}
+                    {profile.isFollowing
+                      ? "Unfollow"
+                      : profile.followStatus === "pending"
+                        ? "Cancel request"
+                        : profile.followsYou
+                          ? "Follow back"
+                          : user
+                            ? "Follow"
+                            : "Sign in to follow"}
                   </Button>
                   <Button
                     variant="secondary"
                     className="h-10 flex-1 rounded-lg sm:flex-none"
-                    disabled={busy || profile.isBlocked || Boolean(user && !profile.messaging.allowed)}
+                    disabled={
+                      busy || profile.isBlocked || Boolean(user && !profile.messaging.allowed)
+                    }
                     onClick={() =>
                       void (async () => {
-                        if (!user) { void navigate({ to: "/auth" }); return; }
+                        if (!user) {
+                          void navigate({ to: "/auth" });
+                          return;
+                        }
                         setBusy(true);
                         try {
                           const result = await openChat({ data: { user_id: profile.id } });
@@ -446,7 +474,6 @@ function PublicProfilePage() {
             ) : null}
           </div>
         </div>
-
       </motion.section>
 
       <nav
@@ -510,11 +537,7 @@ function PublicProfilePage() {
             </div>
           </section>
 
-          <ProfileCommunity
-            username={profile.username}
-            followerCount={profile.followers}
-            preview={followerPreview}
-          />
+          <ProfileCommunity username={profile.username} followerCount={profile.followers} />
         </div>
       ) : null}
 
@@ -524,7 +547,8 @@ function PublicProfilePage() {
             <LockKeyhole className="mx-auto size-7 text-primary" />
             <h2 className="mt-3 font-semibold">This profile is private</h2>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              Follow @{profile.username} and wait for approval to see their stories and contributions.
+              Follow @{profile.username} and wait for approval to see their stories and
+              contributions.
             </p>
           </section>
         ) : pinnedStories.length ? (
@@ -567,143 +591,145 @@ function PublicProfilePage() {
       ) : null}
 
       {activeTab !== "About" ? (
-        profile.can_view_contributions ? <div className="bg-background pb-3 sm:px-5">
-          <section className="overflow-hidden border-y border-border/70 bg-card sm:rounded-xl sm:border">
-            <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4">
-              <div>
-                <h2 className="text-lg font-bold sm:text-xl">Stories</h2>
-                <p className="text-xs text-muted-foreground">
-                  {formatCount(profile.contributions.stories)} published
-                </p>
+        profile.can_view_contributions ? (
+          <div className="bg-background pb-3 sm:px-5">
+            <section className="overflow-hidden border-y border-border/70 bg-card sm:rounded-xl sm:border">
+              <div className="flex items-center justify-between px-4 py-3 sm:px-5 sm:py-4">
+                <div>
+                  <h2 className="text-lg font-bold sm:text-xl">Stories</h2>
+                  <p className="text-xs text-muted-foreground">
+                    {formatCount(profile.contributions.stories)} published
+                  </p>
+                </div>
               </div>
-            </div>
-            {profile.isSelf ? (
-              <>
-                <Link
-                  to="/post"
-                  className="flex items-center gap-3 border-y border-border px-4 py-3 sm:px-5"
-                >
-                  <ProfileAvatar
-                    photoUrl={profile.photo_url}
-                    initials={profile.username.slice(0, 2)}
-                    className="size-10 border border-border"
-                  />
-                  <span className="flex-1 rounded-full bg-secondary px-4 py-2.5 text-sm text-muted-foreground">
-                    Share a workplace story…
-                  </span>
-                  <Image className="size-5 text-primary" />
-                </Link>
-                <Link
-                  to="/profile"
-                  className="mx-4 my-3 flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold sm:mx-5"
-                >
-                  <BookOpen className="size-4" /> Manage stories
-                </Link>
-              </>
-            ) : null}
-            {visibleProfileStories.length ? (
-              <div className="divide-y divide-border">
-                {visibleProfileStories.map((story) => (
-                  <article key={story.id} className="px-4 py-4 sm:px-5">
-                    <div className="flex items-start gap-3">
-                      <ProfileAvatar
-                        photoUrl={profile.photo_url}
-                        initials={profile.username.slice(0, 2)}
-                        className="size-10 border border-border"
-                      />
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold">@{profile.username}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {story.post_type === "announcement"
-                            ? "Candid"
-                            : story.company_name || "Workplace story"}
-                          {story.post_type !== "announcement" && story.county
-                            ? ` · ${story.county}${story.area ? `, ${story.area}` : ""}`
-                            : ""}{" "}
-                          · {new Date(story.created_at).toLocaleDateString("en-KE")}
-                        </p>
+              {profile.isSelf ? (
+                <>
+                  <Link
+                    to="/post"
+                    className="flex items-center gap-3 border-y border-border px-4 py-3 sm:px-5"
+                  >
+                    <ProfileAvatar
+                      photoUrl={profile.photo_url}
+                      initials={profile.username.slice(0, 2)}
+                      className="size-10 border border-border"
+                    />
+                    <span className="flex-1 rounded-full bg-secondary px-4 py-2.5 text-sm text-muted-foreground">
+                      Share a workplace story…
+                    </span>
+                    <Image className="size-5 text-primary" />
+                  </Link>
+                  <Link
+                    to="/profile"
+                    className="mx-4 my-3 flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold sm:mx-5"
+                  >
+                    <BookOpen className="size-4" /> Manage stories
+                  </Link>
+                </>
+              ) : null}
+              {visibleProfileStories.length ? (
+                <div className="divide-y divide-border">
+                  {visibleProfileStories.map((story) => (
+                    <article key={story.id} className="px-4 py-4 sm:px-5">
+                      <div className="flex items-start gap-3">
+                        <ProfileAvatar
+                          photoUrl={profile.photo_url}
+                          initials={profile.username.slice(0, 2)}
+                          className="size-10 border border-border"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold">@{profile.username}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {story.post_type === "announcement"
+                              ? "Candid"
+                              : story.company_name || "Workplace story"}
+                            {story.post_type !== "announcement" && story.county
+                              ? ` · ${story.county}${story.area ? `, ${story.area}` : ""}`
+                              : ""}{" "}
+                            · {new Date(story.created_at).toLocaleDateString("en-KE")}
+                          </p>
+                        </div>
                       </div>
-                    </div>
-                    <Link
-                      to="/stories/$id"
-                      params={{ id: story.id }}
-                      className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                    >
-                      <h3 className="mt-3 text-base font-semibold">
-                        {story.post_type === "announcement" ? "Candid" : story.title}
-                      </h3>
-                      <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
-                        <MentionText text={story.body} linkMentions={false} />
-                      </p>
-                    </Link>
-                    {story.media.length ? (
-                      <div
-                        className={`mt-3 grid gap-1.5 overflow-hidden rounded-xl bg-secondary ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
-                      >
-                        {story.media.map((media, index) =>
-                          media.resource_type === "video" ? (
-                            <video
-                              key={`${media.url}-${index}`}
-                              src={media.url}
-                              controls
-                              playsInline
-                              className="max-h-[60vh] min-h-32 w-full object-contain"
-                            />
-                          ) : (
-                            <img
-                              key={`${media.url}-${index}`}
-                              src={media.url}
-                              alt={`Candid attachment ${index + 1}`}
-                              loading="lazy"
-                              className="max-h-[60vh] min-h-32 w-full object-contain"
-                            />
-                          ),
-                        )}
-                      </div>
-                    ) : null}
-                    <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm text-muted-foreground">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Heart className="size-4" /> {formatCount(story.likes)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setCommentStory(story)}
-                        aria-label={`View comments, ${formatCount(story.comment_count)} total`}
-                        className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-                      >
-                        <MessageSquare className="size-4" />
-                        {formatCount(story.comment_count)} comments
-                      </button>
                       <Link
                         to="/stories/$id"
                         params={{ id: story.id }}
-                        className="font-medium text-primary"
+                        className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                       >
-                        Read story
+                        <h3 className="mt-3 text-base font-semibold">
+                          {story.post_type === "announcement" ? "Candid" : story.title}
+                        </h3>
+                        <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-muted-foreground">
+                          <MentionText text={story.body} linkMentions={false} />
+                        </p>
                       </Link>
-                    </div>
-                  </article>
-                ))}
-              </div>
-            ) : pinnedStories.length === 0 ? (
-              <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-                No published stories yet.
-              </p>
-            ) : null}
-            {hasMoreProfileStories ? (
-              <div className="flex justify-center border-t border-border p-4">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={loadingProfileStories}
-                  onClick={() => void loadMoreProfileStories()}
-                >
-                  {loadingProfileStories ? "Loading stories…" : "Load 30 more stories"}
-                </Button>
-              </div>
-            ) : null}
-          </section>
-        </div> : null
+                      {story.media.length ? (
+                        <div
+                          className={`mt-3 grid gap-1.5 overflow-hidden rounded-xl bg-secondary ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+                        >
+                          {story.media.map((media, index) =>
+                            media.resource_type === "video" ? (
+                              <video
+                                key={`${media.url}-${index}`}
+                                src={media.url}
+                                controls
+                                playsInline
+                                className="max-h-[60vh] min-h-32 w-full object-contain"
+                              />
+                            ) : (
+                              <img
+                                key={`${media.url}-${index}`}
+                                src={media.url}
+                                alt={`Candid attachment ${index + 1}`}
+                                loading="lazy"
+                                className="max-h-[60vh] min-h-32 w-full object-contain"
+                              />
+                            ),
+                          )}
+                        </div>
+                      ) : null}
+                      <div className="mt-4 flex items-center justify-between border-t border-border pt-3 text-sm text-muted-foreground">
+                        <span className="inline-flex items-center gap-1.5">
+                          <Heart className="size-4" /> {formatCount(story.likes)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCommentStory(story)}
+                          aria-label={`View comments, ${formatCount(story.comment_count)} total`}
+                          className="inline-flex min-h-10 items-center gap-1.5 rounded-full px-3 transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        >
+                          <MessageSquare className="size-4" />
+                          {formatCount(story.comment_count)} comments
+                        </button>
+                        <Link
+                          to="/stories/$id"
+                          params={{ id: story.id }}
+                          className="font-medium text-primary"
+                        >
+                          Read story
+                        </Link>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              ) : pinnedStories.length === 0 ? (
+                <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                  No published stories yet.
+                </p>
+              ) : null}
+              {hasMoreProfileStories ? (
+                <div className="flex justify-center border-t border-border p-4">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={loadingProfileStories}
+                    onClick={() => void loadMoreProfileStories()}
+                  >
+                    {loadingProfileStories ? "Loading stories…" : "Load 30 more stories"}
+                  </Button>
+                </div>
+              ) : null}
+            </section>
+          </div>
+        ) : null
       ) : null}
 
       <ProfileStoryComments
@@ -722,9 +748,7 @@ function PublicProfilePage() {
           className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:p-10 lg:p-16"
         >
           <DialogTitle className="sr-only">Profile image</DialogTitle>
-          <DialogDescription className="sr-only">
-            A full-screen profile image.
-          </DialogDescription>
+          <DialogDescription className="sr-only">A full-screen profile image.</DialogDescription>
           <DialogClose asChild>
             <Button
               type="button"
@@ -749,11 +773,26 @@ function PublicProfilePage() {
         <DialogContent className="!fixed !left-0 !right-0 !top-auto !bottom-0 !translate-x-0 !translate-y-0 rounded-t-3xl rounded-b-none p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:!left-1/2 sm:!right-auto sm:!top-1/2 sm:!bottom-auto sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:rounded-3xl sm:pb-6 sm:max-w-md">
           <DialogTitle className="font-display text-xl">Join Candid?</DialogTitle>
           <DialogDescription>
-            You can keep browsing @{profile.username}’s public profile, or create an account to follow, comment and message.
+            You can keep browsing @{profile.username}’s public profile, or create an account to
+            follow, comment and message.
           </DialogDescription>
           <div className="mt-3 flex gap-2">
-            <Button className="flex-1 rounded-xl" onClick={() => { setSignUpPromptOpen(false); void navigate({ to: "/auth" }); }}>Create account</Button>
-            <Button variant="outline" className="flex-1 rounded-xl" onClick={() => setSignUpPromptOpen(false)}>Maybe later</Button>
+            <Button
+              className="flex-1 rounded-xl"
+              onClick={() => {
+                setSignUpPromptOpen(false);
+                void navigate({ to: "/auth" });
+              }}
+            >
+              Create account
+            </Button>
+            <Button
+              variant="outline"
+              className="flex-1 rounded-xl"
+              onClick={() => setSignUpPromptOpen(false)}
+            >
+              Maybe later
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

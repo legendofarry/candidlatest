@@ -47,12 +47,15 @@ export type ConversationRecord = {
   last_message: string;
   last_sender_id: string | null;
   unread: Record<string, number>;
-  preferences?: Record<string, {
-    archived?: boolean;
-    muted?: boolean;
-    pinned?: boolean;
-    deleted?: boolean;
-  }>;
+  preferences?: Record<
+    string,
+    {
+      archived?: boolean;
+      muted?: boolean;
+      pinned?: boolean;
+      deleted?: boolean;
+    }
+  >;
 };
 
 export type MessageRecord = {
@@ -486,17 +489,25 @@ export async function savePrivacySettings(
   };
   const batch = db.batch();
   if (input.whoCanMessage) {
-    batch.set(db.collection("privacy_settings").doc(userId), {
-      user_id: userId,
-      who_can_message: input.whoCanMessage,
-      updated_at: updatedAt,
-    }, { merge: true });
+    batch.set(
+      db.collection("privacy_settings").doc(userId),
+      {
+        user_id: userId,
+        who_can_message: input.whoCanMessage,
+        updated_at: updatedAt,
+      },
+      { merge: true },
+    );
   }
   if (input.profileVisibility) {
-    batch.set(db.collection("profiles").doc(userId), {
-      profile_visibility: input.profileVisibility,
-      updated_at: updatedAt,
-    }, { merge: true });
+    batch.set(
+      db.collection("profiles").doc(userId),
+      {
+        profile_visibility: input.profileVisibility,
+        updated_at: updatedAt,
+      },
+      { merge: true },
+    );
   }
   await batch.commit();
   return record;
@@ -504,39 +515,44 @@ export async function savePrivacySettings(
 
 export async function listFollowRequests(userId: string) {
   const db = getFirestoreDb();
-  const snapshot = await db.collection("follows")
+  const snapshot = await db
+    .collection("follows")
     .where("following_id", "==", userId)
     .where("status", "==", "pending")
     .orderBy("created_at", "desc")
     .limit(50)
     .get();
-  return Promise.all(snapshot.docs.map(async (doc) => {
-    const record = doc.data() as { follower_id?: string; created_at?: string };
-    if (!record.follower_id) return null;
-    const profileSnap = await db.collection("profiles").doc(record.follower_id).get();
-    const profile = profileSnap.data() as ProfileRecord | undefined;
-    if (
-      !profileSnap.exists ||
-      profile?.banned ||
-      profile?.account_status === "deactivated" ||
-      profile?.account_status === "deletion_pending" ||
-      !profile?.username
-    ) return null;
-    return {
-      id: doc.id,
-      user_id: record.follower_id,
-      username: profile.username,
-      photo_url: profile.photo_url ?? null,
-      created_at: record.created_at ?? now(),
-    };
-  })).then((rows) => rows.filter((row): row is NonNullable<typeof row> => Boolean(row)));
+  return Promise.all(
+    snapshot.docs.map(async (doc) => {
+      const record = doc.data() as { follower_id?: string; created_at?: string };
+      if (!record.follower_id) return null;
+      const profileSnap = await db.collection("profiles").doc(record.follower_id).get();
+      const profile = profileSnap.data() as ProfileRecord | undefined;
+      if (
+        !profileSnap.exists ||
+        profile?.banned ||
+        profile?.account_status === "deactivated" ||
+        profile?.account_status === "deletion_pending" ||
+        !profile?.username
+      )
+        return null;
+      return {
+        id: doc.id,
+        user_id: record.follower_id,
+        username: profile.username,
+        photo_url: profile.photo_url ?? null,
+        created_at: record.created_at ?? now(),
+      };
+    }),
+  ).then((rows) => rows.filter((row): row is NonNullable<typeof row> => Boolean(row)));
 }
 
 export async function respondToFollowRequest(userId: string, followId: string, approve: boolean) {
   const db = getFirestoreDb();
   const ref = db.collection("follows").doc(followId);
   const snap = await ref.get();
-  const record = snap.data() as { following_id?: string; follower_id?: string; status?: string } | undefined;
+  const record = snap.data() as
+    { following_id?: string; follower_id?: string; status?: string } | undefined;
   if (!snap.exists || record?.following_id !== userId || record.status !== "pending") {
     throw new Error("That follow request is no longer available.");
   }
@@ -670,23 +686,29 @@ export async function listConversationPage(
     (record) => record.participant_ids.find((id) => id !== userId) ?? userId,
   );
   const participants = await readParticipants(otherIds);
-  const items = records.map((record) => {
-    const otherId = record.participant_ids.find((id) => id !== userId) ?? userId;
-    const preference = record.preferences?.[userId] ?? {};
-    return {
-      id: record.id,
-      with: participants.get(otherId)!,
-      last_message: record.last_message,
-      last_message_at: record.last_message_at,
-      unread: record.unread?.[userId] ?? 0,
-      mine: record.last_sender_id === userId,
-      archived: preference.archived === true,
-      muted: preference.muted === true,
-      pinned: preference.pinned === true,
-      deleted: preference.deleted === true,
-    };
-  }).filter((item) => !item.deleted && item.archived === archived)
-    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime());
+  const items = records
+    .map((record) => {
+      const otherId = record.participant_ids.find((id) => id !== userId) ?? userId;
+      const preference = record.preferences?.[userId] ?? {};
+      return {
+        id: record.id,
+        with: participants.get(otherId)!,
+        last_message: record.last_message,
+        last_message_at: record.last_message_at,
+        unread: record.unread?.[userId] ?? 0,
+        mine: record.last_sender_id === userId,
+        archived: preference.archived === true,
+        muted: preference.muted === true,
+        pinned: preference.pinned === true,
+        deleted: preference.deleted === true,
+      };
+    })
+    .filter((item) => !item.deleted && item.archived === archived)
+    .sort(
+      (a, b) =>
+        Number(b.pinned) - Number(a.pinned) ||
+        new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime(),
+    );
   const last = records.at(-1);
   const hasMore = snap.docs.length > limit;
   return {
@@ -715,20 +737,31 @@ export async function applyConversationAction(
     const followRef = db.collection("follows").doc(userId + ":" + otherId);
     const existing = await followRef.get();
     if (existing.exists) {
-      return { ok: true as const, following: existing.get("status") !== "pending", requested: existing.get("status") === "pending" };
+      return {
+        ok: true as const,
+        following: existing.get("status") !== "pending",
+        requested: existing.get("status") === "pending",
+      };
     }
     const { toggleAccountFollow } = await import("./social.server");
-    return { ok: true as const, ...await toggleAccountFollow(userId, otherId) };
+    return { ok: true as const, ...(await toggleAccountFollow(userId, otherId)) };
   }
 
   const path = "preferences." + userId;
-  const values = action === "archive" ? { archived: true }
-    : action === "unarchive" ? { archived: false }
-      : action === "mute" ? { muted: true }
-        : action === "unmute" ? { muted: false }
-          : action === "pin" ? { pinned: true }
-            : action === "unpin" ? { pinned: false }
-              : { deleted: true, archived: false };
+  const values =
+    action === "archive"
+      ? { archived: true }
+      : action === "unarchive"
+        ? { archived: false }
+        : action === "mute"
+          ? { muted: true }
+          : action === "unmute"
+            ? { muted: false }
+            : action === "pin"
+              ? { pinned: true }
+              : action === "unpin"
+                ? { pinned: false }
+                : { deleted: true, archived: false };
   await ref.update({
     ...Object.fromEntries(Object.entries(values).map(([key, value]) => [path + "." + key, value])),
   });
@@ -1129,14 +1162,23 @@ export async function toggleReaction(userId: string, messageId: string, emoji: s
         import("./notifications.server"),
         db.collection("profiles").doc(userId).get(),
       ]);
-      const actor = (actorSnap.data() as { username?: string | null } | undefined)?.username;
+      const actorProfile = actorSnap.data() as
+        | { username?: string | null; photo_url?: string | null }
+        | undefined;
+      const actor = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
       const target = message.image ? "photo" : "message";
       await pushServerNotification({
         userId: message.sender_id,
         kind: "info",
-        title: `Your ${target} got a reaction`,
-        description: `${actor ? `@${actor}` : "Someone"} reacted ${emoji} to your ${target}.`,
+        title: `${actor} reacted to your ${target}`,
+        description: emoji,
         link: `/messages/${message.conversation_id}`,
+        actor: {
+          id: userId,
+          username: actorProfile?.username ?? null,
+          photoUrl: actorProfile?.photo_url ?? null,
+        },
+        activityType: "message_reaction",
       });
     } catch (error) {
       // The reaction is already saved; notifying the recipient is best-effort.
@@ -1165,7 +1207,8 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     profile.banned ||
     profile.account_status === "deactivated" ||
     profile.account_status === "deletion_pending"
-  ) return null;
+  )
+    return null;
   const pinnedLimit = getMembershipEntitlements(
     getEffectiveMembershipTier(profile),
   ).maxPinnedStories;
@@ -1181,16 +1224,22 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     allFollowing,
     pendingFollowers,
     pendingFollowing,
-    followerPreviews,
     profileFollowsViewer,
     viewerFollowsProfile,
   ] = await Promise.all([
     readParticipants([userId]),
     db.collection("follows").where("following_id", "==", userId).count(),
     db.collection("follows").where("follower_id", "==", userId).count(),
-    db.collection("follows").where("following_id", "==", userId).where("status", "==", "pending").count(),
-    db.collection("follows").where("follower_id", "==", userId).where("status", "==", "pending").count(),
-    db.collection("follows").where("following_id", "==", userId).limit(16).get(),
+    db
+      .collection("follows")
+      .where("following_id", "==", userId)
+      .where("status", "==", "pending")
+      .count(),
+    db
+      .collection("follows")
+      .where("follower_id", "==", userId)
+      .where("status", "==", "pending")
+      .count(),
     viewerId ? db.collection("follows").doc(`${userId}:${viewerId}`).get() : Promise.resolve(null),
     viewerId ? db.collection("follows").doc(`${viewerId}:${userId}`).get() : Promise.resolve(null),
   ]);
@@ -1206,27 +1255,28 @@ export async function readPublicProfile(username: string, viewerId: string | nul
   const canViewContributions = !isPrivate || isSelf || viewerFollowStatus === "accepted";
   const [storyCount, commentCount, stories] = canViewContributions
     ? await Promise.all([
-        db.collection("stories").where("author_id", "==", userId).where("status", "==", "published").count(),
-        db.collection("comments").where("author_id", "==", userId).where("status", "==", "published").count(),
-        db.collection("stories").where("author_id", "==", userId).where("status", "==", "published")
-          .orderBy("created_at", "desc").orderBy("__name__", "desc").limit(31).get(),
+        db
+          .collection("stories")
+          .where("author_id", "==", userId)
+          .where("status", "==", "published")
+          .count(),
+        db
+          .collection("comments")
+          .where("author_id", "==", userId)
+          .where("status", "==", "published")
+          .count(),
+        db
+          .collection("stories")
+          .where("author_id", "==", userId)
+          .where("status", "==", "published")
+          .orderBy("created_at", "desc")
+          .orderBy("__name__", "desc")
+          .limit(31)
+          .get(),
       ])
     : [0, 0, null];
   const storyDocs = stories?.docs ?? [];
   const storySize = stories?.size ?? 0;
-  const followerPreview = await Promise.all(
-    followerPreviews.docs.filter((doc) => doc.get("status") !== "pending").slice(0, 8).map(async (doc) => {
-      const followerId = (doc.data() as { follower_id: string }).follower_id;
-      const followerSnap = await db.collection("profiles").doc(followerId).get();
-      const follower = followerSnap.data() as ProfileRecord | undefined;
-      return follower?.username &&
-        !follower.banned &&
-        follower.account_status !== "deactivated" &&
-        follower.account_status !== "deletion_pending"
-        ? { id: followerId, username: follower.username, photo_url: follower.photo_url ?? null }
-        : null;
-    }),
-  );
   const newestStoryDocsById = new Map(storyDocs.map((doc) => [doc.id, doc] as const));
   const profileStories = await Promise.all(
     storyDocs
@@ -1234,12 +1284,14 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       .map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
   );
   const profileStoriesById = new Map(profileStories.map((story) => [story.id, story] as const));
-  const pinnedStoryDocs = canViewContributions ? await Promise.all(
-    requestedPinIds.map(
-      async (storyId) =>
-        newestStoryDocsById.get(storyId) ?? (await db.collection("stories").doc(storyId).get()),
-    ),
-  ) : [];
+  const pinnedStoryDocs = canViewContributions
+    ? await Promise.all(
+        requestedPinIds.map(
+          async (storyId) =>
+            newestStoryDocsById.get(storyId) ?? (await db.collection("stories").doc(storyId).get()),
+        ),
+      )
+    : [];
   const pinnedStories = await Promise.all(
     pinnedStoryDocs
       .filter((doc) => doc.exists)
@@ -1271,9 +1323,6 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     can_view_contributions: canViewContributions,
     followers: followerCount,
     following: followingCount,
-    follower_preview: followerPreview.filter((entry): entry is NonNullable<typeof entry> =>
-      Boolean(entry),
-    ),
     contributions: {
       stories: storyCount,
       comments: commentCount,
@@ -1293,7 +1342,9 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     isFollowing: viewerFollowStatus === "accepted",
     followStatus: viewerFollowStatus,
     isBlocked: viewerId ? await isBlocked(viewerId, userId) : false,
-    followsYou: Boolean(profileFollowsViewer?.exists && profileFollowsViewer.get("status") !== "pending"),
+    followsYou: Boolean(
+      profileFollowsViewer?.exists && profileFollowsViewer.get("status") !== "pending",
+    ),
     messaging: { allowed: messaging.allowed, reason: messaging.allowed ? null : messaging.reason },
     isSelf,
   };
@@ -1335,10 +1386,17 @@ export async function readPublicProfileStories(
 
   const profileSnap = await db.collection("profiles").doc(userId).get();
   const profile = profileSnap.data() as ProfileRecord | undefined;
-  if (!profileSnap.exists || profile?.banned || profile?.account_status === "deactivated" || profile?.account_status === "deletion_pending")
+  if (
+    !profileSnap.exists ||
+    profile?.banned ||
+    profile?.account_status === "deactivated" ||
+    profile?.account_status === "deletion_pending"
+  )
     return { stories: [], hasMore: false, nextCursor: null };
   if (profile.profile_visibility === "private" && viewerId !== userId) {
-    const follow = viewerId ? await db.collection("follows").doc(`${viewerId}:${userId}`).get() : null;
+    const follow = viewerId
+      ? await db.collection("follows").doc(`${viewerId}:${userId}`).get()
+      : null;
     if (!follow?.exists || follow.get("status") === "pending") {
       return { stories: [], hasMore: false, nextCursor: null };
     }
@@ -1377,7 +1435,12 @@ export async function readPublicProfileFollowers(username: string, cursor: strin
 
   const profileSnap = await db.collection("profiles").doc(userId).get();
   const profile = profileSnap.data() as ProfileRecord | undefined;
-  if (!profileSnap.exists || profile?.banned || profile?.account_status === "deactivated" || profile?.account_status === "deletion_pending")
+  if (
+    !profileSnap.exists ||
+    profile?.banned ||
+    profile?.account_status === "deactivated" ||
+    profile?.account_status === "deletion_pending"
+  )
     return { followers: [], hasMore: false, nextCursor: null };
 
   let query = db

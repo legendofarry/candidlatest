@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -16,6 +16,7 @@ import { formatDate } from "@/components/site/story-card";
 import { StorySocial } from "@/components/site/story-social";
 import { cn, formatCount } from "@/lib/utils";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { getStoryEngagement } from "@/lib/social.functions";
 
 /** Inline vote + comment bar so people can act without leaving the feed. */
 export function StoryActions({
@@ -43,7 +44,16 @@ export function StoryActions({
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const vote = useServerFn(castVote);
+  const getEngagement = useServerFn(getStoryEngagement);
   const comment = useServerFn(addComment);
+  const [nearViewport, setNearViewport] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const voteIntentRef = useRef<{ up: boolean | null; metoo: boolean | null }>({
+    up: null,
+    metoo: null,
+  });
+  const voteSequenceRef = useRef({ up: 0, metoo: 0 });
+  const lastVoteInteractionAtRef = useRef(0);
   const [open, setOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [body, setBody] = useState("");
@@ -58,6 +68,31 @@ export function StoryActions({
     queryFn: () => getStory({ data: { id: storyId } }),
     enabled: open || sheetOpen || discussionOpen,
   });
+  const engagement = useQuery({
+    queryKey: ["story-engagement", storyId, user?.uid ?? "anon"],
+    queryFn: () => getEngagement({ data: { story_id: storyId } }),
+    enabled: Boolean(user) && nearViewport,
+    staleTime: 30_000,
+  });
+  useEffect(() => {
+    const element = containerRef.current;
+    if (!element || nearViewport) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        setNearViewport(true);
+        observer.disconnect();
+      },
+      { rootMargin: "300px" },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [nearViewport]);
+  const votedKinds = engagement.data?.votedKinds ?? [];
+  const voted = {
+    up: voteIntentRef.current.up ?? votedKinds.includes("up"),
+    metoo: voteIntentRef.current.metoo ?? votedKinds.includes("metoo"),
+  };
   const displayedCommentCount = Math.max(
     commentCount + optimistic.comments,
     thread.data?.commentTotal ?? 0,
@@ -70,18 +105,54 @@ export function StoryActions({
 
   const voteMutation = useMutation({
     mutationFn: (kind: "up" | "metoo") => vote({ data: { story_id: storyId, kind } }),
-    onSuccess: (result, kind) => {
-      const delta = result?.voted ? 1 : -1;
+    onMutate: (kind) => {
+      lastVoteInteractionAtRef.current = Date.now();
+      const base = kind === "up" ? votedKinds.includes("up") : votedKinds.includes("metoo");
+      const current = voteIntentRef.current[kind] ?? base;
+      const next = !current;
+      voteIntentRef.current[kind] = next;
+      voteSequenceRef.current[kind] += 1;
       setOptimistic((prev) => ({
         ...prev,
-        up: kind === "up" ? prev.up + delta : prev.up,
-        metoo: kind === "metoo" ? prev.metoo + delta : prev.metoo,
+        [kind]: next === base ? 0 : next ? 1 : -1,
       }));
+      return { sequence: voteSequenceRef.current[kind] };
+    },
+    onSuccess: (result, kind, context) => {
+      if (context?.sequence === voteSequenceRef.current[kind]) {
+        const base = kind === "up" ? votedKinds.includes("up") : votedKinds.includes("metoo");
+        voteIntentRef.current[kind] = result.voted;
+        setOptimistic((prev) => ({
+          ...prev,
+          [kind]: result.voted === base ? 0 : result.voted ? 1 : -1,
+        }));
+      }
       void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
       void queryClient.invalidateQueries({ queryKey: ["stories"] });
+      void queryClient.invalidateQueries({ queryKey: ["story-pages"] });
+      void queryClient.invalidateQueries({ queryKey: ["story-engagement", storyId] });
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error, kind, context) => {
+      toast.error(error.message);
+      if (context?.sequence === voteSequenceRef.current[kind]) {
+        voteIntentRef.current[kind] = null;
+        setOptimistic((prev) => ({ ...prev, [kind]: 0 }));
+      }
+      void queryClient.invalidateQueries({ queryKey: ["story-engagement", storyId] });
+      void queryClient.invalidateQueries({ queryKey: ["story-pages"] });
+      void queryClient.invalidateQueries({ queryKey: ["stories"] });
+    },
   });
+
+  useEffect(() => {
+    if (!engagement.data || engagement.dataUpdatedAt < lastVoteInteractionAtRef.current) return;
+    voteIntentRef.current.up = null;
+    voteIntentRef.current.metoo = null;
+  }, [engagement.data, engagement.dataUpdatedAt]);
+
+  useEffect(() => {
+    setOptimistic((current) => ({ ...current, up: 0, metoo: 0 }));
+  }, [upvotes, metoo]);
 
   const commentMutation = useMutation({
     mutationFn: () => comment({ data: { story_id: storyId, parent_id: null, body } }),
@@ -98,18 +169,19 @@ export function StoryActions({
   const stop = (event: React.MouseEvent) => event.stopPropagation();
 
   return (
-    <div onClick={stop} className="relative z-10">
+    <div ref={containerRef} onClick={stop} className="relative z-10">
       <div
         className={`mt-3 grid items-center gap-1 pt-3 sm:flex sm:flex-wrap sm:gap-1.5 ${announcement ? "grid-cols-4" : "grid-cols-5"}`}
       >
         {!announcement ? (
           <>
             <ActionChip
-              icon={<ArrowBigUp className="size-4 text-primary" />}
+              icon={<ArrowBigUp className="size-4" />}
               label={formatCount(upvotes + optimistic.up)}
               ariaLabel={`${(upvotes + optimistic.up).toLocaleString()} upvotes`}
               hint="Upvote"
-              disabled={!user || voteMutation.isPending}
+              disabled={!user}
+              active={voted.up}
               onClick={() => voteMutation.mutate("up")}
             />
             <ActionChip
@@ -117,7 +189,8 @@ export function StoryActions({
               label={formatCount(metoo + optimistic.metoo)}
               ariaLabel={`${(metoo + optimistic.metoo).toLocaleString()} people said this happened to them too`}
               hint="This happened to me too"
-              disabled={!user || voteMutation.isPending}
+              disabled={!user}
+              active={voted.metoo}
               onClick={() => voteMutation.mutate("metoo")}
             />
           </>
@@ -145,7 +218,6 @@ export function StoryActions({
           variant={announcement ? "announcement" : "story"}
           className="contents sm:flex"
         />
-
       </div>
 
       {open ? (
@@ -291,8 +363,8 @@ function ActionChip({
       disabled={disabled}
       onClick={onClick}
       className={cn(
-        "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-lg border border-transparent px-1 text-xs font-medium whitespace-nowrap text-muted-foreground transition-all hover:border-border hover:bg-secondary hover:text-foreground active:scale-95 disabled:opacity-50 sm:w-auto sm:rounded-full sm:px-2.5",
-        active && "border-primary/40 bg-primary/10 text-foreground",
+        "inline-flex h-10 min-w-0 items-center justify-center gap-1 rounded-lg px-1 text-xs font-medium whitespace-nowrap text-muted-foreground transition-colors hover:text-foreground active:scale-95 disabled:opacity-50 sm:w-auto sm:rounded-full sm:px-2.5",
+        active && "[&_svg]:fill-primary/25 [&_svg]:text-primary",
         className,
       )}
     >
