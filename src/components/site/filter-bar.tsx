@@ -2,6 +2,13 @@ import { Check, ChevronDown, ListFilter, RotateCcw, Search, X } from "lucide-rea
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -9,6 +16,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 export type FilterSelect = {
@@ -95,21 +103,18 @@ export function FilterBar({
   collapsibleFilters?: boolean;
 }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const isMobile = useIsMobile();
   const hasActiveFilter = filters.some((filter) => filter.value !== null);
-  const filterControls = (
-    <div
-      className={cn(
-        "flex flex-wrap items-center gap-2",
-        centerFiltersOnMobile && !collapsibleFilters && "w-full justify-center sm:w-auto sm:justify-start",
-        collapsibleFilters && "rounded-2xl border border-border bg-card p-3 shadow-sm",
-      )}
-    >
+  const filterOptions = (
+    <div className="flex flex-wrap items-center gap-2">
       {filters.map((filter) => (
         <FilterDropdown key={filter.id} filter={filter} />
       ))}
-
       <button
-        onClick={onReset}
+        onClick={() => {
+          onReset();
+          if (isMobile) setFiltersOpen(false);
+        }}
         disabled={!canReset}
         className={cn(
           "inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-sm font-medium transition-all duration-200",
@@ -120,6 +125,17 @@ export function FilterBar({
       >
         <RotateCcw className="size-3.5" /> Reset
       </button>
+    </div>
+  );
+  const filterControls = (
+    <div
+      className={cn(
+        "flex flex-wrap items-center gap-2",
+        centerFiltersOnMobile && !collapsibleFilters && "w-full justify-center sm:w-auto sm:justify-start",
+        collapsibleFilters && "rounded-2xl border border-border bg-card p-3 shadow-sm",
+      )}
+    >
+      {filterOptions}
     </div>
   );
 
@@ -166,8 +182,19 @@ export function FilterBar({
         ) : null}
       </div>
       {collapsibleFilters ? (
-        filtersOpen ? <div className="animate-fade w-full">{filterControls}</div> : null
+        !isMobile && filtersOpen ? <div className="animate-fade w-full">{filterControls}</div> : null
       ) : filterControls}
+      {collapsibleFilters ? (
+        <Drawer open={isMobile && filtersOpen} onOpenChange={setFiltersOpen}>
+          <DrawerContent className="max-h-[82dvh] overflow-y-auto rounded-t-[2rem] border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <DrawerHeader className="px-1 pb-4 text-left">
+              <DrawerTitle>Feed filters</DrawerTitle>
+              <DrawerDescription>Choose how to browse workplace stories.</DrawerDescription>
+            </DrawerHeader>
+            {filterOptions}
+          </DrawerContent>
+        </Drawer>
+      ) : null}
     </div>
   );
 }

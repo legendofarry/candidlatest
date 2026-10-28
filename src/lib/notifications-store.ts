@@ -348,7 +348,8 @@ export function clearArchived() {
 
 /**
  * Idempotently merges durable server-side notifications into the local inbox.
- * Existing server ids are skipped, so polling never duplicates rows.
+ * Existing server rows are refreshed too: older local copies may predate
+ * richer actor/avatar data added to the server notification record.
  */
 export function ingestServerNotifications(
   items: {
@@ -363,12 +364,8 @@ export function ingestServerNotifications(
     createdAt: number;
   }[],
 ) {
-  const known = new Set(
-    notifications.map((n) => n.dedupeKey).filter((key): key is string => Boolean(key)),
-  );
-  const fresh = items
+  const incoming = items
     .filter((item) => item.category !== "message")
-    .filter((item) => !known.has(`srv:${item.id}`))
     .map<AppNotification>((item) => ({
       id: `srv-${item.id}`,
       kind: item.kind,
@@ -382,8 +379,21 @@ export function ingestServerNotifications(
       link: item.link ? { href: item.link } : undefined,
       dedupeKey: `srv:${item.id}`,
     }));
-  if (fresh.length === 0) return 0;
-  notifications = [...notifications, ...fresh]
+  if (incoming.length === 0) return 0;
+  const incomingByKey = new Map(incoming.map((item) => [item.dedupeKey, item]));
+  const known = new Set(
+    notifications.map((n) => n.dedupeKey).filter((key): key is string => Boolean(key)),
+  );
+  const fresh = incoming.filter((item) => !known.has(item.dedupeKey!));
+  notifications = [
+    ...notifications.map((item) => {
+      const replacement = item.dedupeKey ? incomingByKey.get(item.dedupeKey) : undefined;
+      // Read/archive state is local-device state. All presentation fields are
+      // authoritative on the server and may have gained actor data since sync.
+      return replacement ? { ...replacement, read: item.read, archived: item.archived } : item;
+    }),
+    ...fresh,
+  ]
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, MAX_STORED);
   persist();
