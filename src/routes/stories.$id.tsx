@@ -8,26 +8,23 @@ import {
 } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useEffect, useState } from "react";
-import { ArrowBigUp, Flag, Users } from "lucide-react";
+import { ArrowBigUp, Users } from "lucide-react";
 import { notify as toast } from "@/lib/notifications-store";
 import { getStory } from "@/lib/public.functions";
 import { cn, formatCount } from "@/lib/utils";
 import { castVote, getMyEngagement } from "@/lib/actions.functions";
-import { formatDate, reasonTone } from "@/components/site/story-card";
+import {
+  FeedPostMenu,
+  formatDate,
+  reasonTone,
+  type PublicStory,
+} from "@/components/site/story-card";
 import { CommentThread } from "@/components/site/comment-thread";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { ReportDialog } from "@/components/site/report-dialog";
 import { useAuth } from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { StorySocial } from "@/components/site/story-social";
 import { StoryLocationDialog } from "@/components/site/story-location-dialog";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
@@ -85,17 +82,10 @@ function StoryPage() {
   const [reportOpen, setReportOpen] = useState(false);
   const [locallyReported, setLocallyReported] = useState(false);
   const [isCompact, setIsCompact] = useState(false);
-  const [pendingAction, setPendingAction] = useState<"up" | "metoo" | null>(null);
-
-  const confirmAction = (kind: "up" | "metoo") => {
-    setPendingAction(kind);
-  };
-
-  const performConfirmedAction = () => {
-    if (!pendingAction) return;
-    setPendingAction(null);
-    voteMutation.mutate(pendingAction);
-  };
+  const [voteOverride, setVoteOverride] = useState<{ up: boolean | null; metoo: boolean | null }>({
+    up: null,
+    metoo: null,
+  });
 
   useEffect(() => {
     const handleScroll = () => setIsCompact(window.scrollY > 180);
@@ -113,17 +103,32 @@ function StoryPage() {
 
   const voteMutation = useMutation({
     mutationFn: (kind: "up" | "metoo") => vote({ data: { story_id: id, kind } }),
-    onSuccess: () => {
+    onMutate: (kind) => {
+      setVoteOverride((current) => {
+        const base = engagement.data?.votedKinds.includes(kind) ?? false;
+        const voted = current[kind] ?? base;
+        return { ...current, [kind]: !voted };
+      });
+    },
+    onSuccess: (result, kind) => {
+      setVoteOverride((current) => ({ ...current, [kind]: result.voted }));
       void queryClient.invalidateQueries({ queryKey: ["story", id] });
       void engagement.refetch();
     },
-    onError: (error: Error) => toast.error(error.message),
+    onError: (error: Error, kind) => {
+      setVoteOverride((current) => ({ ...current, [kind]: null }));
+      toast.error(error.message);
+    },
   });
 
   if (!data) return null;
   const { story, comments, commentTotal, commentsHasMore, commentsCursor } = data;
   const isReported = locallyReported || (engagement.data?.reportedTargetIds ?? []).includes(id);
   const votedKinds = engagement.data?.votedKinds ?? [];
+  const voted = {
+    up: voteOverride.up ?? votedKinds.includes("up"),
+    metoo: voteOverride.metoo ?? votedKinds.includes("metoo"),
+  };
 
   return (
     <article className={cn("w-full pb-8", !isAnnouncement && "mx-auto max-w-4xl")}>
@@ -270,22 +275,22 @@ function StoryPage() {
 
           <div className="relative flex flex-wrap items-center gap-2">
             {!isAnnouncement ? (
-              <Button
-                variant={votedKinds.includes("up") ? "default" : "outline"}
-                disabled={!user || voteMutation.isPending}
-                onClick={() => confirmAction("up")}
-              >
-                <ArrowBigUp className="size-4" /> Upvote {formatCount(story.upvotes ?? 0)}
-              </Button>
+              <DetailAction
+                icon={<ArrowBigUp className="size-4" />}
+                label={`Upvote ${formatCount(story.upvotes ?? 0)}`}
+                active={voted.up}
+                disabled={!user}
+                onClick={() => voteMutation.mutate("up")}
+              />
             ) : null}
             {!isAnnouncement ? (
-              <Button
-                variant={votedKinds.includes("metoo") ? "default" : "outline"}
-                disabled={!user || voteMutation.isPending}
-                onClick={() => confirmAction("metoo")}
-              >
-                <Users className="size-4" /> This happened to me too {formatCount(story.metoo ?? 0)}
-              </Button>
+              <DetailAction
+                icon={<Users className="size-4" />}
+                label={`This happened to me too ${formatCount(story.metoo ?? 0)}`}
+                active={voted.metoo}
+                disabled={!user}
+                onClick={() => voteMutation.mutate("metoo")}
+              />
             ) : null}
             <StorySocial
               storyId={id}
@@ -293,16 +298,14 @@ function StoryPage() {
               followers={story.follower_count ?? 0}
               variant={isAnnouncement ? "announcement" : "story"}
             />
-            {!isAnnouncement ? (
-              <Button
-                variant="ghost"
-                className="ml-auto text-danger"
-                disabled={!user || isReported}
-                onClick={() => setReportOpen(true)}
-              >
-                <Flag className="size-4" /> {isReported ? "Reported" : "Report"}
-              </Button>
-            ) : null}
+            <span className="ml-auto">
+              <FeedPostMenu
+                story={story as PublicStory}
+                userId={user?.uid ?? null}
+                onReport={() => setReportOpen(true)}
+                reported={isReported}
+              />
+            </span>
           </div>
 
           {!user && !isAnnouncement ? (
@@ -327,43 +330,6 @@ function StoryPage() {
       </div>
 
       {!isAnnouncement ? (
-        <Dialog
-          open={pendingAction !== null}
-          onOpenChange={(open) => {
-            if (!open) setPendingAction(null);
-          }}
-        >
-          <DialogContent className="!fixed !left-1/2 !top-auto !bottom-[calc(100%-1.5rem)] !translate-x-[-50%] !translate-y-0 !rounded-3xl !border !border-border !bg-card !p-0 !shadow-[0_25px_80px_rgba(0,0,0,0.35)] sm:!max-w-md">
-            <div className="p-4 sm:p-5">
-              <DialogHeader className="mb-4 text-left">
-                <div className="mb-3 inline-flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                  {pendingAction === "up" ? (
-                    <ArrowBigUp className="size-5" />
-                  ) : (
-                    <Users className="size-5" />
-                  )}
-                </div>
-                <DialogTitle className="text-left text-xl">
-                  {pendingAction === "up" ? "Upvote this story?" : "Mark this as your experience?"}
-                </DialogTitle>
-                <DialogDescription className="text-left text-sm text-muted-foreground">
-                  {pendingAction === "up"
-                    ? "This helps surface the story for more people who may need to see it. It does not reveal your identity."
-                    : "This tells other workers this story matches a similar experience. It will not share personal details or contact info."}
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter className="sm:justify-between">
-                <Button variant="ghost" onClick={() => setPendingAction(null)}>
-                  Cancel
-                </Button>
-                <Button onClick={performConfirmedAction}>Okay</Button>
-              </DialogFooter>
-            </div>
-          </DialogContent>
-        </Dialog>
-      ) : null}
-
-      {!isAnnouncement ? (
         <ReportDialog
           open={reportOpen}
           onOpenChange={setReportOpen}
@@ -376,5 +342,34 @@ function StoryPage() {
         />
       ) : null}
     </article>
+  );
+}
+
+function DetailAction({
+  icon,
+  label,
+  active = false,
+  disabled = false,
+  onClick,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick}
+      className={cn(
+        "inline-flex h-10 items-center gap-1.5 rounded-lg px-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground active:scale-95 disabled:opacity-50",
+        active && "[&_svg]:fill-primary/25 [&_svg]:text-primary",
+      )}
+    >
+      {icon}
+      <span>{label}</span>
+    </button>
   );
 }

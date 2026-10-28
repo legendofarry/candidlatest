@@ -3,7 +3,19 @@ import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
-import { Archive, ArrowLeft, BadgeCheck, BellOff, Inbox, MoreHorizontal, Pin, Search, Sparkles, Trash2, UserPlus } from "lucide-react";
+import {
+  Archive,
+  ArrowLeft,
+  BadgeCheck,
+  BellOff,
+  Inbox,
+  MoreHorizontal,
+  Pin,
+  Search,
+  Sparkles,
+  Trash2,
+  UserPlus,
+} from "lucide-react";
 import {
   getConversations,
   getMentionSuggestions,
@@ -78,7 +90,9 @@ export function MessagesInbox({
   const [username, setUsername] = useState("");
   const [composeError, setComposeError] = useState("");
   const [startingConversation, setStartingConversation] = useState(false);
-  const [suggestions, setSuggestions] = useState<Array<{ username: string; photoUrl: string | null }>>([]);
+  const [suggestions, setSuggestions] = useState<
+    Array<{ username: string; photoUrl: string | null }>
+  >([]);
   const [suggestionsLoading, setSuggestionsLoading] = useState(false);
   const suggestionSearch = useServerFn(getMentionSuggestions);
   const [showArchived, setShowArchived] = useState(false);
@@ -100,7 +114,8 @@ export function MessagesInbox({
   } = useInfiniteQuery({
     queryKey: ["conversations", user?.uid, showArchived],
     initialPageParam: null as { lastMessageAt: string; id: string } | null,
-    queryFn: ({ pageParam }) => fetchConversations({ data: { limit: 20, cursor: pageParam, archived: showArchived } }),
+    queryFn: ({ pageParam }) =>
+      fetchConversations({ data: { limit: 20, cursor: pageParam, archived: showArchived } }),
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
     enabled: Boolean(user),
     staleTime: 30_000,
@@ -147,7 +162,9 @@ export function MessagesInbox({
       void suggestionSearch({ data: { query: value.toLowerCase() } })
         .then((result) => {
           if (!active) return;
-          setSuggestions((result.users as Array<{ username: string; photoUrl: string | null }>) ?? []);
+          setSuggestions(
+            (result.users as Array<{ username: string; photoUrl: string | null }>) ?? [],
+          );
         })
         .catch(() => {
           if (active) setSuggestions([]);
@@ -190,13 +207,8 @@ export function MessagesInbox({
     action: "archive" | "unarchive" | "mute" | "unmute" | "pin" | "unpin" | "delete" | "follow",
   ) {
     try {
-      const result = await updatePreference({ data: { conversation_id: conversationId, action } });
+      await updatePreference({ data: { conversation_id: conversationId, action } });
       await queryClient.invalidateQueries({ queryKey: ["conversations", user?.uid] });
-      if (action === "follow") {
-        notify.success("requested" in result && result.requested ? "Follow request sent." : "You’re following this account.");
-      } else {
-        notify.success(action === "delete" ? "Conversation removed from your inbox." : "Conversation updated.");
-      }
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not update this conversation.");
     } finally {
@@ -224,7 +236,9 @@ export function MessagesInbox({
       void queryClient.invalidateQueries({ queryKey: ["conversations", user.uid] });
       void navigate({ to: "/messages/$id", params: { id: result.conversation_id } });
     } catch (error) {
-      setComposeError(error instanceof Error ? error.message : "Could not start this conversation.");
+      setComposeError(
+        error instanceof Error ? error.message : "Could not start this conversation.",
+      );
     } finally {
       setStartingConversation(false);
     }
@@ -233,9 +247,7 @@ export function MessagesInbox({
   return (
     <div
       ref={listRef}
-      className={cn(
-        embedded ? "mx-auto max-w-2xl" : "-mx-4 max-w-none md:mx-auto md:max-w-5xl",
-      )}
+      className={cn(embedded ? "mx-auto max-w-2xl" : "-mx-4 max-w-none md:mx-auto md:max-w-5xl")}
     >
       {!embedded ? (
         <header className="border-b border-border bg-background px-4 pb-5 pt-4 sm:px-6 md:py-6">
@@ -259,14 +271,21 @@ export function MessagesInbox({
 
       <div className={cn("px-4 pt-5 sm:px-6", !embedded && "md:pt-6")}>
         {!embedded && user ? (
-          <div className="mb-3 flex items-center gap-2" role="tablist" aria-label="Conversation folders">
+          <div
+            className="mb-3 flex items-center gap-2"
+            role="tablist"
+            aria-label="Conversation folders"
+          >
             <Button
               type="button"
               size="sm"
               variant={showArchived ? "outline" : "default"}
               role="tab"
               aria-selected={!showArchived}
-              onClick={() => { setShowArchived(false); setActionConversationId(null); }}
+              onClick={() => {
+                setShowArchived(false);
+                setActionConversationId(null);
+              }}
               className="rounded-full"
             >
               <Inbox className="mr-1.5 size-4" /> Inbox
@@ -277,7 +296,10 @@ export function MessagesInbox({
               variant={showArchived ? "default" : "outline"}
               role="tab"
               aria-selected={showArchived}
-              onClick={() => { setShowArchived(true); setActionConversationId(null); }}
+              onClick={() => {
+                setShowArchived(true);
+                setActionConversationId(null);
+              }}
               className="rounded-full"
             >
               <Archive className="mr-1.5 size-4" /> Archive
@@ -295,8 +317,7 @@ export function MessagesInbox({
           />
         </label>
         {!embedded ? (
-          <p className="mt-4 max-w-3xl text-base leading-relaxed text-muted-foreground sm:text-lg">
-          </p>
+          <p className="mt-4 max-w-3xl text-base leading-relaxed text-muted-foreground sm:text-lg"></p>
         ) : null}
         {!user && !loading && !embedded ? (
           <Button
@@ -313,7 +334,10 @@ export function MessagesInbox({
       {loading || (isLoading && Boolean(user)) ? (
         <div className="mt-6 space-y-0 border-y border-border bg-background">
           {[0, 1, 2].map((index) => (
-            <div key={index} className="h-24 animate-pulse border-b border-border bg-secondary/60" />
+            <div
+              key={index}
+              className="h-24 animate-pulse border-b border-border bg-secondary/60"
+            />
           ))}
         </div>
       ) : isError ? (
@@ -344,9 +368,13 @@ export function MessagesInbox({
           className="mt-6 border-y border-border bg-background px-4 py-10 text-center sm:px-6"
         >
           <Sparkles className="mx-auto size-8 text-primary" />
-          <p className="mt-4 font-medium">{showArchived ? "No archived conversations" : "No conversations yet"}</p>
+          <p className="mt-4 font-medium">
+            {showArchived ? "No archived conversations" : "No conversations yet"}
+          </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            {showArchived ? "Conversations you archive will appear here." : "Open someone's profile and tap Message to start a chat."}
+            {showArchived
+              ? "Conversations you archive will appear here."
+              : "Open someone's profile and tap Message to start a chat."}
           </p>
         </motion.div>
       ) : matchingConversations.length === 0 ? (
@@ -358,12 +386,7 @@ export function MessagesInbox({
           </p>
         </div>
       ) : (
-        <ul
-          className={cn(
-            "mt-6 border-y border-border bg-background",
-            embedded && "mt-4",
-          )}
-        >
+        <ul className={cn("mt-6 border-y border-border bg-background", embedded && "mt-4")}>
           <AnimatePresence initial={false}>
             {visibleConversations.map((item, index) => (
               <motion.li
@@ -382,7 +405,10 @@ export function MessagesInbox({
                   onTouchStart={() => beginLongPress(item.id)}
                   onTouchEnd={cancelLongPress}
                   onTouchMove={cancelLongPress}
-                  onContextMenu={(event) => { event.preventDefault(); setActionConversationId(item.id); }}
+                  onContextMenu={(event) => {
+                    event.preventDefault();
+                    setActionConversationId(item.id);
+                  }}
                   onClickCapture={(event) => {
                     if (!longPressTriggered.current) return;
                     event.preventDefault();
@@ -406,7 +432,10 @@ export function MessagesInbox({
                         className="size-14 border border-border/70 text-lg uppercase"
                       />
                       {item.with?.id && onlineUsers.has(item.with.id) ? (
-                        <span className="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-background bg-emerald-500" aria-label="Online" />
+                        <span
+                          className="absolute bottom-0 right-0 size-3.5 rounded-full border-2 border-background bg-emerald-500"
+                          aria-label="Online"
+                        />
                       ) : null}
                     </span>
                   </button>
@@ -458,8 +487,15 @@ export function MessagesInbox({
                     </span>
                   ) : null}
                   <span className="flex shrink-0 items-center gap-1">
-                    {item.pinned ? <Pin className="size-3.5 text-primary" aria-label="Pinned conversation" /> : null}
-                    {item.muted ? <BellOff className="size-3.5 text-muted-foreground" aria-label="Muted conversation" /> : null}
+                    {item.pinned ? (
+                      <Pin className="size-3.5 text-primary" aria-label="Pinned conversation" />
+                    ) : null}
+                    {item.muted ? (
+                      <BellOff
+                        className="size-3.5 text-muted-foreground"
+                        aria-label="Muted conversation"
+                      />
+                    ) : null}
                     <Button
                       type="button"
                       size="icon"
@@ -478,8 +514,8 @@ export function MessagesInbox({
         </ul>
       )}
       {!search.trim() &&
-        visibleConversations.length > 0 &&
-        (conversations.length > visibleConversations.length || hasNextPage) ? (
+      visibleConversations.length > 0 &&
+      (conversations.length > visibleConversations.length || hasNextPage) ? (
         <div className="flex flex-col items-center gap-2 px-4 py-5 sm:px-6">
           <p className="text-xs text-muted-foreground">
             {hasNextPage
@@ -525,10 +561,19 @@ export function MessagesInbox({
           <div className="flex h-[min(88dvh,42rem)] flex-col bg-background">
             <div className="flex items-center justify-between border-b border-border px-4 pb-3 pt-4">
               <div>
-                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">New message</p>
+                <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                  New message
+                </p>
                 <DialogTitle className="mt-1 font-display text-2xl">Who to message</DialogTitle>
               </div>
-              <Button type="button" variant="ghost" size="icon" aria-label="Close new message" onClick={() => setComposeOpen(false)} className="rounded-full">
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Close new message"
+                onClick={() => setComposeOpen(false)}
+                className="rounded-full"
+              >
                 <Trash2 className="size-4" />
               </Button>
             </div>
@@ -551,7 +596,10 @@ export function MessagesInbox({
               </div>
             </div>
 
-            <form onSubmit={(event) => void handleStartConversation(event)} className="flex min-h-0 flex-1 flex-col">
+            <form
+              onSubmit={(event) => void handleStartConversation(event)}
+              className="flex min-h-0 flex-1 flex-col"
+            >
               <div className="flex-1 overflow-y-auto px-3 py-3">
                 {suggestionsLoading ? (
                   <div className="space-y-2 px-1 py-2">
@@ -588,13 +636,17 @@ export function MessagesInbox({
                   </div>
                 ) : (
                   <div className="flex min-h-full items-center justify-center px-6 py-10 text-center">
-                    <p className="text-sm text-muted-foreground">Type a username to find someone.</p>
+                    <p className="text-sm text-muted-foreground">
+                      Type a username to find someone.
+                    </p>
                   </div>
                 )}
               </div>
 
               <div className="border-t border-border bg-background px-4 py-3">
-                {composeError ? <p className="mb-3 text-sm text-destructive">{composeError}</p> : null}
+                {composeError ? (
+                  <p className="mb-3 text-sm text-destructive">{composeError}</p>
+                ) : null}
                 <DialogFooter className="sm:justify-between">
                   <Button
                     type="button"
@@ -605,7 +657,11 @@ export function MessagesInbox({
                   >
                     Cancel
                   </Button>
-                  <Button type="submit" className="rounded-full" disabled={startingConversation || !username.trim()}>
+                  <Button
+                    type="submit"
+                    className="rounded-full"
+                    disabled={startingConversation || !username.trim()}
+                  >
                     {startingConversation ? "Opening chat…" : "Start chat"}
                   </Button>
                 </DialogFooter>
@@ -614,7 +670,10 @@ export function MessagesInbox({
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={Boolean(actionConversation)} onOpenChange={(open) => !open && setActionConversationId(null)}>
+      <Dialog
+        open={Boolean(actionConversation)}
+        onOpenChange={(open) => !open && setActionConversationId(null)}
+      >
         <DialogContent className="rounded-t-3xl p-5 sm:max-w-sm sm:rounded-3xl">
           <DialogHeader>
             <DialogTitle>Chat with @{actionConversation?.with?.username ?? "member"}</DialogTitle>
@@ -622,19 +681,58 @@ export function MessagesInbox({
           </DialogHeader>
           {actionConversation ? (
             <div className="grid gap-2">
-              <Button variant="outline" className="justify-start rounded-xl" onClick={() => void runConversationAction(actionConversation.id, actionConversation.pinned ? "unpin" : "pin")}>
-                <Pin className="mr-2 size-4" /> {actionConversation.pinned ? "Unpin conversation" : "Pin conversation"}
+              <Button
+                variant="outline"
+                className="justify-start rounded-xl"
+                onClick={() =>
+                  void runConversationAction(
+                    actionConversation.id,
+                    actionConversation.pinned ? "unpin" : "pin",
+                  )
+                }
+              >
+                <Pin className="mr-2 size-4" />{" "}
+                {actionConversation.pinned ? "Unpin conversation" : "Pin conversation"}
               </Button>
-              <Button variant="outline" className="justify-start rounded-xl" onClick={() => void runConversationAction(actionConversation.id, actionConversation.muted ? "unmute" : "mute")}>
-                <BellOff className="mr-2 size-4" /> {actionConversation.muted ? "Unmute conversation" : "Mute conversation"}
+              <Button
+                variant="outline"
+                className="justify-start rounded-xl"
+                onClick={() =>
+                  void runConversationAction(
+                    actionConversation.id,
+                    actionConversation.muted ? "unmute" : "mute",
+                  )
+                }
+              >
+                <BellOff className="mr-2 size-4" />{" "}
+                {actionConversation.muted ? "Unmute conversation" : "Mute conversation"}
               </Button>
-              <Button variant="outline" className="justify-start rounded-xl" onClick={() => void runConversationAction(actionConversation.id, showArchived ? "unarchive" : "archive")}>
-                <Archive className="mr-2 size-4" /> {showArchived ? "Move to inbox" : "Archive conversation"}
+              <Button
+                variant="outline"
+                className="justify-start rounded-xl"
+                onClick={() =>
+                  void runConversationAction(
+                    actionConversation.id,
+                    showArchived ? "unarchive" : "archive",
+                  )
+                }
+              >
+                <Archive className="mr-2 size-4" />{" "}
+                {showArchived ? "Move to inbox" : "Archive conversation"}
               </Button>
-              <Button variant="outline" className="justify-start rounded-xl" onClick={() => void runConversationAction(actionConversation.id, "follow")}>
-                <UserPlus className="mr-2 size-4" /> Follow @{actionConversation.with?.username ?? "member"}
+              <Button
+                variant="outline"
+                className="justify-start rounded-xl"
+                onClick={() => void runConversationAction(actionConversation.id, "follow")}
+              >
+                <UserPlus className="mr-2 size-4" /> Follow @
+                {actionConversation.with?.username ?? "member"}
               </Button>
-              <Button variant="ghost" className="justify-start rounded-xl text-destructive hover:text-destructive" onClick={() => void runConversationAction(actionConversation.id, "delete")}>
+              <Button
+                variant="ghost"
+                className="justify-start rounded-xl text-destructive hover:text-destructive"
+                onClick={() => void runConversationAction(actionConversation.id, "delete")}
+              >
                 <Trash2 className="mr-2 size-4" /> Remove from my inbox
               </Button>
             </div>

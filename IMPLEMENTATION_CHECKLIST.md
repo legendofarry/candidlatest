@@ -41,6 +41,9 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 - [x] Keep the post form header/footer fixed while only the active middle section scrolls on mobile.
 - [x] Remove the divider above feed engagement controls.
 - [x] Leaderboard lists are capped at 10 employers per ranking.
+- [x] Story details and mobile comment sheets use one clean, full-width comment surface: no stacked frames, duplicate empty-state copy, or redundant composer divider.
+- [x] Story voting acts immediately with icon-only active states; reporting is available from the post menu instead of competing with engagement controls.
+- [x] Suppress routine success banners when the updated UI already confirms the result (feed preferences, follows/blocks, conversation preferences, privacy changes, pins, edits, and removals); errors and meaningful completion feedback remain visible.
 
 ## Account lifecycle
 

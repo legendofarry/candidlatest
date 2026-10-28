@@ -311,7 +311,7 @@ export function StoryActions({
       ) : null}
 
       <Drawer open={sheetOpen} onOpenChange={setSheetOpen}>
-        <DrawerContent className="max-h-[85vh]">
+        <DrawerContent className="max-h-[85vh]" overlayClassName="bg-black/45">
           <DrawerHeader className="border-b border-border pb-3 text-left">
             <DrawerTitle className="text-sm">Comments</DrawerTitle>
           </DrawerHeader>
@@ -327,6 +327,8 @@ export function StoryActions({
                 total={displayedCommentCount}
                 commentsHasMore={thread.data?.commentsHasMore ?? false}
                 commentsCursor={thread.data?.commentsCursor ?? null}
+                panelMode
+                fitContent
               />
             )}
           </div>

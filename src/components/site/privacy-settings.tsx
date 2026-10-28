@@ -74,7 +74,6 @@ export function PrivacySettings() {
     try {
       await unblock({ data: { user_id: userId } });
       await queryClient.invalidateQueries({ queryKey: ["privacy-settings"] });
-      notify.success("Account unblocked.");
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not unblock this account.");
     }
@@ -93,9 +92,6 @@ export function PrivacySettings() {
     try {
       await saveSettings({ data: { profile_visibility: value } });
       await queryClient.invalidateQueries({ queryKey: ["privacy-settings"] });
-      notify.success(
-        value === "private" ? "Your profile is now private." : "Your profile is now public.",
-      );
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not update profile visibility.");
     }
@@ -109,7 +105,6 @@ export function PrivacySettings() {
         queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
         queryClient.invalidateQueries({ queryKey: ["follow-stats"] }),
       ]);
-      notify.success(approve ? "Follower approved." : "Follow request declined.");
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not update that request.");
     }

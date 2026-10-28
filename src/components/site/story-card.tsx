@@ -353,7 +353,7 @@ export function StoryCard({
   );
 }
 
-function FeedPostMenu({
+export function FeedPostMenu({
   story,
   userId,
   onReport,
@@ -421,16 +421,7 @@ function FeedPostMenu({
     }
     if (!story.author_id || story.author_id === userId) return;
     try {
-      const result = await follow({ data: { user_id: story.author_id } });
-      notify.success(
-        result.requested
-          ? "Follow request sent."
-          : result.following
-            ? relationship.data?.followsYou
-              ? "You’re following back."
-              : "You’re following this account."
-            : "You unfollowed this account.",
-      );
+      await follow({ data: { user_id: story.author_id } });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: relationshipKey }),
         queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
@@ -446,8 +437,7 @@ function FeedPostMenu({
     }
     if (!story.author_id || story.author_id === userId) return;
     try {
-      const result = await block({ data: { user_id: story.author_id } });
-      notify.success(result.blocked ? "Account blocked." : "Account unblocked.");
+      await block({ data: { user_id: story.author_id } });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: relationshipKey }),
         queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
@@ -465,14 +455,6 @@ function FeedPostMenu({
     }
     try {
       await setPreference({ data: { kind, target_id: targetId, hidden: true } });
-      notify.success(
-        kind === "story"
-          ? "This post is hidden from your feed."
-          : kind === "author"
-            ? `You’ll see fewer posts from @${story.author_username ?? "this account"}.`
-            : `You’ll see fewer posts about ${story.company_name ?? "this employer"}.`,
-        { duration: 5000 },
-      );
       void queryClient.invalidateQueries({ queryKey: ["story-pages", userId] });
       void queryClient.invalidateQueries({ queryKey: ["stories"] });
     } catch (error) {
@@ -543,9 +525,7 @@ function FeedPostMenu({
                 }}
               >
                 <UserRoundPlus />
-                {relationshipUnavailable
-                  ? relationshipStatusMessage
-                  : followLabel}
+                {relationshipUnavailable ? relationshipStatusMessage : followLabel}
               </DropdownMenuItem>
             ) : null}
             {story.author_id && story.author_id !== userId ? (

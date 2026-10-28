@@ -130,7 +130,6 @@ function SettingsPage() {
       });
       queryClient.setQueryData(["feed-preferences", user.uid], items);
       void queryClient.invalidateQueries({ queryKey: ["story-pages", user.uid] });
-      notify.success("Feed preference removed.");
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not restore this feed content.");
     }
@@ -470,13 +469,6 @@ function SettingsPage() {
           >
             <header>
               <div className="flex items-start justify-between gap-4">
-                <div>
-                  <p className="text-sm font-medium text-primary">Candid account</p>
-                  <h2 className="mt-1 text-3xl font-semibold">Settings</h2>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    Manage your preferences and account controls.
-                  </p>
-                </div>
                 {user ? (
                   <Link
                     to="/billing"
@@ -512,7 +504,7 @@ function SettingsPage() {
             ) : null}
 
             {user?.email?.trim().toLowerCase() === "karimiarrison@gmail.com" &&
-            profile.data?.accountType !== "official" ? (
+              profile.data?.accountType !== "official" ? (
               <SettingsGroup title="Official Candid account">
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>

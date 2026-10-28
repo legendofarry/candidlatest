@@ -117,8 +117,7 @@ function MyContributionsPage() {
     if (!user || pinningStoryId) return;
     setPinningStoryId(storyId);
     try {
-      const result = await toggleStoryPin({ data: { story_id: storyId } });
-      toast.success(result.pinned ? "Pinned to your public profile" : "Removed from profile pins");
+      await toggleStoryPin({ data: { story_id: storyId } });
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["onboarding-state", user.uid] }),
         queryClient.invalidateQueries({ queryKey: ["my-contributions", user.uid] }),
@@ -159,7 +158,6 @@ function MyContributionsPage() {
     try {
       if (deleting.type === "story") await removeStory({ data: { story_id: deleting.id } });
       else await removeComment({ data: { comment_id: deleting.id } });
-      toast.success(deleting.type === "story" ? "Story removed from Candid" : "Comment removed");
       setDeleting(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["my-contributions", user?.uid] }),
@@ -186,7 +184,6 @@ function MyContributionsPage() {
     setSavingEdit(true);
     try {
       await updateComment({ data: { comment_id: editing.id, body: editBody.trim() } });
-      toast.success("Comment updated");
       setEditing(null);
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ["my-contributions", user?.uid] }),

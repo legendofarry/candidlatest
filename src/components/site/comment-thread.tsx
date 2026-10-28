@@ -254,11 +254,11 @@ export function CommentThread({
         "rounded-2xl border border-border bg-card",
         fullWidth && "rounded-none border-x-0 border-y border-border/70 bg-transparent",
         panelMode &&
-        !fitContent &&
-        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
+          !fitContent &&
+          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
         panelMode &&
-        fitContent &&
-        "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
+          fitContent &&
+          "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
       )}
     >
       <header
@@ -321,7 +321,7 @@ export function CommentThread({
             />
           ))}
         </AnimatePresence>
-        {loadedComments.length === 0 ? (
+        {loadedComments.length === 0 && !fullWidth ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">
             No comments yet — be the first voice.
           </p>
@@ -360,7 +360,7 @@ export function CommentThread({
       <div
         className={cn(
           "sticky bottom-0 rounded-b-2xl border-t border-border bg-card/95 p-3 backdrop-blur",
-          fullWidth && "rounded-none bg-background/95",
+          fullWidth && "rounded-none border-t-0 bg-background/95",
           panelMode && "relative shrink-0 rounded-none",
         )}
       >
@@ -463,7 +463,7 @@ function CommentRow({
   const remove = useServerFn(deleteComment);
   const [open, setOpen] = useState(
     (depth === 0 && comment.replies.some((r) => r.is_official)) ||
-    (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
+      (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
   );
   const [reportOpen, setReportOpen] = useState(false);
   const [localLiked, setLocalLiked] = useState<boolean | null>(null);
@@ -696,21 +696,21 @@ function CommentRow({
       <AnimatePresence initial={false}>
         {open
           ? comment.replies
-            .slice(0, visibleReplies)
-            .map((reply) => (
-              <CommentRow
-                key={reply.id}
-                comment={reply}
-                storyId={storyId}
-                depth={depth + 1}
-                liked={liked}
-                reported={reported}
-                focusCommentId={focusCommentId}
-                onReply={onReply}
-                onChanged={onChanged}
-                onDeleted={onDeleted}
-              />
-            ))
+              .slice(0, visibleReplies)
+              .map((reply) => (
+                <CommentRow
+                  key={reply.id}
+                  comment={reply}
+                  storyId={storyId}
+                  depth={depth + 1}
+                  liked={liked}
+                  reported={reported}
+                  focusCommentId={focusCommentId}
+                  onReply={onReply}
+                  onChanged={onChanged}
+                  onDeleted={onDeleted}
+                />
+              ))
           : null}
       </AnimatePresence>
 
