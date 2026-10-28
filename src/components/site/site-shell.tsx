@@ -434,10 +434,10 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         className={cn(
           "relative",
           !fullscreenRoute &&
-            pathname !== "/post" &&
-            pathname !== "/profile" &&
-            !pathname.startsWith("/u/") &&
-            (directConversationRoute ? "w-full md:app-shell" : "app-shell"),
+          pathname !== "/post" &&
+          pathname !== "/profile" &&
+          !pathname.startsWith("/u/") &&
+          (directConversationRoute ? "w-full md:app-shell" : "app-shell"),
         )}
       >
         <aside
@@ -576,14 +576,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               ? "p-0 md:pb-0"
               : "pt-6",
             !fullscreenRoute &&
-              pathname !== "/support" &&
-              !messagesInboxRoute &&
-              !directConversationRoute &&
-              (showDock ? "pb-32" : "pb-10"),
+            pathname !== "/support" &&
+            !messagesInboxRoute &&
+            !directConversationRoute &&
+            (showDock ? "pb-10" : "pb-10"),
             directConversationRoute &&
-              "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
+            "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
             standaloneDesktopRoute &&
-              "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
+            "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
         >
           <BiometricGate>{children}</BiometricGate>

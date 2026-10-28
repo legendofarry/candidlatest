@@ -15,6 +15,7 @@ import {
   Sparkles,
   Trash2,
   UserPlus,
+  X,
 } from "lucide-react";
 import {
   getConversations,
@@ -32,6 +33,7 @@ import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { Input } from "@/components/ui/input";
 import { notify } from "@/lib/notifications-store";
 import { useOnlineUsers } from "@/components/site/presence";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +42,14 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 
 export const Route = createFileRoute("/messages/")({
   head: () => ({
@@ -78,6 +88,7 @@ export function MessagesInbox({
   onSelectConversation?: (conversationId: string) => void;
 } = {}) {
   const { user, loading } = useAuth();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchConversations = useServerFn(getConversations);
@@ -243,6 +254,83 @@ export function MessagesInbox({
       setStartingConversation(false);
     }
   }
+
+  const actionButtons = actionConversation ? (
+    <div
+      className={cn(
+        "grid",
+        isMobile ? "w-full divide-y divide-border border-y border-border" : "gap-2",
+      )}
+    >
+      <Button
+        variant={isMobile ? "ghost" : "outline"}
+        className={cn(
+          "justify-start",
+          isMobile ? "h-14 w-full rounded-none px-5 shadow-none" : "rounded-xl",
+        )}
+        onClick={() =>
+          void runConversationAction(
+            actionConversation.id,
+            actionConversation.pinned ? "unpin" : "pin",
+          )
+        }
+      >
+        <Pin className="mr-2 size-4" />{" "}
+        {actionConversation.pinned ? "Unpin conversation" : "Pin conversation"}
+      </Button>
+      <Button
+        variant={isMobile ? "ghost" : "outline"}
+        className={cn(
+          "justify-start",
+          isMobile ? "h-14 w-full rounded-none px-5 shadow-none" : "rounded-xl",
+        )}
+        onClick={() =>
+          void runConversationAction(
+            actionConversation.id,
+            actionConversation.muted ? "unmute" : "mute",
+          )
+        }
+      >
+        <BellOff className="mr-2 size-4" />{" "}
+        {actionConversation.muted ? "Unmute conversation" : "Mute conversation"}
+      </Button>
+      <Button
+        variant={isMobile ? "ghost" : "outline"}
+        className={cn(
+          "justify-start",
+          isMobile ? "h-14 w-full rounded-none px-5 shadow-none" : "rounded-xl",
+        )}
+        onClick={() =>
+          void runConversationAction(actionConversation.id, showArchived ? "unarchive" : "archive")
+        }
+      >
+        <Archive className="mr-2 size-4" />{" "}
+        {showArchived ? "Move to inbox" : "Archive conversation"}
+      </Button>
+      <Button
+        variant={isMobile ? "ghost" : "outline"}
+        className={cn(
+          "justify-start",
+          isMobile ? "h-14 w-full rounded-none px-5 shadow-none" : "rounded-xl",
+        )}
+        onClick={() => void runConversationAction(actionConversation.id, "follow")}
+      >
+        <UserPlus className="mr-2 size-4" /> Follow @{actionConversation.with?.username ?? "member"}
+      </Button>
+      <Button
+        variant="ghost"
+        className={cn(
+          "justify-start text-destructive hover:text-destructive",
+          isMobile
+            ? "h-14 w-full rounded-none px-5 shadow-none hover:bg-destructive/5"
+            : "rounded-xl",
+        )}
+        onClick={() => void runConversationAction(actionConversation.id, "delete")}
+      >
+        <Trash2 className="mr-2 size-4" /> Remove from my inbox
+      </Button>
+    </div>
+  ) : null;
 
   return (
     <div
@@ -670,8 +758,31 @@ export function MessagesInbox({
           </div>
         </DialogContent>
       </Dialog>
+      <Drawer
+        open={isMobile && Boolean(actionConversation)}
+        onOpenChange={(open) => !open && setActionConversationId(null)}
+      >
+        <DrawerContent className="max-h-[85dvh] overflow-y-auto rounded-t-3xl px-0 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+          <DrawerHeader className="relative px-5 pb-4 pt-3 text-center">
+            <DrawerTitle>Chat with @{actionConversation?.with?.username ?? "member"}</DrawerTitle>
+            <DrawerDescription>Manage this conversation in your inbox.</DrawerDescription>
+            <DrawerClose asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Close conversation actions"
+                className="absolute right-0 top-1"
+              >
+                <X className="size-4" />
+              </Button>
+            </DrawerClose>
+          </DrawerHeader>
+          {actionButtons}
+        </DrawerContent>
+      </Drawer>
       <Dialog
-        open={Boolean(actionConversation)}
+        open={!isMobile && Boolean(actionConversation)}
         onOpenChange={(open) => !open && setActionConversationId(null)}
       >
         <DialogContent className="rounded-t-3xl p-5 sm:max-w-sm sm:rounded-3xl">
@@ -679,64 +790,7 @@ export function MessagesInbox({
             <DialogTitle>Chat with @{actionConversation?.with?.username ?? "member"}</DialogTitle>
             <DialogDescription>Manage this conversation in your inbox.</DialogDescription>
           </DialogHeader>
-          {actionConversation ? (
-            <div className="grid gap-2">
-              <Button
-                variant="outline"
-                className="justify-start rounded-xl"
-                onClick={() =>
-                  void runConversationAction(
-                    actionConversation.id,
-                    actionConversation.pinned ? "unpin" : "pin",
-                  )
-                }
-              >
-                <Pin className="mr-2 size-4" />{" "}
-                {actionConversation.pinned ? "Unpin conversation" : "Pin conversation"}
-              </Button>
-              <Button
-                variant="outline"
-                className="justify-start rounded-xl"
-                onClick={() =>
-                  void runConversationAction(
-                    actionConversation.id,
-                    actionConversation.muted ? "unmute" : "mute",
-                  )
-                }
-              >
-                <BellOff className="mr-2 size-4" />{" "}
-                {actionConversation.muted ? "Unmute conversation" : "Mute conversation"}
-              </Button>
-              <Button
-                variant="outline"
-                className="justify-start rounded-xl"
-                onClick={() =>
-                  void runConversationAction(
-                    actionConversation.id,
-                    showArchived ? "unarchive" : "archive",
-                  )
-                }
-              >
-                <Archive className="mr-2 size-4" />{" "}
-                {showArchived ? "Move to inbox" : "Archive conversation"}
-              </Button>
-              <Button
-                variant="outline"
-                className="justify-start rounded-xl"
-                onClick={() => void runConversationAction(actionConversation.id, "follow")}
-              >
-                <UserPlus className="mr-2 size-4" /> Follow @
-                {actionConversation.with?.username ?? "member"}
-              </Button>
-              <Button
-                variant="ghost"
-                className="justify-start rounded-xl text-destructive hover:text-destructive"
-                onClick={() => void runConversationAction(actionConversation.id, "delete")}
-              >
-                <Trash2 className="mr-2 size-4" /> Remove from my inbox
-              </Button>
-            </div>
-          ) : null}
+          {actionButtons}
         </DialogContent>
       </Dialog>
     </div>

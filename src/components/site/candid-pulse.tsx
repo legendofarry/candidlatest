@@ -147,8 +147,7 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
         </div>
 
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground xl:mt-3 xl:text-sm">
-          What Kenyan workers reported this week — the reasons people are actually leaving, counted
-          as stories come in.
+          What was reported this week.
         </p>
 
         <div className="mt-4 grid grid-cols-3 gap-2 xl:mt-5 xl:gap-3">

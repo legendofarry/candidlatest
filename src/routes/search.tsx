@@ -49,10 +49,7 @@ function SearchPage() {
     <div className="mx-auto w-full max-w-3xl space-y-6 md:mx-0 md:max-w-none">
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Search</h1>
-        <p className="mt-2 text-muted-foreground">
-          Look up an employer or a story. Try a company name, a role, or a phrase like "delayed
-          salary".
-        </p>
+
       </header>
 
       <div className="relative">

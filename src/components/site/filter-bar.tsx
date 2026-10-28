@@ -131,7 +131,9 @@ export function FilterBar({
     <div
       className={cn(
         "flex flex-wrap items-center gap-2",
-        centerFiltersOnMobile && !collapsibleFilters && "w-full justify-center sm:w-auto sm:justify-start",
+        centerFiltersOnMobile &&
+          !collapsibleFilters &&
+          "w-full justify-center sm:w-auto sm:justify-start",
         collapsibleFilters && "rounded-2xl border border-border bg-card p-3 shadow-sm",
       )}
     >
@@ -146,7 +148,12 @@ export function FilterBar({
         className,
       )}
     >
-      <div className={cn("flex min-w-0 items-center gap-2", collapsibleFilters ? "w-full" : "contents")}>
+      <div
+        className={cn(
+          "flex min-w-0 items-center gap-2",
+          collapsibleFilters ? "w-full" : "contents",
+        )}
+      >
         <div className="relative min-w-48 flex-1">
           <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -177,13 +184,19 @@ export function FilterBar({
             )}
           >
             <ListFilter className="size-4" />
-            {hasActiveFilter ? <span className="absolute right-1 top-1 size-1.5 rounded-full bg-primary" /> : null}
+            {hasActiveFilter ? (
+              <span className="absolute right-1 top-1 size-1.5 rounded-full bg-primary" />
+            ) : null}
           </button>
         ) : null}
       </div>
       {collapsibleFilters ? (
-        !isMobile && filtersOpen ? <div className="animate-fade w-full">{filterControls}</div> : null
-      ) : filterControls}
+        !isMobile && filtersOpen ? (
+          <div className="animate-fade w-full">{filterControls}</div>
+        ) : null
+      ) : (
+        filterControls
+      )}
       {collapsibleFilters ? (
         <Drawer open={isMobile && filtersOpen} onOpenChange={setFiltersOpen}>
           <DrawerContent className="max-h-[82dvh] overflow-y-auto rounded-t-[2rem] border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">

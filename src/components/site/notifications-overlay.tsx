@@ -5,6 +5,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import {
   AlertTriangle,
+  Archive,
   ArrowLeft,
   Bell,
   CheckCheck,
@@ -13,6 +14,7 @@ import {
   ChevronRight,
   ListFilter,
   Info,
+  MoreHorizontal,
   Search,
   Trash2,
   X,
@@ -60,6 +62,7 @@ import { ProfileAvatar } from "@/components/site/profile-photo";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Drawer,
+  DrawerClose,
   DrawerContent,
   DrawerDescription,
   DrawerHeader,
@@ -166,6 +169,7 @@ export function NotificationsOverlay() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
+  const [notificationActionId, setNotificationActionId] = useState<string | null>(null);
   const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(20);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const pullStartRef = useRef<number | null>(null);
@@ -186,6 +190,7 @@ export function NotificationsOverlay() {
   }, [serverPages.data]);
 
   const notifications = all.filter((n) => (tab === "archive" ? n.archived : !n.archived));
+  const actionNotification = notifications.find((n) => n.id === notificationActionId) ?? null;
   const matchingNotifications = useMemo(() => {
     const query = search.trim().toLowerCase();
     return notifications.filter((n) => {
@@ -344,11 +349,18 @@ export function NotificationsOverlay() {
             </span>
           </div>
         ) : null}
-        <Group label="Today" items={groups.today} onActivate={activate} onRequest={setPending} />
+        <Group
+          label="Today"
+          items={groups.today}
+          onActivate={activate}
+          onOpenActions={setNotificationActionId}
+          onRequest={setPending}
+        />
         <Group
           label="Earlier"
           items={groups.earlier}
           onActivate={activate}
+          onOpenActions={setNotificationActionId}
           onRequest={setPending}
         />
         {matchingNotifications.length > visibleCount || serverPages.hasNextPage ? (
@@ -699,6 +711,74 @@ export function NotificationsOverlay() {
         ) : null}
       </AnimatePresence>
 
+      <Drawer
+        open={isMobile && notificationActionId !== null}
+        onOpenChange={(open) => !open && setNotificationActionId(null)}
+      >
+        <DrawerContent
+          overlayClassName="z-[105]"
+          className="z-[110] max-h-[85dvh] overflow-y-auto rounded-t-3xl px-0 pb-[max(1.25rem,env(safe-area-inset-bottom))]"
+        >
+          <DrawerHeader className="relative px-5 pb-4 pt-3 text-left">
+            <DrawerTitle>Notification actions</DrawerTitle>
+            <DrawerDescription>Manage this notification.</DrawerDescription>
+            <DrawerClose asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Close notification actions"
+                className="absolute right-0 top-1"
+              >
+                <X className="size-4" />
+              </Button>
+            </DrawerClose>
+          </DrawerHeader>
+          {actionNotification ? (
+            <div className="w-full divide-y divide-border border-y border-border">
+              <Button
+                variant="ghost"
+                className="h-14 w-full justify-start rounded-none px-5 shadow-none"
+                onClick={() => {
+                  setNotificationActionId(null);
+                  setPending({
+                    type: actionNotification.read ? "unread" : "read",
+                    id: actionNotification.id,
+                  });
+                }}
+              >
+                <Check className="mr-2 size-4" />
+                {actionNotification.read ? "Mark as unread" : "Mark as read"}
+              </Button>
+              <Button
+                variant="ghost"
+                className="h-14 w-full justify-start rounded-none px-5 shadow-none"
+                onClick={() => {
+                  setNotificationActionId(null);
+                  setPending({
+                    type: actionNotification.archived ? "unarchive" : "archive",
+                    id: actionNotification.id,
+                  });
+                }}
+              >
+                <Archive className="mr-2 size-4" />
+                {actionNotification.archived ? "Move to inbox" : "Archive notification"}
+              </Button>
+              <Button
+                variant="ghost"
+                className="h-14 w-full justify-start rounded-none px-5 text-destructive shadow-none hover:bg-destructive/5 hover:text-destructive"
+                onClick={() => {
+                  setNotificationActionId(null);
+                  setPending({ type: "delete", id: actionNotification.id });
+                }}
+              >
+                <Trash2 className="mr-2 size-4" /> Remove notification
+              </Button>
+            </div>
+          ) : null}
+        </DrawerContent>
+      </Drawer>
+
       <AlertDialog
         open={pending !== null}
         onOpenChange={(next) => (next ? null : setPending(null))}
@@ -792,11 +872,13 @@ function Group({
   label,
   items,
   onActivate,
+  onOpenActions,
   onRequest,
 }: {
   label: string;
   items: AppNotification[];
   onActivate: (n: AppNotification) => void;
+  onOpenActions: (id: string) => void;
   onRequest: (action: PendingAction) => void;
 }) {
   if (items.length === 0) return null;
@@ -808,7 +890,13 @@ function Group({
       <div className="border-y border-border bg-background">
         <AnimatePresence initial={false}>
           {items.map((n) => (
-            <Row key={n.id} notification={n} onActivate={onActivate} onRequest={onRequest} />
+            <Row
+              key={n.id}
+              notification={n}
+              onActivate={onActivate}
+              onOpenActions={onOpenActions}
+              onRequest={onRequest}
+            />
           ))}
         </AnimatePresence>
       </div>
@@ -819,10 +907,12 @@ function Group({
 function Row({
   notification: n,
   onActivate,
+  onOpenActions,
   onRequest,
 }: {
   notification: AppNotification;
   onActivate: (n: AppNotification) => void;
+  onOpenActions: (id: string) => void;
   onRequest: (action: PendingAction) => void;
 }) {
   const meta = kindMeta[n.kind];
@@ -848,48 +938,61 @@ function Row({
         !n.read && "bg-primary/[0.07]",
       )}
     >
-      <button
-        type="button"
-        onClick={() => onActivate(n)}
-        className="flex min-h-20 w-full items-center gap-4 px-4 py-4 text-left sm:px-5"
-      >
-        {n.actor?.username || n.actor?.photoUrl ? (
-          <ProfileAvatar
-            photoUrl={n.actor.photoUrl}
-            initials={n.actor.username?.slice(0, 2) ?? "U"}
-            className="size-14 shrink-0 border border-border/70 text-base uppercase"
-          />
-        ) : (
-          <span
-            className={cn(
-              "flex size-11 shrink-0 items-center justify-center rounded-full",
-              meta.ring,
-            )}
-          >
-            <Icon className={cn("size-5", meta.tint)} />
-          </span>
-        )}
+      <div className="flex min-h-20 items-center gap-2 px-4 py-4 sm:px-5">
+        <button
+          type="button"
+          onClick={() => onActivate(n)}
+          className="flex min-w-0 flex-1 items-center gap-4 text-left"
+        >
+          {n.actor?.username || n.actor?.photoUrl ? (
+            <ProfileAvatar
+              photoUrl={n.actor.photoUrl}
+              initials={n.actor.username?.slice(0, 2) ?? "U"}
+              className="size-14 shrink-0 border border-border/70 text-base uppercase"
+            />
+          ) : (
+            <span
+              className={cn(
+                "flex size-11 shrink-0 items-center justify-center rounded-full",
+                meta.ring,
+              )}
+            >
+              <Icon className={cn("size-5", meta.tint)} />
+            </span>
+          )}
 
-        <span className="min-w-0 flex-1">
-          <span className="flex items-center gap-3">
-            <span className="block min-w-0 flex-1 truncate text-base font-bold leading-snug text-foreground">
-              {n.title}
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-3">
+              <span className="block min-w-0 flex-1 truncate text-base font-bold leading-snug text-foreground">
+                {n.title}
+              </span>
+              <span className="shrink-0 text-sm font-medium text-muted-foreground">
+                {timeAgo(n.createdAt)}
+              </span>
             </span>
-            <span className="shrink-0 text-sm font-medium text-muted-foreground">
-              {timeAgo(n.createdAt)}
-            </span>
+            {n.description ? (
+              <span className="mt-1 block truncate text-sm text-muted-foreground">
+                {n.description}
+              </span>
+            ) : null}
           </span>
-          {n.description ? (
-            <span className="mt-1 block truncate text-sm text-muted-foreground">
-              {n.description}
-            </span>
+
+          {!n.read ? (
+            <span className="size-2.5 shrink-0 rounded-full bg-primary" aria-label="Unread" />
           ) : null}
-        </span>
+        </button>
 
-        {!n.read ? (
-          <span className="size-2.5 shrink-0 rounded-full bg-primary" aria-label="Unread" />
-        ) : null}
-      </button>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label={`Notification actions for ${n.title}`}
+          className="size-9 shrink-0 rounded-full"
+          onClick={() => onOpenActions(n.id)}
+        >
+          <MoreHorizontal className="size-4" />
+        </Button>
+      </div>
 
       {!n.read ? (
         <span className="pointer-events-none absolute inset-y-0 left-0 w-1 bg-primary" />
