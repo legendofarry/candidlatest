@@ -5,10 +5,14 @@ import { useMemo, useState } from "react";
 import {
   Archive,
   Check,
+  CircleCheck,
   Clock3,
+  Eye,
+  EyeOff,
   LoaderCircle,
   LockKeyhole,
   MessageSquareText,
+  MoreHorizontal,
   Pin,
   PinOff,
   PenLine,
@@ -26,7 +30,15 @@ import { getMyContributions, toggleMyProfileStoryPin } from "@/lib/social.functi
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { getMembershipEntitlements, type MembershipTier } from "@/lib/membership";
 import { notify as toast } from "@/lib/notifications-store";
-import { formatCount } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -219,13 +231,43 @@ function MyContributionsPage() {
         : (counts?.stories ?? 0) + (counts?.comments ?? 0);
 
   return (
-    <main className="min-h-dvh bg-background pb-28 md:pb-12">
+    <main className="min-h-dvh bg-[#f5f6f1] pb-28 md:bg-background md:pb-12">
       <FloatingBackButton
         onClick={() => void navigate({ to: "/profile" })}
         className="hidden md:inline-flex"
       />
-      <div className="w-full pt-5 md:pt-10">
-        <header className="mb-6 flex flex-col gap-4 px-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between sm:px-6 md:px-8">
+      <div className="w-full px-2 pt-2 md:px-0 md:pt-10">
+        <header className="relative mb-5 overflow-hidden rounded-[1.8rem] bg-gradient-to-br from-[#0a1a0e] via-[#0b190f] to-[#324b15] p-5 text-white md:hidden">
+          <div className="relative z-10">
+            <Link to="/profile" className="inline-flex items-center gap-2 text-xs text-white/70">
+              <ProfileAvatar initials="Y" className="size-6 bg-lime-400 text-slate-950" />
+              Your activity
+            </Link>
+            <h1 className="mt-3 font-display text-3xl font-bold tracking-tight">
+              My contributions
+            </h1>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              {[
+                ["Total", (counts?.stories ?? 0) + (counts?.comments ?? 0)],
+                ["Stories", counts?.stories ?? 0],
+                ["Comments", counts?.comments ?? 0],
+              ].map(([label, count]) => (
+                <div key={label} className="rounded-[1.35rem] bg-white/10 px-3 py-2.5">
+                  <p className="text-2xl font-semibold leading-none">
+                    {formatCount(Number(count))}
+                  </p>
+                  <p className="mt-1 text-xs text-white/65">{label}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+          <PenLine
+            aria-hidden="true"
+            className="absolute -right-4 -top-5 size-28 rotate-12 text-white/[0.07]"
+          />
+        </header>
+
+        <header className="mb-6 hidden flex-col gap-4 px-4 sm:mb-8 sm:flex-row sm:items-end sm:justify-between sm:px-6 md:flex md:px-8">
           <div className="min-w-0">
             <Link
               to="/profile"
@@ -259,30 +301,81 @@ function MyContributionsPage() {
         </header>
 
         {category !== "comments" ? (
-          <div className="mb-4 flex w-full flex-wrap items-center gap-3 border-y border-border px-4 py-3 sm:px-6 md:px-8">
-            <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Pin className="size-4" />
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-sm font-semibold">Profile pins</p>
-              <p className="text-xs text-muted-foreground">
-                {maxPinnedStories === 0
-                  ? "Premium members can pin up to 3 published stories."
-                  : `${pinnedStoryIds.size} of ${maxPinnedStories} pins used`}
-              </p>
+          <>
+            <div className="mb-4 flex w-full items-center gap-3 rounded-[1.5rem] bg-card p-4 shadow-[0_6px_18px_rgba(0,0,0,.045)] md:hidden">
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-lime-100 text-[#182515]">
+                <Pin className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Profile pins</p>
+                <p className="text-xs text-muted-foreground">
+                  {maxPinnedStories === 0
+                    ? "Premium members can pin up to 3 published stories."
+                    : `${pinnedStoryIds.size} of ${maxPinnedStories} used`}
+                </p>
+                <div className="mt-1.5 flex max-w-48 gap-1">
+                  {Array.from({ length: Math.min(3, maxPinnedStories || 3) }).map((_, index) => (
+                    <span
+                      key={index}
+                      className={cn(
+                        "h-1.5 flex-1 rounded-full",
+                        index < pinnedStoryIds.size ? "bg-lime-500" : "bg-secondary",
+                      )}
+                    />
+                  ))}
+                </div>
+              </div>
+              <Button
+                asChild
+                size="sm"
+                className="rounded-full bg-[#09170e] px-4 text-white hover:bg-[#14251a]"
+              >
+                <Link to="/billing">{maxPinnedStories === 0 ? "Manage" : "Manage"}</Link>
+              </Button>
             </div>
-            <Button asChild variant="outline" size="sm" className="rounded-xl">
-              <Link to="/billing">
-                {maxPinnedStories === 0 ? "See packages" : "Manage package"}
-              </Link>
-            </Button>
-          </div>
+            <div className="mb-4 hidden w-full flex-wrap items-center gap-3 border-y border-border px-4 py-3 sm:px-6 md:flex md:px-8">
+              <span className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <Pin className="size-4" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">Profile pins</p>
+                <p className="text-xs text-muted-foreground">
+                  {maxPinnedStories === 0
+                    ? "Premium members can pin up to 3 published stories."
+                    : `${pinnedStoryIds.size} of ${maxPinnedStories} pins used`}
+                </p>
+              </div>
+              <Button asChild variant="outline" size="sm" className="rounded-xl">
+                <Link to="/billing">
+                  {maxPinnedStories === 0 ? "See packages" : "Manage package"}
+                </Link>
+              </Button>
+            </div>
+          </>
         ) : null}
 
         <section className="w-full min-w-0">
-          <div className="sticky top-16 z-30 space-y-3 border-y border-border bg-background/95 px-4 py-3 backdrop-blur-md sm:top-16 sm:px-6 sm:py-4 md:px-8">
+          <div className="sticky top-16 z-30 space-y-3 bg-[#f5f6f1]/95 px-0 py-2 backdrop-blur-md sm:top-16 sm:px-6 sm:py-4 md:border-y md:border-border md:bg-background/95 md:px-8">
             <div className="flex flex-col gap-3">
-              <div className="flex w-full gap-5 overflow-x-auto border-b border-border">
+              <div className="grid w-full grid-cols-3 rounded-full bg-[#eceee7] p-1 md:hidden">
+                {(["all", "stories", "comments"] as const).map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    onClick={() => setCategory(item)}
+                    aria-pressed={category === item}
+                    className={cn(
+                      "min-h-9 rounded-full px-2 text-sm font-medium capitalize transition-colors",
+                      category === item
+                        ? "bg-white text-foreground shadow-sm"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {item === "all" ? "All" : item}
+                  </button>
+                ))}
+              </div>
+              <div className="hidden w-full gap-5 overflow-x-auto border-b border-border md:flex">
                 {(["all", "stories", "comments"] as const).map((item) => (
                   <button
                     key={item}
@@ -301,29 +394,44 @@ function MyContributionsPage() {
                   <Input
                     value={search}
                     onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search loaded items"
-                    className="h-11 rounded-lg pl-9 shadow-none"
+                    placeholder="Search your posts"
+                    className="h-11 rounded-full border-0 bg-card pl-10 shadow-sm md:rounded-lg md:border md:bg-background md:shadow-none"
                   />
                 </label>
               </div>
             </div>
-            <div className="flex w-full gap-2 overflow-x-auto pb-0.5">
+            <div className="flex w-full gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {(
                 [
                   ["all", "All statuses", Archive],
                   ["published", "Published", Check],
                   ["pending", "In review", Clock3],
-                  ["hidden", "Hidden", Archive],
+                  ["hidden", "Not public", EyeOff],
                 ] as const
               ).map(([value, label, Icon]) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setStatus(value)}
-                  className={`inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-medium transition-colors ${status === value ? "border-primary/35 bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:bg-secondary"}`}
+                  aria-pressed={status === value}
+                  className={cn(
+                    "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors md:border",
+                    status === value
+                      ? "bg-[#09170e] text-white md:border-primary/35 md:bg-primary/10 md:text-foreground"
+                      : "bg-card text-muted-foreground md:border-border md:bg-transparent hover:bg-secondary",
+                  )}
                 >
                   <Icon
-                    className={`size-3.5 ${value === "pending" ? "text-amber-500" : value === "published" ? "text-primary" : ""}`}
+                    className={cn(
+                      "size-3.5",
+                      value === "pending"
+                        ? "text-amber-500"
+                        : value === "published"
+                          ? status === value
+                            ? "text-lime-300 md:text-primary"
+                            : "text-primary"
+                          : "",
+                    )}
                   />
                   {label}
                 </button>
@@ -368,7 +476,7 @@ function MyContributionsPage() {
               ) : null}
             </div>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="space-y-3 px-0 md:space-y-0 md:divide-y md:divide-border">
               {items.map((item) => (
                 <ContributionRow
                   key={`${item.type}-${item.id}`}
@@ -505,6 +613,7 @@ function ContributionRow({
   onEdit: () => void;
   onDelete: () => void;
 }) {
+  const [menuOpen, setMenuOpen] = useState(false);
   const isStory = item.type === "story";
   const isRemoved = item.isDeleted || item.authorDeleted || item.status === "hidden";
   const statusLabel =
@@ -525,148 +634,384 @@ function ContributionRow({
   const canView = isStory ? item.status === "published" : item.storyStatus === "published";
   const canEdit = isStory ? !item.authorDeleted : !item.isDeleted && item.status === "published";
   const pinLimitReached = !isPinned && pinnedCount >= maxPinnedStories;
+  const dateLabel = item.createdAt
+    ? new Date(item.createdAt).toLocaleDateString("en-KE", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "Date unavailable";
   return (
-    <article className="group flex w-full flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6 md:px-8">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${isStory ? "bg-primary/10 text-primary" : "bg-sky-500/10 text-sky-600 dark:text-sky-300"}`}
-        >
-          {isStory ? <PenLine className="size-5" /> : <MessageSquareText className="size-5" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-              {isStory ? item.companyName || "Workplace story" : `Comment · ${item.storyTitle}`}
-            </span>
-            <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${statusTone}`}>
-              {statusLabel}
-            </span>
-          </div>
-          <h2 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug sm:text-base">
-            {item.isDeleted ? "Comment removed" : item.title}
-          </h2>
-          {!isStory && !item.isDeleted ? (
-            <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-              {item.body}
-            </p>
-          ) : null}
-          {isStory ? (
-            <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
-              {item.body}
-            </p>
-          ) : null}
-          <p className="mt-2 text-xs text-muted-foreground">
-            {item.createdAt
-              ? new Date(item.createdAt).toLocaleDateString("en-KE", {
-                  day: "numeric",
-                  month: "short",
-                  year: "numeric",
-                })
-              : "Date unavailable"}
-            {isStory && item.status === "pending"
-              ? " · Only you can see this while it is reviewed"
-              : isStory && item.status === "published"
-                ? " · Edits go through review again"
-                : ""}
-          </p>
-        </div>
-      </div>
-      <div className="flex flex-wrap items-center gap-2 pl-[3.25rem] sm:pl-0">
-        {canView ? (
-          <Button
-            asChild
-            size="sm"
-            variant="outline"
-            className="min-h-9 flex-1 rounded-xl sm:flex-none"
+    <>
+      <article className="group hidden w-full flex-col gap-3 px-4 py-4 sm:flex-row sm:items-center sm:px-6 md:flex md:px-8">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
+          <span
+            className={`flex size-10 shrink-0 items-center justify-center rounded-xl ${isStory ? "bg-primary/10 text-primary" : "bg-sky-500/10 text-sky-600 dark:text-sky-300"}`}
           >
-            <Link
-              to={href}
-              params={{ id: item.storyId }}
-              {...(isStory ? {} : { search: { comment: item.id } })}
-            >
-              View
-            </Link>
-          </Button>
-        ) : (
-          <span className="flex min-h-9 flex-1 items-center justify-center rounded-xl bg-secondary/60 px-3 text-center text-xs text-muted-foreground sm:flex-none">
-            {item.authorDeleted ? "Removed" : "Not public"}
+            {isStory ? <PenLine className="size-5" /> : <MessageSquareText className="size-5" />}
           </span>
-        )}
-        {isStory && canEdit ? (
-          <Button
-            asChild
-            size="sm"
-            variant="secondary"
-            className="min-h-9 flex-1 rounded-xl sm:flex-none"
-          >
-            <Link to="/post" search={{ edit: item.id }}>
-              {item.status === "published" ? "Edit story" : "Edit / resubmit"}
-            </Link>
-          </Button>
-        ) : null}
-        {!isStory && canEdit ? (
-          <Button
-            size="sm"
-            variant="secondary"
-            className="min-h-9 flex-1 rounded-xl sm:flex-none"
-            onClick={onEdit}
-          >
-            Edit
-          </Button>
-        ) : null}
-        {isStory && canView ? (
-          isPinned ? (
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                {isStory ? item.companyName || "Workplace story" : `Comment · ${item.storyTitle}`}
+              </span>
+              <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${statusTone}`}>
+                {statusLabel}
+              </span>
+            </div>
+            <h2 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug sm:text-base">
+              {item.isDeleted ? "Comment removed" : item.title}
+            </h2>
+            {!isStory && !item.isDeleted ? (
+              <p className="mt-1 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+                {item.body}
+              </p>
+            ) : null}
+            {isStory ? (
+              <p className="mt-1 line-clamp-2 text-sm leading-relaxed text-muted-foreground">
+                {item.body}
+              </p>
+            ) : null}
+            <p className="mt-2 text-xs text-muted-foreground">
+              {dateLabel}
+              {isStory && item.status === "pending"
+                ? " · Only you can see this while it is reviewed"
+                : isStory && item.status === "published"
+                  ? " · Edits go through review again"
+                  : ""}
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-2 pl-[3.25rem] sm:pl-0">
+          {canView ? (
             <Button
+              asChild
               size="sm"
               variant="outline"
-              className="min-h-9 rounded-xl"
-              disabled={pinning}
-              onClick={onTogglePin}
+              className="min-h-9 flex-1 rounded-xl sm:flex-none"
             >
-              {pinning ? <LoaderCircle className="size-4" /> : <PinOff className="size-4" />}
-              Unpin
-            </Button>
-          ) : maxPinnedStories === 0 ? (
-            <Button asChild size="sm" variant="outline" className="min-h-9 rounded-xl">
-              <Link to="/billing" title="Upgrade to Premium to pin a story">
-                <LockKeyhole className="size-4" /> Pin
+              <Link
+                to={href}
+                params={{ id: item.storyId }}
+                {...(isStory ? {} : { search: { comment: item.id } })}
+              >
+                View
               </Link>
             </Button>
-          ) : pinLimitReached ? (
-            <Button
-              size="sm"
-              variant="outline"
-              className="min-h-9 rounded-xl"
-              disabled
-              title="Premium includes up to 3 pinned stories"
-            >
-              <LockKeyhole className="size-4" /> Pin limit
-            </Button>
           ) : (
+            <span className="flex min-h-9 flex-1 items-center justify-center rounded-xl bg-secondary/60 px-3 text-center text-xs text-muted-foreground sm:flex-none">
+              {item.authorDeleted ? "Removed" : "Not public"}
+            </span>
+          )}
+          {isStory && canEdit ? (
+            <Button
+              asChild
+              size="sm"
+              variant="secondary"
+              className="min-h-9 flex-1 rounded-xl sm:flex-none"
+            >
+              <Link to="/post" search={{ edit: item.id }}>
+                {item.status === "published" ? "Edit story" : "Edit / resubmit"}
+              </Link>
+            </Button>
+          ) : null}
+          {!isStory && canEdit ? (
             <Button
               size="sm"
-              variant="outline"
-              className="min-h-9 rounded-xl"
-              disabled={pinning}
-              onClick={onTogglePin}
+              variant="secondary"
+              className="min-h-9 flex-1 rounded-xl sm:flex-none"
+              onClick={onEdit}
             >
-              {pinning ? <LoaderCircle className="size-4" /> : <Pin className="size-4" />}
-              Pin
+              Edit
             </Button>
-          )
-        ) : null}
-        {!isRemoved ? (
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={`Remove ${isStory ? "story" : "comment"}`}
-            className="size-9 shrink-0 rounded-xl text-muted-foreground hover:text-danger"
-            onClick={onDelete}
+          ) : null}
+          {isStory && canView ? (
+            isPinned ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-9 rounded-xl"
+                disabled={pinning}
+                onClick={onTogglePin}
+              >
+                {pinning ? <LoaderCircle className="size-4" /> : <PinOff className="size-4" />}
+                Unpin
+              </Button>
+            ) : maxPinnedStories === 0 ? (
+              <Button asChild size="sm" variant="outline" className="min-h-9 rounded-xl">
+                <Link to="/billing" title="Upgrade to Premium to pin a story">
+                  <LockKeyhole className="size-4" /> Pin
+                </Link>
+              </Button>
+            ) : pinLimitReached ? (
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-9 rounded-xl"
+                disabled
+                title="Premium includes up to 3 pinned stories"
+              >
+                <LockKeyhole className="size-4" /> Pin limit
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                variant="outline"
+                className="min-h-9 rounded-xl"
+                disabled={pinning}
+                onClick={onTogglePin}
+              >
+                {pinning ? <LoaderCircle className="size-4" /> : <Pin className="size-4" />}
+                Pin
+              </Button>
+            )
+          ) : null}
+          {!isRemoved ? (
+            <Button
+              size="icon"
+              variant="ghost"
+              aria-label={`Remove ${isStory ? "story" : "comment"}`}
+              className="size-9 shrink-0 rounded-xl text-muted-foreground hover:text-danger"
+              onClick={onDelete}
+            >
+              <Trash2 className="size-4" />
+            </Button>
+          ) : null}
+        </div>
+      </article>
+      <article className="rounded-[1.5rem] bg-card p-4 shadow-[0_6px_18px_rgba(0,0,0,.045)] md:hidden">
+        <div className="flex items-start gap-3">
+          <span
+            className={cn(
+              "flex size-10 shrink-0 items-center justify-center rounded-full",
+              isStory ? "bg-lime-100 text-[#263716]" : "bg-[#d0f3f2] text-[#122d2d]",
+            )}
           >
-            <Trash2 className="size-4" />
-          </Button>
-        ) : null}
-      </div>
-    </article>
+            {isStory ? <PenLine className="size-5" /> : <MessageSquareText className="size-5" />}
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs">
+              <span className="font-semibold">{isStory ? "Story" : "Comment"}</span>
+              <span className="text-muted-foreground">
+                {" · "}
+                {isStory ? item.companyName || "Workplace story" : item.storyTitle}
+              </span>
+            </p>
+            <h2 className="mt-1 line-clamp-2 text-sm font-semibold leading-snug">
+              {item.isDeleted ? "Comment removed" : item.title}
+            </h2>
+            {isStory && item.body ? (
+              <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+                {item.body}
+              </p>
+            ) : null}
+          </div>
+          {isPinned ? (
+            <span
+              className="flex size-7 shrink-0 items-center justify-center text-lime-700"
+              aria-label="Pinned on profile"
+            >
+              <Pin className="size-3.5 fill-current" />
+            </span>
+          ) : null}
+          <button
+            type="button"
+            aria-label={`More actions for ${isStory ? "story" : "comment"}`}
+            onClick={() => setMenuOpen(true)}
+            className="flex size-8 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
+          >
+            <MoreHorizontal className="size-4" />
+          </button>
+        </div>
+
+        <div className="mt-2 flex items-center gap-2 pl-[3.25rem]">
+          <span
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-2 py-1 text-[10px] font-medium",
+              statusTone,
+            )}
+          >
+            {item.status === "published" ? (
+              <CircleCheck className="size-3" />
+            ) : item.status === "pending" ? (
+              <Clock3 className="size-3" />
+            ) : (
+              <EyeOff className="size-3" />
+            )}
+            {item.status === "hidden" ? "Not public" : statusLabel}
+          </span>
+          <span className="text-[10px] text-muted-foreground">{dateLabel}</span>
+        </div>
+
+        <div className="mt-4 border-t border-border pt-3">
+          <div className="flex items-center gap-2">
+            {canView ? (
+              <Button
+                asChild
+                size="sm"
+                variant="secondary"
+                className="min-h-10 flex-1 rounded-full bg-[#eceee7] text-foreground hover:bg-[#e2e5dc]"
+              >
+                <Link
+                  to={href}
+                  params={{ id: item.storyId }}
+                  {...(isStory ? {} : { search: { comment: item.id } })}
+                >
+                  <Eye className="size-4" /> View
+                </Link>
+              </Button>
+            ) : (
+              <span className="flex min-h-10 flex-1 items-center justify-center gap-1.5 rounded-full bg-secondary/60 px-3 text-xs text-muted-foreground">
+                <EyeOff className="size-4" /> Not public
+              </span>
+            )}
+            {isStory && canEdit ? (
+              <Button
+                asChild
+                size="sm"
+                className="min-h-10 flex-1 rounded-full bg-[#09170e] text-white hover:bg-[#14251a]"
+              >
+                <Link to="/post" search={{ edit: item.id }}>
+                  <PenLine className="size-4" /> Edit
+                </Link>
+              </Button>
+            ) : null}
+            {!isStory && canEdit ? (
+              <Button
+                size="sm"
+                className="min-h-10 flex-1 rounded-full bg-[#09170e] text-white hover:bg-[#14251a]"
+                onClick={onEdit}
+              >
+                <PenLine className="size-4" /> Edit
+              </Button>
+            ) : null}
+            {isStory && canView ? (
+              maxPinnedStories === 0 ? (
+                <Button
+                  asChild
+                  size="icon"
+                  variant="secondary"
+                  className="size-10 shrink-0 rounded-full bg-secondary"
+                >
+                  <Link to="/billing" aria-label="Upgrade to pin a story">
+                    <LockKeyhole className="size-4" />
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  className={cn(
+                    "size-10 shrink-0 rounded-full",
+                    isPinned ? "bg-lime-100 text-[#263716]" : "bg-secondary",
+                  )}
+                  disabled={pinning || pinLimitReached}
+                  onClick={onTogglePin}
+                  aria-label={isPinned ? "Unpin story" : "Pin story"}
+                  title={pinLimitReached ? "Premium includes up to 3 pinned stories" : undefined}
+                >
+                  {pinning ? (
+                    <LoaderCircle className="size-4 animate-spin" />
+                  ) : isPinned ? (
+                    <PinOff className="size-4" />
+                  ) : (
+                    <Pin className="size-4" />
+                  )}
+                </Button>
+              )
+            ) : null}
+            {!isRemoved ? (
+              <Button
+                size="icon"
+                variant="ghost"
+                aria-label={`Remove ${isStory ? "story" : "comment"}`}
+                className="size-10 shrink-0 rounded-full bg-rose-100 text-rose-600 hover:bg-rose-200 hover:text-rose-700"
+                onClick={onDelete}
+              >
+                <Trash2 className="size-4" />
+              </Button>
+            ) : null}
+          </div>
+          {isStory && item.status === "published" ? (
+            <p className="mt-2 text-center text-[10px] text-muted-foreground">
+              Edits go through review again
+            </p>
+          ) : null}
+        </div>
+      </article>
+
+      <Drawer open={menuOpen} onOpenChange={setMenuOpen}>
+        <DrawerContent className="max-h-[80dvh] rounded-t-3xl px-0 pb-[max(1rem,env(safe-area-inset-bottom))] md:hidden">
+          <DrawerHeader className="text-left">
+            <DrawerTitle>{isStory ? "Story actions" : "Comment actions"}</DrawerTitle>
+            <DrawerDescription>Manage this contribution.</DrawerDescription>
+          </DrawerHeader>
+          <div className="grid gap-1 px-4">
+            {canView ? (
+              <DrawerClose asChild>
+                <Link
+                  to={href}
+                  params={{ id: item.storyId }}
+                  {...(isStory ? {} : { search: { comment: item.id } })}
+                  className="flex min-h-12 items-center gap-3 border-b border-border px-2 text-sm font-medium"
+                >
+                  <Eye className="size-4" /> View
+                </Link>
+              </DrawerClose>
+            ) : null}
+            {canEdit ? (
+              isStory ? (
+                <DrawerClose asChild>
+                  <Link
+                    to="/post"
+                    search={{ edit: item.id }}
+                    className="flex min-h-12 items-center gap-3 border-b border-border px-2 text-sm font-medium"
+                  >
+                    <PenLine className="size-4" /> Edit story
+                  </Link>
+                </DrawerClose>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEdit();
+                  }}
+                  className="flex min-h-12 items-center gap-3 border-b border-border px-2 text-left text-sm font-medium"
+                >
+                  <PenLine className="size-4" /> Edit comment
+                </button>
+              )
+            ) : null}
+            {isStory && canView && maxPinnedStories > 0 ? (
+              <button
+                type="button"
+                disabled={pinning || pinLimitReached}
+                onClick={() => {
+                  setMenuOpen(false);
+                  onTogglePin();
+                }}
+                className="flex min-h-12 items-center gap-3 border-b border-border px-2 text-left text-sm font-medium disabled:opacity-50"
+              >
+                {isPinned ? <PinOff className="size-4" /> : <Pin className="size-4" />}
+                {isPinned ? "Remove profile pin" : "Pin to profile"}
+              </button>
+            ) : null}
+            {!isRemoved ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setMenuOpen(false);
+                  onDelete();
+                }}
+                className="flex min-h-12 items-center gap-3 px-2 text-left text-sm font-medium text-danger"
+              >
+                <Trash2 className="size-4" /> Delete
+              </button>
+            ) : null}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    </>
   );
 }

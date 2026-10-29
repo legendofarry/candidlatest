@@ -1,9 +1,20 @@
 import { createFileRoute, Outlet, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { BadgeCheck, Check, ChevronRight, CreditCard, Flame, RefreshCw, RotateCw, Sparkles, WalletCards } from "lucide-react";
-import { useState } from "react";
+import {
+  BadgeCheck,
+  Check,
+  ChevronRight,
+  CreditCard,
+  Flame,
+  RefreshCw,
+  RotateCw,
+  Sparkles,
+  WalletCards,
+} from "lucide-react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { cancelMyPaymentRequest, getMyBilling, requestMyBasicDowngrade } from "@/lib/billing.functions";
 import { switchMyMembership } from "@/lib/membership.functions";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,6 +27,28 @@ export const Route = createFileRoute("/billing")({
 
 function BillingPage() {
   const [membershipCardFlipped, setMembershipCardFlipped] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "airtel">("mpesa");
+  const [businessNumber, setBusinessNumber] = useState("0715938110");
+  const [accountName, setAccountName] = useState("");
+  const [savedPaymentMethod, setSavedPaymentMethod] = useState<{ provider: "mpesa" | "airtel"; number: string; accountName: string } | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const nextSaved = window.localStorage.getItem("candid.savedPaymentMethod");
+    if (!nextSaved) return;
+    try {
+      const parsed = JSON.parse(nextSaved) as { provider?: "mpesa" | "airtel"; number?: string; accountName?: string };
+      if (parsed.provider && parsed.number) {
+        setSavedPaymentMethod({
+          provider: parsed.provider,
+          number: parsed.number,
+          accountName: parsed.accountName ?? "",
+        });
+      }
+    } catch {
+      window.localStorage.removeItem("candid.savedPaymentMethod");
+    }
+  }, []);
   const isCheckout = useRouterState({ select: ({ location }) => location.pathname === "/billing/checkout" });
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -56,6 +89,14 @@ function BillingPage() {
   const plans = data?.packages;
   const awaiting = data?.payments.find((payment) => payment.status === "pending_verification" || payment.status === "awaiting_payment");
   const canRenewPremium = membership?.source === "paid" && membership.assignedTier === "premium";
+
+  useEffect(() => {
+    if (!data?.paymentDetails) return;
+    const nextProvider = data.paymentDetails.mode === "airtel" ? "airtel" : "mpesa";
+    setPaymentMethod(nextProvider);
+    setBusinessNumber(data.paymentDetails.business_number || "0715938110");
+    setAccountName(data.paymentDetails.account_name || "");
+  }, [data?.paymentDetails]);
 
   if (isCheckout) return <Outlet />;
 
@@ -113,12 +154,90 @@ function BillingPage() {
                     <CreditCard className="size-5" />
                   </span>
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">Payment method</p>
-                    <h2 className="mt-1 font-display text-xl font-semibold">Manual M-Pesa</h2>
+                    <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
+                      Payment method
+                    </p>
+                    <h2 className="mt-1 font-display text-xl font-semibold">Saved account</h2>
                   </div>
                 </div>
-                {data.paymentConfigured ? (
-                  <dl className="mt-5 divide-y divide-border text-sm">
+
+                <div className="mt-5 space-y-4">
+                  <div className="grid grid-cols-2 gap-2 rounded-full border border-border bg-secondary/50 p-1">
+                    {(["mpesa", "airtel"] as const).map((provider) => (
+                      <button
+                        key={provider}
+                        type="button"
+                        onClick={() => setPaymentMethod(provider)}
+                        className={cn(
+                          "rounded-full px-3 py-2 text-sm font-medium transition-colors",
+                          paymentMethod === provider
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {provider === "mpesa" ? "M-Pesa" : "Airtel"}
+                      </button>
+                    ))}
+                  </div>
+
+                  <label className="grid gap-2 text-sm font-medium">
+                    Business number
+                    <Input
+                      value={businessNumber}
+                      onChange={(event) => setBusinessNumber(event.target.value)}
+                      placeholder={paymentMethod === "mpesa" ? "0715938110" : "0770000000"}
+                    />
+                  </label>
+
+                  <label className="grid gap-2 text-sm font-medium">
+                    Account name
+                    <Input
+                      value={accountName}
+                      onChange={(event) => setAccountName(event.target.value)}
+                      placeholder="Candid"
+                    />
+                  </label>
+
+                  <Button
+                    type="button"
+                    className="w-full rounded-xl"
+                    onClick={() => {
+                      const nextSaved = {
+                        provider: paymentMethod,
+                        number: businessNumber,
+                        accountName,
+                      };
+                      setSavedPaymentMethod(nextSaved);
+                      if (typeof window !== "undefined") {
+                        window.localStorage.setItem("candid.savedPaymentMethod", JSON.stringify(nextSaved));
+                      }
+                    }}
+                  >
+                    Save payment method
+                  </Button>
+                </div>
+
+                {savedPaymentMethod ? (
+                  <dl className="mt-6 divide-y divide-border text-sm">
+                    <div className="flex justify-between gap-4 py-3">
+                      <dt className="text-muted-foreground">Provider</dt>
+                      <dd className="text-right font-medium">
+                        {savedPaymentMethod.provider === "mpesa" ? "M-Pesa" : "Airtel"}
+                      </dd>
+                    </div>
+                    <div className="flex justify-between gap-4 py-3">
+                      <dt className="text-muted-foreground">Number</dt>
+                      <dd className="text-right font-semibold">{savedPaymentMethod.number}</dd>
+                    </div>
+                    {savedPaymentMethod.accountName ? (
+                      <div className="flex justify-between gap-4 py-3">
+                        <dt className="text-muted-foreground">Account name</dt>
+                        <dd className="text-right font-medium">{savedPaymentMethod.accountName}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                ) : data.paymentConfigured ? (
+                  <dl className="mt-6 divide-y divide-border text-sm">
                     <div className="flex justify-between gap-4 py-3">
                       <dt className="text-muted-foreground">Payment type</dt>
                       <dd className="text-right font-medium">{paymentModeLabel(data.paymentDetails.mode)}</dd>
@@ -136,9 +255,10 @@ function BillingPage() {
                   </dl>
                 ) : (
                   <p className="mt-4 text-sm text-muted-foreground">
-                    A payment method is not configured yet.
+                    Add your preferred mobile money number and save it for future payments.
                   </p>
                 )}
+
                 <p className="mt-3 text-sm leading-6 text-muted-foreground">
                   {data.paymentDetails.reference_instructions}
                 </p>

@@ -3,10 +3,14 @@ import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-
 import { useMemo, useState } from "react";
 import {
   ArrowUpRight,
+  BookOpen,
   Building2,
+  Info,
   MessageSquare,
   Plus,
   Scale,
+  Star,
+  ThumbsUp,
   Users,
   Wallet,
   X,
@@ -19,7 +23,13 @@ import {
 } from "@/lib/company-comparison";
 import { Button } from "@/components/ui/button";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
-import { formatCount } from "@/lib/utils";
+import { cn, formatCount } from "@/lib/utils";
+
+const mobileCompareColors = [
+  { badge: "bg-[#a7dd18]", bar: "bg-[#a7dd18]" },
+  { badge: "bg-[#00b8c0]", bar: "bg-[#00b8c0]" },
+  { badge: "bg-orange-400", bar: "bg-orange-400" },
+];
 
 const compareQuery = queryOptions({
   queryKey: ["company-compare"],
@@ -87,9 +97,49 @@ function ComparePage() {
     setSelected((current) => current.filter((item) => item !== id));
   }
 
+  const compareRows = selected.flatMap((id, index) => {
+    const company = companies.find((row) => row.company_id === id);
+    if (!company) return [];
+    const salary = data.salaries.find((row) => row.company_id === id);
+    return [
+      {
+        company,
+        index,
+        salary,
+        salaryEvidence: describeSalaryEvidence(salary, Boolean(data.salaryError)),
+      },
+    ];
+  });
+  const maxStories = Math.max(
+    1,
+    ...compareRows.map(({ company }) => Number(company.story_count ?? 0)),
+  );
+  const maxSalaryReports = Math.max(
+    1,
+    ...compareRows.map(({ salary }) => Number(salary?.contributions ?? 0)),
+  );
+
   return (
-    <main className="mx-auto max-w-7xl space-y-7 pb-12">
-      <header className="relative overflow-hidden rounded-[2rem] border border-border bg-gradient-to-br from-primary/10 via-card to-cyan-500/10 p-6 sm:p-9">
+    <main className="mx-auto max-w-7xl space-y-5 px-2 pb-28 md:space-y-7 md:px-0 md:pb-12">
+      <header className="relative overflow-hidden rounded-[1.8rem] bg-[#09170e] p-5 text-white md:hidden">
+        <div className="relative z-10">
+          <div className="inline-flex items-center gap-2 rounded-full bg-lime-400 px-3 py-1.5 text-xs font-semibold text-slate-950">
+            A clearer way to choose
+          </div>
+          <h1 className="mt-4 max-w-[15rem] font-display text-3xl font-semibold leading-tight tracking-tight">
+            Compare employers.
+          </h1>
+          <p className="mt-2 max-w-[19rem] text-sm leading-5 text-slate-300">
+            Worker stories, ratings and pay — side by side.
+          </p>
+        </div>
+        <Scale
+          aria-hidden="true"
+          className="absolute -right-4 -top-1 size-28 rotate-12 text-white/[0.08]"
+        />
+      </header>
+
+      <header className="relative hidden overflow-hidden rounded-[2rem] border border-border bg-gradient-to-br from-primary/10 via-card to-cyan-500/10 p-6 sm:p-9 md:block">
         <div className="relative z-10 max-w-3xl">
           <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/75 px-3 py-1.5 text-xs font-semibold text-primary">
             <Scale className="size-4" /> A clearer way to choose
@@ -149,7 +199,179 @@ function ComparePage() {
         </section>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <section className="space-y-4 md:hidden">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="text-lg font-semibold">Your lineup</h2>
+              <span className="text-xs text-muted-foreground">{selected.length}/3 selected</span>
+            </div>
+            <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {compareRows.map(({ company, index }) => (
+                <article
+                  key={`${company.company_id}-${index}`}
+                  className="relative w-40 shrink-0 rounded-[1.6rem] bg-card p-4 shadow-[0_6px_18px_rgba(0,0,0,.045)]"
+                >
+                  <span
+                    className={cn(
+                      "flex size-11 items-center justify-center rounded-full text-base font-bold text-slate-950",
+                      mobileCompareColors[index % mobileCompareColors.length].badge,
+                    )}
+                  >
+                    {company.name.slice(0, 1).toUpperCase()}
+                  </span>
+                  {selected.length > 2 ? (
+                    <button
+                      type="button"
+                      onClick={() => removeCompany(company.company_id)}
+                      aria-label={`Remove ${company.name}`}
+                      className="absolute right-3 top-3 flex size-8 items-center justify-center rounded-full text-muted-foreground hover:bg-secondary"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  ) : null}
+                  <label className="sr-only" htmlFor={`mobile-company-${index}`}>
+                    Employer {index + 1}
+                  </label>
+                  <select
+                    id={`mobile-company-${index}`}
+                    value={company.company_id}
+                    onChange={(event) => changeCompany(index, event.target.value)}
+                    className="mt-3 w-full truncate bg-transparent text-base font-semibold outline-none"
+                  >
+                    {companies
+                      .filter(
+                        (row) =>
+                          row.company_id === company.company_id ||
+                          !selected.includes(row.company_id),
+                      )
+                      .map((row) => (
+                        <option key={row.company_id} value={row.company_id}>
+                          {row.name}
+                        </option>
+                      ))}
+                  </select>
+                  <p className="mt-0.5 line-clamp-2 text-xs leading-4 text-muted-foreground">
+                    {company.industry || "Industry not listed"}
+                    {company.county ? (
+                      <>
+                        <br />
+                        {company.county}
+                      </>
+                    ) : null}
+                  </p>
+                </article>
+              ))}
+              {selected.length < 3 && selected.length < companies.length ? (
+                <button
+                  type="button"
+                  onClick={addCompany}
+                  className="flex w-40 shrink-0 flex-col items-center justify-center gap-2 rounded-[1.6rem] border-2 border-dashed border-border px-4 py-4 text-sm font-medium text-muted-foreground"
+                >
+                  <span className="flex size-10 items-center justify-center rounded-full bg-lime-400 text-slate-950">
+                    <Plus className="size-5" />
+                  </span>
+                  Add employer
+                </button>
+              ) : null}
+            </div>
+          </section>
+
+          <section className="space-y-3 md:hidden">
+            <MobileCompareMetric
+              icon={BookOpen}
+              title="Published stories"
+              note="Experiences shared — not a score."
+              rows={compareRows.map(({ company, index }) => {
+                const count = Number(company.story_count ?? 0);
+                return {
+                  name: company.name,
+                  value: formatCount(count),
+                  percent: (count / maxStories) * 100,
+                  color: mobileCompareColors[index % mobileCompareColors.length].bar,
+                };
+              })}
+            />
+            <MobileCompareMetric
+              icon={Star}
+              title="Employer rating"
+              note="Small samples are early signals."
+              rows={compareRows.map(({ company, index }) => {
+                const count = Number(company.rating_count ?? 0);
+                const score =
+                  company.overall !== null && Number.isFinite(company.overall)
+                    ? Number(company.overall)
+                    : null;
+                return {
+                  name: company.name,
+                  value: score === null || count <= 0 ? "—" : score.toFixed(1),
+                  caption: `${count} resp.`,
+                  percent: score === null ? 0 : (score / 5) * 100,
+                  color: mobileCompareColors[index % mobileCompareColors.length].bar,
+                };
+              })}
+            />
+            <MobileCompareMetric
+              icon={Wallet}
+              title="Salary reports"
+              note={
+                data.salaryError
+                  ? "Salary information is temporarily unavailable."
+                  : "Missing data isn't a pay assessment."
+              }
+              rows={compareRows.map(({ company, index, salary, salaryEvidence }) => {
+                const count = Number(salary?.contributions ?? 0);
+                return {
+                  name: company.name,
+                  value: data.salaryError ? "Unavailable" : count > 0 ? formatCount(count) : "None",
+                  percent: (count / maxSalaryReports) * 100,
+                  color: mobileCompareColors[index % mobileCompareColors.length].bar,
+                  empty: !data.salaryError && count <= 0,
+                  detail: salaryEvidence.detail,
+                };
+              })}
+            />
+            <MobileCompareMetric
+              icon={ThumbsUp}
+              title="Would work here again"
+              note="Based on member responses."
+              rows={compareRows.map(({ company, index }) => {
+                const percent =
+                  company.would_work_again_pct === null
+                    ? null
+                    : Math.round(Number(company.would_work_again_pct));
+                return {
+                  name: company.name,
+                  value: percent === null ? "—" : `${percent}%`,
+                  percent: percent ?? 0,
+                  color: mobileCompareColors[index % mobileCompareColors.length].bar,
+                };
+              })}
+            />
+          </section>
+
+          <p className="flex gap-2 rounded-[1.4rem] bg-secondary/60 px-4 py-3 text-xs leading-5 text-muted-foreground md:hidden">
+            <Info className="mt-0.5 size-4 shrink-0" />
+            <span>
+              These are individual member reports, not guarantees. Limited data doesn’t mean a
+              workplace is good or bad.
+            </span>
+          </p>
+
+          <div className="fixed inset-x-0 bottom-0 z-30 bg-background/95 px-2 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3 backdrop-blur md:hidden">
+            <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              {compareRows.map(({ company }) => (
+                <Link
+                  key={company.company_id}
+                  to="/companies/$slug"
+                  params={{ slug: company.slug }}
+                  className="flex min-h-11 shrink-0 items-center gap-2 rounded-full bg-[#09170e] px-4 text-sm font-medium text-white"
+                >
+                  {company.name} <ArrowUpRight className="size-4 text-lime-300" />
+                </Link>
+              ))}
+            </div>
+          </div>
+
+          <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
             <div>
               <h2 className="text-lg font-semibold">Your comparison</h2>
               <p className="text-sm text-muted-foreground">Choose two or three employers.</p>
@@ -161,7 +383,7 @@ function ComparePage() {
             ) : null}
           </div>
 
-          <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <section className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3">
             {selected.map((id, index) => {
               const company = companies.find((row) => row.company_id === id);
               const salary = data.salaries.find((row) => row.company_id === id);
@@ -267,7 +489,7 @@ function ComparePage() {
             })}
           </section>
 
-          <p className="rounded-2xl border border-border bg-secondary/30 px-4 py-3 text-xs leading-5 text-muted-foreground">
+          <p className="hidden rounded-2xl border border-border bg-secondary/30 px-4 py-3 text-xs leading-5 text-muted-foreground md:block">
             These are individual member reports, not guarantees about an employer or every
             employee’s experience. Read the stories behind the counts; missing or limited data does
             not mean a workplace is good or bad.
@@ -298,5 +520,67 @@ function CompareMetric({
       <p className="mt-2 break-words text-lg font-semibold">{value}</p>
       <p className="mt-1 text-xs text-muted-foreground">{detail}</p>
     </div>
+  );
+}
+
+function MobileCompareMetric({
+  icon: Icon,
+  title,
+  note,
+  rows,
+}: {
+  icon: typeof BookOpen;
+  title: string;
+  note: string;
+  rows: {
+    name: string;
+    value: string;
+    percent: number;
+    color: string;
+    caption?: string;
+    detail?: string;
+    empty?: boolean;
+  }[];
+}) {
+  return (
+    <article className="rounded-[1.5rem] bg-card p-4 shadow-[0_6px_18px_rgba(0,0,0,.045)]">
+      <h3 className="flex items-center gap-2 text-sm font-semibold">
+        <span className="flex size-8 items-center justify-center rounded-full bg-secondary text-foreground">
+          <Icon className="size-4" />
+        </span>
+        {title}
+      </h3>
+      <div className="mt-4 space-y-3">
+        {rows.map((row) => (
+          <div
+            key={row.name}
+            className="grid grid-cols-[88px_minmax(0,1fr)_44px] items-center gap-3"
+          >
+            <span className="truncate text-xs text-muted-foreground">{row.name}</span>
+            <div className="h-2.5 overflow-hidden rounded-full bg-secondary">
+              <div
+                className={cn(
+                  "h-full rounded-full transition-[width]",
+                  row.empty ? "bg-secondary" : row.color,
+                )}
+                style={{ width: `${Math.min(100, Math.max(0, row.percent))}%` }}
+              />
+            </div>
+            <span className="text-right text-sm font-semibold leading-tight">
+              {row.value}
+              {row.caption ? (
+                <span className="block text-[10px] font-normal text-muted-foreground">
+                  {row.caption}
+                </span>
+              ) : null}
+            </span>
+            {row.detail ? (
+              <span className="sr-only col-start-1 col-end-4">{row.detail}</span>
+            ) : null}
+          </div>
+        ))}
+      </div>
+      <p className="mt-3 text-xs leading-4 text-muted-foreground">{note}</p>
+    </article>
   );
 }
