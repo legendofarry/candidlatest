@@ -309,9 +309,6 @@ export function MobileDock({
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm font-semibold">Lock or sign out</span>
-                      <span className="block truncate text-xs text-destructive/75">
-                        Secure your account when you leave
-                      </span>
                     </span>
                   </button>
                 ) : null}

@@ -253,13 +253,13 @@ export function CommentThread({
       className={cn(
         "rounded-2xl border border-border bg-card",
         fullWidth &&
-          "rounded-none border-x-0 border-y border-border/70 bg-transparent pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0",
+        "rounded-none border-x-0 border-y border-border/70 bg-transparent pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0",
         panelMode &&
-          !fitContent &&
-          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
+        !fitContent &&
+        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
         panelMode &&
-          fitContent &&
-          "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
+        fitContent &&
+        "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
       )}
     >
       <header
@@ -275,9 +275,6 @@ export function CommentThread({
         >
           {formatCount(displayedTotal)} comments
         </h2>
-        <span className="ml-auto text-[11px] text-muted-foreground">
-          Official replies pinned first
-        </span>
       </header>
 
       <div
@@ -362,7 +359,7 @@ export function CommentThread({
         className={cn(
           "sticky bottom-0 rounded-b-2xl border-t border-border bg-card/95 p-3 backdrop-blur",
           fullWidth &&
-            "fixed inset-x-0 bottom-0 z-30 rounded-none border-t border-border/70 bg-background/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:sticky md:inset-x-auto md:z-auto md:pb-3",
+          "fixed inset-x-0 bottom-0 z-30 rounded-none border-t border-border/70 bg-background/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:sticky md:inset-x-auto md:z-auto md:pb-3",
           panelMode && "relative shrink-0 rounded-none",
         )}
       >
@@ -465,7 +462,7 @@ function CommentRow({
   const remove = useServerFn(deleteComment);
   const [open, setOpen] = useState(
     (depth === 0 && comment.replies.some((r) => r.is_official)) ||
-      (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
+    (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
   );
   const [reportOpen, setReportOpen] = useState(false);
   const [localLiked, setLocalLiked] = useState<boolean | null>(null);
@@ -698,21 +695,21 @@ function CommentRow({
       <AnimatePresence initial={false}>
         {open
           ? comment.replies
-              .slice(0, visibleReplies)
-              .map((reply) => (
-                <CommentRow
-                  key={reply.id}
-                  comment={reply}
-                  storyId={storyId}
-                  depth={depth + 1}
-                  liked={liked}
-                  reported={reported}
-                  focusCommentId={focusCommentId}
-                  onReply={onReply}
-                  onChanged={onChanged}
-                  onDeleted={onDeleted}
-                />
-              ))
+            .slice(0, visibleReplies)
+            .map((reply) => (
+              <CommentRow
+                key={reply.id}
+                comment={reply}
+                storyId={storyId}
+                depth={depth + 1}
+                liked={liked}
+                reported={reported}
+                focusCommentId={focusCommentId}
+                onReply={onReply}
+                onChanged={onChanged}
+                onDeleted={onDeleted}
+              />
+            ))
           : null}
       </AnimatePresence>
 

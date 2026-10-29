@@ -30,7 +30,13 @@ export type FilterSelect = {
   optionLabel?: (option: string) => string;
 };
 
-function FilterDropdown({ filter }: { filter: FilterSelect }) {
+function FilterDropdown({
+  filter,
+  fullWidth = false,
+}: {
+  filter: FilterSelect;
+  fullWidth?: boolean;
+}) {
   const active = filter.value !== null;
   const label = filter.optionLabel ?? ((option: string) => option);
 
@@ -42,6 +48,8 @@ function FilterDropdown({ filter }: { filter: FilterSelect }) {
             "group inline-flex h-9 items-center gap-1.5 rounded-full border border-border bg-background/60 px-3.5 text-sm font-medium text-muted-foreground",
             "transition-all duration-200 hover:border-primary/40 hover:text-foreground active:scale-[0.97]",
             active && "border-primary/50 bg-primary/10 text-foreground",
+            fullWidth &&
+              "h-12 w-full justify-between rounded-none border-0 border-b border-border bg-transparent px-1 text-left text-foreground shadow-none hover:border-primary/40 hover:bg-transparent",
           )}
         >
           <span className="max-w-40 truncate">
@@ -50,7 +58,13 @@ function FilterDropdown({ filter }: { filter: FilterSelect }) {
           <ChevronDown className="size-3.5 transition-transform duration-200 group-data-[state=open]:rotate-180" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-y-auto">
+      <DropdownMenuContent
+        align="start"
+        className={cn(
+          "max-h-80 overflow-y-auto",
+          fullWidth ? "w-[var(--radix-dropdown-menu-trigger-width)]" : "w-56",
+        )}
+      >
         <DropdownMenuLabel className="text-xs uppercase tracking-wide text-muted-foreground">
           {filter.label}
         </DropdownMenuLabel>
@@ -140,6 +154,62 @@ export function FilterBar({
       {filterOptions}
     </div>
   );
+  const activeFilterCount = filters.filter((filter) => {
+    if (filter.required) return filter.value !== null;
+    return filter.value !== null || filter.value === null;
+  }).length;
+  const mobileFilterControls = (
+    <div className="w-full space-y-5 pb-2">
+      {filters.map((filter) => {
+        const optionList = filter.required ? filter.options : ["All", ...filter.options];
+        const selectedValue = filter.required ? filter.value : (filter.value ?? "All");
+
+        return (
+          <div key={filter.id} className="space-y-2.5">
+            <div className="flex items-center justify-between">
+              <p className="text-base font-medium text-foreground">{filter.label}</p>
+            </div>
+            <div
+              className={cn("flex flex-wrap gap-2", optionList.length > 3 && "grid grid-cols-2")}
+            >
+              {optionList.map((option) => {
+                const optionLabel = filter.optionLabel?.(option) ?? option;
+                const isSelected =
+                  option === "All" ? filter.value === null : selectedValue === option;
+                const isTogglePill = optionList.some((item) => item === "All");
+                return (
+                  <button
+                    key={`${filter.id}-${option}`}
+                    type="button"
+                    onClick={() => {
+                      const nextValue = option === "All" ? null : option;
+                      filter.onChange(nextValue);
+                    }}
+                    className={cn(
+                      "min-h-10 rounded-full border px-3 text-sm font-medium transition-all duration-200",
+                      isSelected
+                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
+                        : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                      isTogglePill && optionList.length > 3 && "justify-self-stretch",
+                    )}
+                  >
+                    {optionLabel}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+      <button
+        type="button"
+        className="mt-2 flex h-12 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
+        onClick={() => setFiltersOpen(false)}
+      >
+        Apply ({activeFilterCount})
+      </button>
+    </div>
+  );
 
   return (
     <div
@@ -199,12 +269,23 @@ export function FilterBar({
       )}
       {collapsibleFilters ? (
         <Drawer open={isMobile && filtersOpen} onOpenChange={setFiltersOpen}>
-          <DrawerContent className="max-h-[82dvh] overflow-y-auto rounded-t-[2rem] border-border bg-background px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <DrawerHeader className="px-1 pb-4 text-left">
-              <DrawerTitle>Feed filters</DrawerTitle>
-              <DrawerDescription>Choose how to browse workplace stories.</DrawerDescription>
+          <DrawerContent className="max-h-[82dvh] overflow-y-auto rounded-t-[2rem] border-border bg-background px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <DrawerHeader className="flex items-center justify-between border-b border-border px-0 pb-4 text-left">
+              <DrawerTitle className="font-display text-[1.8rem] font-semibold">
+                Filters
+              </DrawerTitle>
+              <button
+                type="button"
+                className="text-sm font-medium text-primary"
+                onClick={() => {
+                  onReset();
+                  setFiltersOpen(false);
+                }}
+              >
+                Reset
+              </button>
             </DrawerHeader>
-            {filterOptions}
+            {mobileFilterControls}
           </DrawerContent>
         </Drawer>
       ) : null}

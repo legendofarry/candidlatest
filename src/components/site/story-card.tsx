@@ -238,13 +238,13 @@ export function StoryCard({
             to="/companies/$slug"
             params={{ slug: story.company_slug }}
             onClick={(event) => event.stopPropagation()}
-            className="relative z-10 inline-flex items-center gap-0.5 font-semibold leading-none text-foreground hover:text-primary"
+            className="relative z-10 inline-flex items-center gap-0.5 font-semibold leading-none text-primary hover:text-primary/80"
           >
             {story.company_name}
             {story.company_verified ? <CompanyVerifiedBadge /> : null}
           </Link>
         ) : (
-          <span className="inline-flex items-center gap-1 font-semibold leading-none text-foreground">
+          <span className="inline-flex items-center gap-1 font-semibold leading-none text-primary">
             {story.company_name}
             {story.company_verified ? <CompanyVerifiedBadge /> : null}
           </span>
@@ -607,6 +607,7 @@ export function FeedPostMenu({
       <Drawer open={mobileOpen} onOpenChange={setMobileOpen}>
         <DrawerContent
           className="max-h-[82dvh] rounded-t-3xl md:hidden"
+          overlayOnClick={(event) => event.stopPropagation()}
           onClick={(event) => event.stopPropagation()}
         >
           <DrawerHeader className="shrink-0 text-left">

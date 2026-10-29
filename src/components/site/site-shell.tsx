@@ -590,24 +590,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         </main>
 
         {pathname === "/" ? (
-          <footer className="border-t border-border py-10 text-sm text-muted-foreground md:ml-80">
-            <div className="flex flex-wrap gap-x-6 gap-y-2">
-              <Link to="/about" className="hover:text-foreground">
-                About
-              </Link>
-              <Link to="/guidelines" className="hover:text-foreground">
-                Community guidelines
-              </Link>
-              <Link to="/rights" className="hover:text-foreground">
-                Safety &amp; your rights
-              </Link>
-              <Link to="/privacy" className="hover:text-foreground">
-                Privacy &amp; disclaimer
-              </Link>
-              <Link to="/support" className="hover:text-foreground">
-                Help &amp; support
-              </Link>
-            </div>
+          <footer className="border-t border-border px-4 py-6 text-center text-sm text-muted-foreground md:ml-80">
+            © 2026 Lusaa Limited. All rights reserved. v1.1
           </footer>
         ) : null}
       </div>

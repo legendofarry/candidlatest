@@ -108,9 +108,44 @@ function BillingPage() {
                 {!isOfficial && membership?.source === "paid" && membership.assignedTier === "premium" && !membership.cancelAtPeriodEnd ? <Button className="mt-3 rounded-xl" variant="outline" disabled={downgradeMutation.isPending} onClick={() => { if (window.confirm("Premium access will continue until the current period ends. Your account and content stay intact. Continue?")) downgradeMutation.mutate(); }}>Move to Basic at expiry</Button> : null}
               </article>
               <article className="rounded-[1.7rem] border bg-card p-6 shadow-sm sm:p-8">
-                <div className="flex items-center gap-3"><span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary"><CreditCard className="size-5" /></span><div><p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">Payments</p><h2 className="mt-1 font-display text-xl font-semibold">Manual M-Pesa</h2></div></div>
-                <p className="mt-4 text-sm leading-6 text-muted-foreground">After you send payment proof, Candid reviews it. Your package activates once it’s confirmed.</p>
-                <p className="mt-4 text-sm">{data.paymentConfigured ? "Checkout is available for enabled packages." : "Checkout is not configured yet."}</p>
+                <div className="flex items-center gap-3">
+                  <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                    <CreditCard className="size-5" />
+                  </span>
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">Payment method</p>
+                    <h2 className="mt-1 font-display text-xl font-semibold">Manual M-Pesa</h2>
+                  </div>
+                </div>
+                {data.paymentConfigured ? (
+                  <dl className="mt-5 divide-y divide-border text-sm">
+                    <div className="flex justify-between gap-4 py-3">
+                      <dt className="text-muted-foreground">Payment type</dt>
+                      <dd className="text-right font-medium">{paymentModeLabel(data.paymentDetails.mode)}</dd>
+                    </div>
+                    <div className="flex justify-between gap-4 py-3">
+                      <dt className="text-muted-foreground">Send payment to</dt>
+                      <dd className="text-right font-semibold">{data.paymentDetails.business_number}</dd>
+                    </div>
+                    {data.paymentDetails.account_name ? (
+                      <div className="flex justify-between gap-4 py-3">
+                        <dt className="text-muted-foreground">Account name</dt>
+                        <dd className="text-right font-medium">{data.paymentDetails.account_name}</dd>
+                      </div>
+                    ) : null}
+                  </dl>
+                ) : (
+                  <p className="mt-4 text-sm text-muted-foreground">
+                    A payment method is not configured yet.
+                  </p>
+                )}
+                <p className="mt-3 text-sm leading-6 text-muted-foreground">
+                  {data.paymentDetails.reference_instructions}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                  After you send payment proof, Candid reviews it. Your package activates once it’s
+                  confirmed.
+                </p>
               </article>
             </section>
 
@@ -160,7 +195,7 @@ function BillingPage() {
             </section> : null}
 
             <section className="mt-12">
-              <div className="mb-4 flex items-end justify-between gap-4"><div><h2 className="font-display text-2xl font-semibold">Billing history</h2><p className="mt-1 text-sm text-muted-foreground">Payment reviews and subscription periods.</p></div><Button variant="ghost" size="sm" onClick={() => void billing.refetch()}><RefreshCw className="mr-2 size-4" />Refresh</Button></div>
+              <div className="mb-4 flex items-end justify-between gap-4"><div><h2 className="font-display text-2xl font-semibold">Payment history</h2><p className="mt-1 text-sm text-muted-foreground">Payment reviews and subscription periods.</p></div><Button variant="ghost" size="sm" onClick={() => void billing.refetch()}><RefreshCw className="mr-2 size-4" />Refresh</Button></div>
               {data.payments.length === 0 && data.history.length === 0 ? <div className="rounded-2xl border bg-card px-5 py-8 text-center text-sm text-muted-foreground">No billing activity yet.</div> : <div className="overflow-hidden rounded-2xl border bg-card">{data.payments.map((payment) => <div key={payment.id} className="flex flex-wrap items-center justify-between gap-3 border-b px-5 py-4 last:border-0"><div><p className="font-medium">{payment.package_name} · KSh {payment.expected_amount_kes.toLocaleString("en-KE")}</p><p className="mt-1 text-xs text-muted-foreground">{payment.payment_reference} · {formatDate(payment.submitted_at || payment.created_at)}</p>{payment.rejection_reason ? <p className="mt-1 text-xs text-destructive">{payment.rejection_reason}</p> : null}</div><div className="flex items-center gap-3"><span className="text-sm capitalize text-muted-foreground">{payment.status.replaceAll("_", " ")}</span>{["awaiting_payment", "pending_verification"].includes(payment.status) ? <Button size="sm" variant="outline" disabled={cancelPaymentMutation.isPending} onClick={() => { if (window.confirm("Cancel this payment request? If you already sent money, cancelling the request will not reverse or refund the M-Pesa transfer.")) cancelPaymentMutation.mutate(payment.id); }}>Cancel request</Button> : null}</div></div>)}{data.history.map((period) => <div key={period.id} className="flex flex-wrap items-center justify-between gap-3 border-t px-5 py-4"><div><p className="font-medium">{String(period["package_name"] ?? "Premium")} subscription</p><p className="mt-1 text-xs text-muted-foreground">{formatDate(String(period["starts_at"] ?? ""))} – {formatDate(String(period["ends_at"] ?? ""))}</p></div><span className="text-sm text-muted-foreground">KSh {Number(period["amount_kes"] ?? 0).toLocaleString("en-KE")} · M-Pesa</span></div>)}</div>}
             </section>
           </> : null}
@@ -172,6 +207,12 @@ function BillingPage() {
 }
 
 function capitalize(value: string) { return value ? value[0]!.toUpperCase() + value.slice(1) : "Basic"; }
+function paymentModeLabel(mode: "paybill" | "till" | "send_money" | null) {
+  if (mode === "paybill") return "M-Pesa Paybill";
+  if (mode === "till") return "M-Pesa Till";
+  if (mode === "send_money") return "M-Pesa Send Money";
+  return "Manual M-Pesa";
+}
 function statusLabel(status?: string, source?: string) {
   if (source === "complimentary") return "Complimentary";
   if (status === "expired") return "Expired";
