@@ -6,7 +6,6 @@ import { motion } from "motion/react";
 import type { User } from "firebase/auth";
 import { EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import {
-  BellRing,
   ChevronRight,
   Fingerprint,
   Settings2,
@@ -46,13 +45,6 @@ import { firebaseAuth } from "@/integrations/firebase/client";
 import { claimOfficialCandidAccount, getOnboardingState } from "@/lib/onboarding.functions";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
 import { clearDevelopmentFirestore, RESET_CONFIRMATION } from "@/lib/developer.functions";
-import {
-  registerMyPushToken,
-  sendMyPushTestNotification,
-  unregisterMyPushToken,
-} from "@/lib/push.functions";
-import { firebaseApp, registerFirebaseServiceWorker } from "@/integrations/firebase/client";
-import { hasPushOptIn, setPushOptIn } from "@/lib/push-preference";
 import { getMyFeedPreferences, updateFeedPreference } from "@/lib/social.functions";
 import {
   AlertDialog,
@@ -94,20 +86,9 @@ function SettingsPage() {
   const [developerResetText, setDeveloperResetText] = useState("");
   const [developerResetting, setDeveloperResetting] = useState(false);
   const [claimingCandid, setClaimingCandid] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(false);
-  const [pushAvailable, setPushAvailable] = useState(false);
-  const [pushPermission, setPushPermission] = useState<NotificationPermission | "unsupported">(
-    "default",
-  );
-  const [pushBusy, setPushBusy] = useState(false);
-  const [pushTestBusy, setPushTestBusy] = useState(false);
-  const [pushToken, setPushToken] = useState<string | null>(null);
   const fetchProfile = useServerFn(getOnboardingState);
   const claimCandidAccount = useServerFn(claimOfficialCandidAccount);
   const resetFirestore = useServerFn(clearDevelopmentFirestore);
-  const registerPush = useServerFn(registerMyPushToken);
-  const unregisterPush = useServerFn(unregisterMyPushToken);
-  const sendPushTest = useServerFn(sendMyPushTestNotification);
   const readFeedPreferences = useServerFn(getMyFeedPreferences);
   const changeFeedPreference = useServerFn(updateFeedPreference);
   const developerMode = import.meta.env.DEV || import.meta.env["VITE_DEVELOPER_MODE"] === "true";
@@ -139,180 +120,6 @@ function SettingsPage() {
     void isPlatformAuthenticatorAvailable().then(setBioAvailable);
     setEnrolled(user ? hasCredentialFor(user.uid) : false);
   }, [user]);
-
-  useEffect(() => {
-    let active = true;
-    void (async () => {
-      if (!user || typeof Notification === "undefined" || !("serviceWorker" in navigator)) {
-        if (active) {
-          setPushAvailable(false);
-          setPushEnabled(false);
-          setPushPermission("unsupported");
-        }
-        return;
-      }
-      try {
-        const messagingSdk = await import("firebase/messaging");
-        const supported = await messagingSdk.isSupported().catch(() => false);
-        if (!active) return;
-        setPushAvailable(supported);
-        setPushPermission(Notification.permission);
-        if (!supported || Notification.permission !== "granted") {
-          setPushEnabled(false);
-          return;
-        }
-        if (!hasPushOptIn(Notification.permission)) {
-          setPushEnabled(false);
-          return;
-        }
-        const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
-        if (!vapidKey) return;
-        const registration = await registerFirebaseServiceWorker();
-        const messaging = messagingSdk.getMessaging(firebaseApp);
-        const token = await messagingSdk.getToken(messaging, {
-          vapidKey,
-          serviceWorkerRegistration: registration,
-        });
-        if (!token || !active) return;
-        setPushToken(token);
-        setPushEnabled(true);
-      } catch (error) {
-        console.warn("[push settings] Could not restore this device", error);
-      }
-    })();
-    return () => {
-      active = false;
-    };
-  }, [user]);
-
-  async function togglePushNotifications(next: boolean) {
-    if (!user || pushBusy) return;
-    setPushBusy(true);
-    try {
-      const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
-      if (!vapidKey)
-        throw new Error("Push notifications are not configured for this Candid site yet.");
-      const ios = /iphone|ipad|ipod/i.test(navigator.userAgent);
-      const installed =
-        window.matchMedia("(display-mode: standalone)").matches ||
-        (navigator as Navigator & { standalone?: boolean }).standalone === true;
-      if (next && ios && !installed)
-        throw new Error(
-          "On iPhone or iPad, add Candid to your Home Screen before enabling notifications.",
-        );
-
-      if (next) {
-        if (typeof Notification === "undefined")
-          throw new Error("This browser does not support notifications.");
-        let permission = Notification.permission;
-        // Ask before any async setup so the browser still recognizes the user's click.
-        if (permission === "default") permission = await Notification.requestPermission();
-        setPushPermission(permission);
-        if (permission !== "granted") {
-          throw new Error(
-            permission === "denied"
-              ? "Notifications are blocked by your browser. Allow them in the browser's site settings."
-              : "Allow notifications to enable Candid alerts.",
-          );
-        }
-      }
-
-      const messagingSdk = await import("firebase/messaging");
-      if (!(await messagingSdk.isSupported()))
-        throw new Error("This browser does not support web push notifications.");
-      const messaging = messagingSdk.getMessaging(firebaseApp);
-      if (!next) {
-        const registration = await registerFirebaseServiceWorker();
-        const token =
-          pushToken ||
-          (await messagingSdk.getToken(messaging, {
-            vapidKey,
-            serviceWorkerRegistration: registration,
-          }));
-        if (token) await unregisterPush({ data: { token } });
-        await messagingSdk.deleteToken(messaging);
-        setPushOptIn(false);
-        setPushToken(null);
-        setPushEnabled(false);
-        return;
-      }
-      const registration = await registerFirebaseServiceWorker();
-      const token = await messagingSdk.getToken(messaging, {
-        vapidKey,
-        serviceWorkerRegistration: registration,
-      });
-      if (!token) throw new Error("This device did not return a notification token. Try again.");
-      await registerPush({ data: { token } });
-      setPushOptIn(true);
-      setPushToken(token);
-      setPushEnabled(true);
-      notify.success("Notifications are enabled on this device.");
-    } catch (error) {
-      const code =
-        error && typeof error === "object" && "code" in error
-          ? String((error as { code?: unknown }).code ?? "")
-          : "";
-      if (code === "messaging/token-subscribe-failed") {
-        notify.error("Firebase could not register this device", {
-          description:
-            "Check that FCM Registration API is enabled and that this deployment’s Firebase web config and VAPID key all belong to the same Firebase project.",
-        });
-      } else {
-        notify.error(
-          error instanceof Error ? error.message : "Could not update notification settings.",
-        );
-      }
-    } finally {
-      setPushBusy(false);
-    }
-  }
-
-  async function sendPushTestNotification() {
-    if (pushTestBusy) return;
-    setPushTestBusy(true);
-    try {
-      const result = await sendPushTest();
-      if (result.sent > 0) {
-        notify.success("Test notification sent", {
-          description: `Sent to ${result.sent} of ${result.registered} registered device${result.registered === 1 ? "" : "s"}.`,
-        });
-      } else if (result.registered === 0) {
-        notify.error("No push-enabled devices found", {
-          description: "Turn on push notifications for this browser or installed app first.",
-        });
-      } else {
-        notify.error("Candid could not deliver the test notification", {
-          description: "Check the Firebase Cloud Messaging setup, then try again.",
-        });
-      }
-    } catch (error) {
-      notify.error(error instanceof Error ? error.message : "Could not send a test notification.");
-    } finally {
-      setPushTestBusy(false);
-    }
-  }
-
-  const iosDevice =
-    typeof navigator !== "undefined" && /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const installedWebApp =
-    typeof window !== "undefined" &&
-    (window.matchMedia("(display-mode: standalone)").matches ||
-      (navigator as Navigator & { standalone?: boolean }).standalone === true);
-  const pushDescription = pushBusy
-    ? "Updating notification settings on this device…"
-    : !user
-      ? "Sign in to enable push alerts."
-      : !pushAvailable || pushPermission === "unsupported"
-        ? "This browser or device does not support web push notifications."
-        : !import.meta.env["VITE_FIREBASE_VAPID_KEY"]
-          ? "Push notifications are not configured for this site yet."
-          : pushPermission === "denied"
-            ? "Notifications are blocked. Allow them in your browser or device settings, then reload Candid."
-            : pushEnabled
-              ? "Enabled for this browser or installed app. Background alerts appear as system notifications; while Candid is open, they appear in Candid."
-              : iosDevice && !installedWebApp
-                ? "Off. On iPhone or iPad, first add Candid to your Home Screen, then enable alerts from the installed app."
-                : "Off. Turn this on to receive message and account alerts. Installing is optional on desktop and Android.";
 
   async function toggleBiometric(next: boolean) {
     if (!user) return;
@@ -568,43 +375,6 @@ function SettingsPage() {
               </nav>
               <div className="space-y-8">
                 <div id="security">
-                  <SettingsGroup title="Notifications">
-                    <ToggleRow
-                      icon={<BellRing className="size-4" />}
-                      title="Push notifications on this device"
-                      description={pushDescription}
-                      checked={pushEnabled}
-                      disabled={
-                        !user ||
-                        !pushAvailable ||
-                        pushBusy ||
-                        pushPermission === "denied" ||
-                        pushPermission === "unsupported" ||
-                        !import.meta.env["VITE_FIREBASE_VAPID_KEY"]
-                      }
-                      onCheckedChange={(next) => void togglePushNotifications(next)}
-                    />
-                    {pushEnabled ? (
-                      <div className="flex flex-wrap items-center justify-between gap-3 p-4">
-                        <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium">Check push delivery</p>
-                          <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
-                            Send a sample alert to your push-enabled browsers and installed apps.
-                            Keep another device in the background to check its system alert.
-                          </p>
-                        </div>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          disabled={pushTestBusy}
-                          onClick={() => void sendPushTestNotification()}
-                        >
-                          {pushTestBusy ? "Sending…" : "Send test"}
-                        </Button>
-                      </div>
-                    ) : null}
-                  </SettingsGroup>
                   <div className="mt-4">
                     <SettingsGroup title="Security & access">
                       <ToggleRow

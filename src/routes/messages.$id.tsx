@@ -11,12 +11,10 @@ import {
   Download,
   ImagePlus,
   Loader2,
-  Phone,
   Send,
   Smile,
   Trash2,
   X,
-  Video,
 } from "lucide-react";
 import type { ConversationView } from "@/lib/messaging.server";
 import {
@@ -35,7 +33,6 @@ import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
-import { requestConversationCall } from "@/components/site/call-center";
 import { onValue, ref } from "firebase/database";
 import { firebaseRealtimeDb } from "@/integrations/firebase/client";
 import {
@@ -547,10 +544,6 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
             <span className="flex items-center gap-1.5 text-xs text-zinc-400 sm:text-muted-foreground">{partnerPresence.online ? <span className="size-2 rounded-full bg-emerald-500" /> : null}{partner?.official ? "Official Candid account" : partnerActivity}</span>
           </span>
         </button>
-        {partner ? <div className="flex shrink-0 items-center gap-1">
-          <Button type="button" variant="ghost" size="icon" aria-label="Start voice call" title="Voice call" className="size-10 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => requestConversationCall(id, "audio")}><Phone className="size-5" /></Button>
-          <Button type="button" variant="ghost" size="icon" aria-label="Start video call" title="Video call" className="size-10 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => requestConversationCall(id, "video")}><Video className="size-5" /></Button>
-        </div> : null}
       </header>
 
       <div
