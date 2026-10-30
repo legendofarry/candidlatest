@@ -482,9 +482,8 @@ export function FeedPostMenu({
           event.stopPropagation();
           runMobileAction(action);
         }}
-        className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50 ${
-          destructive ? "text-destructive" : "text-foreground"
-        }`}
+        className={`flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm font-medium transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-50 ${destructive ? "text-destructive" : "text-foreground"
+          }`}
       >
         <Icon className="size-4 shrink-0" />
         {label}
@@ -612,29 +611,24 @@ export function FeedPostMenu({
         >
           <DrawerHeader className="shrink-0 text-left">
             <DrawerTitle>Post options</DrawerTitle>
-            <DrawerDescription>
-              {story.title
-                ? `Choose an action for “${story.title}”.`
-                : "Choose an action for this post."}
-            </DrawerDescription>
           </DrawerHeader>
           <div className="min-h-0 overflow-y-auto px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             {mobileAction(Share2, "Share post", () => void share())}
             {story.author_id && story.author_id !== userId
               ? mobileAction(
-                  UserRoundPlus,
-                  relationshipUnavailable ? relationshipStatusMessage : followLabel,
-                  () => void followPublisher(),
-                  relationshipUnavailable,
-                )
+                UserRoundPlus,
+                relationshipUnavailable ? relationshipStatusMessage : followLabel,
+                () => void followPublisher(),
+                relationshipUnavailable,
+              )
               : null}
             {story.author_id && story.author_id !== userId
               ? mobileAction(
-                  Ban,
-                  relationshipUnavailable ? relationshipStatusMessage : blockLabel,
-                  () => void blockPublisher(),
-                  relationshipUnavailable,
-                )
+                Ban,
+                relationshipUnavailable ? relationshipStatusMessage : blockLabel,
+                () => void blockPublisher(),
+                relationshipUnavailable,
+              )
               : null}
             <div className="my-2 border-t border-border" />
             <p className="px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
@@ -650,19 +644,19 @@ export function FeedPostMenu({
             )}
             {story.author_id && story.author_id !== userId
               ? mobileAction(
-                  UserRoundX,
-                  "Fewer posts from this account",
-                  () => void notInterested("author", story.author_id!),
-                  !userId,
-                )
+                UserRoundX,
+                "Fewer posts from this account",
+                () => void notInterested("author", story.author_id!),
+                !userId,
+              )
               : null}
             {story.company_id
               ? mobileAction(
-                  Building2,
-                  `Fewer posts about ${story.company_name ?? "this employer"}`,
-                  () => void notInterested("company", story.company_id!),
-                  !userId,
-                )
+                Building2,
+                `Fewer posts about ${story.company_name ?? "this employer"}`,
+                () => void notInterested("company", story.company_id!),
+                !userId,
+              )
               : null}
             <div className="my-2 border-t border-border" />
             {mobileAction(

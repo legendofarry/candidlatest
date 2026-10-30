@@ -95,11 +95,15 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       aliases: company.aliases ?? [],
     });
     validateEmployerName(data.name);
-    const slug = slugify(data.name);
+    const { findKnownKenyanEmployer } = await import("./kenyan-employers");
+    const knownEmployer = findKnownKenyanEmployer(data.name);
+    const companyName = knownEmployer?.name ?? data.name.trim();
+    const companyIndustry = knownEmployer?.industry ?? data.industry;
+    const slug = slugify(companyName);
     if (!slug) throw new Error("Enter a valid employer name.");
 
     const { normalizeCompanyName } = await import("./company-match");
-    const normalized = normalizeCompanyName(data.name);
+    const normalized = normalizeCompanyName(companyName);
     const indexId = slugify(normalized);
     const [slugMatch, indexSnap] = await Promise.all([
       queryFirst<CompanyRecord>("companies", "slug", slug),
@@ -117,14 +121,21 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
         : null);
     if (exact) {
       // Remember this alternate spelling so future matches resolve here.
-      const aliases = new Set([...(exact.aliases ?? [])]);
-      if (![exact.name, ...aliases].some((n) => n.toLowerCase() === data.name.toLowerCase())) {
-        aliases.add(data.name);
-        await db
-          .collection("companies")
-          .doc(exact.id)
-          .update({ aliases: [...aliases] });
-        exact.aliases = [...aliases];
+      const originalAliases = exact.aliases ?? [];
+      const aliases = new Set(originalAliases);
+      const addCanonicalAlias = ![exact.name, ...aliases].some(
+        (n) => n.toLowerCase() === companyName.toLowerCase(),
+      );
+      if (addCanonicalAlias) {
+        aliases.add(companyName);
+      }
+      const patch: Partial<CompanyRecord> = {};
+      if (knownEmployer && exact.is_public !== true) patch.is_public = true;
+      if (knownEmployer && !exact.industry) patch.industry = companyIndustry;
+      if (addCanonicalAlias) patch.aliases = [...aliases];
+      if (Object.keys(patch).length) {
+        await db.collection("companies").doc(exact.id).update(patch);
+        Object.assign(exact, patch);
       }
       if (indexId) {
         const indexRef = db.collection("company_name_index").doc(indexId);
@@ -155,8 +166,20 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
         ?.company_id;
       if (racedCompanyId) {
         const racedCompany = await db.collection("companies").doc(racedCompanyId).get();
-        if (racedCompany.exists)
-          return clientCompany({ ...(racedCompany.data() as CompanyRecord), id: racedCompany.id });
+        if (racedCompany.exists) {
+          const racedRecord = {
+            ...(racedCompany.data() as CompanyRecord),
+            id: racedCompany.id,
+          };
+          const knownPatch: Partial<CompanyRecord> = {};
+          if (knownEmployer && racedRecord.is_public !== true) knownPatch.is_public = true;
+          if (knownEmployer && !racedRecord.industry) knownPatch.industry = companyIndustry;
+          if (Object.keys(knownPatch).length) {
+            await racedCompany.ref.update(knownPatch);
+            Object.assign(racedRecord, knownPatch);
+          }
+          return clientCompany(racedRecord);
+        }
       }
       throw new Error("This employer is being added already. Try selecting it again in a moment.");
     }
@@ -164,10 +187,10 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
     const created: CompanyRecord = {
       id: generateId(),
       slug,
-      name: data.name,
-      industry: data.industry,
+      name: companyName,
+      industry: companyIndustry,
       county: data.county,
-      is_public: false,
+      is_public: Boolean(knownEmployer),
       verified: false,
       created_at: new Date().toISOString(),
       aliases: [],
@@ -186,26 +209,28 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
       throw error;
     }
 
-    try {
-      const { researchCompany } = await import("./ai.server");
-      const profile = await researchCompany({
-        name: created.name,
-        industry: created.industry,
-        county: created.county,
-      });
-      if (profile) {
-        await db
-          .collection("company_ai_profiles")
-          .doc(created.id)
-          .set({
-            company_id: created.id,
-            ...profile,
-            generated_at: new Date().toISOString(),
-            locked: false,
-          });
+    if (!knownEmployer) {
+      try {
+        const { researchCompany } = await import("./ai.server");
+        const profile = await researchCompany({
+          name: created.name,
+          industry: created.industry,
+          county: created.county,
+        });
+        if (profile) {
+          await db
+            .collection("company_ai_profiles")
+            .doc(created.id)
+            .set({
+              company_id: created.id,
+              ...profile,
+              generated_at: new Date().toISOString(),
+              locked: false,
+            });
+        }
+      } catch (error) {
+        console.error("[findOrCreateCompany] research failed", error);
       }
-    } catch (error) {
-      console.error("[findOrCreateCompany] research failed", error);
     }
 
     return clientCompany(created);
@@ -422,14 +447,14 @@ export const createStory = createServerFn({ method: "POST" })
     // Tell the company's claimed account it was tagged in a new live story.
     if (created.status === "published") {
       try {
-        const [{ pushServerNotification, resolveMentionedUserIds }, owners, actorSnap] = await Promise.all([
-          import("./notifications.server"),
-          db.collection("account_verifications").where("company_id", "==", company.id).get(),
-          db.collection("profiles").doc(context.userId).get(),
-        ]);
+        const [{ pushServerNotification, resolveMentionedUserIds }, owners, actorSnap] =
+          await Promise.all([
+            import("./notifications.server"),
+            db.collection("account_verifications").where("company_id", "==", company.id).get(),
+            db.collection("profiles").doc(context.userId).get(),
+          ]);
         const actorProfile = actorSnap.data() as
-          | { username?: string | null; photo_url?: string | null }
-          | undefined;
+          { username?: string | null; photo_url?: string | null } | undefined;
         const actor = {
           id: context.userId,
           username: actorProfile?.username ?? null,
@@ -877,8 +902,7 @@ export const likeComment = createServerFn({ method: "POST" })
             : Promise.resolve(null),
         ]);
         const actorProfile = actorSnap.data() as
-          | { username?: string | null; photo_url?: string | null }
-          | undefined;
+          { username?: string | null; photo_url?: string | null } | undefined;
         const actorName = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
         const story = storySnap?.data() as { title?: string } | undefined;
         await pushServerNotification({

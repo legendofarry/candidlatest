@@ -10,13 +10,12 @@ import {
   CalendarDays,
   Ellipsis,
   Heart,
-  Image,
   Link2,
   LockKeyhole,
   MapPin,
   MessageSquare,
+  PenLine,
   Pin,
-  Plus,
   Share2,
   UserRound,
   UserPlus,
@@ -29,6 +28,7 @@ import {
   getPublicProfileStories,
   startConversation,
   toggleBlockAccount,
+  updateMyProfileBio,
 } from "@/lib/messaging.functions";
 import { followAccount } from "@/lib/social.functions";
 import { Button } from "@/components/ui/button";
@@ -51,6 +51,15 @@ import { MembershipBadge } from "@/components/site/membership-badge";
 import { MentionText } from "@/components/site/mention-textarea";
 import { ProfileCommunity } from "@/components/site/profile-community";
 import { ProfileStoryComments } from "@/components/site/profile-story-comments";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 type ProfileStory = {
   id: string;
@@ -88,9 +97,13 @@ export const Route = createFileRoute("/u/$username")({
 function PublicProfilePage() {
   const { username } = Route.useParams();
   const { user, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
+  const [bioEditorOpen, setBioEditorOpen] = useState(false);
+  const [bioDraft, setBioDraft] = useState("");
+  const [savingBio, setSavingBio] = useState(false);
   const [activeTab, setActiveTab] = useState<"All" | "Stories" | "About">("All");
   const [profileMenuOpen, setProfileMenuOpen] = useState(false);
   const [signUpPromptOpen, setSignUpPromptOpen] = useState(false);
@@ -105,6 +118,7 @@ function PublicProfilePage() {
   const follow = useServerFn(followAccount);
   const block = useServerFn(toggleBlockAccount);
   const openChat = useServerFn(startConversation);
+  const saveBio = useServerFn(updateMyProfileBio);
 
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["public-profile", username, user?.uid ?? null],
@@ -237,12 +251,68 @@ function PublicProfilePage() {
     }
   }
 
+  function openBioEditor() {
+    setBioDraft(profile.bio ?? "");
+    setBioEditorOpen(true);
+  }
+
+  async function submitBio() {
+    setSavingBio(true);
+    try {
+      await saveBio({ data: { bio: bioDraft } });
+      await queryClient.invalidateQueries({ queryKey: ["public-profile", username] });
+      setBioEditorOpen(false);
+      notify.success("Your About section was updated.");
+    } catch (error) {
+      notify.error(error instanceof Error ? error.message : "Could not update your About section.");
+    } finally {
+      setSavingBio(false);
+    }
+  }
+
   const socialLinks = profile.socials
     ? (Object.entries(profile.socials) as [string, string | null][])
         .map(([key, value]) => [key, profileLink(key, value)] as const)
         .filter((entry): entry is readonly [string, string] => Boolean(entry[1]))
     : [];
   const tabs = ["All", "Stories", "About"] as const;
+  const bioEditorForm = (
+    <form
+      onSubmit={(event) => {
+        event.preventDefault();
+        void submitBio();
+      }}
+      className="space-y-4"
+    >
+      <label htmlFor="profile-bio" className="block text-sm font-medium">
+        Bio
+      </label>
+      <Textarea
+        id="profile-bio"
+        value={bioDraft}
+        onChange={(event) => setBioDraft(event.target.value)}
+        maxLength={500}
+        rows={5}
+        placeholder="Write a little about yourself"
+        className="resize-y"
+      />
+      <p className="-mt-3 text-right text-xs text-muted-foreground">{bioDraft.length}/500</p>
+      <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+        <Button
+          type="button"
+          variant="ghost"
+          className="min-h-11 w-full sm:w-auto"
+          onClick={() => setBioEditorOpen(false)}
+          disabled={savingBio}
+        >
+          Cancel
+        </Button>
+        <Button type="submit" className="min-h-11 w-full sm:w-auto" disabled={savingBio}>
+          {savingBio ? "Saving…" : "Save bio"}
+        </Button>
+      </div>
+    </form>
+  );
 
   return (
     <div className="-mt-4 w-full overflow-x-clip bg-background text-foreground md:mt-0">
@@ -381,76 +451,67 @@ function PublicProfilePage() {
                 ) : null}
               </div>
             </div>
-            <div className="flex gap-2 sm:pb-1">
-              {profile.isSelf ? (
+            {!profile.isSelf ? (
+              <div className="flex gap-2 sm:pb-1">
                 <Button
-                  className="flex-1 rounded-lg sm:flex-none"
-                  onClick={() => navigate({ to: "/post" })}
+                  disabled={busy || profile.isBlocked}
+                  className={cn(
+                    "h-10 flex-1 rounded-lg sm:flex-none",
+                    profile.isFollowing && "bg-secondary text-foreground hover:bg-secondary/80",
+                  )}
+                  onClick={() => {
+                    if (!user) {
+                      void navigate({ to: "/auth" });
+                      return;
+                    }
+                    void run(() => follow({ data: { user_id: profile.id } }));
+                  }}
                 >
-                  <Plus className="size-4" /> Create story
+                  {profile.isFollowing ? (
+                    <UserCheck className="size-4" />
+                  ) : (
+                    <UserPlus className="size-4" />
+                  )}
+                  {profile.isFollowing
+                    ? "Unfollow"
+                    : profile.followStatus === "pending"
+                      ? "Cancel request"
+                      : profile.followsYou
+                        ? "Follow back"
+                        : user
+                          ? "Follow"
+                          : "Sign in to follow"}
                 </Button>
-              ) : (
-                <>
-                  <Button
-                    disabled={busy || profile.isBlocked}
-                    className={cn(
-                      "h-10 flex-1 rounded-lg sm:flex-none",
-                      profile.isFollowing && "bg-secondary text-foreground hover:bg-secondary/80",
-                    )}
-                    onClick={() => {
+                <Button
+                  variant="secondary"
+                  className="h-10 flex-1 rounded-lg sm:flex-none"
+                  disabled={
+                    busy || profile.isBlocked || Boolean(user && !profile.messaging.allowed)
+                  }
+                  onClick={() =>
+                    void (async () => {
                       if (!user) {
                         void navigate({ to: "/auth" });
                         return;
                       }
-                      void run(() => follow({ data: { user_id: profile.id } }));
-                    }}
-                  >
-                    {profile.isFollowing ? (
-                      <UserCheck className="size-4" />
-                    ) : (
-                      <UserPlus className="size-4" />
-                    )}
-                    {profile.isFollowing
-                      ? "Unfollow"
-                      : profile.followStatus === "pending"
-                        ? "Cancel request"
-                        : profile.followsYou
-                          ? "Follow back"
-                          : user
-                            ? "Follow"
-                            : "Sign in to follow"}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="h-10 flex-1 rounded-lg sm:flex-none"
-                    disabled={
-                      busy || profile.isBlocked || Boolean(user && !profile.messaging.allowed)
-                    }
-                    onClick={() =>
-                      void (async () => {
-                        if (!user) {
-                          void navigate({ to: "/auth" });
-                          return;
-                        }
-                        setBusy(true);
-                        try {
-                          const result = await openChat({ data: { user_id: profile.id } });
-                          navigate({ to: "/messages/$id", params: { id: result.conversation_id } });
-                        } catch (error) {
-                          notify.error(
-                            error instanceof Error ? error.message : "Cannot message this account",
-                          );
-                        } finally {
-                          setBusy(false);
-                        }
-                      })()
-                    }
-                  >
-                    <MessageSquare className="size-4" /> {user ? "Message" : "Sign in to message"}
-                  </Button>
-                </>
-              )}
-            </div>
+                      setBusy(true);
+                      try {
+                        const result = await openChat({ data: { user_id: profile.id } });
+                        navigate({ to: "/messages/$id", params: { id: result.conversation_id } });
+                      } catch (error) {
+                        notify.error(
+                          error instanceof Error ? error.message : "Cannot message this account",
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    })()
+                  }
+                >
+                  <MessageSquare className="size-4" /> {user ? "Message" : "Sign in to message"}
+                </Button>
+              </div>
+            ) : null}
           </div>
 
           <div className="border-b border-border py-2 text-left sm:py-3">
@@ -502,8 +563,23 @@ function PublicProfilePage() {
           <section className="border-y border-border/70 bg-card/80 px-4 py-3 sm:rounded-xl sm:border sm:px-5 sm:py-4">
             <div className="mb-3 flex items-center justify-between">
               <h2 className="text-lg font-bold sm:text-xl">About @{profile.username}</h2>
+              {profile.isSelf ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Edit your bio"
+                  title="Edit your bio"
+                  onClick={openBioEditor}
+                >
+                  <PenLine className="size-5" />
+                </Button>
+              ) : null}
             </div>
             <div className="space-y-3">
+              {profile.bio ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">{profile.bio}</p>
+              ) : null}
               {profile.role_label ? (
                 <p className="flex items-center gap-3 text-sm">
                   <BriefcaseBusiness className="size-4 shrink-0 text-muted-foreground" />
@@ -531,7 +607,10 @@ function PublicProfilePage() {
                   <span className="capitalize">{key}</span>
                 </a>
               ))}
-              {!profile.role_label && !profile.county && socialLinks.length === 0 ? (
+              {!profile.bio &&
+              !profile.role_label &&
+              !profile.county &&
+              socialLinks.length === 0 ? (
                 <p className="text-sm text-muted-foreground">No public details have been shared.</p>
               ) : null}
             </div>
@@ -603,28 +682,12 @@ function PublicProfilePage() {
                 </div>
               </div>
               {profile.isSelf ? (
-                <>
-                  <Link
-                    to="/post"
-                    className="flex items-center gap-3 border-y border-border px-4 py-3 sm:px-5"
-                  >
-                    <ProfileAvatar
-                      photoUrl={profile.photo_url}
-                      initials={profile.username.slice(0, 2)}
-                      className="size-10 border border-border"
-                    />
-                    <span className="flex-1 rounded-full bg-secondary px-4 py-2.5 text-sm text-muted-foreground">
-                      Share a workplace story…
-                    </span>
-                    <Image className="size-5 text-primary" />
-                  </Link>
-                  <Link
-                    to="/profile"
-                    className="mx-4 my-3 flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold sm:mx-5"
-                  >
-                    <BookOpen className="size-4" /> Manage stories
-                  </Link>
-                </>
+                <Link
+                  to="/profile"
+                  className="mx-4 my-3 flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold sm:mx-5"
+                >
+                  <BookOpen className="size-4" /> Manage stories
+                </Link>
               ) : null}
               {visibleProfileStories.length ? (
                 <div className="divide-y divide-border">
@@ -730,6 +793,28 @@ function PublicProfilePage() {
             </section>
           </div>
         ) : null
+      ) : null}
+
+      {profile.isSelf && isMobile ? (
+        <Drawer open={bioEditorOpen} onOpenChange={setBioEditorOpen}>
+          <DrawerContent className="max-h-[85dvh] rounded-t-3xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <DrawerHeader className="text-left">
+              <DrawerTitle>Edit your bio</DrawerTitle>
+              <DrawerDescription>
+                Add a short introduction to your public profile.
+              </DrawerDescription>
+            </DrawerHeader>
+            {bioEditorForm}
+          </DrawerContent>
+        </Drawer>
+      ) : profile.isSelf ? (
+        <Dialog open={bioEditorOpen} onOpenChange={setBioEditorOpen}>
+          <DialogContent>
+            <DialogTitle>Edit your bio</DialogTitle>
+            <DialogDescription>Add a short introduction to your public profile.</DialogDescription>
+            {bioEditorForm}
+          </DialogContent>
+        </Dialog>
       ) : null}
 
       <ProfileStoryComments

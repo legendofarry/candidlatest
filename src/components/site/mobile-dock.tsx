@@ -26,8 +26,6 @@ import {
 } from "@/components/ui/drawer";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
-import { requestPwaInstall } from "@/lib/pwa-install";
-import { notify } from "@/lib/notifications-store";
 
 type DockSheet = "you" | "help" | null;
 
@@ -157,7 +155,7 @@ export function MobileDock({
             </DrawerTitle>
             <DrawerDescription>
               {sheet === "help"
-                ? "Guidance, support and information about Candid."
+                ? ""
                 : signedIn
                   ? ""
                   : "Sign in to post stories, comment and follow employers."}
@@ -205,25 +203,19 @@ export function MobileDock({
             ) : (
               <>
                 {signedIn ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSheet(null);
-                      void requestPwaInstall().catch(() =>
-                        notify.error(
-                          "Your browser could not open the install prompt. Try the browser menu.",
-                        ),
-                      );
-                    }}
+                  <a
+                    href="/downloads/candid.apk"
+                    download="candid.apk"
+                    onClick={() => setSheet(null)}
                     className="mb-2 flex w-full items-center gap-3 rounded-2xl border border-primary/30 bg-primary px-3 py-3.5 text-left text-primary-foreground shadow-[0_0_28px_hsl(var(--primary)/0.32)] transition hover:brightness-105 active:scale-[0.99]"
                   >
                     <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-black/10">
                       <Smartphone className="size-5" />
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block text-sm font-bold">Install Candid app</span>
+                      <span className="block text-sm font-bold">Download Candid for Android</span>
                       <span className="mt-0.5 block text-xs text-primary-foreground/80">
-                        Check this device and install from your browser
+                        Download the Android app package
                       </span>
                     </span>
                     <span
@@ -232,7 +224,7 @@ export function MobileDock({
                     >
                       App
                     </span>
-                  </button>
+                  </a>
                 ) : null}
                 {signedIn ? (
                   <>

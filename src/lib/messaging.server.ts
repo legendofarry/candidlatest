@@ -513,6 +513,22 @@ export async function savePrivacySettings(
   return record;
 }
 
+export async function saveProfileBio(userId: string, bio: string) {
+  const db = getFirestoreDb();
+  const normalizedBio = bio.trim();
+  await db
+    .collection("profiles")
+    .doc(userId)
+    .set(
+    {
+      bio: normalizedBio || null,
+      updated_at: now(),
+    },
+    { merge: true },
+    );
+  return { bio: normalizedBio };
+}
+
 export async function listFollowRequests(userId: string) {
   const db = getFirestoreDb();
   const snapshot = await db
@@ -1312,6 +1328,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       : { allowed: false as const, reason: null };
   return {
     ...participants.get(userId)!,
+    bio: profile?.bio ?? null,
     role_label: profile?.role_label ?? null,
     account_type: profile?.account_type ?? "unknown",
     photo_url: profile?.photo_url ?? null,

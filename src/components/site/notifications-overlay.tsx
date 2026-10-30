@@ -8,9 +8,9 @@ import {
   Archive,
   ArrowLeft,
   Bell,
+  Check,
   CheckCheck,
   CheckCircle2,
-  Check,
   ChevronRight,
   ListFilter,
   Info,
@@ -33,17 +33,18 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   archiveNotification,
+  archiveNotifications,
   backToNotificationList,
-  clearArchived,
-  clearNotifications,
   closeNotifications,
   ingestServerNotifications,
-  markAllRead,
   markRead,
+  markNotificationsRead,
+  markNotificationsUnread,
   markUnread,
   openNotificationDetail,
   pruneExpired,
   removeNotification,
+  removeNotifications,
   unarchiveNotification,
   useNotifications,
   useNotificationsOverlay,
@@ -104,12 +105,11 @@ function timeAgo(ts: number) {
 
 type PendingAction =
   | { type: "delete"; id: string }
+  | { type: "deleteMany"; ids: string[] }
   | { type: "read"; id: string }
   | { type: "unread"; id: string }
   | { type: "archive"; id: string }
-  | { type: "unarchive"; id: string }
-  | { type: "clear" }
-  | { type: "emptyArchive" };
+  | { type: "unarchive"; id: string };
 
 type NotificationFilter =
   "all" | "unread" | "follows" | "likes" | "comments" | "mentions" | "messages" | "other";
@@ -170,6 +170,8 @@ export function NotificationsOverlay() {
   const [filter, setFilter] = useState<NotificationFilter>("all");
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [notificationActionId, setNotificationActionId] = useState<string | null>(null);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(20);
   const panelRef = useRef<HTMLDivElement | null>(null);
   const pullStartRef = useRef<number | null>(null);
@@ -202,6 +204,56 @@ export function NotificationsOverlay() {
   const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
 
   const unread = all.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0);
+  const selectedNotifications = matchingNotifications.filter((n) => selectedIds.has(n.id));
+  const selectedCount = selectedIds.size;
+
+  function exitSelectionMode() {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }
+
+  function toggleSelected(id: string) {
+    setSelectionMode(true);
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function startSelectionMode() {
+    setSelectionMode(true);
+  }
+
+  function markSelectedReadOrUnread() {
+    if (selectedCount === 0) return;
+    if (selectedNotifications.some((n) => !n.read)) markNotificationsRead([...selectedIds]);
+    else markNotificationsUnread([...selectedIds]);
+    exitSelectionMode();
+  }
+
+  function archiveSelected() {
+    if (selectedCount === 0) return;
+    archiveNotifications([...selectedIds], tab === "inbox");
+    exitSelectionMode();
+  }
+
+  function deleteSelected() {
+    if (!selectedCount) return;
+    setPending({ type: "deleteMany", ids: [...selectedIds] });
+  }
+
+  useEffect(() => {
+    if (open) return;
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, [open]);
+
+  useEffect(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, [tab, search, filter]);
 
   // Sweep expired one-time notices whenever the centre is opened.
   useEffect(() => {
@@ -262,12 +314,12 @@ export function NotificationsOverlay() {
   function runPending() {
     if (!pending) return;
     if (pending.type === "delete") removeNotification(pending.id);
+    if (pending.type === "deleteMany") removeNotifications(pending.ids);
     if (pending.type === "read") markRead(pending.id);
     if (pending.type === "unread") markUnread(pending.id);
     if (pending.type === "archive") archiveNotification(pending.id);
     if (pending.type === "unarchive") unarchiveNotification(pending.id);
-    if (pending.type === "clear") clearNotifications();
-    if (pending.type === "emptyArchive") clearArchived();
+    if (pending.type === "deleteMany") exitSelectionMode();
     setPending(null);
   }
 
@@ -355,6 +407,9 @@ export function NotificationsOverlay() {
           onActivate={activate}
           onOpenActions={setNotificationActionId}
           onRequest={setPending}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelected={toggleSelected}
         />
         <Group
           label="Earlier"
@@ -362,6 +417,9 @@ export function NotificationsOverlay() {
           onActivate={activate}
           onOpenActions={setNotificationActionId}
           onRequest={setPending}
+          selectionMode={selectionMode}
+          selectedIds={selectedIds}
+          onToggleSelected={toggleSelected}
         />
         {matchingNotifications.length > visibleCount || serverPages.hasNextPage ? (
           <div className="flex flex-col items-center gap-2 pt-1">
@@ -546,14 +604,20 @@ export function NotificationsOverlay() {
                   variant="outline"
                   size="icon"
                   aria-label={
-                    view.name === "list" ? "Close notifications" : "Back to notifications"
+                    selectionMode
+                      ? "Cancel notification selection"
+                      : view.name === "list"
+                        ? "Close notifications"
+                        : "Back to notifications"
                   }
                   className="!size-12 shrink-0 rounded-full border-2"
-                  onClick={() =>
-                    view.name === "list" ? closeNotifications() : backToNotificationList()
-                  }
+                  onClick={() => {
+                    if (selectionMode) exitSelectionMode();
+                    else if (view.name === "list") closeNotifications();
+                    else backToNotificationList();
+                  }}
                 >
-                  <ArrowLeft className="size-4" />
+                  {selectionMode ? <X className="size-4" /> : <ArrowLeft className="size-4" />}
                 </Button>
 
                 <div className="min-w-0">
@@ -561,7 +625,11 @@ export function NotificationsOverlay() {
                     {view.name === "list" ? "Notifications" : "Notification"}
                   </h2>
                   <p className="text-sm font-medium text-muted-foreground">
-                    {unread > 0 ? `${unread} unread` : "You're all caught up"}
+                    {selectionMode
+                      ? `${selectedCount} selected`
+                      : unread > 0
+                        ? `${unread} unread`
+                        : "You're all caught up"}
                   </p>
                 </div>
 
@@ -571,30 +639,73 @@ export function NotificationsOverlay() {
                     view.name === "detail" && "hidden xl:flex",
                   )}
                 >
-                  <>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      aria-label="Mark all notifications as read"
-                      className="!size-10 rounded-full border-2 sm:!size-12"
-                      onClick={markAllRead}
-                      disabled={unread === 0 || tab === "archive"}
-                    >
-                      <CheckCheck className="size-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      aria-label={tab === "archive" ? "Empty archive" : "Clear all notifications"}
-                      className="!size-10 rounded-full border-2 sm:!size-12"
-                      disabled={notifications.length === 0}
-                      onClick={() =>
-                        setPending({ type: tab === "archive" ? "emptyArchive" : "clear" })
-                      }
-                    >
-                      <Trash2 className="size-4" />
-                    </Button>
-                  </>
+                  {view.name === "list" ? (
+                    selectionMode ? (
+                      <>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          aria-label={
+                            selectedNotifications.some((n) => !n.read)
+                              ? "Mark selected notifications as read"
+                              : "Mark selected notifications as unread"
+                          }
+                          title={
+                            selectedNotifications.some((n) => !n.read)
+                              ? "Mark selected as read"
+                              : "Mark selected as unread"
+                          }
+                          className="!size-10 rounded-full border-2 sm:!size-12"
+                          onClick={markSelectedReadOrUnread}
+                          disabled={selectedCount === 0}
+                        >
+                          {selectedNotifications.some((n) => !n.read) ? (
+                            <CheckCheck className="size-4" />
+                          ) : (
+                            <Check className="size-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          aria-label={
+                            tab === "archive"
+                              ? "Move selected notifications to inbox"
+                              : "Archive selected notifications"
+                          }
+                          title={tab === "archive" ? "Move to inbox" : "Archive selected"}
+                          className="!size-10 rounded-full border-2 sm:!size-12"
+                          onClick={archiveSelected}
+                          disabled={selectedCount === 0}
+                        >
+                          <Archive className="size-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          aria-label="Delete selected notifications"
+                          title="Delete selected"
+                          className="!size-10 rounded-full border-2 text-destructive sm:!size-12"
+                          onClick={deleteSelected}
+                          disabled={selectedCount === 0}
+                        >
+                          <Trash2 className="size-4" />
+                        </Button>
+                      </>
+                    ) : (
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        aria-label="Select notifications"
+                        title="Select notifications"
+                        className="!size-10 rounded-full border-2 sm:!size-12"
+                        onClick={startSelectionMode}
+                        disabled={notifications.length === 0}
+                      >
+                        <CheckCheck className="size-4" />
+                      </Button>
+                    )
+                  ) : null}
                   {view.name !== "list" ? (
                     <Button
                       variant="outline"
@@ -786,33 +897,31 @@ export function NotificationsOverlay() {
         <AlertDialogContent className="z-[95]">
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {pending?.type === "clear"
-                ? "Clear every notification?"
-                : pending?.type === "emptyArchive"
-                  ? "Empty the archive?"
-                  : pending?.type === "delete"
-                    ? "Delete this notification?"
-                    : pending?.type === "archive"
-                      ? "Archive this notification?"
-                      : pending?.type === "unarchive"
-                        ? "Move back to inbox?"
-                        : pending?.type === "unread"
-                          ? "Mark as unread?"
-                          : "Mark as read?"}
+              {pending?.type === "deleteMany"
+                ? `Delete ${pending.ids.length} selected notification${pending.ids.length === 1 ? "" : "s"}?`
+                : pending?.type === "delete"
+                  ? "Delete this notification?"
+                  : pending?.type === "archive"
+                    ? "Archive this notification?"
+                    : pending?.type === "unarchive"
+                      ? "Move back to inbox?"
+                      : pending?.type === "unread"
+                        ? "Mark as unread?"
+                        : "Mark as read?"}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {pending?.type === "clear"
-                ? "This removes all inbox notifications from this device. It cannot be undone."
-                : pending?.type === "emptyArchive"
-                  ? "This permanently deletes everything in the archive. It cannot be undone."
-                  : pending?.type === "delete"
-                    ? "It will be removed from this device. It cannot be undone."
-                    : "You can change this again at any time."}
+              {pending?.type === "deleteMany"
+                ? "These notifications will be removed from this device. This cannot be undone."
+                : pending?.type === "delete"
+                  ? "It will be removed from this device. It cannot be undone."
+                  : "You can change this again at any time."}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={runPending}>Confirm</AlertDialogAction>
+            <AlertDialogAction onClick={runPending}>
+              {pending?.type === "deleteMany" || pending?.type === "delete" ? "Delete" : "Confirm"}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
@@ -874,12 +983,18 @@ function Group({
   onActivate,
   onOpenActions,
   onRequest,
+  selectionMode,
+  selectedIds,
+  onToggleSelected,
 }: {
   label: string;
   items: AppNotification[];
   onActivate: (n: AppNotification) => void;
   onOpenActions: (id: string) => void;
   onRequest: (action: PendingAction) => void;
+  selectionMode: boolean;
+  selectedIds: Set<string>;
+  onToggleSelected: (id: string) => void;
 }) {
   if (items.length === 0) return null;
   return (
@@ -896,6 +1011,9 @@ function Group({
               onActivate={onActivate}
               onOpenActions={onOpenActions}
               onRequest={onRequest}
+              selectionMode={selectionMode}
+              selected={selectedIds.has(n.id)}
+              onToggleSelected={onToggleSelected}
             />
           ))}
         </AnimatePresence>
@@ -909,11 +1027,17 @@ function Row({
   onActivate,
   onOpenActions,
   onRequest,
+  selectionMode,
+  selected,
+  onToggleSelected,
 }: {
   notification: AppNotification;
   onActivate: (n: AppNotification) => void;
   onOpenActions: (id: string) => void;
   onRequest: (action: PendingAction) => void;
+  selectionMode: boolean;
+  selected: boolean;
+  onToggleSelected: (id: string) => void;
 }) {
   const meta = kindMeta[n.kind];
   const Icon = meta.icon;
@@ -925,25 +1049,42 @@ function Row({
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, x: -40, height: 0, marginBottom: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 34 }}
-      drag="x"
+      drag={selectionMode ? false : "x"}
       dragSnapToOrigin
       dragElastic={0.25}
       dragConstraints={{ left: 0, right: 0 }}
       onDragEnd={(_, info) => {
+        if (selectionMode) return;
         if (info.offset.x < -90) onRequest({ type: "delete", id: n.id });
         else if (info.offset.x > 90) onRequest({ type: n.read ? "unread" : "read", id: n.id });
       }}
       className={cn(
         "group relative border-b border-border last:border-b-0 transition-colors hover:bg-secondary/30",
         !n.read && "bg-primary/[0.07]",
+        selectionMode && selected && "bg-primary/10",
       )}
     >
       <div className="flex min-h-20 items-center gap-2 px-4 py-4 sm:px-5">
         <button
           type="button"
-          onClick={() => onActivate(n)}
-          className="flex min-w-0 flex-1 items-center gap-4 text-left"
+          onClick={() => (selectionMode ? onToggleSelected(n.id) : onActivate(n))}
+          aria-label={selectionMode ? `${selected ? "Deselect" : "Select"} ${n.title}` : n.title}
+          aria-pressed={selectionMode ? selected : undefined}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
+          {selectionMode ? (
+            <span
+              className={cn(
+                "flex size-5 shrink-0 items-center justify-center rounded-full border",
+                selected
+                  ? "border-primary bg-primary text-primary-foreground"
+                  : "border-muted-foreground/50 text-transparent",
+              )}
+              aria-hidden="true"
+            >
+              <Check className="size-3.5" />
+            </span>
+          ) : null}
           {n.actor?.username || n.actor?.photoUrl ? (
             <ProfileAvatar
               photoUrl={n.actor.photoUrl}
@@ -982,16 +1123,18 @@ function Row({
           ) : null}
         </button>
 
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label={`Notification actions for ${n.title}`}
-          className="size-9 shrink-0 rounded-full"
-          onClick={() => onOpenActions(n.id)}
-        >
-          <MoreHorizontal className="size-4" />
-        </Button>
+        {!selectionMode ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label={`Notification actions for ${n.title}`}
+            className="size-9 shrink-0 rounded-full"
+            onClick={() => onOpenActions(n.id)}
+          >
+            <MoreHorizontal className="size-4" />
+          </Button>
+        ) : null}
       </div>
 
       {!n.read ? (

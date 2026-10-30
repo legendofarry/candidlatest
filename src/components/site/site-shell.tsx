@@ -73,7 +73,14 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
-import { requestPwaInstall } from "@/lib/pwa-install";
+import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 
 const primaryNav = [
   { to: "/", label: "Feed", icon: Home },
@@ -121,6 +128,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   useServerNotificationsSync();
   usePushRegistrationSync();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const needsEmailVerification = requiresEmailVerification(user);
   const routeConversationId = pathname.match(/^\/messages\/([^/]+)\/?$/)?.[1];
@@ -509,20 +517,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 </button>
                 {userMenuOpen ? (
                   <div className="absolute bottom-full left-0 z-10 mb-2 w-full rounded-xl border border-border bg-popover p-1.5 text-sm shadow-2xl">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setUserMenuOpen(false);
-                        void requestPwaInstall().catch(() => {
-                          notify.error(
-                            "Your browser could not open the install prompt. Try the browser menu.",
-                          );
-                        });
-                      }}
+                    <a
+                      href="/downloads/candid.apk"
+                      download="candid.apk"
+                      onClick={() => setUserMenuOpen(false)}
                       className="mb-1 flex w-full items-center gap-2 rounded-lg bg-primary px-3 py-2.5 text-left font-semibold text-primary-foreground shadow-[0_0_24px_hsl(var(--primary)/0.35)] transition hover:brightness-105"
                     >
-                      <Smartphone className="size-4" /> Install Candid app
-                    </button>
+                      <Smartphone className="size-4" /> Download Candid for Android
+                    </a>
                     <Link
                       to="/profile"
                       onClick={() => setUserMenuOpen(false)}
@@ -637,55 +639,113 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <InstallBanner />
       <CallCenter />
 
-      <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {canLock ? "Leaving for now?" : "Sign out of Candid?"}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {canLock
-                ? "You can stay signed in on this device and just lock Candid behind your fingerprint or face, or sign out completely."
-                : "You will need to sign in again to post stories, comment or vote."}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          {canLock ? (
-            <label className="flex items-start gap-2 text-sm text-muted-foreground">
-              <input
-                type="checkbox"
-                className="mt-0.5 size-4 accent-[var(--primary)]"
-                checked={rememberChoice}
-                onChange={(event) => setRememberChoice(event.target.checked)}
-              />
-              Remember what I choose and stop asking.
-            </label>
-          ) : null}
-          <AlertDialogFooter>
-            <AlertDialogCancel>Stay here</AlertDialogCancel>
+      {isMobile ? (
+        <Drawer open={confirmSignOut} onOpenChange={setConfirmSignOut}>
+          <DrawerContent className="rounded-t-3xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+            <DrawerHeader className="text-left">
+              <DrawerTitle>{canLock ? "Leaving for now?" : "Sign out of Candid?"}</DrawerTitle>
+              <DrawerDescription>
+                {canLock
+                  ? "You can stay signed in on this device and just lock Candid behind your fingerprint or face, or sign out completely."
+                  : "You will need to sign in again to post stories, comment or vote."}
+              </DrawerDescription>
+            </DrawerHeader>
             {canLock ? (
-              <AlertDialogAction
+              <label className="flex items-start gap-2 px-4 py-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-[var(--primary)]"
+                  checked={rememberChoice}
+                  onChange={(event) => setRememberChoice(event.target.checked)}
+                />
+                Remember what I choose and stop asking.
+              </label>
+            ) : null}
+            <div className="mt-2 flex flex-col gap-2">
+              {canLock ? (
+                <Button
+                  className="min-h-12 w-full"
+                  onClick={() => {
+                    setConfirmSignOut(false);
+                    if (rememberChoice) setPreference("sessionMemory", "lock");
+                    requestLock();
+                  }}
+                >
+                  Keep me signed in — just lock
+                </Button>
+              ) : null}
+              <Button
+                variant={canLock ? "outline" : "destructive"}
+                className="min-h-12 w-full"
                 onClick={() => {
                   setConfirmSignOut(false);
-                  if (rememberChoice) setPreference("sessionMemory", "lock");
-                  requestLock();
+                  if (canLock && rememberChoice) setPreference("sessionMemory", "signout");
+                  void signOut();
                 }}
               >
-                Keep me signed in — just lock
-              </AlertDialogAction>
+                Sign out
+              </Button>
+              <Button
+                variant="ghost"
+                className="min-h-12 w-full"
+                onClick={() => setConfirmSignOut(false)}
+              >
+                Stay here
+              </Button>
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>
+                {canLock ? "Leaving for now?" : "Sign out of Candid?"}
+              </AlertDialogTitle>
+              <AlertDialogDescription>
+                {canLock
+                  ? "You can stay signed in on this device and just lock Candid behind your fingerprint or face, or sign out completely."
+                  : "You will need to sign in again to post stories, comment or vote."}
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            {canLock ? (
+              <label className="flex items-start gap-2 text-sm text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 accent-[var(--primary)]"
+                  checked={rememberChoice}
+                  onChange={(event) => setRememberChoice(event.target.checked)}
+                />
+                Remember what I choose and stop asking.
+              </label>
             ) : null}
-            <AlertDialogAction
-              className={canLock ? "bg-secondary text-foreground hover:bg-secondary/80" : ""}
-              onClick={() => {
-                setConfirmSignOut(false);
-                if (canLock && rememberChoice) setPreference("sessionMemory", "signout");
-                void signOut();
-              }}
-            >
-              Sign out
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Stay here</AlertDialogCancel>
+              {canLock ? (
+                <AlertDialogAction
+                  onClick={() => {
+                    setConfirmSignOut(false);
+                    if (rememberChoice) setPreference("sessionMemory", "lock");
+                    requestLock();
+                  }}
+                >
+                  Keep me signed in — just lock
+                </AlertDialogAction>
+              ) : null}
+              <AlertDialogAction
+                className={canLock ? "bg-secondary text-foreground hover:bg-secondary/80" : ""}
+                onClick={() => {
+                  setConfirmSignOut(false);
+                  if (canLock && rememberChoice) setPreference("sessionMemory", "signout");
+                  void signOut();
+                }}
+              >
+                Sign out
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      )}
     </div>
   );
 }

@@ -196,6 +196,14 @@ export const updatePrivacySettings = createServerFn({ method: "POST" })
     });
   });
 
+export const updateMyProfileBio = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ bio: z.string().trim().max(500) }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { saveProfileBio } = await import("./messaging.server");
+    return saveProfileBio(context.userId, data.bio);
+  });
+
 export const getFollowRequests = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .handler(async ({ context }) => {

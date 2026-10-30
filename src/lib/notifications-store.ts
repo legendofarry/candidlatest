@@ -310,6 +310,22 @@ export function markAllRead() {
   emit();
 }
 
+export function markNotificationsRead(ids: string[]) {
+  const selectedIds = new Set(ids);
+  notifications = notifications.map((n) => (selectedIds.has(n.id) ? withReadStamp(n) : n));
+  persist();
+  emit();
+}
+
+export function markNotificationsUnread(ids: string[]) {
+  const selectedIds = new Set(ids);
+  notifications = notifications.map((n) =>
+    selectedIds.has(n.id) ? { ...n, read: false, expiresAt: undefined } : n,
+  );
+  persist();
+  emit();
+}
+
 export function markRead(id: string) {
   notifications = notifications.map((n) => (n.id === id ? withReadStamp(n) : n));
   persist();
@@ -318,6 +334,13 @@ export function markRead(id: string) {
 
 export function removeNotification(id: string) {
   notifications = notifications.filter((n) => n.id !== id);
+  persist();
+  emit();
+}
+
+export function removeNotifications(ids: string[]) {
+  const selectedIds = new Set(ids);
+  notifications = notifications.filter((n) => !selectedIds.has(n.id));
   persist();
   emit();
 }
@@ -336,6 +359,15 @@ export function unarchiveNotification(id: string) {
 
 export function archiveAll() {
   notifications = notifications.map((n) => (n.archived ? n : { ...n, archived: true }));
+  persist();
+  emit();
+}
+
+export function archiveNotifications(ids: string[], archived: boolean) {
+  const selectedIds = new Set(ids);
+  notifications = notifications.map((n) =>
+    selectedIds.has(n.id) ? { ...n, archived: archived || undefined } : n,
+  );
   persist();
   emit();
 }

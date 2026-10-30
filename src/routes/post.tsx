@@ -35,6 +35,7 @@ import {
   issueEmploymentEvidenceUpload,
 } from "@/lib/evidence-upload.functions";
 import { findCompanyMatches } from "@/lib/company-match";
+import { knownKenyanEmployers } from "@/lib/kenyan-employers";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -160,6 +161,7 @@ function WorkplaceStoryComposer() {
 
   const [step, setStep] = useState(0);
   const [companyName, setCompanyName] = useState("");
+  const [employerSuggestionsOpen, setEmployerSuggestionsOpen] = useState(false);
   const [industry, setIndustry] = useState("");
   const [county, setCounty] = useState("");
   const [area, setArea] = useState("");
@@ -434,6 +436,30 @@ function WorkplaceStoryComposer() {
   const steps = ["Employer", "What happened", "Your role", "Your story", "Review"];
 
   const matches = findCompanyMatches(companyName, filters.companies, 5);
+  const companyNeedle = companyName.trim().toLocaleLowerCase();
+  const companySuggestions = [
+    ...matches.map((match) => ({
+      name: match.name,
+      industry: match.industry ?? "",
+      verified: match.verified,
+    })),
+    ...knownKenyanEmployers
+      .filter(
+        (employer) =>
+          !companyNeedle ||
+          employer.name.toLocaleLowerCase().includes(companyNeedle) ||
+          employer.industry.toLocaleLowerCase().includes(companyNeedle),
+      )
+      .map((employer) => ({ ...employer, verified: false })),
+  ]
+    .filter(
+      (employer, index, list) =>
+        list.findIndex(
+          (candidate) =>
+            candidate.name.trim().toLocaleLowerCase() === employer.name.trim().toLocaleLowerCase(),
+        ) === index,
+    )
+    .slice(0, 8);
   const areaSuggestions = county ? areasForCounty(county) : allKenyaAreas();
 
   function pinCurrentLocation() {
@@ -456,8 +482,6 @@ function WorkplaceStoryComposer() {
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 60000 },
     );
   }
-  const exactMatch = matches.some((m) => m.name.toLowerCase() === companyName.trim().toLowerCase());
-
   function saveDraft() {
     if (!user || !dirty) return;
     try {
@@ -772,42 +796,91 @@ function WorkplaceStoryComposer() {
                         <>
                           <div className="space-y-2">
                             <Label htmlFor="company">Who was your employer?</Label>
-                            <Input
-                              id="company"
-                              value={companyName}
-                              onChange={(event) => setCompanyName(event.target.value)}
-                              placeholder="e.g. Sky Minimart, Naivas, a boda stage"
-                              autoComplete="off"
-                            />
+                            <div className="relative z-30">
+                              <Input
+                                id="company"
+                                value={companyName}
+                                role="combobox"
+                                aria-autocomplete="list"
+                                aria-expanded={
+                                  employerSuggestionsOpen &&
+                                  (companySuggestions.length > 0 || Boolean(companyName.trim()))
+                                }
+                                aria-controls="employer-suggestions"
+                                onFocus={() => setEmployerSuggestionsOpen(true)}
+                                onBlur={(event) => {
+                                  const nextTarget = event.relatedTarget;
+                                  if (
+                                    !(nextTarget instanceof Node) ||
+                                    !event.currentTarget.parentElement?.contains(nextTarget)
+                                  ) {
+                                    setEmployerSuggestionsOpen(false);
+                                  }
+                                }}
+                                onChange={(event) => {
+                                  setCompanyName(event.target.value);
+                                  setIndustry("");
+                                  setEmployerSuggestionsOpen(true);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Escape") setEmployerSuggestionsOpen(false);
+                                }}
+                                placeholder="e.g. Sky Minimart, Naivas, a boda stage"
+                                autoComplete="off"
+                              />
+                              {employerSuggestionsOpen &&
+                              (companySuggestions.length > 0 || companyName.trim()) ? (
+                                <div
+                                  id="employer-suggestions"
+                                  role="listbox"
+                                  aria-label="Employer suggestions"
+                                  className="absolute inset-x-0 top-[calc(100%+0.35rem)] z-50 max-h-64 overflow-y-auto rounded-2xl border border-border bg-background p-1.5 shadow-xl"
+                                >
+                                  {companySuggestions.map((match) => (
+                                    <button
+                                      key={`${match.name}-${match.industry}`}
+                                      type="button"
+                                      role="option"
+                                      aria-selected={companyName === match.name}
+                                      onMouseDown={(event) => event.preventDefault()}
+                                      onClick={() => {
+                                        setCompanyName(match.name);
+                                        if (match.industry) setIndustry(match.industry);
+                                        setEmployerSuggestionsOpen(false);
+                                      }}
+                                      className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-secondary focus-visible:bg-secondary"
+                                    >
+                                      <Building2 className="size-4 shrink-0 text-primary" />
+                                      <span className="min-w-0 flex-1 truncate">{match.name}</span>
+                                      <span className="max-w-[45%] shrink-0 truncate text-[10px] text-muted-foreground">
+                                        {match.industry || "Known employer"}
+                                      </span>
+                                      {match.verified ? <CompanyVerifiedBadge /> : null}
+                                    </button>
+                                  ))}
+                                  {companyName.trim() ? (
+                                    <button
+                                      type="button"
+                                      role="option"
+                                      aria-selected={false}
+                                      onMouseDown={(event) => event.preventDefault()}
+                                      onClick={() => setEmployerSuggestionsOpen(false)}
+                                      className="mt-1 w-full border-t border-border px-3 py-2.5 text-left text-xs text-muted-foreground hover:bg-secondary"
+                                    >
+                                      {companySuggestions.length
+                                        ? `Continue with “${companyName.trim()}” as entered`
+                                        : `Use “${companyName.trim()}” as a new employer`}
+                                    </button>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </div>
                             <p className="rounded-xl border border-border bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
                               The company name always appears on a published story. Your Candid
                               username appears as the author; your account email and legal name are
                               not shown. Avoid details that could identify you personally.
                             </p>
 
-                            {matches.length > 0 && !exactMatch ? (
-                              <div className="space-y-1.5 rounded-2xl border border-border bg-secondary/40 p-3">
-                                <p className="text-xs font-medium text-muted-foreground">
-                                  {matches.length === 1
-                                    ? "Possible existing employer — is this the same business?"
-                                    : "Possible existing employers — is one of these the same business?"}
-                                </p>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {matches.map((match) => (
-                                    <button
-                                      key={match.slug}
-                                      type="button"
-                                      onClick={() => setCompanyName(match.name)}
-                                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-sm hover:border-primary/50"
-                                    >
-                                      <Building2 className="size-3.5 text-primary" />
-                                      {match.name}
-                                      {match.verified ? <CompanyVerifiedBadge /> : null}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-                            ) : null}
                           </div>
                           <ChipField
                             label="What kind of work do they do? (industry)"

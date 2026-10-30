@@ -159,11 +159,18 @@ function CompanyPage() {
         </div>
 
         <aside className="space-y-4">
-          <CompanyIntelPanel
-            companyId={company.id}
-            companyName={company.name}
-            metooTotal={stories.reduce((total, story) => total + Number(story.metoo ?? 0), 0)}
-          />
+          {company.id.startsWith("seed-") ? (
+            <p className="border-y border-border py-4 text-sm text-muted-foreground">
+              Member ratings and workplace insights will appear here as people share their
+              experiences.
+            </p>
+          ) : (
+            <CompanyIntelPanel
+              companyId={company.id}
+              companyName={company.name}
+              metooTotal={stories.reduce((total, story) => total + Number(story.metoo ?? 0), 0)}
+            />
+          )}
 
           <div className="rounded-2xl border border-border bg-card p-5">
             <h2 className="text-sm font-semibold">Average scores</h2>

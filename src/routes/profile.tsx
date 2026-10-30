@@ -22,6 +22,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { declareAccountType, getOnboardingState } from "@/lib/onboarding.functions";
@@ -38,6 +45,7 @@ import {
 } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { getPublicProfile } from "@/lib/messaging.functions";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -58,6 +66,7 @@ export const Route = createFileRoute("/profile")({
 function ProfilePage() {
   const { user, loading, signOut } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
 
@@ -432,27 +441,59 @@ function ProfilePage() {
             ) : null}
           </motion.div>
 
-          <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Sign out of Candid?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  You will need to sign in again to post stories, comment or vote.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Stay signed in</AlertDialogCancel>
-                <AlertDialogAction
-                  onClick={() => {
-                    setConfirmSignOut(false);
-                    void signOut().then(() => navigate({ to: "/" }));
-                  }}
-                >
-                  Sign out
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          {isMobile ? (
+            <Drawer open={confirmSignOut} onOpenChange={setConfirmSignOut}>
+              <DrawerContent className="rounded-t-3xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
+                <DrawerHeader className="text-left">
+                  <DrawerTitle>Sign out of Candid?</DrawerTitle>
+                  <DrawerDescription>
+                    You will need to sign in again to post stories, comment or vote.
+                  </DrawerDescription>
+                </DrawerHeader>
+                <div className="mt-2 flex flex-col gap-2">
+                  <Button
+                    variant="destructive"
+                    className="min-h-12 w-full"
+                    onClick={() => {
+                      setConfirmSignOut(false);
+                      void signOut().then(() => navigate({ to: "/" }));
+                    }}
+                  >
+                    Sign out
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="min-h-12 w-full"
+                    onClick={() => setConfirmSignOut(false)}
+                  >
+                    Stay signed in
+                  </Button>
+                </div>
+              </DrawerContent>
+            </Drawer>
+          ) : (
+            <AlertDialog open={confirmSignOut} onOpenChange={setConfirmSignOut}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Sign out of Candid?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    You will need to sign in again to post stories, comment or vote.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Stay signed in</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => {
+                      setConfirmSignOut(false);
+                      void signOut().then(() => navigate({ to: "/" }));
+                    }}
+                  >
+                    Sign out
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
         </motion.div>
       </section>
     </div>
