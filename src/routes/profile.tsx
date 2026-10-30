@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import {
   BadgeCheck,
+  ChevronDown,
   ChevronRight,
   Link2,
   LogOut,
@@ -46,6 +47,14 @@ import {
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { getPublicProfile } from "@/lib/messaging.functions";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -224,13 +233,49 @@ function ProfilePage() {
                 <div className="min-w-0">
                   <h1 className="mt-1 flex items-center gap-1.5 truncate text-xl font-semibold md:text-2xl">
                     {onboarding.data?.username ? (
-                      <Link
-                        to="/u/$username"
-                        params={{ username: onboarding.data.username }}
-                        className="hover:text-primary"
-                      >
-                        {handle}
-                      </Link>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label={`Options for ${handle}`}
+                            className="inline-flex min-w-0 items-center gap-1 rounded-sm text-inherit transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <span className="truncate">{handle}</span>
+                            <ChevronDown className="size-4 shrink-0" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuLabel>{handle}</DropdownMenuLabel>
+                          <DropdownMenuItem asChild>
+                            <Link to="/u/$username" params={{ username: onboarding.data.username }}>
+                              <Link2 className="size-4" /> View public profile
+                            </Link>
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          {nextUsernameChangeAt !== null && Date.now() < nextUsernameChangeAt ? (
+                            <>
+                              <DropdownMenuItem disabled>
+                                <PenLine className="size-4" /> Change username
+                              </DropdownMenuItem>
+                              <p className="px-2 py-1 text-xs text-muted-foreground">
+                                Available after{" "}
+                                {new Date(nextUsernameChangeAt).toLocaleDateString("en-KE")}.
+                              </p>
+                            </>
+                          ) : (
+                            <DropdownMenuItem asChild>
+                              <Link to="/onboarding" search={{ editUsername: true }}>
+                                <PenLine className="size-4" /> Change username
+                              </Link>
+                            </DropdownMenuItem>
+                          )}
+                          {nextUsernameChangeAt === null ? (
+                            <p className="px-2 py-1 text-xs text-muted-foreground">
+                              Username changes are limited to once every 2 weeks.
+                            </p>
+                          ) : null}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     ) : (
                       handle
                     )}
@@ -243,11 +288,7 @@ function ProfilePage() {
                     />
                   </h1>
                   <p className="truncate text-sm text-muted-foreground">
-                    {loading
-                      ? "Checking your session…"
-                      : user
-                        ? ""
-                        : "Not signed in"}
+                    {loading ? "Checking your session…" : user ? "" : "Not signed in"}
                   </p>
                 </div>
                 {user && !onboarding.data?.username && !onboarding.isLoading ? (
@@ -277,35 +318,6 @@ function ProfilePage() {
                   </Button>
                 </div>
               ) : null}
-              {user ? (
-                <div className="mt-3 space-y-4 border-t border-border pt-4">
-                  {onboarding.data?.username ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                      {nextUsernameChangeAt !== null && Date.now() < nextUsernameChangeAt ? (
-                        <Button size="sm" variant="outline" disabled>
-                          Change username
-                        </Button>
-                      ) : (
-                        <Button asChild size="sm" variant="outline">
-                          <Link to="/onboarding" search={{ editUsername: true }}>
-                            Change username
-                          </Link>
-                        </Button>
-                      )}
-                      {nextUsernameChangeAt ? (
-                        <span className="text-xs text-muted-foreground">
-                          Next change after{" "}
-                          {new Date(nextUsernameChangeAt).toLocaleDateString("en-KE")}.
-                        </span>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">
-                          Username changes are limited to once every 2 weeks.
-                        </span>
-                      )}
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
               {verification.data?.canClaim ? (
                 <div className="mt-4 flex flex-wrap items-center gap-3 border-l-2 border-primary/40 py-2 pl-3 md:rounded-xl md:border md:border-primary/30 md:bg-primary/5 md:p-3">
                   <BadgeCheck className="size-5 shrink-0 text-primary" />
@@ -329,13 +341,6 @@ function ProfilePage() {
                   </p>
                 </div>
               ) : null}
-              <div className="mt-4 flex items-start gap-3 border-l-2 border-verified/35 py-2 pl-3 md:mt-5 md:rounded-xl md:border md:border-verified/15 md:bg-verified/5 md:p-4">
-                <ShieldCheck className="mt-0.5 size-4 shrink-0 text-verified" />
-                <p className="text-sm leading-relaxed text-muted-foreground">
-                  Your email stays private. Your handle, photo, and cover are public; individual
-                  votes stay private.
-                </p>
-              </div>
             </div>
           </motion.section>
 

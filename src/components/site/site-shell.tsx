@@ -573,6 +573,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               messagesInboxRoute ||
               pathname === "/post" ||
               pathname === "/profile" ||
+              pathname === "/settings" ||
               pathname === "/support" ||
               directConversationRoute
               ? "p-0 md:pb-0"

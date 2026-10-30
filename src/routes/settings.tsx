@@ -460,12 +460,12 @@ function SettingsPage() {
           </div>
         </section>
 
-        <section className="min-h-screen overflow-y-auto px-5 pb-12 pt-5 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
+        <section className="min-h-screen overflow-y-auto px-5 pb-12 pt-2 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="mx-auto max-w-5xl space-y-8"
+            className="mx-auto max-w-5xl space-y-4 md:space-y-8"
           >
             <header>
               <div className="flex items-start justify-between gap-4">

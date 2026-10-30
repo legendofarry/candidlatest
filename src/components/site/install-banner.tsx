@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/compone
 
 const DISMISS_KEY = "candid-install-banner-dismissed-at";
 const LOGIN_SESSION_KEY = "candid-install-prompt-login-session";
-const COOLDOWN_MS = 2 * 60 * 1000;
+const COOLDOWN_MS = 15 * 1000;
 
 type InstallPromptEvent = Event & {
   prompt: () => Promise<void>;

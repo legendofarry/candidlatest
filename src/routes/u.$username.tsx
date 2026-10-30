@@ -51,6 +51,7 @@ import { MembershipBadge } from "@/components/site/membership-badge";
 import { MentionText } from "@/components/site/mention-textarea";
 import { ProfileCommunity } from "@/components/site/profile-community";
 import { ProfileStoryComments } from "@/components/site/profile-story-comments";
+import { ManageProfileStoriesSheet } from "@/components/site/manage-profile-stories-sheet";
 import { Textarea } from "@/components/ui/textarea";
 import {
   Drawer,
@@ -102,6 +103,7 @@ function PublicProfilePage() {
   const queryClient = useQueryClient();
   const [busy, setBusy] = useState(false);
   const [bioEditorOpen, setBioEditorOpen] = useState(false);
+  const [manageStoriesOpen, setManageStoriesOpen] = useState(false);
   const [bioDraft, setBioDraft] = useState("");
   const [savingBio, setSavingBio] = useState(false);
   const [activeTab, setActiveTab] = useState<"All" | "Stories" | "About">("All");
@@ -682,12 +684,22 @@ function PublicProfilePage() {
                 </div>
               </div>
               {profile.isSelf ? (
-                <Link
-                  to="/profile"
-                  className="mx-4 my-3 flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold sm:mx-5"
-                >
-                  <BookOpen className="size-4" /> Manage stories
-                </Link>
+                isMobile ? (
+                  <button
+                    type="button"
+                    onClick={() => setManageStoriesOpen(true)}
+                    className="mx-4 my-3 flex min-h-11 w-[calc(100%-2rem)] items-center justify-center gap-2 border-y border-border px-4 py-2.5 text-sm font-semibold sm:mx-5 sm:w-[calc(100%-2.5rem)]"
+                  >
+                    <BookOpen className="size-4" /> Manage stories
+                  </button>
+                ) : (
+                  <Link
+                    to="/my-contributions"
+                    className="mx-4 my-3 flex items-center justify-center gap-2 rounded-lg bg-secondary px-4 py-2.5 text-sm font-semibold sm:mx-5"
+                  >
+                    <BookOpen className="size-4" /> Manage stories
+                  </Link>
+                )
               ) : null}
               {visibleProfileStories.length ? (
                 <div className="divide-y divide-border">
@@ -815,6 +827,13 @@ function PublicProfilePage() {
             {bioEditorForm}
           </DialogContent>
         </Dialog>
+      ) : null}
+
+      {profile.isSelf && isMobile ? (
+        <ManageProfileStoriesSheet
+          open={manageStoriesOpen}
+          onOpenChange={setManageStoriesOpen}
+        />
       ) : null}
 
       <ProfileStoryComments
