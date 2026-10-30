@@ -36,12 +36,12 @@ function useCountUp(target: number, duration = 900) {
 const statClass =
   "block w-full rounded-xl border border-white/10 bg-white/5 px-3 py-3 text-left transition hover:border-primary/50 hover:bg-white/10 active:scale-95 xl:px-4 xl:py-3";
 
-function StatInner({ label, value }: { label: string; value: number }) {
-  const shown = useCountUp(value);
+function StatInner({ label, value }: { label: string; value: number | null }) {
+  const shown = useCountUp(value ?? 0);
   return (
     <>
-      <p className="text-3xl font-bold leading-none text-foreground tabular-nums xl:text-2xl">
-        {shown}
+      <p className="text-3xl font-bold leading-none text-foreground tabular-nums xl:text-2xl" aria-label={value === null ? `${label} unavailable` : `${shown} ${label.toLowerCase()}`}>
+        {value === null ? "—" : shown}
       </p>
       <p className="mt-1.5 flex items-center gap-0.5 whitespace-nowrap text-[11px] uppercase tracking-wide text-muted-foreground">
         {label} <ChevronRight className="size-3" />
@@ -102,8 +102,8 @@ type PulseProps = {
 export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}) {
   const spotlight = useScrollSpotlight();
   const [hydrated, setHydrated] = useState(false);
-  const { data } = useQuery({
-    queryKey: ["pulse"],
+  const { data, isPending, isError } = useQuery({
+    queryKey: ["pulse-v2"],
     queryFn: () => getPulse(),
     refetchInterval: 60_000,
     staleTime: 30_000,
@@ -111,7 +111,8 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
 
   useEffect(() => setHydrated(true), []);
 
-  const pulse = hydrated ? data : undefined;
+  const pulse = hydrated && !isPending && !isError ? data : undefined;
+  const unavailable = hydrated && (isError || (!isPending && data === null));
 
   const maxReason = Math.max(1, ...(pulse?.topReasons ?? []).map((row) => row.count));
 
@@ -142,33 +143,38 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
             }
             className="flex items-center gap-1.5 rounded-full px-2 py-1 text-muted-foreground transition hover:bg-white/10 active:scale-95"
           >
-            <span className="size-2 animate-pulse rounded-full bg-primary" /> Live
+            <span className={`size-2 rounded-full ${unavailable ? "bg-muted-foreground" : pulse ? "animate-pulse bg-primary" : "bg-muted-foreground"}`} />
+            {unavailable ? "Unavailable" : pulse ? "Live" : "Loading"}
           </button>
         </div>
 
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground xl:mt-3 xl:text-sm">
-          What was reported this week.
+          {unavailable ? "Live community data is unavailable right now." : "Live workplace signals from across Kenya."}
         </p>
 
         <div className="mt-4 grid grid-cols-3 gap-2 xl:mt-5 xl:gap-3">
           <button type="button" className={statClass} onClick={onStories}>
-            <StatInner label="Stories" value={pulse?.storiesTotal ?? 0} />
+            <StatInner label="Stories" value={pulse?.storiesTotal ?? null} />
           </button>
           <button type="button" className={statClass} onClick={onThisWeek}>
-            <StatInner label="This week" value={pulse?.storiesLast7Days ?? 0} />
+            <StatInner label="This week" value={pulse?.storiesLast7Days ?? null} />
           </button>
           <Link to="/companies" className={statClass}>
-            <StatInner label="Employers" value={pulse?.companies ?? 0} />
+            <StatInner label="Employers" value={pulse?.companies ?? null} />
           </Link>
         </div>
 
         <div className="mt-4 space-y-2 xl:mt-5 xl:space-y-3">
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-            Top reasons for leaving
+            Common reasons in recent stories
           </p>
           {(pulse?.topReasons ?? []).length === 0 ? (
             <p className="text-xs text-muted-foreground">
-              No stories yet — the first one will show up here.
+              {unavailable
+                ? "Reasons could not be loaded. Try again in a moment."
+                : pulse?.storiesLast7Days === 0
+                  ? "No stories were published in the past 7 days."
+                  : "No reason breakdown is available yet."}
             </p>
           ) : (
             (pulse?.topReasons ?? []).map((row) => (
@@ -198,10 +204,10 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
 
         <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs xl:mt-5 xl:px-4 xl:py-3 xl:text-sm">
           <span className="flex items-center gap-1.5 text-muted-foreground">
-            <MapPin className="size-3.5 text-verified" /> {formatCount(pulse?.counties ?? 0)}{" "}
-            counties covered
+            <MapPin className="size-3.5 text-verified" /> {pulse ? formatCount(pulse.counties) : "—"}{" "}
+            counties in recent stories
           </span>
-          <span className="text-primary">{formatCount(pulse?.storiesLast24Hours ?? 0)} in 24h</span>
+          <span className="text-primary">{pulse ? `${formatCount(pulse.storiesLast24Hours)} in 24h` : "— in 24h"}</span>
         </div>
       </div>
     </div>
