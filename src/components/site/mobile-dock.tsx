@@ -6,6 +6,7 @@ import {
   Building2,
   Headset,
   Home,
+  Info,
   LogOut,
   PenLine,
   ScrollText,
@@ -90,6 +91,7 @@ export function MobileDock({
     "/guidelines",
     "/rights",
     "/privacy",
+    "/about",
   ].some((root) => pathname.startsWith(root));
 
   return (
@@ -171,6 +173,13 @@ export function MobileDock({
                 >
                   <ArrowLeft className="size-4" /> Back to your account
                 </button>
+                <SheetRow
+                  to="/about"
+                  icon={Info}
+                  label="About Candid"
+                  hint="Who we are and what we do"
+                  active={pathname === "/about"}
+                />
                 <SheetRow
                   to="/support"
                   icon={Headset}

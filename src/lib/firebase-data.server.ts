@@ -624,14 +624,15 @@ export type CompanySalarySummary = {
   contributions: number;
   positions: number;
   average_kes: number | null;
+  position_summaries: CompanyPositionSalary[];
 };
 
 export type CompanyPositionSalary = {
   role_title: string;
   contributions: number;
-  average_kes: number;
-  low_kes: number;
-  high_kes: number;
+  average_kes: number | null;
+  low_kes: number | null;
+  high_kes: number | null;
   range_visible: boolean;
 };
 
@@ -677,13 +678,48 @@ async function calculateCompanySalaryDirectory() {
     byCompany.set(report.company_id, list);
   }
 
+  const curatedCompanies = getKnownKenyanEmployerDirectoryEntries();
+  const directoryCompanies = includeKnownEmployers(companies, curatedCompanies);
   const rows: CompanySalarySummary[] = [];
-  for (const company of companies.filter((entry) =>
+  for (const company of directoryCompanies.filter((entry) =>
     isDiscoverableCompany(entry, companiesWithPublishedStories),
   )) {
     const items = byCompany.get(company.id) ?? [];
-    if (items.length === 0) continue;
-    const positions = new Set(items.map((item) => item.role_title.trim().toLowerCase()));
+    const groupedPositions = new Map<string, SalaryReportRecord[]>();
+    for (const item of items) {
+      const key = item.role_title.trim().toLowerCase();
+      const group = groupedPositions.get(key) ?? [];
+      group.push(item);
+      groupedPositions.set(key, group);
+    }
+    const positionSummaries: CompanyPositionSalary[] = [...groupedPositions.values()]
+      .map((reportsForPosition) => {
+        const visible = reportsForPosition.length >= SALARY_MIN_CONTRIBUTIONS;
+        return {
+          role_title: reportsForPosition[0]?.role_title ?? "—",
+          contributions: reportsForPosition.length,
+          average_kes: visible
+            ? Math.round(average(reportsForPosition.map(midpoint)) ?? 0)
+            : null,
+          low_kes: visible
+            ? Math.min(...reportsForPosition.map((report) => Number(report.min_kes)))
+            : null,
+          high_kes: visible
+            ? Math.max(...reportsForPosition.map((report) => Number(report.max_kes)))
+            : null,
+          range_visible: visible,
+        };
+      })
+      .sort((a, b) => b.contributions - a.contributions);
+    const rangesLive = positionSummaries.some((position) => position.range_visible);
+    const visibleRoleKeys = new Set(
+      [...groupedPositions.entries()]
+        .filter(([, roleReports]) => roleReports.length >= SALARY_MIN_CONTRIBUTIONS)
+        .map(([key]) => key),
+    );
+    const visibleReports = items.filter((item) =>
+      visibleRoleKeys.has(item.role_title.trim().toLowerCase()),
+    );
     rows.push({
       company_id: company.id,
       name: company.name,
@@ -692,11 +728,12 @@ async function calculateCompanySalaryDirectory() {
       industry: company.industry,
       county: company.county,
       contributions: items.length,
-      positions: positions.size,
+      positions: positionSummaries.length,
       average_kes:
-        items.length >= SALARY_MIN_CONTRIBUTIONS
-          ? Math.round(average(items.map(midpoint)) ?? 0)
+        rangesLive
+          ? Math.round(average(visibleReports.map(midpoint)) ?? 0)
           : null,
+      position_summaries: positionSummaries,
     });
   }
 
@@ -704,7 +741,7 @@ async function calculateCompanySalaryDirectory() {
 }
 
 export function buildCompanySalaryDirectory() {
-  return cacheServerRead("public:salary-directory", 60_000, calculateCompanySalaryDirectory);
+  return cacheServerRead("public:salary-directory:v2", 60_000, calculateCompanySalaryDirectory);
 }
 
 /** Per-position breakdown for one company. */
@@ -733,9 +770,9 @@ async function calculateCompanySalaryDetail(slug: string) {
     return {
       role_title: items[0]?.role_title ?? "—",
       contributions: items.length,
-      average_kes: Math.round(average(items.map(midpoint)) ?? 0),
-      low_kes: Math.min(...items.map((item) => Number(item.min_kes))),
-      high_kes: Math.max(...items.map((item) => Number(item.max_kes))),
+      average_kes: visible ? Math.round(average(items.map(midpoint)) ?? 0) : null,
+      low_kes: visible ? Math.min(...items.map((item) => Number(item.min_kes))) : null,
+      high_kes: visible ? Math.max(...items.map((item) => Number(item.max_kes))) : null,
       range_visible: visible,
     };
   });

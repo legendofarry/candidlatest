@@ -253,7 +253,7 @@ export function CommentThread({
       className={cn(
         "rounded-2xl border border-border bg-card",
         fullWidth &&
-        "rounded-none border-x-0 border-y border-border/70 bg-transparent pb-[calc(6rem+env(safe-area-inset-bottom))] md:pb-0",
+        "relative left-1/2 -ml-[50vw] w-screen rounded-none border-x-0 border-y border-border/70 bg-transparent pb-[calc(6rem+env(safe-area-inset-bottom))] md:left-auto md:ml-[-1.5rem] md:w-[calc(100%+3rem)] md:pb-0",
         panelMode &&
         !fitContent &&
         "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
@@ -593,7 +593,7 @@ function CommentRow({
             <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">
               <MentionText text={comment.body} />
               {comment.edited_at && !comment.is_deleted ? (
-                <span className="ml-1 text-xs text-muted-foreground">(edited)</span>
+                <span className="ml-1 text-xs text-muted-foreground"></span>
               ) : null}
             </p>
           )}

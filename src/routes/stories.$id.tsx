@@ -250,10 +250,10 @@ function StoryPage() {
 
           {isAnnouncement && story.media?.length ? (
             <div
-              className={`relative left-1/2 grid w-screen -translate-x-1/2 gap-px overflow-hidden bg-border md:left-auto md:mx-[-1.5rem] md:w-[calc(100%+3rem)] md:translate-x-0 ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
+              className={`-mx-4 grid w-[calc(100%+2rem)] gap-px overflow-hidden bg-border sm:-mx-6 sm:w-[calc(100%+3rem)] ${story.media.length > 1 ? "grid-cols-2" : "grid-cols-1"}`}
             >
               {story.media.map((media, index) => (
-                <div key={`${media.url}-${index}`} className="overflow-hidden bg-background">
+                <div key={`${media.url}-${index}`} className="min-w-0 overflow-hidden bg-background">
                   {media.resource_type === "video" ? (
                     <video
                       src={media.url}
@@ -265,7 +265,7 @@ function StoryPage() {
                     <img
                       src={media.url}
                       alt={`Candid attachment ${index + 1}`}
-                      className={`w-full ${story.media!.length > 1 ? "aspect-square object-cover" : "max-h-[75vh] min-h-40 object-contain"}`}
+                      className={`block w-full ${story.media!.length > 1 ? "aspect-square object-cover" : "max-h-[75vh] min-h-40 object-contain"}`}
                     />
                   )}
                 </div>
