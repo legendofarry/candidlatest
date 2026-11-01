@@ -83,6 +83,7 @@ function OnboardingPage() {
   const state = useServerFn(getOnboardingState);
 
   const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [mediaStage, setMediaStage] = useState<"profile" | "cover">("profile");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
   const [username, setUsername] = useState("");
@@ -125,6 +126,7 @@ function OnboardingPage() {
         if (!active) return;
         setPhotoUrl(result.photoUrl);
         setCoverUrl(result.coverUrl);
+        setMediaStage(result.photoUrl ? "cover" : "profile");
         if (!result.needsOnboarding && !editUsername) navigate({ to: "/" });
       })
       .catch((error: unknown) => {
@@ -300,7 +302,9 @@ function OnboardingPage() {
                       ? "Choose your username"
                       : "Pick a suggested username"
                 : step === 1
-                  ? "Make your profile yours"
+                  ? mediaStage === "profile"
+                    ? "Add a profile photo"
+                    : "Add a cover photo"
                   : "Add your links"}
             </h1>
             <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
@@ -313,7 +317,9 @@ function OnboardingPage() {
                       ? "Choose a name you’re comfortable having shown on your stories and comments. We’ll check that it’s available."
                       : "Choose one of these available names, or ask Candid for another set."
                 : step === 1
-                  ? "Add a profile photo and choose a cover. Both are optional; we’ve added a Candid banner if you want to use a cover later."
+                  ? mediaStage === "profile"
+                    ? "Choose a profile photo or character avatar. This is optional, and you can add one later."
+                    : "Choose a cover photo for the top of your public profile. This is optional, and you can change it anytime."
                   : "Social links are optional. Add any you want people to find on your profile."}
             </p>
           </motion.div>
@@ -559,68 +565,90 @@ function OnboardingPage() {
               </motion.section>
             ) : step === 1 ? (
               <motion.section
-                key="photo"
+                key={mediaStage === "profile" ? "profile-photo" : "cover-photo"}
                 initial={{ opacity: 0, x: 24 }}
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                 className="space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
               >
-                <ProfilePhotoPicker
-                  photoUrl={photoUrl}
-                  initials={(user?.email?.[0] ?? "C").toUpperCase()}
-                  onSaved={(nextPhotoUrl) => {
-                    setPhotoUrl(nextPhotoUrl);
-                    if (user) {
-                      queryClient.setQueryData(
-                        ["onboarding-state", user.uid],
-                        (previous: unknown) =>
-                          previous && typeof previous === "object"
-                            ? { ...previous, photoUrl: nextPhotoUrl }
-                            : previous,
-                      );
-                    }
-                  }}
-                />
-                <div className="space-y-2 border-t border-border/70 pt-5">
-                  <div>
-                    <p className="text-sm font-medium">Your cover photo</p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      This appears across the top of your public profile. You can change it
-                      anytime.
-                    </p>
-                  </div>
-                  <div className="relative h-32 overflow-hidden rounded-2xl border border-border bg-secondary sm:h-40">
-                    <ProfileCoverPicker
-                      coverUrl={coverUrl}
-                      onSaved={(nextCoverUrl) => {
-                        setCoverUrl(nextCoverUrl);
+                {mediaStage === "profile" ? (
+                  <>
+                    <ProfilePhotoPicker
+                      photoUrl={photoUrl}
+                      initials={(user?.email?.[0] ?? "C").toUpperCase()}
+                      onSaved={(nextPhotoUrl) => {
+                        setPhotoUrl(nextPhotoUrl);
+                        setMediaStage("cover");
                         if (user) {
                           queryClient.setQueryData(
                             ["onboarding-state", user.uid],
                             (previous: unknown) =>
                               previous && typeof previous === "object"
-                                ? { ...previous, coverUrl: nextCoverUrl }
+                                ? { ...previous, photoUrl: nextPhotoUrl }
                                 : previous,
                           );
                         }
                       }}
                     />
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <Button className="flex-1 glow-primary" onClick={() => setStep(2)}>
-                    {photoUrl || coverUrl ? "Continue" : "Continue without photos"}{" "}
-                    <ArrowRight className="size-4" />
-                  </Button>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setStep(0)}
-                  className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
-                >
-                  Back to username
-                </button>
+                    <button
+                      type="button"
+                      onClick={() => setMediaStage("cover")}
+                      className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Skip profile photo
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStep(0)}
+                      className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Back to username
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <div>
+                        <p className="text-sm font-medium">Your cover photo</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          This appears across the top of your public profile. You can change it
+                          anytime.
+                        </p>
+                      </div>
+                      <div className="relative h-32 overflow-hidden rounded-2xl border border-border bg-secondary sm:h-40">
+                        <ProfileCoverPicker
+                          coverUrl={coverUrl}
+                          onSaved={(nextCoverUrl) => {
+                            setCoverUrl(nextCoverUrl);
+                            if (user) {
+                              queryClient.setQueryData(
+                                ["onboarding-state", user.uid],
+                                (previous: unknown) =>
+                                  previous && typeof previous === "object"
+                                    ? { ...previous, coverUrl: nextCoverUrl }
+                                    : previous,
+                              );
+                            }
+                          }}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Button className="flex-1 glow-primary" onClick={() => setStep(2)}>
+                        {coverUrl ? "Continue" : "Continue without cover photo"}{" "}
+                        <ArrowRight className="size-4" />
+                      </Button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setMediaStage("profile")}
+                      className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                    >
+                      Back to profile photo
+                    </button>
+                  </>
+                )}
               </motion.section>
             ) : (
               <motion.section

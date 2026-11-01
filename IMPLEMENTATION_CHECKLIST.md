@@ -13,6 +13,7 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 
 ## Profiles and community
 
+- [ ] Redesign the private profile screen to match the Lovable reference's background, typography, spacing, and full-width section layout; keep the cover, overlapping avatar, and existing profile actions. This visual fix is deferred for a later pass.
 - [x] Public/private profile visibility and follow approval.
 - [x] Tag suggestions, highlighted mentions, and mention notifications in posts/comments.
 - [x] Complimentary Premium for new accounts and a home welcome message.
