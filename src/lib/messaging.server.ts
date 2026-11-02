@@ -1,4 +1,5 @@
 import { getFirestoreDb } from "./firebase.server";
+import { consumeMembershipQuota, getUserMembershipEntitlements } from "./membership.server";
 import { createHash } from "node:crypto";
 import { FieldValue, type DocumentReference } from "./firestore-rest.server";
 import {
@@ -35,6 +36,9 @@ export type PrivacySettings = {
   user_id: string;
   who_can_message: MessagePrivacy;
   profile_visibility: "public" | "private";
+  mention_audience: MessagePrivacy;
+  anonymous_contributions_default: boolean;
+  message_theme: "default" | "midnight" | "forest" | "ocean" | "sunset";
   updated_at: string;
 };
 
@@ -470,13 +474,21 @@ export async function readPrivacySettings(userId: string): Promise<PrivacySettin
     user_id: userId,
     who_can_message: data?.who_can_message ?? "everyone",
     profile_visibility: profile?.profile_visibility ?? "public",
+    mention_audience: data?.mention_audience ?? "everyone",
+    anonymous_contributions_default: data?.anonymous_contributions_default === true,
+    message_theme: data?.message_theme ?? "default",
     updated_at: data?.updated_at ?? now(),
   };
 }
 
 export async function savePrivacySettings(
   userId: string,
-  input: { whoCanMessage?: MessagePrivacy; profileVisibility?: "public" | "private" },
+  input: {
+    whoCanMessage?: MessagePrivacy;
+    profileVisibility?: "public" | "private";
+    mentionAudience?: MessagePrivacy;
+    anonymousContributionsDefault?: boolean;
+  },
 ) {
   const db = getFirestoreDb();
   const previous = await readPrivacySettings(userId);
@@ -485,6 +497,9 @@ export async function savePrivacySettings(
     user_id: userId,
     who_can_message: input.whoCanMessage ?? previous.who_can_message,
     profile_visibility: input.profileVisibility ?? previous.profile_visibility,
+    mention_audience: input.mentionAudience ?? previous.mention_audience,
+    anonymous_contributions_default: input.anonymousContributionsDefault ?? previous.anonymous_contributions_default,
+    message_theme: previous.message_theme,
     updated_at: updatedAt,
   };
   const batch = db.batch();
@@ -498,6 +513,16 @@ export async function savePrivacySettings(
       },
       { merge: true },
     );
+  }
+  if (input.mentionAudience || input.anonymousContributionsDefault !== undefined) {
+    batch.set(db.collection("privacy_settings").doc(userId), {
+      user_id: userId,
+      ...(input.mentionAudience ? { mention_audience: input.mentionAudience } : {}),
+      ...(input.anonymousContributionsDefault !== undefined
+        ? { anonymous_contributions_default: input.anonymousContributionsDefault }
+        : {}),
+      updated_at: updatedAt,
+    }, { merge: true });
   }
   if (input.profileVisibility) {
     batch.set(
@@ -513,6 +538,24 @@ export async function savePrivacySettings(
   return record;
 }
 
+const MESSAGE_THEMES = ["default", "midnight", "forest", "ocean", "sunset"] as const;
+export async function readMessageTheme(userId: string) {
+  const snap = await getFirestoreDb().collection("privacy_settings").doc(userId).get();
+  return (snap.get("message_theme") ?? "default") as (typeof MESSAGE_THEMES)[number];
+}
+export async function saveMessageTheme(userId: string, theme: (typeof MESSAGE_THEMES)[number]) {
+  if (!MESSAGE_THEMES.includes(theme)) throw new Error("Choose an available chat theme.");
+  if (["forest", "ocean", "sunset"].includes(theme)) {
+    const access = await getUserMembershipEntitlements(userId);
+    if (access.tier === "basic") throw new Error("This chat theme is available with Premium.");
+  }
+  const db = getFirestoreDb();
+  await db.collection("privacy_settings").doc(userId).set({
+    user_id: userId, message_theme: theme, updated_at: now(),
+  }, { merge: true });
+  return { message_theme: theme };
+}
+
 export async function saveProfileBio(userId: string, bio: string) {
   const db = getFirestoreDb();
   const normalizedBio = bio.trim();
@@ -520,11 +563,11 @@ export async function saveProfileBio(userId: string, bio: string) {
     .collection("profiles")
     .doc(userId)
     .set(
-    {
-      bio: normalizedBio || null,
-      updated_at: now(),
-    },
-    { merge: true },
+      {
+        bio: normalizedBio || null,
+        updated_at: now(),
+      },
+      { merge: true },
     );
   return { bio: normalizedBio };
 }
@@ -805,6 +848,16 @@ export async function openConversation(userId: string, otherId: string) {
   const ref = db.collection("conversations").doc(id);
   const snap = await ref.get();
   if (!snap.exists) {
+    // Candid support must remain reachable on every package.
+    if (otherId !== CANDID_USER_ID) {
+      const membership = await getUserMembershipEntitlements(userId);
+      await consumeMembershipQuota(
+        userId,
+        "new_conversations",
+        membership.dailyNewConversations,
+        "day",
+      );
+    }
     const timestamp = now();
     const record: ConversationRecord = {
       id,
@@ -1179,8 +1232,7 @@ export async function toggleReaction(userId: string, messageId: string, emoji: s
         db.collection("profiles").doc(userId).get(),
       ]);
       const actorProfile = actorSnap.data() as
-        | { username?: string | null; photo_url?: string | null }
-        | undefined;
+        { username?: string | null; photo_url?: string | null } | undefined;
       const actor = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
       const target = message.image ? "photo" : "message";
       await pushServerNotification({
@@ -1269,7 +1321,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
   const isSelf = viewerId === userId;
   const isPrivate = profile.profile_visibility === "private";
   const canViewContributions = !isPrivate || isSelf || viewerFollowStatus === "accepted";
-  const [storyCount, commentCount, stories] = canViewContributions
+  const [storyCount, commentCount, anonymousStoryCount, anonymousCommentCount, stories] = canViewContributions
     ? await Promise.all([
         db
           .collection("stories")
@@ -1281,6 +1333,8 @@ export async function readPublicProfile(username: string, viewerId: string | nul
           .where("author_id", "==", userId)
           .where("status", "==", "published")
           .count(),
+        db.collection("stories").where("author_id", "==", userId).where("status", "==", "published").where("is_anonymous", "==", true).count(),
+        db.collection("comments").where("author_id", "==", userId).where("status", "==", "published").where("is_anonymous", "==", true).count(),
         db
           .collection("stories")
           .where("author_id", "==", userId)
@@ -1290,12 +1344,12 @@ export async function readPublicProfile(username: string, viewerId: string | nul
           .limit(31)
           .get(),
       ])
-    : [0, 0, null];
+    : [0, 0, 0, 0, null];
   const storyDocs = stories?.docs ?? [];
   const storySize = stories?.size ?? 0;
   const newestStoryDocsById = new Map(storyDocs.map((doc) => [doc.id, doc] as const));
   const profileStories = await Promise.all(
-    storyDocs
+    storyDocs.filter((doc) => doc.get("is_anonymous") !== true)
       .slice(0, 30)
       .map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
   );
@@ -1313,7 +1367,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       .filter((doc) => doc.exists)
       .map(async (doc) => {
         const story = doc.data() as StoryRecord;
-        if (story.author_id !== userId || story.status !== "published") return null;
+        if (story.author_id !== userId || story.status !== "published" || story.is_anonymous) return null;
         const alreadyLoaded = profileStoriesById.get(doc.id);
         if (alreadyLoaded) return { ...alreadyLoaded, is_pinned: true };
         return publicProfileStory(doc.id, story, doc.updateTime, true);
@@ -1341,8 +1395,8 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     followers: followerCount,
     following: followingCount,
     contributions: {
-      stories: storyCount,
-      comments: commentCount,
+      stories: Math.max(0, storyCount - anonymousStoryCount),
+      comments: Math.max(0, commentCount - anonymousCommentCount),
       joined_at: profile?.onboarded_at ?? profile?.created_at ?? null,
     },
     pinnedStoryIds: visiblePinnedStories.map((story) => story.id),
@@ -1410,7 +1464,7 @@ export async function readPublicProfileStories(
     profile?.account_status === "deletion_pending"
   )
     return { stories: [], hasMore: false, nextCursor: null };
-  if (profile.profile_visibility === "private" && viewerId !== userId) {
+  if (profile?.profile_visibility === "private" && viewerId !== userId) {
     const follow = viewerId
       ? await db.collection("follows").doc(`${viewerId}:${userId}`).get()
       : null;
@@ -1433,7 +1487,7 @@ export async function readPublicProfileStories(
   const last = docs.at(-1);
   return {
     stories: await Promise.all(
-      docs.map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
+      docs.filter((doc) => doc.get("is_anonymous") !== true).map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
     ),
     hasMore: snapshot.size > 30,
     nextCursor:

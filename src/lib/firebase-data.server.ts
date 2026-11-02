@@ -120,6 +120,7 @@ export type StoryRecord = {
   industry: string | null;
   would_work_again: boolean | null;
   author_id: string | null;
+  is_anonymous?: boolean;
   author_username?: string | null;
   author_photo_url?: string | null;
   author_membership_tier?: "basic" | "premium" | "gold";
@@ -153,6 +154,7 @@ export type CommentRecord = {
   body: string;
   status: string;
   author_id: string | null;
+  is_anonymous?: boolean;
   author_handle: string;
   author_username?: string | null;
   author_photo_url?: string | null;
@@ -293,6 +295,7 @@ function publicWorkplaceCoordinates(story: StoryRecord) {
 
 function publicStoryFields(
   story: StoryRecord,
+  viewerId: string | null = null,
 ): Omit<
   StoryRecord,
   | "status"
@@ -319,11 +322,12 @@ function publicStoryFields(
     tenure: story.tenure,
     industry: story.industry,
     would_work_again: story.would_work_again,
-    author_id: story.author_id,
-    author_username: story.author_username ?? null,
-    author_photo_url: story.author_photo_url ?? null,
-    author_membership_tier: story.author_membership_tier ?? "basic",
-    verified: Boolean(story.verified),
+    author_id: story.is_anonymous && story.author_id !== viewerId ? null : story.author_id,
+    author_username: story.is_anonymous && story.author_id !== viewerId ? null : story.author_username ?? null,
+    author_photo_url: story.is_anonymous && story.author_id !== viewerId ? null : story.author_photo_url ?? null,
+    author_membership_tier: story.is_anonymous && story.author_id !== viewerId ? "basic" : story.author_membership_tier ?? "basic",
+    verified: story.is_anonymous && story.author_id !== viewerId ? false : Boolean(story.verified),
+    is_anonymous: Boolean(story.is_anonymous),
     upvotes: story.upvotes,
     likes: Number(story.likes ?? 0),
     follower_count: Number(story.follower_count ?? 0),
@@ -1082,7 +1086,7 @@ async function calculatePublicStories(input: {
       .map((profile) => [profile.id, profile]),
   );
   return visibleSelected.map(({ story }) => ({
-    ...publicStoryFields(story),
+    ...publicStoryFields(story, input.viewerId ?? null),
     title: story.title,
     body: story.body,
     ...publicWorkplaceCoordinates(story),
@@ -1101,15 +1105,9 @@ async function calculatePublicStories(input: {
     metoo: story.metoo,
     upvotes: story.upvotes,
     would_work_again: story.would_work_again,
-    author_username:
-      story.author_username ??
-      (story.author_id ? profilesById.get(story.author_id)?.username : null) ??
-      null,
-    author_photo_url:
-      story.author_photo_url ??
-      (story.author_id ? profilesById.get(story.author_id)?.photo_url : null) ??
-      null,
-    author_membership_tier: membershipBadgeTier(
+    author_username: story.is_anonymous && story.author_id !== input.viewerId ? null : story.author_username ?? (story.author_id ? profilesById.get(story.author_id)?.username : null) ?? null,
+    author_photo_url: story.is_anonymous && story.author_id !== input.viewerId ? null : story.author_photo_url ?? (story.author_id ? profilesById.get(story.author_id)?.photo_url : null) ?? null,
+    author_membership_tier: story.is_anonymous && story.author_id !== input.viewerId ? "basic" : membershipBadgeTier(
       story.author_id ? (profilesById.get(story.author_id) ?? undefined) : undefined,
     ),
   }));
@@ -1229,7 +1227,7 @@ export async function getPublicStoryPage(input: {
     const company = companiesById.get(story.company_id);
     const author = story.author_id ? authorsById.get(story.author_id) : null;
     return {
-      ...publicStoryFields(story),
+      ...publicStoryFields(story, input.viewerId ?? null),
       ...publicWorkplaceCoordinates(story),
       company_location_suggestion: null,
       company_name: company?.name ?? story.company_name ?? null,
@@ -1243,8 +1241,9 @@ export async function getPublicStoryPage(input: {
       comment_count: Number(story.comment_count ?? 0),
       metoo: Number(story.metoo ?? 0),
       upvotes: Number(story.upvotes ?? 0),
-      author_username: story.author_username ?? author?.username ?? null,
-      author_membership_tier: membershipBadgeTier(author ?? undefined),
+      author_username: story.is_anonymous && story.author_id !== input.viewerId ? null : story.author_username ?? author?.username ?? null,
+      author_photo_url: story.is_anonymous && story.author_id !== input.viewerId ? null : story.author_photo_url ?? author?.photo_url ?? null,
+      author_membership_tier: story.is_anonymous && story.author_id !== input.viewerId ? "basic" : membershipBadgeTier(author ?? undefined),
     };
   });
   const last = stories.at(-1);
@@ -1341,8 +1340,9 @@ async function calculateCompanyView(slug: string) {
       metoo: story.metoo,
       upvotes: story.upvotes,
       would_work_again: story.would_work_again,
-      author_username: story.author_username ?? null,
-      author_membership_tier: story.author_membership_tier ?? "basic",
+      author_username: story.is_anonymous ? null : story.author_username ?? null,
+      author_photo_url: story.is_anonymous ? null : story.author_photo_url ?? null,
+      author_membership_tier: story.is_anonymous ? "basic" : story.author_membership_tier ?? "basic",
     })),
     hasMoreStories: storiesSnapshot.size > 50,
   };
@@ -1425,14 +1425,17 @@ async function calculateStoryView(id: string, viewerId: string | null = null) {
 
   const enriched: PublicComment[] = rawComments.map((comment) => {
     const profile = comment.author_id ? profilesById.get(comment.author_id) : null;
-    const official = comment.author_id === "candid-official" || (comment.is_official ?? false);
+    const hidden = comment.is_anonymous && comment.author_id !== viewerId;
+    const official = !hidden && (comment.author_id === "candid-official" || (comment.is_official ?? false));
     return {
       ...comment,
+      author_id: hidden ? null : comment.author_id,
+      author_handle: hidden ? "Anonymous member" : comment.author_handle,
       body: comment.is_deleted ? "" : comment.body,
-      author_username: comment.author_username ?? profile?.username ?? null,
-      author_photo_url: comment.author_photo_url ?? profile?.photo_url ?? null,
-      author_membership_tier: membershipBadgeTier(profile ?? undefined),
-      author_verified: Boolean(comment.author_verified),
+      author_username: hidden ? null : comment.author_username ?? profile?.username ?? null,
+      author_photo_url: hidden ? null : comment.author_photo_url ?? profile?.photo_url ?? null,
+      author_membership_tier: hidden ? "basic" : membershipBadgeTier(profile ?? undefined),
+      author_verified: hidden ? false : Boolean(comment.author_verified),
       is_official: official,
       likes: Number(comment.likes ?? 0),
       replies: [],
@@ -1503,7 +1506,7 @@ async function calculateStoryView(id: string, viewerId: string | null = null) {
   sortTree(visibleRoots);
   return {
     story: {
-      ...publicStoryFields(story),
+      ...publicStoryFields(story, viewerId),
       title: story.title,
       body: story.body,
       ...publicWorkplaceCoordinates(story),
@@ -1521,8 +1524,9 @@ async function calculateStoryView(id: string, viewerId: string | null = null) {
       metoo: story.metoo,
       upvotes: story.upvotes,
       would_work_again: story.would_work_again,
-      author_username: authorProfile?.username ?? null,
-      author_membership_tier: membershipBadgeTier(authorProfile ?? undefined),
+      author_username: story.is_anonymous && story.author_id !== viewerId ? null : authorProfile?.username ?? null,
+      author_photo_url: story.is_anonymous && story.author_id !== viewerId ? null : story.author_photo_url ?? authorProfile?.photo_url ?? null,
+      author_membership_tier: story.is_anonymous && story.author_id !== viewerId ? "basic" : membershipBadgeTier(authorProfile ?? undefined),
     } as PublicStoryRecord,
     comments: visibleRoots,
     commentTotal,
@@ -1586,15 +1590,18 @@ export async function getStoryCommentsPage(
   );
   const comments: PublicComment[] = raw.map((comment) => {
     const profile = comment.author_id ? profilesById.get(comment.author_id) : null;
+    const hidden = comment.is_anonymous && comment.author_id !== viewerId;
     return {
       ...comment,
+      author_id: hidden ? null : comment.author_id,
+      author_handle: hidden ? "Anonymous member" : comment.author_handle,
       body: comment.is_deleted ? "" : comment.body,
-      author_username: comment.author_username ?? profile?.username ?? null,
-      author_photo_url: comment.author_photo_url ?? profile?.photo_url ?? null,
-      author_membership_tier:
+      author_username: hidden ? null : comment.author_username ?? profile?.username ?? null,
+      author_photo_url: hidden ? null : comment.author_photo_url ?? profile?.photo_url ?? null,
+      author_membership_tier: hidden ? "basic" :
         comment.author_membership_tier ?? membershipBadgeTier(profile ?? undefined),
-      author_verified: Boolean(comment.author_verified),
-      is_official: comment.author_id === "candid-official" || Boolean(comment.is_official),
+      author_verified: hidden ? false : Boolean(comment.author_verified),
+      is_official: !hidden && (comment.author_id === "candid-official" || Boolean(comment.is_official)),
       likes: Number(comment.likes ?? 0),
       replies: [],
     };
@@ -1664,15 +1671,18 @@ export async function getStoryCommentContext(
   );
   const nodes = chain.map<PublicComment>((comment) => {
     const profile = comment.author_id ? profilesById.get(comment.author_id) : null;
+    const hidden = comment.is_anonymous && comment.author_id !== viewerId;
     return {
       ...comment,
+      author_id: hidden ? null : comment.author_id,
+      author_handle: hidden ? "Anonymous member" : comment.author_handle,
       body: comment.is_deleted ? "" : comment.body,
-      author_username: comment.author_username ?? profile?.username ?? null,
-      author_photo_url: comment.author_photo_url ?? profile?.photo_url ?? null,
-      author_membership_tier:
+      author_username: hidden ? null : comment.author_username ?? profile?.username ?? null,
+      author_photo_url: hidden ? null : comment.author_photo_url ?? profile?.photo_url ?? null,
+      author_membership_tier: hidden ? "basic" :
         comment.author_membership_tier ?? membershipBadgeTier(profile ?? undefined),
-      author_verified: Boolean(comment.author_verified),
-      is_official: comment.author_id === "candid-official" || Boolean(comment.is_official),
+      author_verified: hidden ? false : Boolean(comment.author_verified),
+      is_official: !hidden && (comment.author_id === "candid-official" || Boolean(comment.is_official)),
       likes: Number(comment.likes ?? 0),
       replies: [],
     };
@@ -1780,8 +1790,9 @@ async function calculateSearchData(queryText: string) {
       metoo: story.metoo,
       upvotes: story.upvotes,
       would_work_again: story.would_work_again,
-      author_username: story.author_username ?? author?.username ?? null,
-      author_membership_tier:
+      author_username: story.is_anonymous ? null : story.author_username ?? author?.username ?? null,
+      author_photo_url: story.is_anonymous ? null : story.author_photo_url ?? author?.photo_url ?? null,
+      author_membership_tier: story.is_anonymous ? "basic" :
         story.author_membership_tier ?? membershipBadgeTier(author ?? undefined),
     };
   });

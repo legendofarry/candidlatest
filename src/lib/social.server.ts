@@ -53,6 +53,11 @@ export async function setFeedPreference(
 }
 import { type CommentRecord, type StoryRecord } from "./firebase-data.server";
 import { getEffectiveMembershipTier, getMembershipEntitlements } from "./membership";
+import {
+  consumeMembershipQuota,
+  getUserMembershipEntitlements,
+  releaseMembershipQuota,
+} from "./membership.server";
 
 export type FollowRecord = {
   id: string;
@@ -116,8 +121,7 @@ export async function toggleAccountFollow(followerId: string, followingId: strin
         db.collection("profiles").doc(followerId).get(),
       ]);
       const actorProfile = actorSnap.data() as
-        | { username?: string | null; photo_url?: string | null }
-        | undefined;
+        { username?: string | null; photo_url?: string | null } | undefined;
       const actorName = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
       await pushServerNotification({
         userId: followingId,
@@ -143,8 +147,7 @@ export async function toggleAccountFollow(followerId: string, followingId: strin
         db.collection("profiles").doc(followerId).get(),
       ]);
       const actorProfile = actorSnap.data() as
-        | { username?: string | null; photo_url?: string | null }
-        | undefined;
+        { username?: string | null; photo_url?: string | null } | undefined;
       const actorName = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
       await pushServerNotification({
         userId: followingId,
@@ -240,8 +243,7 @@ export async function toggleStoryLike(storyId: string, userId: string) {
         db.collection("profiles").doc(userId).get(),
       ]);
       const actorProfile = actorSnap.data() as
-        | { username?: string | null; photo_url?: string | null }
-        | undefined;
+        { username?: string | null; photo_url?: string | null } | undefined;
       const actorName = actorProfile?.username ? `@${actorProfile.username}` : "Someone";
       await pushServerNotification({
         userId: result.story.author_id,
@@ -364,9 +366,7 @@ export async function toggleProfileStoryPin(storyId: string, userId: string) {
       throw new Error("Story pins are included with Premium. Upgrade from Billing.");
     }
     if (pinnedIds.length >= limit) {
-      throw new Error(
-        `Your Premium package allows up to ${limit} pinned ${limit === 1 ? "story" : "stories"}.`,
-      );
+      throw new Error(`Your Premium package allows up to ${limit} pinned stories.`);
     }
 
     const nextPinnedIds = [...pinnedIds, storyId];
@@ -539,6 +539,9 @@ export async function buildStoryCatchUp(storyId: string, userId: string) {
   const followSnap = await db.collection("story_follows").doc(`${storyId}:${userId}`).get();
   if (!followSnap.exists) throw new Error("Follow this story to view its timeline.");
 
+  const dateKey = new Date().toISOString().slice(0, 10);
+  const catchUpRef = db.collection("story_catchups").doc(`${userId}_${dateKey}_${storyId}`);
+
   const [storyDoc, commentSnap, totalComments] = await Promise.all([
     db.collection("stories").doc(storyId).get(),
     db
@@ -562,16 +565,44 @@ export async function buildStoryCatchUp(storyId: string, userId: string) {
     .filter((comment) => comment.status === "published")
     .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
 
-  const { summarizeStoryActivity } = await import("./ai.server");
-  const summary = timeline.length
-    ? await summarizeStoryActivity({
-        title: story?.title ?? "This story",
-        body: story?.body ?? "",
-        comments: timeline.slice(-40).map((comment) => comment.body),
-      })
-    : "The story has been shared, and there are no published replies yet.";
+  const latestUpdateAt = timeline.at(-1)?.created_at ?? story.created_at;
+  const cachedCatchUp = await catchUpRef.get();
+  const cached = cachedCatchUp.data() as { latestUpdateAt?: string; summary?: string } | undefined;
+  let summary = cached?.latestUpdateAt === latestUpdateAt ? cached.summary : undefined;
+  if (!summary) {
+    const membership = await getUserMembershipEntitlements(userId);
+    try {
+      await consumeMembershipQuota(userId, "story_catchups", membership.dailyStoryCatchUps, "day");
+    } catch (error) {
+      if (membership.tier === "basic") {
+        throw new Error("Free includes one story catch-up each day. Premium includes up to 10.");
+      }
+      throw error;
+    }
+    try {
+      const { summarizeStoryActivity } = await import("./ai.server");
+      summary = timeline.length
+        ? await summarizeStoryActivity({
+            title: story.title ?? "This story",
+            body: story.body ?? "",
+            comments: timeline.slice(-40).map((comment) => comment.body),
+          })
+        : "The story has been shared, and there are no published replies yet.";
+      await catchUpRef.set({
+        user_id: userId,
+        story_id: storyId,
+        date: dateKey,
+        latestUpdateAt,
+        summary,
+        updated_at: new Date().toISOString(),
+      });
+    } catch (error) {
+      await releaseMembershipQuota(userId, "story_catchups", "day");
+      throw error;
+    }
+  }
 
-  return {
+  const result = {
     story: {
       title: story.title,
       body: story.body,
@@ -587,6 +618,7 @@ export async function buildStoryCatchUp(storyId: string, userId: string) {
     })),
     totalUpdates: totalComments,
     hasMoreUpdates: totalComments > timeline.length,
-    latestUpdateAt: timeline.at(-1)?.created_at ?? story.created_at,
+    latestUpdateAt,
   };
+  return result;
 }

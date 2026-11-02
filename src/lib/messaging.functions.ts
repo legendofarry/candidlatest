@@ -173,11 +173,12 @@ export const getPrivacySettings = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .handler(async ({ context }) => {
     const { readPrivacySettings, listBlocked } = await import("./messaging.server");
-    const [settings, blocked] = await Promise.all([
+    const [settings, blocked, membership] = await Promise.all([
       readPrivacySettings(context.userId),
       listBlocked(context.userId),
+      import("./membership.server").then(({ getUserMembershipEntitlements }) => getUserMembershipEntitlements(context.userId)),
     ]);
-    return { ...settings, blocked };
+    return { ...settings, blocked, membership_tier: membership.tier };
   });
 
 export const updatePrivacySettings = createServerFn({ method: "POST" })
@@ -186,14 +187,35 @@ export const updatePrivacySettings = createServerFn({ method: "POST" })
     z.object({
       who_can_message: z.enum(["everyone", "followers", "nobody"]).optional(),
       profile_visibility: z.enum(["public", "private"]).optional(),
-    }).refine((data) => data.who_can_message || data.profile_visibility, "Choose a privacy setting.").parse(input),
+      mention_audience: z.enum(["everyone", "followers", "nobody"]).optional(),
+      anonymous_contributions_default: z.boolean().optional(),
+    }).refine((data) => Object.values(data).some((value) => value !== undefined), "Choose a setting.").parse(input),
   )
   .handler(async ({ data, context }) => {
     const { savePrivacySettings } = await import("./messaging.server");
     return savePrivacySettings(context.userId, {
-      whoCanMessage: data.who_can_message,
-      profileVisibility: data.profile_visibility,
+      ...(data.who_can_message ? { whoCanMessage: data.who_can_message } : {}),
+      ...(data.profile_visibility ? { profileVisibility: data.profile_visibility } : {}),
+      ...(data.mention_audience ? { mentionAudience: data.mention_audience } : {}),
+      ...(data.anonymous_contributions_default !== undefined ? { anonymousContributionsDefault: data.anonymous_contributions_default } : {}),
     });
+  });
+
+export const updateMessageTheme = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    theme: z.enum(["default", "midnight", "forest", "ocean", "sunset"]),
+  }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { saveMessageTheme } = await import("./messaging.server");
+    return saveMessageTheme(context.userId, data.theme);
+  });
+
+export const getMessageTheme = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    const { readMessageTheme } = await import("./messaging.server");
+    return { theme: await readMessageTheme(context.userId) };
   });
 
 export const updateMyProfileBio = createServerFn({ method: "POST" })
@@ -273,7 +295,6 @@ export const getMentionSuggestions = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = (await import("./firebase.server")).getFirestoreDb();
-    const { canMessage } = await import("./messaging.server");
     const snapshot = await db
       .collection("profiles")
       .where("username", ">=", data.query)
@@ -291,8 +312,13 @@ export const getMentionSuggestions = createServerFn({ method: "POST" })
       }
       const username = doc.get("username");
       if (typeof username !== "string") continue;
-      const gate = await canMessage(context.userId, doc.id);
-      if (!gate.allowed) continue;
+      const prefs = await db.collection("privacy_settings").doc(doc.id).get();
+      const audience = prefs.get("mention_audience") ?? "everyone";
+      if (audience === "nobody") continue;
+      if (audience === "followers") {
+        const followsRecipient = await db.collection("follows").doc(`${context.userId}:${doc.id}`).get();
+        if (!followsRecipient.exists || followsRecipient.get("status") === "pending") continue;
+      }
       users.push({ username, photoUrl: doc.get("photo_url") ?? null });
       if (users.length >= 8) break;
     }

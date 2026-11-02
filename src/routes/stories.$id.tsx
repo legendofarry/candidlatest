@@ -210,7 +210,7 @@ function StoryPage() {
                   />
                 </>
               ) : (
-                "Candid member"
+                story.is_anonymous ? "Anonymous member" : "Candid member"
               )}{" "}
               · {formatDate(story.created_at)}
             </p>

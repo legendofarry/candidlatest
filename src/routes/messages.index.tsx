@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
-import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -22,6 +22,7 @@ import {
   getMentionSuggestions,
   startConversationByUsername,
   updateConversationPreference,
+  getMessageTheme,
 } from "@/lib/messaging.functions";
 import { readInboxScroll, saveInboxScroll } from "@/lib/message-panel-state";
 import { useAuth } from "@/hooks/useAuth";
@@ -112,6 +113,21 @@ export function MessagesInbox({
   const longPressTriggered = useRef(false);
   const embedded = Boolean(onSelectConversation);
   const updatePreference = useServerFn(updateConversationPreference);
+  const fetchMessageTheme = useServerFn(getMessageTheme);
+  const { data: messageThemeData } = useQuery({
+    queryKey: ["message-theme", user?.uid ?? null],
+    queryFn: () => fetchMessageTheme(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
+  const selectedTheme = (messageThemeData?.theme ?? "default") as "default" | "midnight" | "forest" | "ocean" | "sunset";
+  const themeClass = ({
+    default: "",
+    midnight: "!bg-[#050507]",
+    forest: "!bg-[#07150f]",
+    ocean: "!bg-[#071421]",
+    sunset: "!bg-[#1a0d19]",
+  } as const)[selectedTheme];
 
   const {
     data,
@@ -335,7 +351,8 @@ export function MessagesInbox({
   return (
     <div
       ref={listRef}
-      className={cn(embedded ? "mx-auto max-w-2xl" : "-mx-4 max-w-none md:mx-auto md:max-w-5xl")}
+      data-message-theme={selectedTheme}
+      className={cn("candid-message-theme", embedded ? "mx-auto max-w-2xl" : "-mx-4 max-w-none md:mx-auto md:max-w-5xl", themeClass)}
     >
       {!embedded ? (
         <header className="border-b border-border bg-background px-4 pb-5 pt-4 sm:px-6 md:py-6">

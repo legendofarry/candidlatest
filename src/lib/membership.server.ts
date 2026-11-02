@@ -1,4 +1,9 @@
-import { DEFAULT_MEMBERSHIP, type MembershipTier } from "./membership";
+import {
+  DEFAULT_MEMBERSHIP,
+  getEffectiveMembershipTier,
+  getMembershipEntitlements,
+  type MembershipTier,
+} from "./membership";
 import { getFirestoreDb } from "./firebase.server";
 
 type MembershipRecord = {
@@ -31,7 +36,8 @@ export async function switchMembership(
   requestId: string,
   expectedVersion: number,
 ) {
-  if (tier === "gold") throw new Error("Gold is no longer a separate package. Choose Premium instead.");
+  if (tier === "gold")
+    throw new Error("Gold is no longer a separate package. Choose Premium instead.");
   const db = getFirestoreDb();
   const profileRef = db.collection("profiles").doc(userId);
   const eventRef = db.collection("subscription_change_events").doc(requestId);
@@ -149,4 +155,90 @@ export async function switchMembership(
   }
 
   throw new Error("Your package could not be changed. Refresh and try again.");
+}
+
+/** Reserve a quota slot with Firestore update-time preconditions to serialize concurrent requests. */
+export async function consumeMembershipQuota(
+  userId: string,
+  feature: "story_catchups" | "new_conversations" | "salary_reports",
+  limit: number,
+  period: "day" | "month",
+  initialUsed = 0,
+) {
+  const db = getFirestoreDb();
+  const now = new Date();
+  const periodKey =
+    period === "day" ? now.toISOString().slice(0, 10) : now.toISOString().slice(0, 7);
+  const ref = db.collection("membership_usage").doc(userId);
+  const countField = `${feature}_used`;
+  const periodField = `${feature}_period`;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const snapshot = await ref.get();
+    const used =
+      snapshot.get(periodField) === periodKey ? Number(snapshot.get(countField) ?? 0) : initialUsed;
+    if (used >= limit) {
+      throw new Error(
+        `You’ve reached your ${period === "day" ? "daily" : "monthly"} package limit.`,
+      );
+    }
+    const value = {
+      user_id: userId,
+      [periodField]: periodKey,
+      [countField]: used + 1,
+      updated_at: now.toISOString(),
+    };
+    try {
+      if (snapshot.exists) {
+        if (!snapshot.updateTime) throw new Error("Could not update usage right now.");
+        await ref.update(value, { updateTime: snapshot.updateTime });
+      } else {
+        await ref.create(value);
+      }
+      return { used: used + 1, limit };
+    } catch (error) {
+      if (!(error instanceof Error) || !/\[(409|412)\]/.test(error.message) || attempt === 4) {
+        throw error;
+      }
+    }
+  }
+  throw new Error("Could not reserve a package usage slot. Please try again.");
+}
+
+export async function releaseMembershipQuota(
+  userId: string,
+  feature: "story_catchups" | "new_conversations" | "salary_reports",
+  period: "day" | "month",
+) {
+  const now = new Date();
+  const periodKey =
+    period === "day" ? now.toISOString().slice(0, 10) : now.toISOString().slice(0, 7);
+  const ref = getFirestoreDb().collection("membership_usage").doc(userId);
+  const countField = `${feature}_used`;
+  const periodField = `${feature}_period`;
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const snapshot = await ref.get();
+    const used = Number(snapshot.get(countField) ?? 0);
+    if (!snapshot.exists || snapshot.get(periodField) !== periodKey || used < 1) return;
+    if (!snapshot.updateTime) return;
+    try {
+      await ref.update(
+        { [countField]: used - 1, updated_at: now.toISOString() },
+        {
+          updateTime: snapshot.updateTime,
+        },
+      );
+      return;
+    } catch (error) {
+      if (!(error instanceof Error) || !/\[(409|412)\]/.test(error.message) || attempt === 4) {
+        throw error;
+      }
+    }
+  }
+}
+
+export async function getUserMembershipEntitlements(userId: string) {
+  const profile = (await getFirestoreDb().collection("profiles").doc(userId).get()).data() ?? {};
+  const tier = getEffectiveMembershipTier(profile);
+  return { tier, ...getMembershipEntitlements(tier) };
 }

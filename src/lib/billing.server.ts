@@ -15,14 +15,16 @@ import {
 
 const FALLBACK_PACKAGES = {
   basic: {
-    name: "Basic",
+    name: "Free",
     price_kes: 0,
     billing_period: "Free",
     enabled: true,
     benefits: [
-      "Read and share workplace stories and salary insights",
-      "Comment, save, follow, message and report",
-      "All essential community and safety features",
+      "Create stories, comment, react, save, report and manage your own contributions",
+      "Full notifications, privacy, blocking and safety controls",
+      "Compare 2 employers and see 5 entries on each leaderboard",
+      "Submit up to 3 salary reports per month and start 3 new chats per day",
+      "1 AI story catch-up per day; published salary ranges remain visible to everyone",
     ],
   },
   premium: {
@@ -31,9 +33,11 @@ const FALLBACK_PACKAGES = {
     billing_period: "",
     enabled: true,
     benefits: [
-      "Everything in Basic",
+      "Everything in Free, with higher monthly and daily limits",
+      "Compare up to 5 employers and see 10 entries on each leaderboard",
+      "Submit up to 20 salary reports per month and start up to 20 new chats per day",
+      "Up to 10 AI story catch-ups per day",
       "Pin up to 3 published stories to your profile",
-      "Premium supporter badge",
     ],
   },
   // Kept to render historical billing records only; users cannot purchase Gold.
@@ -42,11 +46,7 @@ const FALLBACK_PACKAGES = {
     price_kes: 1000,
     billing_period: "",
     enabled: false,
-    benefits: [
-      "Everything in Premium",
-      "Pin up to 3 published stories to your profile",
-      "Gold supporter badge",
-    ],
+    benefits: ["Everything in Premium", "Pin up to 3 published stories to your profile"],
   },
 } as const;
 
@@ -223,7 +223,7 @@ export async function getMyBillingSummary(userId: string) {
       assignedTier:
         profile.subscription_tier === "gold"
           ? "premium"
-          : profile.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
+          : (profile.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier),
       status: profile.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
       source: profile.subscription_source ?? DEFAULT_MEMBERSHIP.subscription_source,
       startedAt:
@@ -276,7 +276,8 @@ export async function createManualPaymentRequest(
     throw new Error("This package is not currently available for purchase.");
   }
   const effectiveTier = getEffectiveMembershipTier(profile);
-  const normalizedAssignedTier = profile.subscription_tier === "gold" ? "premium" : profile.subscription_tier;
+  const normalizedAssignedTier =
+    profile.subscription_tier === "gold" ? "premium" : profile.subscription_tier;
   if (renewal) {
     if (tier !== normalizedAssignedTier || profile.subscription_source !== "paid")
       throw new Error("This subscription cannot be renewed from this account.");

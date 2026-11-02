@@ -11,6 +11,7 @@ import {
   LockKeyhole,
   MessageSquareLock,
   UserRoundCheck,
+  Palette,
 } from "lucide-react";
 import {
   getFollowRequests,
@@ -18,6 +19,7 @@ import {
   respondToFollowRequest,
   toggleBlockAccount,
   updatePrivacySettings,
+  updateMessageTheme,
 } from "@/lib/messaging.functions";
 import { Button } from "@/components/ui/button";
 import { notify } from "@/lib/notifications-store";
@@ -46,12 +48,25 @@ const VISIBILITY = [
     Icon: LockKeyhole,
   },
 ] as const;
+const MENTION_OPTIONS = [
+  { value: "everyone", label: "Everyone" },
+  { value: "followers", label: "Your followers" },
+  { value: "nobody", label: "No one" },
+] as const;
+const CHAT_THEMES = [
+  { id: "default", label: "Candid", premium: false, swatch: "bg-zinc-900" },
+  { id: "midnight", label: "Midnight", premium: false, swatch: "bg-black" },
+  { id: "forest", label: "Forest", premium: true, swatch: "bg-emerald-950" },
+  { id: "ocean", label: "Ocean", premium: true, swatch: "bg-sky-950" },
+  { id: "sunset", label: "Sunset", premium: true, swatch: "bg-fuchsia-950" },
+] as const;
 
 export function PrivacySettings() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const fetchSettings = useServerFn(getPrivacySettings);
   const saveSettings = useServerFn(updatePrivacySettings);
+  const saveTheme = useServerFn(updateMessageTheme);
   const unblock = useServerFn(toggleBlockAccount);
   const getRequests = useServerFn(getFollowRequests);
   const respond = useServerFn(respondToFollowRequest);
@@ -260,6 +275,46 @@ export function PrivacySettings() {
             </button>
           );
         })}
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <p className="text-sm font-medium">Who can mention you?</p>
+        <p className="mt-1 text-xs text-muted-foreground">People may still type your handle, but only your chosen audience can trigger a mention notification.</p>
+        <div className="mt-2 grid gap-0 md:grid-cols-3 md:gap-2">
+          {MENTION_OPTIONS.map((option) => (
+            <button key={`mention-${option.value}`} type="button" disabled={isLoading}
+              onClick={() => void saveSettings({ data: { mention_audience: option.value } }).then(() => queryClient.invalidateQueries({ queryKey: ["privacy-settings"] })).catch((error) => notify.error(error instanceof Error ? error.message : "Could not save mention settings."))}
+              className={cn("border-b border-border px-2 py-3 text-left text-sm md:rounded-xl md:border md:p-3", (data?.mention_audience ?? "everyone") === option.value ? "border-primary bg-primary/10" : "hover:bg-secondary/60")}
+            >{option.label}{(data?.mention_audience ?? "everyone") === option.value ? " ✓" : ""}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
+        <div>
+          <p className="text-sm font-medium">Post new stories and comments anonymously</p>
+          <p className="mt-1 text-xs text-muted-foreground">Your identity stays hidden from other members. You and moderators can still manage and review your contributions. Existing posts are unchanged.</p>
+        </div>
+        <button type="button" role="switch" aria-checked={data?.anonymous_contributions_default ?? false}
+          disabled={isLoading}
+          onClick={() => void saveSettings({ data: { anonymous_contributions_default: !(data?.anonymous_contributions_default ?? false) } }).then(() => queryClient.invalidateQueries({ queryKey: ["privacy-settings"] })).catch((error) => notify.error(error instanceof Error ? error.message : "Could not save anonymity settings."))}
+          className={cn("h-6 w-11 shrink-0 rounded-full p-1 transition-colors", data?.anonymous_contributions_default ? "bg-primary" : "bg-muted")}
+        ><span className={cn("block size-4 rounded-full bg-white transition-transform", data?.anonymous_contributions_default && "translate-x-5")} /></button>
+      </div>
+
+      <div className="border-t border-border pt-4">
+        <div className="flex items-center gap-2"><Palette className="size-4 text-primary" /><p className="text-sm font-medium">Message appearance</p></div>
+        <p className="mt-1 text-xs text-muted-foreground">Only you see the theme you choose. Premium includes the full theme set.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {CHAT_THEMES.map((theme) => {
+            const locked = theme.premium && data?.membership_tier === "basic";
+            const active = (data?.message_theme ?? "default") === theme.id;
+            return <button key={theme.id} type="button" disabled={isLoading || locked} aria-pressed={active}
+              onClick={() => void saveTheme({ data: { theme: theme.id } }).then(() => queryClient.invalidateQueries({ queryKey: ["privacy-settings"] })).catch((error) => notify.error(error instanceof Error ? error.message : "Could not change message appearance."))}
+              className={cn("flex items-center gap-2 border-b border-border px-2 py-2 text-sm md:rounded-xl md:border md:px-3", active && "border-primary bg-primary/10", locked && "opacity-50")}
+            ><span className={cn("size-5 rounded-full border border-border", theme.swatch)} />{theme.label}{theme.premium ? <span className="text-[10px] text-muted-foreground">PREMIUM</span> : null}</button>;
+          })}
+        </div>
       </div>
 
       <div>

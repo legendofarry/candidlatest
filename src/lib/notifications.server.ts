@@ -210,7 +210,15 @@ export async function resolveMentionedUserIds(body: string, excludeUserId?: stri
   for (const handle of handles.slice(0, 10)) {
     const snap = await db.collection("usernames").doc(handle).get();
     const userId = (snap.data() as { user_id?: string } | undefined)?.user_id;
-    if (userId && userId !== excludeUserId && !ids.includes(userId)) ids.push(userId);
+    if (!userId || userId === excludeUserId || ids.includes(userId)) continue;
+    const prefs = await db.collection("privacy_settings").doc(userId).get();
+    const audience = prefs.get("mention_audience") ?? "everyone";
+    if (audience === "nobody") continue;
+    if (audience === "followers" && excludeUserId) {
+      const followsRecipient = await db.collection("follows").doc(`${excludeUserId}:${userId}`).get();
+      if (!followsRecipient.exists || followsRecipient.get("status") === "pending") continue;
+    }
+    ids.push(userId);
   }
   return ids;
 }

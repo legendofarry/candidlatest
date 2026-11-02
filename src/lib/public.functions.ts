@@ -13,6 +13,7 @@ import {
   searchData,
 } from "./firebase-data.server";
 import { optionalFirebaseAuth } from "@/integrations/firebase/auth-middleware";
+import { getUserMembershipEntitlements } from "./membership.server";
 
 function isFirebaseReadUnavailable(error: unknown) {
   return (
@@ -100,7 +101,10 @@ export const listStoryPage = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     try {
-      return { ...(await getPublicStoryPage({ ...data, viewerId: context.userId })), error: null as string | null };
+      return {
+        ...(await getPublicStoryPage({ ...data, viewerId: context.userId })),
+        error: null as string | null,
+      };
     } catch (error) {
       if (!isFirebaseReadUnavailable(error)) throw error;
       console.warn("[listStoryPage] Firebase public read unavailable", error);
@@ -179,37 +183,46 @@ export const getStoryComments = createServerFn({ method: "GET" })
       })
       .parse(input),
   )
-  .handler(async ({ data, context }) => readStoryCommentsPage(data.id, data.cursor, context.userId));
+  .handler(async ({ data, context }) =>
+    readStoryCommentsPage(data.id, data.cursor, context.userId),
+  );
 
 export const getStoryCommentContext = createServerFn({ method: "GET" })
   .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ story_id: z.string().uuid(), comment_id: z.string().uuid() }).parse(input),
   )
-  .handler(async ({ data, context }) => readStoryCommentContext(data.story_id, data.comment_id, context.userId));
+  .handler(async ({ data, context }) =>
+    readStoryCommentContext(data.story_id, data.comment_id, context.userId),
+  );
 
-export const getLeaderboards = createServerFn({ method: "GET" }).handler(async () => {
-  try {
-    const rows = await buildCompanyScores();
-    return {
-      mostReported: [...rows]
-        .sort((a, b) => Number(b.story_count) - Number(a.story_count))
-        .slice(0, 10),
-      bestRated: [...rows]
-        .filter((r) => Number(r.rating_count) > 0)
-        .sort((a, b) => Number(b.overall) - Number(a.overall))
-        .slice(0, 10),
-      wouldReturn: [...rows]
-        .filter((r) => r.would_work_again_pct !== null)
-        .sort((a, b) => Number(b.would_work_again_pct) - Number(a.would_work_again_pct))
-        .slice(0, 10),
-    };
-  } catch (error) {
-    if (!isFirebaseReadUnavailable(error)) throw error;
-    console.warn("[getLeaderboards] Firebase public read unavailable", error);
-    return { mostReported: [], bestRated: [], wouldReturn: [] };
-  }
-});
+export const getLeaderboards = createServerFn({ method: "GET" })
+  .middleware([optionalFirebaseAuth])
+  .handler(async ({ context }) => {
+    try {
+      const rowLimit = context.userId
+        ? (await getUserMembershipEntitlements(context.userId)).leaderboardRows
+        : 5;
+      const rows = await buildCompanyScores();
+      return {
+        mostReported: [...rows]
+          .sort((a, b) => Number(b.story_count) - Number(a.story_count))
+          .slice(0, rowLimit),
+        bestRated: [...rows]
+          .filter((r) => Number(r.rating_count) > 0)
+          .sort((a, b) => Number(b.overall) - Number(a.overall))
+          .slice(0, rowLimit),
+        wouldReturn: [...rows]
+          .filter((r) => r.would_work_again_pct !== null)
+          .sort((a, b) => Number(b.would_work_again_pct) - Number(a.would_work_again_pct))
+          .slice(0, rowLimit),
+      };
+    } catch (error) {
+      if (!isFirebaseReadUnavailable(error)) throw error;
+      console.warn("[getLeaderboards] Firebase public read unavailable", error);
+      return { mostReported: [], bestRated: [], wouldReturn: [] };
+    }
+  });
 
 export const getSalaryAggregates = createServerFn({ method: "GET" }).handler(async () => {
   try {

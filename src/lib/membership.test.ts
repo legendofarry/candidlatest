@@ -51,17 +51,32 @@ test("only the existing legacy Gold account or explicitly unlocked accounts can 
   assert.equal(canSelfSwitchMembership({ subscription_tier: "basic" }), false);
 });
 
-test("package entitlements provide profile pins without limiting core community use", () => {
+test("Free and Premium package limits keep safety, core actions, and verified badges independent", () => {
   assert.deepEqual(getMembershipEntitlements("basic"), {
     membershipBadge: false,
     maxPinnedStories: 0,
+    maxComparedCompanies: 2,
+    leaderboardRows: 5,
+    dailyStoryCatchUps: 1,
+    dailyNewConversations: 3,
+    monthlySalaryReports: 3,
   });
   assert.deepEqual(getMembershipEntitlements("premium"), {
-    membershipBadge: true,
+    membershipBadge: false,
     maxPinnedStories: 3,
+    maxComparedCompanies: 5,
+    leaderboardRows: 10,
+    dailyStoryCatchUps: 10,
+    dailyNewConversations: 20,
+    monthlySalaryReports: 20,
   });
   assert.deepEqual(getMembershipEntitlements("gold"), {
-    membershipBadge: true,
+    membershipBadge: false,
     maxPinnedStories: 3,
+    maxComparedCompanies: 5,
+    leaderboardRows: 10,
+    dailyStoryCatchUps: 10,
+    dailyNewConversations: 20,
+    monthlySalaryReports: 20,
   });
 });

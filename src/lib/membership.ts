@@ -1,5 +1,5 @@
 export const MEMBERSHIP_PLANS = {
-  basic: { name: "Basic", priceKes: 0, interval: "Free" },
+  basic: { name: "Free", priceKes: 0, interval: "Always free" },
   premium: { name: "Premium", priceKes: 500, interval: "per month" },
   // Kept only to read existing records. Gold is no longer offered as a package.
   gold: { name: "Gold", priceKes: 1000, interval: "per month" },
@@ -31,10 +31,46 @@ export const DEFAULT_MEMBERSHIP = {
 
 /** Feature limits are defined once here and enforced by both UI and server actions. */
 export const MEMBERSHIP_ENTITLEMENTS = {
-  basic: { membershipBadge: false, maxPinnedStories: 0 },
-  premium: { membershipBadge: true, maxPinnedStories: 3 },
-  gold: { membershipBadge: true, maxPinnedStories: 3 },
-} as const satisfies Record<MembershipTier, { membershipBadge: boolean; maxPinnedStories: number }>;
+  basic: {
+    membershipBadge: false,
+    maxPinnedStories: 0,
+    maxComparedCompanies: 2,
+    leaderboardRows: 5,
+    dailyStoryCatchUps: 1,
+    dailyNewConversations: 3,
+    monthlySalaryReports: 3,
+  },
+  premium: {
+    membershipBadge: false,
+    maxPinnedStories: 3,
+    maxComparedCompanies: 5,
+    leaderboardRows: 10,
+    dailyStoryCatchUps: 10,
+    dailyNewConversations: 20,
+    monthlySalaryReports: 20,
+  },
+  // Historical Gold memberships keep Premium access, but Gold is never offered.
+  gold: {
+    membershipBadge: false,
+    maxPinnedStories: 3,
+    maxComparedCompanies: 5,
+    leaderboardRows: 10,
+    dailyStoryCatchUps: 10,
+    dailyNewConversations: 20,
+    monthlySalaryReports: 20,
+  },
+} as const satisfies Record<
+  MembershipTier,
+  {
+    membershipBadge: boolean;
+    maxPinnedStories: number;
+    maxComparedCompanies: number;
+    leaderboardRows: number;
+    dailyStoryCatchUps: number;
+    dailyNewConversations: number;
+    monthlySalaryReports: number;
+  }
+>;
 
 export function getMembershipEntitlements(tier: MembershipTier) {
   return MEMBERSHIP_ENTITLEMENTS[tier];

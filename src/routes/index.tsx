@@ -96,7 +96,9 @@ function FeedPage() {
         ? listStoryPage({ data: { limit: 20, cursor: pageParam, industry, county, area } })
         : listStories({ data: { sort, industry, county, area, cursor: pageParam } }),
     getNextPageParam: (lastPage) => (lastPage.hasMore ? lastPage.nextCursor : undefined),
-    ...(!user && isDefaultView ? { initialData: { pages: [initialFeed], pageParams: [null] } } : {}),
+    ...(!user && isDefaultView
+      ? { initialData: { pages: [initialFeed], pageParams: [null] } }
+      : {}),
   });
   const areaOptions = county ? (filters.areasByCounty[county] ?? []) : filters.areas;
 
@@ -104,14 +106,14 @@ function FeedPage() {
   const stories = (feedPages.data?.pages.flatMap((page) => page.stories) ?? []).filter((story) =>
     needle
       ? [
-        story.title,
-        story.body,
-        story.company_name ?? "",
-        ...((story as { reasons?: string[] }).reasons ?? []),
-      ]
-        .join(" ")
-        .toLowerCase()
-        .includes(needle)
+          story.title,
+          story.body,
+          story.company_name ?? "",
+          ...((story as { reasons?: string[] }).reasons ?? []),
+        ]
+          .join(" ")
+          .toLowerCase()
+          .includes(needle)
       : true,
   );
 
@@ -172,7 +174,7 @@ function FeedPage() {
         </div>
       </section>
 
-      <ComplimentaryPremiumBanner />
+      <FreePackageBanner />
 
       <button
         type="button"
@@ -365,7 +367,7 @@ function FeedPage() {
   );
 }
 
-function ComplimentaryPremiumBanner() {
+function FreePackageBanner() {
   const { user, loading } = useAuth();
   const getOnboarding = useServerFn(getOnboardingState);
   const [dismissed, setDismissed] = useState(false);
@@ -378,16 +380,17 @@ function ComplimentaryPremiumBanner() {
 
   useEffect(() => {
     if (!user || typeof window === "undefined") return;
-    setDismissed(window.localStorage.getItem("candid-premium-welcome:" + user.uid) === "dismissed");
+    setDismissed(window.localStorage.getItem("candid-free-welcome:" + user.uid) === "dismissed");
   }, [user?.uid]);
 
   if (
     dismissed ||
     !user ||
-    data?.membership.tier !== "premium" ||
-    data.membership.source !== "complimentary" ||
+    data?.membership.tier !== "basic" ||
+    data.membership.source !== "default" ||
     data.accountType === "official"
-  ) return null;
+  )
+    return null;
 
   return (
     <section className="relative flex items-center gap-3 border-y border-primary/25 bg-primary/10 px-4 py-3 sm:rounded-2xl sm:border sm:px-5">
@@ -395,20 +398,26 @@ function ComplimentaryPremiumBanner() {
         <Sparkles className="size-5" />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="font-semibold">Premium is on us</p>
+        <p className="font-semibold">You’re on Free</p>
         <p className="text-sm text-muted-foreground">
-          Your account includes Premium features at no cost, including up to 3 pinned stories.
+          Share stories, react, manage your posts and use privacy tools. Premium raises selected
+          daily and monthly limits and lets you pin stories.
         </p>
       </div>
-      <Button asChild size="sm" variant="outline" className="hidden shrink-0 rounded-full sm:inline-flex">
+      <Button
+        asChild
+        size="sm"
+        variant="outline"
+        className="hidden shrink-0 rounded-full sm:inline-flex"
+      >
         <Link to="/billing">View membership</Link>
       </Button>
       <button
         type="button"
-        aria-label="Dismiss Premium welcome"
+        aria-label="Dismiss Free package notice"
         className="shrink-0 rounded-full p-2 text-muted-foreground hover:bg-background"
         onClick={() => {
-          window.localStorage.setItem("candid-premium-welcome:" + user.uid, "dismissed");
+          window.localStorage.setItem("candid-free-welcome:" + user.uid, "dismissed");
           setDismissed(true);
         }}
       >

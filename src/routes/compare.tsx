@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { queryOptions, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
+import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowUpRight,
   BookOpen,
@@ -24,6 +25,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { cn, formatCount } from "@/lib/utils";
+import { useAuth } from "@/hooks/useAuth";
+import { getOnboardingState } from "@/lib/onboarding.functions";
 
 const mobileCompareColors = [
   { badge: "bg-[#a7dd18]", bar: "bg-[#a7dd18]" },
@@ -59,6 +62,15 @@ export const Route = createFileRoute("/compare")({
 });
 
 function ComparePage() {
+  const { user } = useAuth();
+  const getMembership = useServerFn(getOnboardingState);
+  const membershipQuery = useQuery({
+    queryKey: ["onboarding-state", user?.uid ?? null],
+    queryFn: () => getMembership(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
+  const maxComparedCompanies = membershipQuery.data?.membership.tier === "premium" ? 5 : 2;
   const { data } = useSuspenseQuery(compareQuery);
   const queryClient = useQueryClient();
   const companies = useMemo(
@@ -89,6 +101,7 @@ function ComparePage() {
   }
 
   function addCompany() {
+    if (selected.length >= maxComparedCompanies) return;
     const next = companies.find((company) => !selected.includes(company.company_id));
     if (next) setSelected((current) => [...current, next.company_id]);
   }
@@ -202,8 +215,15 @@ function ComparePage() {
           <section className="space-y-4 md:hidden">
             <div className="flex items-center justify-between gap-3">
               <h2 className="text-lg font-semibold">Your lineup</h2>
-              <span className="text-xs text-muted-foreground">{selected.length}/3 selected</span>
+              <span className="text-xs text-muted-foreground">
+                {selected.length}/{maxComparedCompanies} selected
+              </span>
             </div>
+            {maxComparedCompanies === 2 ? (
+              <Link to="/billing" className="text-xs font-medium text-primary">
+                Premium compares up to five employers
+              </Link>
+            ) : null}
             <div className="-mx-2 flex gap-3 overflow-x-auto px-2 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {compareRows.map(({ company, index }) => (
                 <article
@@ -213,12 +233,12 @@ function ComparePage() {
                   <span
                     className={cn(
                       "flex size-11 items-center justify-center rounded-full text-base font-bold text-slate-950",
-                      mobileCompareColors[index % mobileCompareColors.length].badge,
+                      mobileCompareColors[index % mobileCompareColors.length]!.badge,
                     )}
                   >
                     {company.name.slice(0, 1).toUpperCase()}
                   </span>
-                  {selected.length > 2 ? (
+                  {selected.length > 1 ? (
                     <button
                       type="button"
                       onClick={() => removeCompany(company.company_id)}
@@ -260,7 +280,7 @@ function ComparePage() {
                   </p>
                 </article>
               ))}
-              {selected.length < 3 && selected.length < companies.length ? (
+              {selected.length < maxComparedCompanies && selected.length < companies.length ? (
                 <button
                   type="button"
                   onClick={addCompany}
@@ -286,7 +306,7 @@ function ComparePage() {
                   name: company.name,
                   value: formatCount(count),
                   percent: (count / maxStories) * 100,
-                  color: mobileCompareColors[index % mobileCompareColors.length].bar,
+                  color: mobileCompareColors[index % mobileCompareColors.length]!.bar,
                 };
               })}
             />
@@ -305,7 +325,7 @@ function ComparePage() {
                   value: score === null || count <= 0 ? "—" : score.toFixed(1),
                   caption: `${count} resp.`,
                   percent: score === null ? 0 : (score / 5) * 100,
-                  color: mobileCompareColors[index % mobileCompareColors.length].bar,
+                  color: mobileCompareColors[index % mobileCompareColors.length]!.bar,
                 };
               })}
             />
@@ -323,7 +343,7 @@ function ComparePage() {
                   name: company.name,
                   value: data.salaryError ? "Unavailable" : count > 0 ? formatCount(count) : "None",
                   percent: (count / maxSalaryReports) * 100,
-                  color: mobileCompareColors[index % mobileCompareColors.length].bar,
+                  color: mobileCompareColors[index % mobileCompareColors.length]!.bar,
                   empty: !data.salaryError && count <= 0,
                   detail: salaryEvidence.detail,
                 };
@@ -342,7 +362,7 @@ function ComparePage() {
                   name: company.name,
                   value: percent === null ? "—" : `${percent}%`,
                   percent: percent ?? 0,
-                  color: mobileCompareColors[index % mobileCompareColors.length].bar,
+                  color: mobileCompareColors[index % mobileCompareColors.length]!.bar,
                 };
               })}
             />
@@ -374,9 +394,11 @@ function ComparePage() {
           <div className="hidden flex-wrap items-center justify-between gap-3 md:flex">
             <div>
               <h2 className="text-lg font-semibold">Your comparison</h2>
-              <p className="text-sm text-muted-foreground">Choose two or three employers.</p>
+              <p className="text-sm text-muted-foreground">
+                Free compares two employers. Premium compares up to five.
+              </p>
             </div>
-            {selected.length < 3 && selected.length < companies.length ? (
+            {selected.length < maxComparedCompanies && selected.length < companies.length ? (
               <Button variant="outline" onClick={addCompany}>
                 <Plus className="size-4" /> Add employer
               </Button>
@@ -416,7 +438,7 @@ function ComparePage() {
                             </option>
                           ))}
                       </select>
-                      {selected.length > 2 ? (
+                      {selected.length > 1 ? (
                         <button
                           type="button"
                           onClick={() => removeCompany(id)}

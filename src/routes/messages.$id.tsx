@@ -24,6 +24,7 @@ import {
   issueChatImageUpload,
   postMessage,
   reactToMessage,
+  getMessageTheme,
 } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -115,6 +116,15 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const react = useServerFn(reactToMessage);
   const issueImageUpload = useServerFn(issueChatImageUpload);
   const discardImageUpload = useServerFn(discardChatImageUpload);
+  const fetchMessageTheme = useServerFn(getMessageTheme);
+  const { data: messageThemeData } = useQuery({
+    queryKey: ["message-theme", user?.uid ?? null],
+    queryFn: () => fetchMessageTheme(),
+    enabled: Boolean(user),
+    staleTime: 60_000,
+  });
+  const theme = messageThemeData?.theme ?? "default";
+  const themedSurface = theme === "forest" ? "bg-[#07150f]" : theme === "ocean" ? "bg-[#071421]" : theme === "sunset" ? "bg-[#1a0d19]" : theme === "midnight" ? "bg-[#050507]" : "";
   const conversationQueryKey = ["conversation", id, user?.uid ?? null] as const;
 
   const [draft, setDraft] = useState("");
@@ -523,14 +533,15 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
 
   return (
     <div
+      data-message-theme={theme}
       className={cn(
-        "flex h-full min-h-0 w-full flex-col overflow-hidden",
-        inSidebar ? "mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none" : "bg-black sm:bg-background",
+        "candid-message-theme flex h-full min-h-0 w-full flex-col overflow-hidden",
+        inSidebar ? cn("mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none", themedSurface) : cn("bg-black sm:bg-background", themedSurface),
       )}
     >
       <header className={cn(
         "sticky top-0 z-30 flex shrink-0 items-center gap-2 transition-colors",
-        inSidebar ? "glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur" : "border-b border-zinc-800 bg-zinc-950 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white sm:border-border sm:bg-background/95 sm:px-5 sm:py-3.5 sm:text-foreground sm:backdrop-blur",
+        inSidebar ? cn("glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur", themedSurface) : cn("border-b border-zinc-800 bg-zinc-950 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white sm:border-border sm:bg-background/95 sm:px-5 sm:py-3.5 sm:text-foreground sm:backdrop-blur", themedSurface),
       )}>
         {!inSidebar ? <Button type="button" variant="ghost" size="icon" aria-label="Back to messages" className="size-9 shrink-0 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => void navigate({ to: "/messages" })}><ArrowLeft className="size-5" /></Button> : null}
         <button type="button" onClick={() => { if (partner) void navigate({ to: "/u/$username", params: { username: partner.username } }); }} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={!partner} aria-label={partner ? `View @${partner.username}'s profile` : undefined}>
@@ -549,7 +560,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
       <div
         className={cn(
           "min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          inSidebar ? "space-y-3 pb-4" : "bg-black px-3 py-5 text-white sm:bg-background sm:px-6 sm:text-foreground",
+          inSidebar ? cn("space-y-3 pb-4", themedSurface) : cn("bg-black px-3 py-5 text-white sm:bg-background sm:px-6 sm:text-foreground", themedSurface),
         )}
       >
           <div className={cn("flex flex-col gap-3", !inSidebar && "mx-auto w-full max-w-2xl")}>
@@ -623,7 +634,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                               "rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-relaxed shadow-sm sm:rounded-3xl sm:text-sm",
                               mine
                                 ? "rounded-br-md bg-gradient-to-br from-primary to-lime-400 text-zinc-950 sm:bg-primary sm:text-primary-foreground"
-                                : "rounded-bl-md bg-[#262626] text-white sm:border sm:border-border sm:bg-card sm:text-foreground",
+                                : "candid-message-received rounded-bl-md bg-[#262626] text-white sm:border sm:border-border sm:bg-card sm:text-foreground",
                             )}
                           >
                             <p className="whitespace-pre-wrap">{message.body}</p>

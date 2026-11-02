@@ -19,6 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { PrivacySettings } from "@/components/site/privacy-settings";
+import { AccountDataExport } from "@/components/site/account-data-export";
 import { AccountLifecycleSettings } from "@/components/site/account-lifecycle-settings";
 import { useAuth } from "@/hooks/useAuth";
 import { notify } from "@/lib/notifications-store";
@@ -458,6 +459,7 @@ function SettingsPage() {
                     </div>
                   </div>
                   <PrivacySettings />
+                  <AccountDataExport />
                 </div>
 
                 {developerMode ? (

@@ -18,6 +18,7 @@ import {
 } from "./company-participation.server";
 import { FieldValue } from "./firestore-rest.server";
 import { getEffectiveMembershipTier } from "./membership";
+import { consumeMembershipQuota, getUserMembershipEntitlements } from "./membership.server";
 import { isValidMapCoordinates } from "./map-location";
 import { parseMapCoordinates } from "./map-location";
 import {
@@ -250,6 +251,7 @@ export const createStory = createServerFn({ method: "POST" })
         county: z.string().max(60).nullable().default(null),
         area: z.string().max(100).nullable().default(null),
         company_public: z.boolean().default(true),
+        is_anonymous: z.boolean().default(false),
         company_location_suggestion: z.string().url().max(500).nullable().default(null),
         tenure: z.string().max(40).nullable().default(null),
         industry: z.string().max(80).nullable().default(null),
@@ -367,6 +369,7 @@ export const createStory = createServerFn({ method: "POST" })
       industry: data.industry ?? company.industry,
       would_work_again: data.would_work_again,
       author_id: context.userId,
+      is_anonymous: data.is_anonymous,
       status: autoApproved ? "published" : "pending",
       moderation_note: autoApproved ? null : screen.summary,
       evidence_status: hasEvidence
@@ -455,7 +458,7 @@ export const createStory = createServerFn({ method: "POST" })
           ]);
         const actorProfile = actorSnap.data() as
           { username?: string | null; photo_url?: string | null } | undefined;
-        const actor = {
+        const actor = data.is_anonymous ? undefined : {
           id: context.userId,
           username: actorProfile?.username ?? null,
           photoUrl: actorProfile?.photo_url ?? null,
@@ -466,10 +469,10 @@ export const createStory = createServerFn({ method: "POST" })
               pushServerNotification({
                 userId: doc.id,
                 kind: "info",
-                title: `${company.name} was tagged in a new story`,
+                title: data.is_anonymous ? `An anonymous member shared a story about ${company.name}` : `${company.name} was tagged in a new story`,
                 description: `“${created.title}”`,
                 link: `/stories/${created.id}`,
-                actor,
+                actor: actor ?? null,
                 activityType: "mention",
               }),
             ),
@@ -484,7 +487,7 @@ export const createStory = createServerFn({ method: "POST" })
               title: "You were mentioned in a story",
               description: `“${created.title}”`,
               link: `/stories/${created.id}`,
-              actor,
+              actor: actor ?? null,
               activityType: "mention",
             }),
           ),
@@ -726,6 +729,7 @@ export const addComment = createServerFn({ method: "POST" })
         story_id: z.string().uuid(),
         parent_id: z.string().uuid().nullable().default(null),
         body: z.string().min(2).max(2000),
+        is_anonymous: z.boolean().default(false),
       })
       .parse(input),
   )
@@ -775,12 +779,13 @@ export const addComment = createServerFn({ method: "POST" })
       id: commentId,
       ...data,
       author_id: context.userId,
-      author_handle: profile?.handle ?? "Candid member",
-      author_username: profile?.username ?? null,
-      author_photo_url: profile?.photo_url ?? null,
+      is_anonymous: data.is_anonymous,
+      author_handle: data.is_anonymous ? "Anonymous member" : profile?.handle ?? "Candid member",
+      author_username: data.is_anonymous ? null : profile?.username ?? null,
+      author_photo_url: data.is_anonymous ? null : profile?.photo_url ?? null,
       author_membership_tier: getEffectiveMembershipTier(profile),
-      author_verified: verification?.badge_status === "claimed",
-      is_official: isOfficial,
+      author_verified: !data.is_anonymous && verification?.badge_status === "claimed",
+      is_official: !data.is_anonymous && isOfficial,
       likes: 0,
       status: "published",
       created_at: new Date().toISOString(),
@@ -795,8 +800,8 @@ export const addComment = createServerFn({ method: "POST" })
     try {
       const { pushServerNotification, resolveMentionedUserIds } =
         await import("./notifications.server");
-      const authorName = profile?.username ? `@${profile.username}` : "Someone";
-      const actor = {
+      const authorName = data.is_anonymous ? "An anonymous member" : profile?.username ? `@${profile.username}` : "Someone";
+      const actor = data.is_anonymous ? undefined : {
         id: context.userId,
         username: profile?.username ?? null,
         photoUrl: profile?.photo_url ?? null,
@@ -833,7 +838,7 @@ export const addComment = createServerFn({ method: "POST" })
             title: notification.title,
             description: notification.description,
             link: `/stories/${data.story_id}?comment=${commentId}`,
-            actor,
+            actor: actor ?? null,
             activityType: notification.activityType,
           }),
         ),
@@ -854,7 +859,7 @@ export const addComment = createServerFn({ method: "POST" })
               title: `${authorName} mentioned you`,
               description: `In a comment on “${storyTitle}”`,
               link: `/stories/${data.story_id}?comment=${commentId}`,
-              actor,
+              actor: actor ?? null,
               activityType: "mention",
             }),
           ),
@@ -1181,6 +1186,22 @@ export const submitSalary = createServerFn({ method: "POST" })
     }
     const reports = db.collection("salary_reports");
     const salaryId = `${data.company_id}:${context.userId}`;
+    if ((await reports.doc(salaryId).get()).exists) {
+      throw new Error("You have already submitted a salary range for this company.");
+    }
+    const packageAccess = await getUserMembershipEntitlements(context.userId);
+    const monthStart = `${new Date().toISOString().slice(0, 7)}-01T00:00:00.000Z`;
+    const reportsThisMonth = await reports
+      .where("user_id", "==", context.userId)
+      .where("created_at", ">=", monthStart)
+      .count();
+    await consumeMembershipQuota(
+      context.userId,
+      "salary_reports",
+      packageAccess.monthlySalaryReports,
+      "month",
+      reportsThisMonth,
+    );
     await db.runTransaction(async (transaction) => {
       const existingForCompany = await transaction.get(reports.doc(salaryId));
       if (existingForCompany.exists) {

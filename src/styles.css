@@ -691,3 +691,25 @@
   animation: banner-out 280ms ease-in both;
 }
 
+/* Curated chat themes belong to the viewing account; they never alter a recipient's chat. */
+.candid-message-theme[data-message-theme="midnight"] { --message-surface: #050507; --message-raised: #111116; --message-ink: #f4f4f5; background: var(--message-surface); color: var(--message-ink); }
+.candid-message-theme[data-message-theme="forest"] { --message-surface: #07150f; --message-raised: #10251a; --message-ink: #f0f7f1; background: var(--message-surface); color: var(--message-ink); }
+.candid-message-theme[data-message-theme="ocean"] { --message-surface: #071421; --message-raised: #102335; --message-ink: #eff7ff; background: var(--message-surface); color: var(--message-ink); }
+.candid-message-theme[data-message-theme="sunset"] { --message-surface: #1a0d19; --message-raised: #2a1728; --message-ink: #fff3fb; background: var(--message-surface); color: var(--message-ink); }
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) > header,
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) > ul,
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) > div,
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) header,
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) [data-message-area] {
+  background-color: var(--message-surface) !important;
+  color: var(--message-ink) !important;
+}
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) input,
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) textarea,
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) li > div {
+  background-color: var(--message-raised) !important;
+  color: var(--message-ink) !important;
+}
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) .text-muted-foreground { color: #a1a1aa !important; }
+.candid-message-theme[data-message-theme]:not([data-message-theme="default"]) .candid-message-received { background-color: var(--message-raised) !important; color: var(--message-ink) !important; }
+

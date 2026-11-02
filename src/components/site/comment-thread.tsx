@@ -31,6 +31,7 @@ import {
   likeComment,
 } from "@/lib/actions.functions";
 import { getStoryCommentContext, getStoryComments } from "@/lib/public.functions";
+import { getPrivacySettings } from "@/lib/messaging.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { useAuth } from "@/hooks/useAuth";
 import { cn, formatCount } from "@/lib/utils";
@@ -125,6 +126,12 @@ export function CommentThread({
   const post = useServerFn(addComment);
   const engagementFn = useServerFn(getMyEngagement);
   const fetchComments = useServerFn(getStoryComments);
+  const fetchPrivacy = useServerFn(getPrivacySettings);
+  const { data: privacySettings } = useQuery({
+    queryKey: ["privacy-settings", user?.uid ?? null],
+    queryFn: () => fetchPrivacy(),
+    enabled: Boolean(user),
+  });
   const [loadedComments, setLoadedComments] = useState(comments);
   const [nextCommentsCursor, setNextCommentsCursor] = useState(commentsCursor);
   const [hasMoreComments, setHasMoreComments] = useState(commentsHasMore);
@@ -137,6 +144,8 @@ export function CommentThread({
     [loadedComments],
   );
   const [body, setBody] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
+  const [anonymousTouched, setAnonymousTouched] = useState(false);
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
   const {
     visibleCount: visibleRootCount,
@@ -149,6 +158,12 @@ export function CommentThread({
     setNextCommentsCursor(commentsCursor);
     setHasMoreComments(commentsHasMore);
   }, [comments, commentsCursor, commentsHasMore]);
+
+  useEffect(() => {
+    if (!anonymousTouched && privacySettings) {
+      setAnonymous(privacySettings.anonymous_contributions_default);
+    }
+  }, [anonymousTouched, privacySettings]);
 
   useEffect(() => {
     if (!focusCommentId) return;
@@ -234,11 +249,13 @@ export function CommentThread({
   }, [focusCommentId, revealRootCount, sortedComments, visibleRootCount]);
 
   const commentMutation = useMutation({
-    mutationFn: () => post({ data: { story_id: storyId, parent_id: replyTo?.id ?? null, body } }),
+    mutationFn: () => post({ data: { story_id: storyId, parent_id: replyTo?.id ?? null, body, is_anonymous: anonymous } }),
     onSuccess: () => {
       const addedTopLevelComment = replyTo === null;
       setBody("");
       setReplyTo(null);
+      setAnonymousTouched(false);
+      setAnonymous(privacySettings?.anonymous_contributions_default ?? false);
       void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
       if (addedTopLevelComment) {
         void queryClient.invalidateQueries({ queryKey: ["story-pages"] });
@@ -416,6 +433,10 @@ export function CommentThread({
                 )}
               </Button>
             </div>
+            <label className="mt-2 flex w-fit items-center gap-2 text-xs text-muted-foreground">
+              <input type="checkbox" checked={anonymous} onChange={(event) => { setAnonymous(event.target.checked); setAnonymousTouched(true); }} />
+              Post as Anonymous member
+            </label>
           </>
         ) : (
           <p className="text-sm text-muted-foreground">

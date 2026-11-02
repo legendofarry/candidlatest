@@ -95,6 +95,9 @@ function LeaderboardsPage() {
           Rankings built from workplace stories and culture ratings by Kenyan workers. Scores move
           as new reports come in.
         </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Free shows the top 5 employers in each list. Premium shows the top 10.
+        </p>
       </header>
 
       <div className="grid gap-4 md:grid-cols-3 xl:gap-5">

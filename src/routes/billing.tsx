@@ -92,7 +92,7 @@ function BillingPage() {
     onSuccess: async ({ periodEndsAt }) => {
       await queryClient.invalidateQueries({ queryKey: ["billing"] });
       window.alert(
-        `Your Premium access remains active until ${formatDate(periodEndsAt)}. It will then return to Basic.`,
+        `Your Premium access remains active until ${formatDate(periodEndsAt)}. It will then return to Free.`,
       );
     },
     onError: (error) =>
@@ -307,7 +307,7 @@ function BillingPage() {
                           downgradeMutation.mutate();
                       }}
                     >
-                      Move to Basic at expiry
+                      Move to Free at expiry
                     </Button>
                   ) : null}
                 </article>
@@ -361,8 +361,9 @@ function BillingPage() {
                   <div className="mb-5">
                     <h2 className="font-display text-2xl font-semibold">Available packages</h2>
                     <p className="mt-1 text-sm text-muted-foreground">
-                      Core stories, salary insights, messaging and safety tools stay free. Paid
-                      plans support Candid and add profile pins.
+                      Every new account starts on Free. Stories, reactions, notifications, privacy,
+                      safety and full control of your own contributions stay available to everyone.
+                      Premium raises selected usage limits and adds story pins.
                     </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Paid access starts after manual payment verification.
@@ -393,7 +394,7 @@ function BillingPage() {
                           if (paidActive) {
                             if (
                               window.confirm(
-                                "Your paid access will continue through its current period, then return to Basic. Continue?",
+                                "Your paid access will continue through its current period, then return to Free. Continue?",
                               )
                             )
                               downgradeMutation.mutate();
@@ -465,8 +466,8 @@ function BillingPage() {
                                     ? "Unavailable"
                                     : tier === "basic" && paidActive
                                       ? membership?.cancelAtPeriodEnd
-                                        ? "Basic scheduled"
-                                        : "Move to Basic at expiry"
+                                        ? "Free scheduled"
+                                        : "Move to Free at expiry"
                                       : renew ||
                                           (tier === membership?.assignedTier && canRenewPremium)
                                         ? "Renew Premium"
@@ -664,7 +665,7 @@ function BillingPage() {
 }
 
 function capitalize(value: string) {
-  return value ? value[0]!.toUpperCase() + value.slice(1) : "Basic";
+  return value ? (value === "basic" ? "Free" : value[0]!.toUpperCase() + value.slice(1)) : "Free";
 }
 function paymentModeLabel(mode: "paybill" | "till" | "send_money" | null) {
   if (mode === "paybill") return "M-Pesa Paybill";

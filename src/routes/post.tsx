@@ -49,6 +49,7 @@ import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { allKenyaAreas, areasForCounty } from "@/lib/kenya-locations";
 import { CommunityPostComposer } from "@/components/site/community-post-composer";
 import { getOnboardingState } from "@/lib/onboarding.functions";
+import { getPrivacySettings } from "@/lib/messaging.functions";
 
 const filtersQuery = queryOptions({ queryKey: ["filters"], queryFn: () => getFilterOptions() });
 
@@ -143,6 +144,12 @@ function WorkplaceStoryComposer() {
   const { data: filters } = useSuspenseQuery(filtersQuery);
   const { user, loading } = useAuth();
   const fetchOnboarding = useServerFn(getOnboardingState);
+  const fetchPrivacySettings = useServerFn(getPrivacySettings);
+  const { data: privacySettings } = useQuery({
+    queryKey: ["privacy-settings", user?.uid ?? null],
+    queryFn: () => fetchPrivacySettings(),
+    enabled: Boolean(user),
+  });
   const { data: account } = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchOnboarding(),
@@ -174,6 +181,7 @@ function WorkplaceStoryComposer() {
   const [position, setPosition] = useState("");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
   const [storyDraftedFromAnswers, setStoryDraftedFromAnswers] = useState(false);
   const [wouldReturn, setWouldReturn] = useState<boolean | null>(null);
   const [evidenceNote, setEvidenceNote] = useState("");
@@ -196,6 +204,10 @@ function WorkplaceStoryComposer() {
   const writingAttemptKey = useRef<string | null>(null);
   const storyDraftUserId = user?.uid;
   const isEditing = Boolean(editStoryId);
+
+  useEffect(() => {
+    if (!isEditing && privacySettings) setAnonymous(privacySettings.anonymous_contributions_default);
+  }, [isEditing, privacySettings]);
 
   useEffect(() => {
     if (!editStoryId || !user) {
@@ -666,6 +678,7 @@ function WorkplaceStoryComposer() {
         tenure: tenure || null,
         industry: industry || company.industry || null,
         would_work_again: wouldReturn,
+        ...(isEditing ? {} : { is_anonymous: anonymous }),
         evidence,
       };
       const result = isEditing
@@ -1134,6 +1147,12 @@ function WorkplaceStoryComposer() {
                             <p className="text-xs text-muted-foreground">
                               {body.trim().length} characters (min 60)
                             </p>
+                            {!isEditing ? (
+                              <label className="flex w-fit items-center gap-2 py-1 text-sm text-muted-foreground">
+                                <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} />
+                                Publish this story as Anonymous member
+                              </label>
+                            ) : null}
                           </div>
                         </>
                       ) : null}

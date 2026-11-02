@@ -73,6 +73,7 @@ export type PublicStory = {
   reasons: string[] | null;
   would_work_again?: boolean | null;
   author_username?: string | null;
+  is_anonymous?: boolean;
   author_photo_url?: string | null;
   author_membership_tier?: MembershipTier;
   post_type?: "workplace_story" | "announcement";
@@ -302,7 +303,7 @@ export function StoryCard({
             />
           </>
         ) : (
-          <span>Candid member</span>
+          <span>{story.is_anonymous ? "Anonymous member" : "Candid member"}</span>
         )}
         <span aria-hidden="true">·</span>
         <span>{formatDate(story.created_at)}</span>

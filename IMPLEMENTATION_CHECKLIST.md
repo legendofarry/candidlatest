@@ -16,8 +16,12 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 - [ ] Redesign the private profile screen to match the Lovable reference's background, typography, spacing, and full-width section layout; keep the cover, overlapping avatar, and existing profile actions. This visual fix is deferred for a later pass.
 - [x] Public/private profile visibility and follow approval.
 - [x] Tag suggestions, highlighted mentions, and mention notifications in posts/comments.
-- [x] Complimentary Premium for new accounts and a home welcome message.
+- [x] New regular accounts default to the Free package; only the official Candid account has complimentary Premium.
 - [x] Basic and Premium packages only; legacy Gold entitlements map to Premium.
+- [x] Package limits are enforced on the server for salary reports, new chats, and AI story catch-ups; Free is 3 salary reports/month, 3 new conversations/day, and 1 catch-up/day. Premium is 20/month, 20/day, and 10/day.
+- [x] Free compares up to 2 employers and sees 5 leaderboard entries; Premium compares up to 5 and sees 10.
+- [x] Full notifications, reactions, account safety/privacy controls, support access, and contribution management stay Free. Premium does not lock other users' public profiles or posts.
+- [x] Premium story pins are capped at 3; paying does not grant an identity-verification badge or boost ranking.
 - [x] Shareable profile links and optional mobile sign-up prompt for signed-out visitors.
 - [x] Mobile long-press actions for conversations; notifications retain their own actions.
 - [x] Social notifications show the actor's handle and avatar for follows, follow requests, post/comment activity, mentions, and message reactions; system notices keep generic icons.
@@ -41,12 +45,17 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 - [x] Improve generated story descriptions so they read as the contributor’s own draft.
 - [x] Keep the post form header/footer fixed while only the active middle section scrolls on mobile.
 - [x] Remove the divider above feed engagement controls.
-- [x] Leaderboard lists are capped at 10 employers per ranking.
+- [x] Leaderboard lists show 5 entries to Free users and 10 to Premium users.
 - [x] Story details and mobile comment sheets use one clean, full-width comment surface: no stacked frames, duplicate empty-state copy, or redundant composer divider.
 - [x] Story voting acts immediately with icon-only active states; reporting is available from the post menu instead of competing with engagement controls.
 - [x] Suppress routine success banners when the updated UI already confirms the result (feed preferences, follows/blocks, conversation preferences, privacy changes, pins, edits, and removals); errors and meaningful completion feedback remain visible.
 
 ## Account lifecycle
+
+- [x] Add a user-controlled mention audience (everyone, followers, or nobody); keep tagging available on every package and enforce notification privacy on the server.
+- [x] Add personal message themes. The viewer's theme applies to their inbox and conversations only; Free has Candid and Midnight, while Premium unlocks Forest, Ocean, and Sunset.
+- [x] Add opt-in anonymity for new workplace stories and comments, with a per-contribution choice and a saved default. Existing contributions are unchanged; ownership stays private in storage for moderation and author management; public profile counts and story lists omit anonymous contributions.
+- [x] Add a self-service JSON account export for every member, including profile, authored contributions, reactions/saves/follows, notifications, and conversations. Exclude credentials, employment proof, internal moderation data, and other members' private profile information.
 
 - [x] Deactivation hides profile/search and records permanent deletion after seven days.
 - [x] Deletion grace period is 48 hours, with reactivation and a Netlify scheduled Auth + Firestore purge.
