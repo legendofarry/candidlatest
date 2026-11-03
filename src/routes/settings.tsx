@@ -291,24 +291,74 @@ function SettingsPage() {
             </header>
 
             {user ? (
-              <SettingsGroup title="Your profile">
-                <div className="p-4">
-                  <ProfilePhotoPicker
-                    compact
-                    photoUrl={profile.data?.photoUrl}
-                    initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
-                    onSaved={(photoUrl) => {
-                      queryClient.setQueryData(
-                        ["onboarding-state", user.uid],
-                        (previous: unknown) =>
-                          previous && typeof previous === "object"
-                            ? { ...previous, photoUrl }
-                            : previous,
-                      );
-                    }}
-                  />
+              <>
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+                  className="overflow-hidden rounded-3xl border border-border/50 bg-card/40 md:hidden"
+                >
+                  <div className="flex items-center gap-4 p-4">
+                    <ProfilePhotoPicker
+                      avatarOnly
+                      photoUrl={profile.data?.photoUrl}
+                      initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                      avatarClassName="size-16 border border-border"
+                      onSaved={(photoUrl) => {
+                        queryClient.setQueryData(
+                          ["onboarding-state", user.uid],
+                          (previous: unknown) =>
+                            previous && typeof previous === "object"
+                              ? { ...previous, photoUrl }
+                              : previous,
+                        );
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-display text-[15px] font-semibold tracking-tight">
+                        {profile.data?.username
+                          ? `@${profile.data.username}`
+                          : user.displayName || "Your account"}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 divide-x divide-border/50 border-t border-border/50">
+                    <Link
+                      to="/profile"
+                      className="flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground transition-colors active:bg-secondary/60"
+                    >
+                      <UserRound className="size-4" /> Profile
+                    </Link>
+                    <Link
+                      to="/billing"
+                      className="flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground transition-colors active:bg-secondary/60"
+                    >
+                      <Gem className="size-4" /> Membership
+                    </Link>
+                  </div>
+                </motion.div>
+                <div className="hidden md:block">
+                  <SettingsGroup title="Your profile">
+                    <div className="p-4">
+                      <ProfilePhotoPicker
+                        compact
+                        photoUrl={profile.data?.photoUrl}
+                        initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                        onSaved={(photoUrl) => {
+                          queryClient.setQueryData(
+                            ["onboarding-state", user.uid],
+                            (previous: unknown) =>
+                              previous && typeof previous === "object"
+                                ? { ...previous, photoUrl }
+                                : previous,
+                          );
+                        }}
+                      />
+                    </div>
+                  </SettingsGroup>
                 </div>
-              </SettingsGroup>
+              </>
             ) : null}
 
             {user?.email?.trim().toLowerCase() === "karimiarrison@gmail.com" &&
