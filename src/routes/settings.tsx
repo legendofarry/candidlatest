@@ -14,6 +14,7 @@ import {
   EyeOff,
   Gem,
   RotateCcw,
+  UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -458,7 +459,7 @@ function SettingsPage() {
                   <SettingsGroup title="Advanced">
                     <Accordion type="single" collapsible className="w-full px-0">
                       <AccordionItem value="advanced-actions" className="border-b-0">
-                        <AccordionTrigger className="px-4 py-3 text-left text-sm font-medium text-foreground hover:no-underline">
+                        <AccordionTrigger className="px-4 py-3.5 text-left text-sm font-medium text-foreground hover:no-underline md:py-3">
                           Account actions
                         </AccordionTrigger>
                         <AccordionContent className="px-0 pb-0">
@@ -532,7 +533,7 @@ function SettingsPage() {
                   </div>
                 ) : null}
 
-                <Button asChild variant="outline" className="w-full">
+                <Button asChild variant="outline" className="hidden w-full md:inline-flex">
                   <Link to="/profile">View profile</Link>
                 </Button>
               </div>
@@ -692,9 +693,11 @@ function signInMethodError(error: unknown) {
 
 function SettingsGroup({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <section className="space-y-2">
-      <h3 className="px-1 text-xs font-semibold uppercase text-muted-foreground">{title}</h3>
-      <div className="divide-y divide-border border-y border-border bg-transparent md:overflow-hidden md:rounded-lg md:border md:bg-card">
+    <section className="space-y-2.5">
+      <h3 className="px-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        {title}
+      </h3>
+      <div className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/50 bg-card/40 md:divide-border md:rounded-lg md:border md:border-border md:bg-card">
         {children}
       </div>
     </section>
@@ -713,8 +716,8 @@ function Row({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex items-center gap-3 p-4">
-      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
+    <div className="flex items-center gap-3 p-4 md:p-4">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary/70 text-muted-foreground md:rounded-lg md:bg-secondary">
         {icon}
       </span>
       <div className="min-w-0 flex-1">
