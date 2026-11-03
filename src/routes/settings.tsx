@@ -268,12 +268,12 @@ function SettingsPage() {
           </div>
         </section>
 
-        <section className="min-h-screen overflow-y-auto px-5 pb-12 pt-2 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
+        <section className="min-h-screen overflow-y-auto px-4 pb-16 pt-3 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
-            className="mx-auto max-w-5xl space-y-4 md:space-y-8"
+            className="mx-auto max-w-5xl space-y-5 md:space-y-8"
           >
             <header>
               <div className="flex items-start justify-between gap-4">
@@ -291,24 +291,74 @@ function SettingsPage() {
             </header>
 
             {user ? (
-              <SettingsGroup title="Your profile">
-                <div className="p-4">
-                  <ProfilePhotoPicker
-                    compact
-                    photoUrl={profile.data?.photoUrl}
-                    initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
-                    onSaved={(photoUrl) => {
-                      queryClient.setQueryData(
-                        ["onboarding-state", user.uid],
-                        (previous: unknown) =>
-                          previous && typeof previous === "object"
-                            ? { ...previous, photoUrl }
-                            : previous,
-                      );
-                    }}
-                  />
+              <>
+                <motion.div
+                  initial={{ opacity: 0, y: 12 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4, ease: "easeOut", delay: 0.05 }}
+                  className="overflow-hidden rounded-3xl border border-border/50 bg-card/40 md:hidden"
+                >
+                  <div className="flex items-center gap-4 p-4">
+                    <ProfilePhotoPicker
+                      avatarOnly
+                      photoUrl={profile.data?.photoUrl}
+                      initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                      avatarClassName="size-16 border border-border"
+                      onSaved={(photoUrl) => {
+                        queryClient.setQueryData(
+                          ["onboarding-state", user.uid],
+                          (previous: unknown) =>
+                            previous && typeof previous === "object"
+                              ? { ...previous, photoUrl }
+                              : previous,
+                        );
+                      }}
+                    />
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate font-display text-[15px] font-semibold tracking-tight">
+                        {profile.data?.username
+                          ? `@${profile.data.username}`
+                          : user.displayName || "Your account"}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{user.email}</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 divide-x divide-border/50 border-t border-border/50">
+                    <Link
+                      to="/profile"
+                      className="flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground transition-colors active:bg-secondary/60"
+                    >
+                      <UserRound className="size-4" /> Profile
+                    </Link>
+                    <Link
+                      to="/billing"
+                      className="flex items-center justify-center gap-2 py-3 text-sm font-medium text-muted-foreground transition-colors active:bg-secondary/60"
+                    >
+                      <Gem className="size-4" /> Membership
+                    </Link>
+                  </div>
+                </motion.div>
+                <div className="hidden md:block">
+                  <SettingsGroup title="Your profile">
+                    <div className="p-4">
+                      <ProfilePhotoPicker
+                        compact
+                        photoUrl={profile.data?.photoUrl}
+                        initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                        onSaved={(photoUrl) => {
+                          queryClient.setQueryData(
+                            ["onboarding-state", user.uid],
+                            (previous: unknown) =>
+                              previous && typeof previous === "object"
+                                ? { ...previous, photoUrl }
+                                : previous,
+                          );
+                        }}
+                      />
+                    </div>
+                  </SettingsGroup>
                 </div>
-              </SettingsGroup>
+              </>
             ) : null}
 
             {user?.email?.trim().toLowerCase() === "karimiarrison@gmail.com" &&
@@ -422,24 +472,29 @@ function SettingsPage() {
                 </div>
 
                 <div id="privacy">
-                  <div className="mb-4">
+                  <h2 className="px-1.5 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground md:hidden">
+                    Privacy &amp; data
+                  </h2>
+                  <div className="space-y-3 md:space-y-0">
                     <div className="md:hidden">
-                      <button
-                        type="button"
-                        onClick={() => setNotInterestedOpen(true)}
-                        className="flex w-full items-center gap-3 border-y border-border py-4 text-left"
-                      >
-                        <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
-                          <EyeOff className="size-4" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-medium">Not interested</span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            Restore hidden posts and muted accounts
+                      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/40">
+                        <button
+                          type="button"
+                          onClick={() => setNotInterestedOpen(true)}
+                          className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-secondary/60"
+                        >
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary/70 text-muted-foreground">
+                            <EyeOff className="size-4" />
                           </span>
-                        </span>
-                        <ChevronRight className="size-4 text-muted-foreground" />
-                      </button>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">Not interested</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              Restore hidden posts and muted accounts
+                            </span>
+                          </span>
+                          <ChevronRight className="size-4 text-muted-foreground" />
+                        </button>
+                      </div>
                       <Drawer open={notInterestedOpen} onOpenChange={setNotInterestedOpen}>
                         <DrawerContent className="h-[85dvh] max-h-[85dvh] rounded-t-3xl md:hidden">
                           <DrawerHeader className="shrink-0 text-left">
@@ -457,9 +512,9 @@ function SettingsPage() {
                     <div className="hidden md:block">
                       <SettingsGroup title="Not interested">{notInterestedContent}</SettingsGroup>
                     </div>
+                    <PrivacySettings />
+                    <AccountDataExport />
                   </div>
-                  <PrivacySettings />
-                  <AccountDataExport />
                 </div>
 
                 {developerMode ? (
