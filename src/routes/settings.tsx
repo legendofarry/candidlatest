@@ -472,24 +472,29 @@ function SettingsPage() {
                 </div>
 
                 <div id="privacy">
-                  <div className="mb-4">
+                  <h2 className="px-1.5 pb-0.5 pt-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground md:hidden">
+                    Privacy &amp; data
+                  </h2>
+                  <div className="space-y-3 md:space-y-0">
                     <div className="md:hidden">
-                      <button
-                        type="button"
-                        onClick={() => setNotInterestedOpen(true)}
-                        className="flex w-full items-center gap-3 border-y border-border py-4 text-left"
-                      >
-                        <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
-                          <EyeOff className="size-4" />
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block text-sm font-medium">Not interested</span>
-                          <span className="mt-0.5 block text-xs text-muted-foreground">
-                            Restore hidden posts and muted accounts
+                      <div className="overflow-hidden rounded-2xl border border-border/50 bg-card/40">
+                        <button
+                          type="button"
+                          onClick={() => setNotInterestedOpen(true)}
+                          className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors active:bg-secondary/60"
+                        >
+                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-secondary/70 text-muted-foreground">
+                            <EyeOff className="size-4" />
                           </span>
-                        </span>
-                        <ChevronRight className="size-4 text-muted-foreground" />
-                      </button>
+                          <span className="min-w-0 flex-1">
+                            <span className="block text-sm font-medium">Not interested</span>
+                            <span className="mt-0.5 block text-xs text-muted-foreground">
+                              Restore hidden posts and muted accounts
+                            </span>
+                          </span>
+                          <ChevronRight className="size-4 text-muted-foreground" />
+                        </button>
+                      </div>
                       <Drawer open={notInterestedOpen} onOpenChange={setNotInterestedOpen}>
                         <DrawerContent className="h-[85dvh] max-h-[85dvh] rounded-t-3xl md:hidden">
                           <DrawerHeader className="shrink-0 text-left">
@@ -507,9 +512,9 @@ function SettingsPage() {
                     <div className="hidden md:block">
                       <SettingsGroup title="Not interested">{notInterestedContent}</SettingsGroup>
                     </div>
+                    <PrivacySettings />
+                    <AccountDataExport />
                   </div>
-                  <PrivacySettings />
-                  <AccountDataExport />
                 </div>
 
                 {developerMode ? (
