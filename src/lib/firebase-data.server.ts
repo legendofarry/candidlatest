@@ -73,7 +73,7 @@ export type ProfileRecord = {
   socials?: ProfileSocials | null;
   account_type?: "individual" | "company" | "official" | "unknown";
   profile_visibility?: "public" | "private";
-  account_status?: "active" | "deletion_pending" | "deactivated";
+  account_status?: "active" | "deletion_pending" | "deletion_in_progress" | "deactivated";
   account_action_at?: string | null;
   account_action_expires_at?: string | null;
   onboarded_at?: string | null;
@@ -686,7 +686,7 @@ async function calculateCompanySalaryDirectory() {
   const directoryCompanies = includeKnownEmployers(companies, curatedCompanies);
   const rows: CompanySalarySummary[] = [];
   for (const company of directoryCompanies.filter((entry) =>
-    isDiscoverableCompany(entry, companiesWithPublishedStories),
+    isDiscoverableCompany(entry),
   )) {
     const items = byCompany.get(company.id) ?? [];
     const groupedPositions = new Map<string, SalaryReportRecord[]>();
