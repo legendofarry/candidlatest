@@ -34,6 +34,8 @@ import { notify as toast } from "@/lib/notifications-store";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { MessageAppearanceSettings } from "@/components/site/message-appearance-settings";
+import { getMessageAppearanceStyle, useMessageAppearance } from "@/lib/message-appearance";
 import { onValue, ref } from "firebase/database";
 import { firebaseRealtimeDb } from "@/integrations/firebase/client";
 import {
@@ -123,6 +125,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     enabled: Boolean(user),
     staleTime: 60_000,
   });
+  const appearance = useMessageAppearance(user?.uid ?? null, messageThemeData?.theme);
   const theme = messageThemeData?.theme ?? "default";
   const themedSurface = theme === "forest" ? "bg-[#07150f]" : theme === "ocean" ? "bg-[#071421]" : theme === "sunset" ? "bg-[#1a0d19]" : theme === "midnight" ? "bg-[#050507]" : "";
   const conversationQueryKey = ["conversation", id, user?.uid ?? null] as const;
@@ -540,6 +543,12 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   return (
     <div
       data-message-theme={theme}
+      data-appearance-preset={appearance.preset}
+      data-wallpaper={appearance.wallpaper}
+      data-doodle={appearance.doodle}
+      data-pattern-intensity={appearance.patternIntensity}
+      data-bubble-shape={appearance.bubbleShape}
+      style={getMessageAppearanceStyle(appearance)}
       className={cn(
         "candid-message-theme flex h-full min-h-0 w-full flex-col overflow-hidden",
         inSidebar ? cn("mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none", themedSurface) : cn("bg-black sm:bg-background", themedSurface),
@@ -548,7 +557,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
       <header className={cn(
         "sticky top-0 z-30 flex shrink-0 items-center gap-2 transition-colors",
         inSidebar ? cn("glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur", themedSurface) : cn("border-b border-zinc-800 bg-zinc-950 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white sm:border-border sm:bg-background/95 sm:px-5 sm:py-3.5 sm:text-foreground sm:backdrop-blur", themedSurface),
-      )}>
+      )} data-chat-header>
         {!inSidebar ? <Button type="button" variant="ghost" size="icon" aria-label="Back to messages" className="size-9 shrink-0 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => void navigate({ to: "/messages" })}><ArrowLeft className="size-5" /></Button> : null}
         <button type="button" onClick={() => { if (partner) void navigate({ to: "/u/$username", params: { username: partner.username } }); }} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={!partner} aria-label={partner ? `View @${partner.username}'s profile` : undefined}>
           <ProfileAvatar photoUrl={partner?.photo_url} initials={partner?.username?.slice(0, 2) ?? "··"} className="size-10 shrink-0 font-display uppercase" />
@@ -561,9 +570,14 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
             <span className="flex items-center gap-1.5 text-xs text-zinc-400 sm:text-muted-foreground">{partnerPresence.online ? <span className="size-2 rounded-full bg-emerald-500" /> : null}{partner?.official ? "Official Candid account" : partnerActivity}</span>
           </span>
         </button>
+        <MessageAppearanceSettings
+          contactName={partner?.username ? `@${partner.username}` : undefined}
+          className="size-10 text-current hover:bg-black/5 hover:text-current max-sm:text-white max-sm:hover:bg-white/10"
+        />
       </header>
 
       <div
+        data-chat-area
         className={cn(
           "min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
           inSidebar ? cn("space-y-3 pb-4", themedSurface) : cn("bg-black px-3 py-5 text-white sm:bg-background sm:px-6 sm:text-foreground", themedSurface),
@@ -639,7 +653,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                             className={cn(
                               "rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-relaxed shadow-sm sm:rounded-3xl sm:text-sm",
                               mine
-                                ? "rounded-br-md bg-gradient-to-br from-primary to-lime-400 text-zinc-950 sm:bg-primary sm:text-primary-foreground"
+                                ? "candid-message-sent rounded-br-md bg-gradient-to-br from-primary to-lime-400 text-zinc-950 sm:bg-primary sm:text-primary-foreground"
                                 : "candid-message-received rounded-bl-md bg-[#262626] text-white sm:border sm:border-border sm:bg-card sm:text-foreground",
                             )}
                           >
@@ -746,6 +760,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
         </div>
       ) : (
         <div
+          data-chat-composer
           className={cn(
             "shrink-0",
             inSidebar
@@ -790,7 +805,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 ) : null}
               </div>
             ) : null}
-            <div className="flex items-end gap-2">
+            <div data-composer-controls className="flex items-end gap-2">
               <input
                 ref={imageInputRef}
                 type="file"
@@ -831,6 +846,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 type="button"
                 size="icon"
                 className="glow-primary rounded-full"
+                data-chat-send
                 aria-label="Send message"
                 disabled={send.isPending || uploadingImage || (!draft.trim() && !imageReceipt)}
                 onClick={() => send.mutate()}

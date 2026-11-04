@@ -1,11 +1,13 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Clock3, UserRoundMinus } from "lucide-react";
+import { Clock3, Trash2, UserRoundMinus } from "lucide-react";
+import { motion } from "motion/react";
 import { useAuth } from "@/hooks/useAuth";
 import { changeMyAccountLifecycle, getMyAccountLifecycle } from "@/lib/account-lifecycle.functions";
 import { notify } from "@/lib/notifications-store";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,6 +26,7 @@ export function AccountLifecycleSettings() {
   const changeLifecycle = useServerFn(changeMyAccountLifecycle);
   const [confirmAction, setConfirmAction] = useState<"delete" | "deactivate" | null>(null);
   const [busy, setBusy] = useState(false);
+  const isMobile = useIsMobile();
   const { data } = useQuery({
     queryKey: ["account-lifecycle", user?.uid ?? null],
     queryFn: () => getLifecycle(),
@@ -66,8 +69,7 @@ export function AccountLifecycleSettings() {
         <div>
           <h3 className="text-sm font-semibold">Account status</h3>
           <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
-            Deactivation hides your account for up to 7 days. Deletion starts a 48-hour recovery
-            period, then removes your account and sign-in.
+            Deactivation hides your account for up to 7 days.
           </p>
         </div>
       </div>
@@ -104,33 +106,86 @@ export function AccountLifecycleSettings() {
         open={Boolean(confirmAction)}
         onOpenChange={(open) => !open && setConfirmAction(null)}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Choose account action</AlertDialogTitle>
-            <AlertDialogDescription>
-              Select what you want to do with your account.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <div className="grid gap-3 py-2">
+        <AlertDialogContent
+          className={
+            isMobile
+              ? "fixed inset-x-0 bottom-0 top-auto left-0 grid w-full max-w-none translate-x-0 translate-y-0 gap-0 overflow-hidden rounded-t-[1.75rem] rounded-b-none border-x-0 border-b-0 bg-background p-0 pb-[max(1.25rem,env(safe-area-inset-bottom))] shadow-[0_-16px_64px_rgba(0,0,0,0.2)] data-[state=open]:slide-in-from-bottom-full data-[state=closed]:slide-out-to-bottom-full"
+              : "max-w-md overflow-hidden rounded-3xl border-border/70 bg-background p-0 shadow-2xl"
+          }
+        >
+          <div className="relative overflow-hidden border-b border-border/60 bg-gradient-to-br from-primary/10 via-background to-sky-500/10 px-6 pb-5 pt-7 sm:px-7 sm:pb-6">
+            <motion.div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-10 -top-20 size-48 rounded-full border border-primary/15 bg-primary/10"
+              animate={{ scale: [1, 1.24, 1], opacity: [0.35, 0.7, 0.35] }}
+              transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <motion.div
+              aria-hidden="true"
+              className="pointer-events-none absolute -right-4 -top-14 size-36 rounded-full border border-sky-400/20"
+              animate={{ scale: [1.18, 1, 1.18], opacity: [0.2, 0.55, 0.2] }}
+              transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+            />
+            <div className="relative">
+              <AlertDialogHeader className="space-y-2 p-0 text-left">
+                <span className="flex size-11 items-center justify-center rounded-2xl border border-primary/15 bg-background/80 text-primary shadow-sm">
+                  <UserRoundMinus className="size-5" />
+                </span>
+                <AlertDialogTitle className="pt-1 font-display text-xl font-semibold tracking-tight sm:text-2xl">
+                  Choose account action
+                </AlertDialogTitle>
+                <AlertDialogDescription className="max-w-sm text-sm leading-relaxed">
+                  Select what you want to do with your account.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+            </div>
+          </div>
+          <div className="grid gap-3 px-5 py-5 sm:px-7 sm:py-6">
             <Button
               variant="outline"
-              className="justify-start"
+              className="group h-auto min-h-16 justify-start gap-3 rounded-2xl border-border/70 bg-background px-4 py-3 text-left shadow-sm transition-all hover:border-primary/40 hover:bg-primary/[0.03] hover:shadow-md active:scale-[0.99]"
               disabled={busy}
-              onClick={() => setConfirmAction("deactivate")}
+              onClick={() => void submit("deactivate")}
             >
-              Deactivate for 7 days
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                <Clock3 className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-foreground">Deactivate for 7 days</span>
+                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                  Hide your account temporarily. You can come back anytime.
+                </span>
+              </span>
             </Button>
             <Button
-              variant="destructive"
-              className="justify-start"
+              variant="outline"
+              className="group h-auto min-h-16 justify-start gap-3 rounded-2xl border-destructive/25 bg-destructive/[0.025] px-4 py-3 text-left shadow-sm transition-all hover:border-destructive/50 hover:bg-destructive/[0.06] hover:shadow-md active:scale-[0.99]"
               disabled={busy}
-              onClick={() => setConfirmAction("delete")}
+              onClick={() => void submit("delete")}
             >
-              Delete account
+              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                <Trash2 className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block font-semibold text-destructive">Delete account</span>
+                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                  Schedule deletion with a 48-hour recovery period.
+                </span>
+              </span>
             </Button>
+            {busy ? (
+              <p role="status" className="text-center text-xs text-muted-foreground">
+                Updating your account…
+              </p>
+            ) : null}
           </div>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>Cancel</AlertDialogCancel>
+          <AlertDialogFooter className="border-t border-border/60 bg-muted/20 px-5 py-4 sm:px-7">
+            <AlertDialogCancel
+              disabled={busy}
+              className="mt-0 h-11 w-full rounded-xl border-0 bg-primary/10 font-medium text-foreground hover:bg-primary/15 sm:w-auto"
+            >
+              Cancel
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

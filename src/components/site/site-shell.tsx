@@ -647,8 +647,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               <DrawerTitle>{canLock ? "Leaving for now?" : "Sign out of Candid?"}</DrawerTitle>
               <DrawerDescription>
                 {canLock
-                  ? "You can stay signed in on this device and just lock Candid behind your fingerprint or face, or sign out completely."
-                  : "You will need to sign in again to post stories, comment or vote."}
+                  ? ""
+                  : ""}
               </DrawerDescription>
             </DrawerHeader>
             {canLock ? (
@@ -659,7 +659,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                   checked={rememberChoice}
                   onChange={(event) => setRememberChoice(event.target.checked)}
                 />
-                Remember what I choose and stop asking.
+                Remember me.
               </label>
             ) : null}
             <div className="mt-2 flex flex-col gap-2">

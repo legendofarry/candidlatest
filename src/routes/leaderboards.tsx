@@ -92,11 +92,7 @@ function LeaderboardsPage() {
       <header>
         <h1 className="text-3xl font-semibold md:text-4xl">Leaderboards</h1>
         <p className="mt-2 max-w-2xl text-muted-foreground">
-          Rankings built from workplace stories and culture ratings by Kenyan workers. Scores move
-          as new reports come in.
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          Free shows the top 5 employers in each list. Premium shows the top 10.
+          Rankings built from workplace stories and culture ratings by Kenyan workers.
         </p>
       </header>
 
@@ -123,11 +119,6 @@ function LeaderboardsPage() {
           value={(row) => `${Math.round(Number(row.would_work_again_pct ?? 0))}%`}
         />
       </div>
-
-      <p className="text-xs text-muted-foreground">
-        Rankings reflect the opinions of contributors, not verified fact. Employers are welcome to
-        reply.
-      </p>
     </div>
   );
 }

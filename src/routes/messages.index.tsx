@@ -30,6 +30,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { MessageAppearanceSettings } from "@/components/site/message-appearance-settings";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { Input } from "@/components/ui/input";
 import { notify } from "@/lib/notifications-store";
@@ -370,6 +371,9 @@ export function MessagesInbox({
             <h1 className="min-w-0 flex-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">
               Messages
             </h1>
+            {user ? (
+              <MessageAppearanceSettings className="size-11 border border-border bg-card" />
+            ) : null}
           </div>
         </header>
       ) : null}
