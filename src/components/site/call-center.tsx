@@ -211,7 +211,7 @@ function CallRoom({
       }
     };
     const signal = (peerId: string, kind: "offer" | "answer" | "candidate", payload: unknown) => {
-      const target = push(ref(firebaseRealtimeDb, `call_rooms/${callId}/signals/${userId}/${peerId}/${kind}`));
+      const target = push(ref(db, `call_rooms/${callId}/signals/${userId}/${peerId}/${kind}`));
       return import("firebase/database").then(({ set }) => set(target, payload));
     };
     const createPeer = (peerId: string) => {
@@ -250,9 +250,9 @@ function CallRoom({
 
     const unsubscribers: Array<() => void> = [];
     for (const peerId of activePeerIds) {
-      const offerInbox = ref(firebaseRealtimeDb, `call_rooms/${callId}/signals/${peerId}/${userId}/offer`);
-      const answerInbox = ref(firebaseRealtimeDb, `call_rooms/${callId}/signals/${peerId}/${userId}/answer`);
-      const candidateInbox = ref(firebaseRealtimeDb, `call_rooms/${callId}/signals/${peerId}/${userId}/candidate`);
+      const offerInbox = ref(db, `call_rooms/${callId}/signals/${peerId}/${userId}/offer`);
+      const answerInbox = ref(db, `call_rooms/${callId}/signals/${peerId}/${userId}/answer`);
+      const candidateInbox = ref(db, `call_rooms/${callId}/signals/${peerId}/${userId}/candidate`);
       unsubscribers.push(onChildAdded(offerInbox, async (snapshot: DataSnapshot) => {
         try {
           await localReady;
@@ -263,7 +263,7 @@ function CallRoom({
           await applyPendingCandidates(peerId, pc);
           const answer = await pc.createAnswer();
           await pc.setLocalDescription(answer);
-          await signal(peerId, "answer", answer.toJSON());
+          await signal(peerId, "answer", pc.localDescription?.toJSON() ?? answer);
         } catch (error) { setMediaError(error instanceof Error ? error.message : "Could not connect the call."); }
       }));
       unsubscribers.push(onChildAdded(answerInbox, async (snapshot: DataSnapshot) => {
@@ -298,7 +298,7 @@ function CallRoom({
             const pc = createPeer(peerId);
             const offer = await pc.createOffer();
             await pc.setLocalDescription(offer);
-            await signal(peerId, "offer", offer.toJSON());
+            await signal(peerId, "offer", pc.localDescription?.toJSON() ?? offer);
           } catch (error) { setMediaError(error instanceof Error ? error.message : "Could not start the call."); }
         })();
       }
