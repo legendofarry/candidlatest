@@ -40,3 +40,5 @@
 - [x] Header-free sign-in and onboarding
 - [x] Full-screen support chat on phones
 - [x] Header back button on Leaderboards and Help & support
+- [x] Mobile settings redesign: grouped rounded cards, account header, consistent rows
+- [x] Fix all remaining typecheck errors (call center, push sync, billing, data layer)
