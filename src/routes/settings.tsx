@@ -58,12 +58,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -303,7 +297,11 @@ function SettingsPage() {
                     <ProfilePhotoPicker
                       avatarOnly
                       photoUrl={profile.data?.photoUrl}
-                      initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                      initials={(
+                        profile.data?.username?.[0] ??
+                        user.email?.[0] ??
+                        "U"
+                      ).toUpperCase()}
                       avatarClassName="size-16 border border-border"
                       onSaved={(photoUrl) => {
                         queryClient.setQueryData(
@@ -323,6 +321,7 @@ function SettingsPage() {
                       </p>
                       <p className="mt-0.5 truncate text-xs text-muted-foreground">{user.email}</p>
                     </div>
+                    <AccountLifecycleSettings />
                   </div>
                   <div className="grid grid-cols-2 divide-x divide-border/50 border-t border-border/50">
                     <Link
@@ -341,11 +340,15 @@ function SettingsPage() {
                 </motion.div>
                 <div className="hidden md:block">
                   <SettingsGroup title="Your profile">
-                    <div className="p-4">
+                    <div className="flex items-center justify-between gap-4 p-4">
                       <ProfilePhotoPicker
                         compact
                         photoUrl={profile.data?.photoUrl}
-                        initials={(profile.data?.username?.[0] ?? user.email?.[0] ?? "U").toUpperCase()}
+                        initials={(
+                          profile.data?.username?.[0] ??
+                          user.email?.[0] ??
+                          "U"
+                        ).toUpperCase()}
                         onSaved={(photoUrl) => {
                           queryClient.setQueryData(
                             ["onboarding-state", user.uid],
@@ -356,6 +359,7 @@ function SettingsPage() {
                           );
                         }}
                       />
+                      <AccountLifecycleSettings />
                     </div>
                   </SettingsGroup>
                 </div>
@@ -363,7 +367,7 @@ function SettingsPage() {
             ) : null}
 
             {user?.email?.trim().toLowerCase() === "karimiarrison@gmail.com" &&
-              profile.data?.accountType !== "official" ? (
+            profile.data?.accountType !== "official" ? (
               <SettingsGroup title="Official Candid account">
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -412,12 +416,6 @@ function SettingsPage() {
                     Security
                   </a>
                   <a
-                    href="#advanced"
-                    className="block py-2 text-sm text-muted-foreground hover:text-foreground"
-                  >
-                    Advanced
-                  </a>
-                  <a
                     href="#privacy"
                     className="block py-2 text-sm text-muted-foreground hover:text-foreground"
                   >
@@ -453,23 +451,6 @@ function SettingsPage() {
                   <div className="mt-4">
                     <SignInMethods user={user} />
                   </div>
-                </div>
-
-                <div id="advanced">
-                  <SettingsGroup title="Advanced">
-                    <Accordion type="single" collapsible className="w-full px-0">
-                      <AccordionItem value="advanced-actions" className="border-b-0">
-                        <AccordionTrigger className="px-4 py-3.5 text-left text-sm font-medium text-foreground hover:no-underline md:py-3">
-                          Account actions
-                        </AccordionTrigger>
-                        <AccordionContent className="px-0 pb-0">
-                          <div className="px-4 pb-4 pt-2">
-                            <AccountLifecycleSettings />
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </SettingsGroup>
                 </div>
 
                 <div id="privacy">

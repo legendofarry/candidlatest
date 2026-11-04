@@ -1,8 +1,8 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Clock3, Trash2, UserRoundMinus } from "lucide-react";
-import { motion } from "motion/react";
+import { ChevronRight, Clock3, Ellipsis, RotateCcw, Trash2, UserRoundMinus, X } from "lucide-react";
+import { motion, useReducedMotion } from "motion/react";
 import { useAuth } from "@/hooks/useAuth";
 import { changeMyAccountLifecycle, getMyAccountLifecycle } from "@/lib/account-lifecycle.functions";
 import { notify } from "@/lib/notifications-store";
@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -24,9 +23,10 @@ export function AccountLifecycleSettings() {
   const queryClient = useQueryClient();
   const getLifecycle = useServerFn(getMyAccountLifecycle);
   const changeLifecycle = useServerFn(changeMyAccountLifecycle);
-  const [confirmAction, setConfirmAction] = useState<"delete" | "deactivate" | null>(null);
+  const [actionsOpen, setActionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const isMobile = useIsMobile();
+  const reduceMotion = useReducedMotion();
   const { data } = useQuery({
     queryKey: ["account-lifecycle", user?.uid ?? null],
     queryFn: () => getLifecycle(),
@@ -46,7 +46,7 @@ export function AccountLifecycleSettings() {
             ? "Your account is hidden. Reactivate it within 7 days to keep it."
             : "Your account is active again.",
       );
-      setConfirmAction(null);
+      setActionsOpen(false);
     } catch (error) {
       notify.error(
         error instanceof Error ? error.message : "Could not update your account status.",
@@ -61,51 +61,52 @@ export function AccountLifecycleSettings() {
   const expiry = data?.expiresAt ? new Date(data.expiresAt) : null;
 
   return (
-    <section className="space-y-3 border-t border-border pt-5">
-      <div className="flex items-start gap-3">
-        <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-          <UserRoundMinus className="size-4" />
-        </span>
-        <div>
-          <h3 className="text-sm font-semibold">Account status</h3>
-          <p className="mt-1 max-w-xl text-xs leading-relaxed text-muted-foreground">
-            Deactivation hides your account for up to 7 days.
-          </p>
-        </div>
-      </div>
-
-      {status === "active" ? (
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={busy}
-            onClick={() => setConfirmAction("delete")}
+    <div className="flex shrink-0 items-center gap-1">
+      {status !== "active" ? (
+        <>
+          <span
+            title={
+              status === "deletion_pending"
+                ? `Deletion scheduled${expiry ? ` · recovery ends ${expiry.toLocaleString("en-KE", { timeZone: "Africa/Nairobi" })}` : ""}`
+                : `Account deactivated${expiry ? ` · recovery ends ${expiry.toLocaleString("en-KE", { timeZone: "Africa/Nairobi" })}` : ""}`
+            }
+            className="flex size-9 items-center justify-center rounded-full bg-amber-500/10 text-amber-600"
           >
-            Account actions
+            <Clock3 className="size-4" />
+            <span className="sr-only">
+              {status === "deletion_pending" ? "Deletion scheduled" : "Account deactivated"}
+            </span>
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Reactivate account"
+            title="Reactivate account"
+            disabled={busy}
+            onClick={() => void submit("reactivate")}
+            className="size-9 rounded-full text-muted-foreground transition-colors hover:bg-primary/10 hover:text-primary"
+          >
+            <RotateCcw className={`size-4 ${busy ? "animate-spin" : ""}`} />
           </Button>
-        </div>
-      ) : (
-        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-amber-500/30 bg-amber-500/5 p-3">
-          <Clock3 className="size-4 shrink-0 text-amber-600" />
-          <p className="min-w-0 flex-1 text-sm">
-            {status === "deletion_pending" ? "Deletion scheduled" : "Account deactivated"}
-            {expiry ? (
-              <span className="block text-xs text-muted-foreground">
-                Recovery ends {expiry.toLocaleString("en-KE", { timeZone: "Africa/Nairobi" })}
-              </span>
-            ) : null}
-          </p>
-          <Button size="sm" disabled={busy} onClick={() => void submit("reactivate")}>
-            {busy ? "Updating…" : "Reactivate"}
-          </Button>
-        </div>
-      )}
+        </>
+      ) : null}
+      {status === "active" ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Account controls"
+          title="Account controls"
+          disabled={busy}
+          onClick={() => setActionsOpen(true)}
+          className="group size-9 rounded-full text-muted-foreground transition-all hover:bg-secondary hover:text-foreground"
+        >
+          <Ellipsis className="size-5 transition-transform duration-300 group-hover:rotate-90" />
+        </Button>
+      ) : null}
 
-      <AlertDialog
-        open={Boolean(confirmAction)}
-        onOpenChange={(open) => !open && setConfirmAction(null)}
-      >
+      <AlertDialog open={actionsOpen} onOpenChange={setActionsOpen}>
         <AlertDialogContent
           className={
             isMobile
@@ -117,13 +118,17 @@ export function AccountLifecycleSettings() {
             <motion.div
               aria-hidden="true"
               className="pointer-events-none absolute -right-10 -top-20 size-48 rounded-full border border-primary/15 bg-primary/10"
-              animate={{ scale: [1, 1.24, 1], opacity: [0.35, 0.7, 0.35] }}
+              animate={
+                reduceMotion ? undefined : { scale: [1, 1.24, 1], opacity: [0.35, 0.7, 0.35] }
+              }
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
             />
             <motion.div
               aria-hidden="true"
               className="pointer-events-none absolute -right-4 -top-14 size-36 rounded-full border border-sky-400/20"
-              animate={{ scale: [1.18, 1, 1.18], opacity: [0.2, 0.55, 0.2] }}
+              animate={
+                reduceMotion ? undefined : { scale: [1.18, 1, 1.18], opacity: [0.2, 0.55, 0.2] }
+              }
               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
             />
             <div className="relative">
@@ -132,47 +137,75 @@ export function AccountLifecycleSettings() {
                   <UserRoundMinus className="size-5" />
                 </span>
                 <AlertDialogTitle className="pt-1 font-display text-xl font-semibold tracking-tight sm:text-2xl">
-                  Choose account action
+                  Account controls
                 </AlertDialogTitle>
                 <AlertDialogDescription className="max-w-sm text-sm leading-relaxed">
-                  Select what you want to do with your account.
+                  Choose an action.
                 </AlertDialogDescription>
               </AlertDialogHeader>
             </div>
           </div>
           <div className="grid gap-3 px-5 py-5 sm:px-7 sm:py-6">
-            <Button
-              variant="outline"
-              className="group h-auto min-h-16 justify-start gap-3 rounded-2xl border-border/70 bg-background px-4 py-3 text-left shadow-sm transition-all hover:border-primary/40 hover:bg-primary/[0.03] hover:shadow-md active:scale-[0.99]"
-              disabled={busy}
-              onClick={() => void submit("deactivate")}
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, ease: "easeOut" }}
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
-                <Clock3 className="size-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-foreground">Deactivate for 7 days</span>
-                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                  Hide your account temporarily. You can come back anytime.
+              <Button
+                variant="outline"
+                className="group h-auto min-h-14 justify-start gap-3 rounded-2xl border-border/70 bg-background px-4 py-3 text-left shadow-sm transition-all hover:border-primary/40 hover:bg-primary/[0.03] hover:shadow-md active:scale-[0.99]"
+                disabled={busy}
+                onClick={() => void submit("deactivate")}
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/10 text-amber-600">
+                  <UserRoundMinus className="size-4" />
                 </span>
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              className="group h-auto min-h-16 justify-start gap-3 rounded-2xl border-destructive/25 bg-destructive/[0.025] px-4 py-3 text-left shadow-sm transition-all hover:border-destructive/50 hover:bg-destructive/[0.06] hover:shadow-md active:scale-[0.99]"
-              disabled={busy}
-              onClick={() => void submit("delete")}
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-foreground">Pause account</span>
+                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                    Hidden for up to 7 days
+                  </span>
+                </span>
+                <motion.span
+                  aria-hidden="true"
+                  className="text-muted-foreground"
+                  whileHover={reduceMotion ? undefined : { x: 3 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <ChevronRight className="size-4" />
+                </motion.span>
+              </Button>
+            </motion.div>
+            <motion.div
+              initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.22, delay: 0.06, ease: "easeOut" }}
             >
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
-                <Trash2 className="size-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block font-semibold text-destructive">Delete account</span>
-                <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                  Schedule deletion with a 48-hour recovery period.
+              <Button
+                variant="outline"
+                className="group h-auto min-h-14 justify-start gap-3 rounded-2xl border-destructive/25 bg-destructive/[0.025] px-4 py-3 text-left shadow-sm transition-all hover:border-destructive/50 hover:bg-destructive/[0.06] hover:shadow-md active:scale-[0.99]"
+                disabled={busy}
+                onClick={() => void submit("delete")}
+              >
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-destructive/10 text-destructive">
+                  <Trash2 className="size-4" />
                 </span>
-              </span>
-            </Button>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-semibold text-destructive">Delete account</span>
+                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                    48-hour recovery window
+                  </span>
+                </span>
+                <motion.span
+                  aria-hidden="true"
+                  className="text-destructive/70"
+                  whileHover={reduceMotion ? undefined : { x: 3 }}
+                  transition={{ duration: 0.18 }}
+                >
+                  <ChevronRight className="size-4" />
+                </motion.span>
+              </Button>
+            </motion.div>
             {busy ? (
               <p role="status" className="text-center text-xs text-muted-foreground">
                 Updating your account…
@@ -181,14 +214,16 @@ export function AccountLifecycleSettings() {
           </div>
           <AlertDialogFooter className="border-t border-border/60 bg-muted/20 px-5 py-4 sm:px-7">
             <AlertDialogCancel
+              aria-label="Close account controls"
+              title="Close"
               disabled={busy}
-              className="mt-0 h-11 w-full rounded-xl border-0 bg-primary/10 font-medium text-foreground hover:bg-primary/15 sm:w-auto"
+              className="mt-0 size-11 rounded-xl border-0 bg-primary/10 p-0 text-foreground hover:bg-primary/15"
             >
-              Cancel
+              <X className="size-4" />
             </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </div>
   );
 }
