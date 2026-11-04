@@ -326,11 +326,11 @@ export function PrivacySettings() {
 
   return (
     <section className="animate-fade space-y-1">
-      <div className="space-y-2 md:hidden">
+      <div className="space-y-3 md:hidden">
         <button
           type="button"
           onClick={() => setMobilePanel("privacy")}
-          className="flex w-full items-center gap-3 border-y border-border py-4 text-left"
+          className="flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-border/50 bg-card/40 px-4 py-3.5 text-left transition-colors active:bg-secondary/60"
         >
           <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
             <LockKeyhole className="size-4" />
@@ -346,7 +346,7 @@ export function PrivacySettings() {
         <button
           type="button"
           onClick={() => setMobilePanel("blocked")}
-          className="flex w-full items-center gap-3 border-b border-border py-4 text-left"
+          className="flex w-full items-center gap-3 overflow-hidden rounded-2xl border border-border/50 bg-card/40 px-4 py-3.5 text-left transition-colors active:bg-secondary/60"
         >
           <span className="flex size-9 items-center justify-center rounded-xl bg-secondary text-muted-foreground">
             <Ban className="size-4" />

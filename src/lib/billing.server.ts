@@ -63,7 +63,7 @@ export type BillingConfig = {
   >;
   manual_mpesa: {
     enabled: boolean;
-    mode: "paybill" | "till" | "send_money" | null;
+    mode: "paybill" | "till" | "send_money" | "airtel" | null;
     business_number: string;
     account_name: string;
     reference_instructions: string;

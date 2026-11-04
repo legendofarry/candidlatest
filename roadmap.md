@@ -32,7 +32,7 @@
 - [x] Sprint 1 — Post-story flow: employer autocomplete + duplicate detection, custom reason tags, position field, optional private employment evidence
 - [x] Sprint 2 — Mobile comment bottom sheet, reusable confirmation dialogs
 - [x] Sprint 3 — @mention notifications with deep links, notification archive tabs, company-tag alerts
-- [ ] Sprint 4 — Help & Support screen (FAQs, email/WhatsApp, ticket form, live chat)
+- [x] Sprint 4 — Help & Support screen (FAQs, email/WhatsApp, ticket form, live chat)
 
 ## Launch polish batch
 - [x] Fix published-site 500 (edge-safe Firestore transport, env mirroring)
@@ -40,3 +40,5 @@
 - [x] Header-free sign-in and onboarding
 - [x] Full-screen support chat on phones
 - [x] Header back button on Leaderboards and Help & support
+- [x] Mobile settings redesign: grouped rounded cards, account header, consistent rows
+- [x] Fix all remaining typecheck errors (call center, push sync, billing, data layer)

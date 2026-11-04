@@ -28,7 +28,7 @@ export function AccountDataExport() {
     }
   }
 
-  return <div className="flex flex-col gap-3 border-y border-border py-4 sm:flex-row sm:items-center sm:justify-between">
+  return <div className="flex flex-col gap-3 overflow-hidden rounded-2xl border border-border/50 bg-card/40 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:rounded-none sm:border-x-0 sm:border-t-0 sm:border-y sm:border-border sm:bg-transparent sm:p-0 sm:py-4">
     <div><p className="text-sm font-medium">Download your account data</p><p className="mt-1 text-xs text-muted-foreground">Get a JSON copy of your profile, contributions, activity and messages. Other members’ private details and employment evidence are excluded.</p></div>
     <Button type="button" variant="outline" disabled={loading} onClick={() => void download()} className="shrink-0">
       {loading ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}

@@ -35,9 +35,9 @@ export function usePushRegistrationSync() {
             !active || document.visibilityState !== "visible" ||
             Notification.permission !== "granted" || !hasPushOptIn(Notification.permission)
           ) return;
-          const title = payload.notification?.title || payload.data?.title || "Candid";
+          const title = payload.notification?.title || payload.data?.["title"] || "Candid";
           const body =
-            payload.notification?.body || payload.data?.body || "You have a new notification.";
+            payload.notification?.body || payload.data?.["body"] || "You have a new notification.";
           notify.info(title, { description: body, duration: 7000 });
         });
         if (Notification.permission !== "granted" || !hasPushOptIn(Notification.permission)) return;
