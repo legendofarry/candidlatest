@@ -195,7 +195,8 @@ function CallRoom({
   const activePeerIds = useMemo(() => Object.entries(meta.members ?? {}).filter(([id, member]) => id !== userId && member.status === "active").map(([id]) => id).sort(), [meta.members, userId]);
 
   useEffect(() => {
-    if (!firebaseRealtimeDb) { setMediaError("Realtime Database is not configured for calls."); return; }
+    const db = firebaseRealtimeDb;
+    if (!db) { setMediaError("Realtime Database is not configured for calls."); return; }
     let mounted = true;
     let local: MediaStream | null = null;
     let signalLocalReady = () => {};
