@@ -5,6 +5,7 @@ import type {
   QueryDocumentSnapshot,
 } from "./firestore-rest.server";
 import { getFirestoreDb } from "./firebase.server";
+import { accountsBlockEachOther } from "./block.server";
 import { getEffectiveMembershipTier, type MembershipSource } from "./membership";
 import { allKenyaAreas, areasForCounty } from "./kenya-locations";
 import { cacheServerRead } from "./server-cache";
@@ -966,19 +967,15 @@ async function readFeedExclusions(viewerId: string | null | undefined) {
   if (!viewerId)
     return { stories: new Set<string>(), authors: new Set<string>(), companies: new Set<string>() };
   const db = getFirestoreDb();
-  const [preferences, blockedAuthors] = await Promise.all([
+  const [preferences, blockedByViewer, blockedViewer] = await Promise.all([
     db.collection("feed_preferences").doc(viewerId).get(),
-    cacheServerRead(`feed:blocked-authors:${viewerId}`, 15_000, async () => {
-      const [blockedByViewer, blockedViewer] = await Promise.all([
-        db.collection("blocks").where("blocker_id", "==", viewerId).limit(500).get(),
-        db.collection("blocks").where("blocked_id", "==", viewerId).limit(500).get(),
-      ]);
-      return [
-        ...blockedByViewer.docs.map((doc) => String(doc.get("blocked_id"))),
-        ...blockedViewer.docs.map((doc) => String(doc.get("blocker_id"))),
-      ];
-    }),
+    db.collection("blocks").where("blocker_id", "==", viewerId).limit(500).get(),
+    db.collection("blocks").where("blocked_id", "==", viewerId).limit(500).get(),
   ]);
+  const blockedAuthors = [
+    ...blockedByViewer.docs.map((doc) => String(doc.get("blocked_id"))),
+    ...blockedViewer.docs.map((doc) => String(doc.get("blocker_id"))),
+  ];
   const items =
     (preferences.data()?.["items"] as Array<{ kind: string; target_id: string }> | undefined) ?? [];
   return {
@@ -1366,6 +1363,7 @@ async function canViewAuthorContributions(
     profile.account_status === "deletion_in_progress"
   )
     return false;
+  if (viewerId && viewerId !== authorId && await accountsBlockEachOther(viewerId, authorId)) return false;
   if (profile.profile_visibility !== "private" || viewerId === authorId) return true;
   if (!viewerId) return false;
   const follow = await getFirestoreDb()
@@ -1697,12 +1695,12 @@ export async function getStoryCommentContext(
   return omitDeletedCommentNodes(roots)[0] ?? null;
 }
 
-async function calculateSearchData(queryText: string) {
+async function calculateSearchData(queryText: string, viewerId: string | null = null) {
   const q = queryText.trim().toLowerCase();
   if (q.length < 2) return { companies: [], stories: [] };
 
   const db = getFirestoreDb();
-  const [companies, stories] = await Promise.all([
+  const [companies, stories, blockedByViewer, blockedViewer] = await Promise.all([
     db
       .collection("companies")
       .limit(500)
@@ -1720,6 +1718,12 @@ async function calculateSearchData(queryText: string) {
           updateTime: doc.updateTime,
         })),
       ),
+    viewerId ? db.collection("blocks").where("blocker_id", "==", viewerId).limit(500).get() : Promise.resolve(null),
+    viewerId ? db.collection("blocks").where("blocked_id", "==", viewerId).limit(500).get() : Promise.resolve(null),
+  ]);
+  const blockedAuthors = new Set([
+    ...(blockedByViewer?.docs.map((doc) => String(doc.get("blocked_id"))) ?? []),
+    ...(blockedViewer?.docs.map((doc) => String(doc.get("blocker_id"))) ?? []),
   ]);
 
   const companyMatches = companies
@@ -1757,6 +1761,7 @@ async function calculateSearchData(queryText: string) {
     const author = story.author_id ? authorsById.get(story.author_id) : null;
     return Boolean(
       author &&
+      !blockedAuthors.has(author.id) &&
       !author.banned &&
       author.profile_visibility !== "private" &&
       !["deactivated", "deletion_pending", "deletion_in_progress"].includes(
@@ -1800,9 +1805,10 @@ async function calculateSearchData(queryText: string) {
   return { companies: companyMatches, stories: storyMatches };
 }
 
-export function searchData(queryText: string) {
+export function searchData(queryText: string, viewerId: string | null = null) {
   const normalized = queryText.trim().toLowerCase();
+  if (viewerId) return calculateSearchData(queryText, viewerId);
   return cacheServerRead(`public:search:${normalized}`, 60_000, () =>
-    calculateSearchData(queryText),
+    calculateSearchData(queryText, null),
   );
 }

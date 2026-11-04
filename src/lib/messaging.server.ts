@@ -1,4 +1,5 @@
 import { getFirestoreDb } from "./firebase.server";
+import { accountsBlockEachOther } from "./block.server";
 import { consumeMembershipQuota, getUserMembershipEntitlements } from "./membership.server";
 import { createHash } from "node:crypto";
 import { FieldValue, type DocumentReference } from "./firestore-rest.server";
@@ -80,6 +81,9 @@ export type MessageRecord = {
   } | null;
   is_deleted?: boolean;
   deleted_at?: string | null;
+  /** Set when a blocked recipient must never receive this sender-only message. */
+  undelivered_to?: string | null;
+  delivery_state?: "sent" | "not_delivered";
 };
 
 export type ChatImageUploadReceipt = {
@@ -629,6 +633,155 @@ export async function isBlocked(blockerId: string, blockedId: string) {
   return snap.exists;
 }
 
+export async function isBlockedBetween(firstId: string, secondId: string) {
+  return accountsBlockEachOther(firstId, secondId);
+}
+
+async function readAllPairRecords(collection: string, field: string, ids: string[]) {
+  const db = getFirestoreDb();
+  const records: Array<{ id: string; data: Record<string, any> }> = [];
+  let cursor: string | null = null;
+  while (true) {
+    let query = db.collection(collection).where(field, "in", ids).orderBy("__name__", "asc");
+    if (cursor) query = query.startAfter(db.collection(collection).doc(cursor));
+    const page = await query.limit(300).get();
+    records.push(...page.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, any> })));
+    const last = page.docs.at(-1);
+    if (page.size < 300 || !last) break;
+    cursor = last.id;
+  }
+  return records;
+}
+
+/** Removes follows and the two accounts' reactions/comments on one another's stories. */
+async function removePairInteractions(firstId: string, secondId: string) {
+  const db = getFirestoreDb();
+  const pair = [firstId, secondId];
+  const [pairFollows, pairStoryLikes, pairStoryFollows, pairVotes, pairComments, pairCommentLikes] = await Promise.all([
+    Promise.all([
+      db.collection("follows").doc(`${firstId}:${secondId}`).get(),
+      db.collection("follows").doc(`${secondId}:${firstId}`).get(),
+    ]),
+    readAllPairRecords("story_likes", "user_id", pair),
+    readAllPairRecords("story_follows", "user_id", pair),
+    readAllPairRecords("votes", "user_id", pair),
+    readAllPairRecords("comments", "author_id", pair),
+    readAllPairRecords("comment_likes", "user_id", pair),
+  ]);
+
+  const storyIds = [...new Set([
+    ...pairStoryLikes.map((item) => String(item.data["story_id"] ?? "")),
+    ...pairStoryFollows.map((item) => String(item.data["story_id"] ?? "")),
+    ...pairVotes.map((item) => String(item.data["story_id"] ?? "")),
+    ...pairComments.map((item) => String(item.data["story_id"] ?? "")),
+  ].filter(Boolean))];
+  const stories = await Promise.all(storyIds.map((id) => db.collection("stories").doc(id).get()));
+  const storyById = new Map(stories.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const));
+  const parentIds = [...new Set(pairComments.map((item) => String(item.data["parent_id"] ?? "")).filter(Boolean))];
+  const parentDocs = await Promise.all(parentIds.map((id) => db.collection("comments").doc(id).get()));
+  const parentById = new Map(parentDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const));
+  const pairSet = new Set(pair);
+  const isCounterpart = (actorId: string, ownerId: unknown) =>
+    pairSet.has(actorId) && pairSet.has(String(ownerId ?? "")) && actorId !== ownerId;
+
+  const storyLikeDeletes = pairStoryLikes.filter((item) =>
+    isCounterpart(String(item.data["user_id"] ?? ""), storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id")),
+  );
+  const storyFollowDeletes = pairStoryFollows.filter((item) =>
+    isCounterpart(String(item.data["user_id"] ?? ""), storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id")),
+  );
+  const voteDeletes = pairVotes.filter((item) =>
+    isCounterpart(String(item.data["user_id"] ?? ""), storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id")),
+  );
+  const commentsToRemove = pairComments.filter((item) => {
+    const ownerId = storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id");
+    const parentOwnerId = parentById.get(String(item.data["parent_id"] ?? ""))?.get("author_id");
+    return (isCounterpart(String(item.data["author_id"] ?? ""), ownerId) ||
+      isCounterpart(String(item.data["author_id"] ?? ""), parentOwnerId)) && !item.data["is_deleted"];
+  });
+  const removedCommentIds = new Set(commentsToRemove.map((item) => item.id));
+  const commentIds = [...new Set([
+    ...pairCommentLikes.map((item) => String(item.data["comment_id"] ?? "")),
+    ...commentsToRemove.map((item) => item.id),
+  ].filter(Boolean))];
+  const commentDocs = await Promise.all(commentIds.map((id) => db.collection("comments").doc(id).get()));
+  const commentById = new Map(commentDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const));
+  const commentLikeDeletes = pairCommentLikes.filter((item) => {
+    const comment = commentById.get(String(item.data["comment_id"] ?? ""));
+    return removedCommentIds.has(String(item.data["comment_id"] ?? "")) ||
+      isCounterpart(String(item.data["user_id"] ?? ""), comment?.get("author_id"));
+  });
+
+  const storyMetricDeltas = new Map<string, {
+    likes: number; followers: number; comments: number; upvotes: number; metoo: number;
+  }>();
+  const metricFor = (id: string) => {
+    if (!storyById.has(id)) return null;
+    let metric = storyMetricDeltas.get(id);
+    if (!metric) {
+      metric = { likes: 0, followers: 0, comments: 0, upvotes: 0, metoo: 0 };
+      storyMetricDeltas.set(id, metric);
+    }
+    return metric;
+  };
+  for (const item of storyLikeDeletes) {
+    const metric = metricFor(String(item.data["story_id"]));
+    if (metric) metric.likes -= 1;
+  }
+  for (const item of storyFollowDeletes) {
+    const metric = metricFor(String(item.data["story_id"]));
+    if (metric) metric.followers -= 1;
+  }
+  for (const item of voteDeletes) {
+    const metric = metricFor(String(item.data["story_id"]));
+    if (metric && item.data["kind"] === "up") metric.upvotes -= 1;
+    else if (metric && item.data["kind"] === "metoo") metric.metoo -= 1;
+  }
+  for (const item of commentsToRemove) {
+    if (!item.data["parent_id"]) {
+      const metric = metricFor(String(item.data["story_id"]));
+      if (metric) metric.comments -= 1;
+    }
+  }
+
+  const commentLikeCounts = new Map<string, number>();
+  for (const item of commentLikeDeletes) {
+    const commentId = String(item.data["comment_id"] ?? "");
+    commentLikeCounts.set(commentId, (commentLikeCounts.get(commentId) ?? 0) + 1);
+  }
+  const operations: Array<(batch: ReturnType<typeof db.batch>) => void> = [];
+  for (const follow of pairFollows) if (follow.exists) operations.push((batch) => batch.delete(follow.ref));
+  // Delete interaction docs from their own collections.
+  for (const item of storyLikeDeletes) operations.push((batch) => batch.delete(db.collection("story_likes").doc(item.id)));
+  for (const item of storyFollowDeletes) operations.push((batch) => batch.delete(db.collection("story_follows").doc(item.id)));
+  for (const item of voteDeletes) operations.push((batch) => batch.delete(db.collection("votes").doc(item.id)));
+  for (const item of commentLikeDeletes) operations.push((batch) => batch.delete(db.collection("comment_likes").doc(item.id)));
+  for (const item of commentsToRemove) operations.push((batch) => batch.update(db.collection("comments").doc(item.id), {
+    body: "", likes: 0, is_deleted: true, counter_adjusted_on_delete: true, deleted_at: now(),
+  }));
+  for (const [storyId, metric] of storyMetricDeltas) {
+    const delta: Record<string, ReturnType<typeof FieldValue.increment>> = {};
+    if (metric.likes) delta.likes = FieldValue.increment(metric.likes);
+    if (metric.followers) delta.follower_count = FieldValue.increment(metric.followers);
+    if (metric.comments) delta.comment_count = FieldValue.increment(metric.comments);
+    if (metric.upvotes) delta.upvotes = FieldValue.increment(metric.upvotes);
+    if (metric.metoo) delta.metoo = FieldValue.increment(metric.metoo);
+    operations.push((batch) => batch.update(db.collection("stories").doc(storyId), delta));
+  }
+  for (const [commentId, removedLikes] of commentLikeCounts) {
+    if (removedCommentIds.has(commentId)) continue;
+    const comment = commentById.get(commentId);
+    if (comment) operations.push((batch) => batch.update(comment.ref, {
+      likes: FieldValue.increment(-removedLikes),
+    }));
+  }
+  for (let offset = 0; offset < operations.length; offset += 400) {
+    const batch = db.batch();
+    operations.slice(offset, offset + 400).forEach((operation) => operation(batch));
+    await batch.commit();
+  }
+}
+
 export async function toggleBlock(blockerId: string, blockedId: string) {
   if (blockerId === blockedId) throw new Error("You cannot block yourself.");
   if (blockedId === (await getCandidAccountId())) throw new Error("Candid cannot be blocked.");
@@ -646,6 +799,13 @@ export async function toggleBlock(blockerId: string, blockedId: string) {
   const ref = db.collection("blocks").doc(`${blockerId}:${blockedId}`);
   const snap = await ref.get();
   if (snap.exists) {
+    // If the block was saved but interaction cleanup was interrupted, retry cleanup
+    // while keeping the block active. A second tap must never silently unblock it.
+    if (snap.get("cleanup_complete") === false) {
+      await removePairInteractions(blockerId, blockedId);
+      await ref.update({ cleanup_complete: true, cleanup_completed_at: now() });
+      return { blocked: true };
+    }
     await ref.delete();
     return { blocked: false };
   }
@@ -654,7 +814,10 @@ export async function toggleBlock(blockerId: string, blockedId: string) {
     blocker_id: blockerId,
     blocked_id: blockedId,
     created_at: now(),
+    cleanup_complete: false,
   });
+  await removePairInteractions(blockerId, blockedId);
+  await ref.update({ cleanup_complete: true, cleanup_completed_at: now() });
   return { blocked: true };
 }
 
@@ -900,6 +1063,8 @@ export async function readConversation(
   if (!record.participant_ids.includes(userId)) throw new Error("Not your conversation");
 
   const activityAt = record.activity_at ?? record.last_message_at;
+  const otherId = record.participant_ids.find((id) => id !== userId) ?? userId;
+  const blockedBetween = await isBlockedBetween(userId, otherId);
   if (
     !cursor &&
     knownActivityAt &&
@@ -916,11 +1081,12 @@ export async function readConversation(
       hasOlder: false,
       nextCursor: null,
       can_send: true,
-      blocked_reason: null,
+      blocked_reason: blockedBetween
+        ? "This account is blocked. Messages you send here will not be delivered."
+        : null,
     };
   }
 
-  const otherId = record.participant_ids.find((id) => id !== userId) ?? userId;
   let messageQuery = db
     .collection("messages")
     .where("conversation_id", "==", conversationId)
@@ -941,6 +1107,7 @@ export async function readConversation(
   const messages = messagesSnap.docs
     .slice(0, 50)
     .map((doc) => ({ ...(doc.data() as MessageRecord), id: doc.id }))
+    .filter((message) => !message.undelivered_to || message.sender_id === userId)
     .reverse();
   const messagesWithImages = await Promise.all(
     messages.map(async (message) => {
@@ -990,7 +1157,9 @@ export async function readConversation(
 
   const gate = cursor
     ? { allowed: true as const, reason: null }
-    : await canMessage(userId, otherId);
+    : blockedBetween
+      ? { allowed: true as const, reason: "This account is blocked. Messages you send here will not be delivered." }
+      : await canMessage(userId, otherId);
 
   return {
     id: conversationId,
@@ -1003,7 +1172,9 @@ export async function readConversation(
     nextCursor:
       hasOlder && messages[0] ? { createdAt: messages[0].created_at, id: messages[0].id } : null,
     can_send: gate.allowed,
-    blocked_reason: gate.allowed ? null : gate.reason,
+    blocked_reason: blockedBetween
+      ? "This account is blocked. Messages you send here will not be delivered."
+      : gate.allowed ? null : gate.reason,
   };
 }
 
@@ -1021,7 +1192,10 @@ export async function sendMessage(input: {
   if (!record.participant_ids.includes(input.userId)) throw new Error("Not your conversation");
 
   const otherId = record.participant_ids.find((id) => id !== input.userId) ?? input.userId;
-  const gate = await canMessage(input.userId, otherId);
+  const blockedBetween = await isBlockedBetween(input.userId, otherId);
+  const gate = blockedBetween
+    ? { allowed: true as const, reason: null }
+    : await canMessage(input.userId, otherId);
   if (!gate.allowed) throw new Error(gate.reason);
 
   let image: MessageRecord["image"] = null;
@@ -1083,16 +1257,19 @@ export async function sendMessage(input: {
     reactions: {},
     image,
     is_deleted: false,
+    ...(blockedBetween ? { undelivered_to: otherId, delivery_state: "not_delivered" as const } : { delivery_state: "sent" as const }),
   };
   const batch = db.batch();
   batch.set(messageRef, message);
-  batch.update(ref, {
-    last_message: input.body || (image ? "📷 Image" : ""),
-    last_message_at: message.created_at,
-    activity_at: message.created_at,
-    last_sender_id: input.userId,
-    [`unread.${otherId}`]: FieldValue.increment(1),
-  });
+  if (!blockedBetween) {
+    batch.update(ref, {
+      last_message: input.body || (image ? "📷 Image" : ""),
+      last_message_at: message.created_at,
+      activity_at: message.created_at,
+      last_sender_id: input.userId,
+      [`unread.${otherId}`]: FieldValue.increment(1),
+    });
+  }
   if (ticketRef && input.image) {
     batch.update(
       ticketRef,
@@ -1103,6 +1280,7 @@ export async function sendMessage(input: {
   await batch.commit();
 
   try {
+    if (blockedBetween) return message;
     const [{ dispatchWebPush }, senderSnap] = await Promise.all([
       import("./push.server"),
       db.collection("profiles").doc(input.userId).get(),
@@ -1277,6 +1455,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     profile.account_status === "deletion_pending"
   )
     return null;
+  if (viewerId && viewerId !== userId && await accountsBlockEachOther(viewerId, userId)) return null;
   const pinnedLimit = getMembershipEntitlements(
     getEffectiveMembershipTier(profile),
   ).maxPinnedStories;
@@ -1464,6 +1643,9 @@ export async function readPublicProfileStories(
     profile?.account_status === "deletion_pending"
   )
     return { stories: [], hasMore: false, nextCursor: null };
+  if (viewerId && viewerId !== userId && await accountsBlockEachOther(viewerId, userId)) {
+    return { stories: [], hasMore: false, nextCursor: null };
+  }
   if (profile?.profile_visibility === "private" && viewerId !== userId) {
     const follow = viewerId
       ? await db.collection("follows").doc(`${viewerId}:${userId}`).get()
@@ -1498,7 +1680,7 @@ export async function readPublicProfileStories(
 }
 
 /** Cursor-paged public follower directory. Each request reads one bounded page. */
-export async function readPublicProfileFollowers(username: string, cursor: string | null) {
+export async function readPublicProfileFollowers(username: string, cursor: string | null, viewerId: string) {
   const db = getFirestoreDb();
   const usernameSnap = await db.collection("usernames").doc(username.trim().toLowerCase()).get();
   const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
@@ -1513,6 +1695,9 @@ export async function readPublicProfileFollowers(username: string, cursor: strin
     profile?.account_status === "deletion_pending"
   )
     return { followers: [], hasMore: false, nextCursor: null };
+  if (viewerId !== userId && await accountsBlockEachOther(viewerId, userId)) {
+    return { followers: [], hasMore: false, nextCursor: null };
+  }
 
   let query = db
     .collection("follows")

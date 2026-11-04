@@ -233,6 +233,14 @@ function PublicProfilePage() {
         }),
       ]);
     } catch (error) {
+      // Blocking is persisted before historical-interaction cleanup. Refresh even
+      // after a cleanup error so an already-active block hides this profile at once.
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["public-profile", username] }),
+        queryClient.invalidateQueries({
+          queryKey: ["account-relationship", user?.uid, profile.id],
+        }),
+      ]);
       notify.error(error instanceof Error ? error.message : "Something went wrong");
     } finally {
       setBusy(false);

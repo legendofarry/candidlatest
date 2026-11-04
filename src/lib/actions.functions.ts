@@ -12,6 +12,7 @@ import {
   type StoryRecord,
 } from "./firebase-data.server";
 import { getFirestoreDb } from "./firebase.server";
+import { accountsBlockEachOther } from "./block.server";
 import {
   getUserParticipatingCompanyIds,
   userParticipatedWithCompany,
@@ -693,6 +694,11 @@ export const castVote = createServerFn({ method: "POST" })
     const voteRef = db.collection("votes").doc(voteId);
     const storyRef = db.collection("stories").doc(data.story_id);
     const field = data.kind === "up" ? "upvotes" : "metoo";
+    const storyOwner = await storyRef.get();
+    const ownerId = String(storyOwner.get("author_id") ?? "");
+    if (ownerId && await accountsBlockEachOther(context.userId, ownerId)) {
+      throw new Error("This post is unavailable.");
+    }
     return db.runTransaction(async (transaction) => {
       const [existing, storySnap] = await Promise.all([
         transaction.get(voteRef),
@@ -742,6 +748,10 @@ export const addComment = createServerFn({ method: "POST" })
     const currentStory = storySnap.exists ? storySnap.data() : null;
     if (!currentStory || currentStory["status"] !== "published")
       throw new Error("Story not found.");
+    const storyAuthorId = String(currentStory["author_id"] ?? "");
+    if (storyAuthorId && await accountsBlockEachOther(context.userId, storyAuthorId)) {
+      throw new Error("This post is unavailable.");
+    }
     const parentCommentSnap = data.parent_id
       ? await db.collection("comments").doc(data.parent_id).get()
       : null;
@@ -754,6 +764,10 @@ export const addComment = createServerFn({ method: "POST" })
         parentComment["is_deleted"] === true)
     ) {
       throw new Error("That comment is no longer available to reply to.");
+    }
+    const parentAuthorId = String(parentComment?.["author_id"] ?? "");
+    if (parentAuthorId && await accountsBlockEachOther(context.userId, parentAuthorId)) {
+      throw new Error("This comment is unavailable.");
     }
 
     const verificationSnap = await db.collection("account_verifications").doc(context.userId).get();
@@ -883,6 +897,9 @@ export const likeComment = createServerFn({ method: "POST" })
     const comment = commentSnap.data() as
       { likes?: number; author_id?: string | null; story_id?: string; body?: string } | undefined;
     const current = Number(comment?.likes ?? 0);
+    if (comment?.author_id && await accountsBlockEachOther(context.userId, comment.author_id)) {
+      throw new Error("This comment is unavailable.");
+    }
 
     if (likeSnap.exists) {
       await likeRef.delete();

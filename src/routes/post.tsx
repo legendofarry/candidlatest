@@ -8,6 +8,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
+  ChevronDown,
   FileText,
   Image as ImageIcon,
   Lock,
@@ -17,6 +18,7 @@ import {
   Paperclip,
   Save,
   ShieldCheck,
+  VenetianMask,
   Trash2,
   X,
 } from "lucide-react";
@@ -46,7 +48,7 @@ import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { cn } from "@/lib/utils";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
-import { allKenyaAreas, areasForCounty } from "@/lib/kenya-locations";
+import { allKenyaAreas, areasForCounty, KENYA_LOCATIONS } from "@/lib/kenya-locations";
 import { CommunityPostComposer } from "@/components/site/community-post-composer";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { getPrivacySettings } from "@/lib/messaging.functions";
@@ -172,6 +174,8 @@ function WorkplaceStoryComposer() {
   const [industry, setIndustry] = useState("");
   const [county, setCounty] = useState("");
   const [area, setArea] = useState("");
+  const [showAllCounties, setShowAllCounties] = useState(false);
+  const [showAllAreas, setShowAllAreas] = useState(false);
   const [companyMapUrl, setCompanyMapUrl] = useState("");
   const [pinningLocation, setPinningLocation] = useState(false);
   const [reasons, setReasons] = useState<string[]>([]);
@@ -473,6 +477,9 @@ function WorkplaceStoryComposer() {
     )
     .slice(0, 8);
   const areaSuggestions = county ? areasForCounty(county) : allKenyaAreas();
+  const countyOptions = Object.keys(KENYA_LOCATIONS).sort((a, b) => a.localeCompare(b));
+  const popularCounties = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Kiambu", "Uasin Gishu"];
+  const visibleCounties = showAllCounties ? countyOptions : popularCounties;
 
   function pinCurrentLocation() {
     if (!navigator.geolocation) {
@@ -901,16 +908,42 @@ function WorkplaceStoryComposer() {
                             value={industry}
                             onChange={setIndustry}
                           />
-                          <ChipField
-                            label="Which county is this?"
-                            options={filters.counties}
-                            value={county}
-                            onChange={setCounty}
-                          />
+                          <div className="space-y-2">
+                            <Label>County</Label>
+                            <div className="flex flex-wrap gap-2">
+                              {visibleCounties.map((option) => (
+                                <button key={option} type="button" onClick={() => {
+                                  setCounty(option);
+                                  setArea("");
+                                  setShowAllAreas(false);
+                                }} className={cn("rounded-full border px-3 py-1.5 text-sm transition-colors", county === option ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground")}>
+                                  {option}
+                                </button>
+                              ))}
+                              {!showAllCounties ? (
+                                <button type="button" onClick={() => setShowAllCounties(true)} className="rounded-full px-3 py-1.5 text-sm font-medium text-primary">
+                                  +{Math.max(0, countyOptions.length - popularCounties.length)} more
+                                </button>
+                              ) : null}
+                            </div>
+                            <Input aria-label="Or enter a county" value={county} onChange={(event) => { setCounty(event.target.value); setArea(""); }} placeholder="Or type a county" maxLength={80} />
+                          </div>
                           <div className="space-y-2">
                             <Label htmlFor="work-area">
                               Which area did you work in? (optional)
                             </Label>
+                            {county && areaSuggestions.length ? (
+                              <div className="flex flex-wrap gap-2">
+                                {(showAllAreas ? areaSuggestions : areaSuggestions.slice(0, 6)).map((suggestion) => (
+                                  <button key={suggestion} type="button" onClick={() => setArea(suggestion)} className={cn("rounded-full border px-3 py-1.5 text-sm transition-colors", area === suggestion ? "border-primary bg-primary/10 text-foreground" : "border-border text-muted-foreground hover:text-foreground")}>
+                                    {suggestion}
+                                  </button>
+                                ))}
+                                {areaSuggestions.length > 6 && !showAllAreas ? (
+                                  <button type="button" onClick={() => setShowAllAreas(true)} className="rounded-full px-3 py-1.5 text-sm font-medium text-primary">See all areas</button>
+                                ) : null}
+                              </div>
+                            ) : null}
                             <Input
                               id="work-area"
                               value={area}
@@ -924,10 +957,7 @@ function WorkplaceStoryComposer() {
                                 <option key={suggestion} value={suggestion} />
                               ))}
                             </datalist>
-                            <p className="text-xs text-muted-foreground">
-                              Suggestions follow your county. You can enter another area or leave it
-                              blank.
-                            </p>
+                            <p className="text-xs text-muted-foreground">Choose an area under the county, type another, or leave it blank.</p>
                           </div>
                           <div className="space-y-2">
                             <Label htmlFor="company-map">Public workplace map pin (optional)</Label>
@@ -1148,10 +1178,23 @@ function WorkplaceStoryComposer() {
                               {body.trim().length} characters (min 60)
                             </p>
                             {!isEditing ? (
-                              <label className="flex w-fit items-center gap-2 py-1 text-sm text-muted-foreground">
-                                <input type="checkbox" checked={anonymous} onChange={(event) => setAnonymous(event.target.checked)} />
-                                Publish this story as Anonymous member
-                              </label>
+                              <div className="border-y border-border/70 py-3">
+                                <button type="button" onClick={() => setAnonymous((value) => !value)} aria-label={anonymous ? "Switch to public identity" : "Switch to anonymous identity"} aria-pressed={anonymous} className="flex items-center gap-3 text-left">
+                                  <span className={cn("relative grid size-11 shrink-0 place-items-center overflow-hidden rounded-full border text-foreground transition-all duration-200", anonymous ? "border-primary/70 bg-primary/10 shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]" : "border-border bg-secondary")}>
+                                    <motion.span key={anonymous ? "anonymous" : "public"} initial={{ opacity: 0, scale: 0.7, rotate: anonymous ? -12 : 12 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} transition={{ duration: 0.2, ease: "easeOut" }} className="absolute inset-0 grid place-items-center">
+                                      {anonymous ? <VenetianMask className="size-5 text-primary" /> : user.photoURL ? <img src={user.photoURL} alt="" className="size-full object-cover" /> : <span className="text-sm font-semibold">{(user.displayName ?? "U").slice(0, 1).toUpperCase()}</span>}
+                                    </motion.span>
+                                    <ChevronDown className={cn("absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-background p-0.5 transition-transform duration-200", anonymous && "rotate-180")} />
+                                  </span>
+                                  <span>
+                                    <span className="block text-sm font-medium">{anonymous ? "Posting anonymously" : "Posting publicly"}</span>
+                                    <span className="block text-xs text-muted-foreground">Tap your photo to switch identity</span>
+                                  </span>
+                                </button>
+                                <p className="mt-2 pl-14 text-xs text-muted-foreground">
+                                  {anonymous ? "Your handle and photo are hidden on this story. Candid can still verify it for safety." : "Your Candid handle appears as the author; your email and legal name stay private."}
+                                </p>
+                              </div>
                             ) : null}
                           </div>
                         </>

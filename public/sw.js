@@ -28,7 +28,6 @@ importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js
 importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-messaging-compat.js");
 
 const fallbackFirebaseConfig = {
-  apiKey: "AIzaSyAfuu1wA9oXJvNV5omY1Wg6RD-ncahsDgg",
   authDomain: "candid-bbef5.firebaseapp.com",
   projectId: "candid-bbef5",
   storageBucket: "candid-bbef5.firebasestorage.app",

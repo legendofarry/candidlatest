@@ -29,6 +29,7 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 - [x] Full-width Candid posts in feed, with no tick or “Update” label; Candid name and avatar open @candid.
 - [x] Three-dot menu on each feed post with report, share, direct follow, and block.
 - [x] Follow menus and public profiles reflect follow-back, unfollow, pending-request, block, and unblock states.
+- [x] Blocking hides both accounts from one another's profile, feed, and search; removes mutual follows and pair interactions; keeps existing chats but makes new messages sender-only and marked not delivered.
 - [x] Mobile feed-post options open in a slide-up action sheet.
 - [x] Reversible “Not interested” options for a single post, an author, or an employer; restore items in Settings.
 - [x] Candid-authored posts render edge to edge without a post card or rounded media card.
@@ -47,6 +48,8 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 - [x] Remove the divider above feed engagement controls.
 - [x] Leaderboard lists show 5 entries to Free users and 10 to Premium users.
 - [x] Story details and mobile comment sheets use one clean, full-width comment surface: no stacked frames, duplicate empty-state copy, or redundant composer divider.
+- [x] Story comment threads display replies as flat, unindented rows, collapsed by default behind a reply toggle; each revealed reply shows its parent handle inline.
+- [x] Story composer location selection is grouped progressively: choose a county, then choose an area or type a custom one; the contributor identity avatar toggles public/anonymous mode for each story and comment.
 - [x] Story voting acts immediately with icon-only active states; reporting is available from the post menu instead of competing with engagement controls.
 - [x] Suppress routine success banners when the updated UI already confirms the result (feed preferences, follows/blocks, conversation preferences, privacy changes, pins, edits, and removals); errors and meaningful completion feedback remain visible.
 

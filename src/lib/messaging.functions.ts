@@ -282,9 +282,9 @@ export const getPublicProfileFollowers = createServerFn({ method: "POST" })
       })
       .parse(input),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     const { readPublicProfileFollowers } = await import("./messaging.server");
-    return readPublicProfileFollowers(data.username, data.cursor);
+    return readPublicProfileFollowers(data.username, data.cursor, context.userId);
   });
 
 /** Small, authenticated lookup used by the @mention picker. */
@@ -307,6 +307,8 @@ export const getMentionSuggestions = createServerFn({ method: "POST" })
     for (const doc of snapshot.docs) {
       if (doc.id === context.userId) continue;
       if (doc.get("banned") === true) continue;
+      const { accountsBlockEachOther } = await import("./block.server");
+      if (await accountsBlockEachOther(context.userId, doc.id)) continue;
       if (["deactivated", "deletion_pending", "deletion_in_progress"].includes(String(doc.get("account_status") ?? "active"))) {
         continue;
       }

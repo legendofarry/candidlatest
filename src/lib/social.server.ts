@@ -1,4 +1,5 @@
 import { getFirestoreDb } from "./firebase.server";
+import { accountsBlockEachOther } from "./block.server";
 
 export type FeedPreferenceKind = "story" | "author" | "company";
 export type FeedPreference = {
@@ -87,6 +88,9 @@ const now = () => new Date().toISOString();
 /** Follows / unfollows another account. Returns the resulting state. */
 export async function toggleAccountFollow(followerId: string, followingId: string) {
   if (followerId === followingId) throw new Error("You cannot follow yourself");
+  if (await accountsBlockEachOther(followerId, followingId)) {
+    throw new Error("You cannot follow an account involved in a block.");
+  }
   const db = getFirestoreDb();
   const id = `${followerId}:${followingId}`;
   const ref = db.collection("follows").doc(id);
@@ -212,6 +216,11 @@ export async function toggleStoryLike(storyId: string, userId: string) {
   const db = getFirestoreDb();
   const ref = db.collection("story_likes").doc(`${storyId}:${userId}`);
   const storyRef = db.collection("stories").doc(storyId);
+  const storyOwner = await storyRef.get();
+  const ownerId = String(storyOwner.get("author_id") ?? "");
+  if (ownerId && await accountsBlockEachOther(userId, ownerId)) {
+    throw new Error("This post is unavailable.");
+  }
   const result = await db.runTransaction(async (transaction) => {
     const [snap, storySnap] = await Promise.all([transaction.get(ref), transaction.get(storyRef)]);
     if (!storySnap.exists || storySnap.get("status") !== "published") {
@@ -270,6 +279,11 @@ export async function toggleStoryFollow(storyId: string, userId: string) {
   const db = getFirestoreDb();
   const ref = db.collection("story_follows").doc(`${storyId}:${userId}`);
   const storyRef = db.collection("stories").doc(storyId);
+  const storyOwner = await storyRef.get();
+  const ownerId = String(storyOwner.get("author_id") ?? "");
+  if (ownerId && await accountsBlockEachOther(userId, ownerId)) {
+    throw new Error("This post is unavailable.");
+  }
   return db.runTransaction(async (transaction) => {
     const [snap, storySnap] = await Promise.all([transaction.get(ref), transaction.get(storyRef)]);
     const existingCount = Math.max(
@@ -300,6 +314,11 @@ export async function toggleStorySave(storyId: string, userId: string) {
   const db = getFirestoreDb();
   const ref = db.collection("story_saves").doc(`${storyId}:${userId}`);
   const storyRef = db.collection("stories").doc(storyId);
+  const storyOwner = await storyRef.get();
+  const ownerId = String(storyOwner.get("author_id") ?? "");
+  if (ownerId && await accountsBlockEachOther(userId, ownerId)) {
+    throw new Error("This post is unavailable.");
+  }
   return db.runTransaction(async (transaction) => {
     const [snap, storySnap] = await Promise.all([transaction.get(ref), transaction.get(storyRef)]);
     if (

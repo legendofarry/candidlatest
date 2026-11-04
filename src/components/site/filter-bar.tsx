@@ -1,13 +1,7 @@
 import { Check, ChevronDown, ListFilter, RotateCcw, Search, X } from "lucide-react";
 import { useState } from "react";
 import { Input } from "@/components/ui/input";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -18,6 +12,23 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+
+const INDUSTRY_QUICK_PICKS = [
+  "Technology",
+  "Information Technology",
+  "Financial Services",
+  "Banking",
+  "Healthcare",
+  "Education",
+  "Manufacturing",
+  "Retail",
+  "Hospitality",
+  "Telecommunications",
+  "Construction",
+  "Agriculture",
+];
+const LOCATION_QUICK_PICKS = ["Nairobi", "Mombasa", "Kiambu", "Kisumu", "Nakuru"];
+const MAX_QUICK_FILTER_OPTIONS = 8;
 
 export type FilterSelect = {
   id: string;
@@ -117,8 +128,17 @@ export function FilterBar({
   collapsibleFilters?: boolean;
 }) {
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [countySearch, setCountySearch] = useState("");
+  const [areaSearch, setAreaSearch] = useState("");
+  const [industrySearch, setIndustrySearch] = useState("");
   const isMobile = useIsMobile();
-  const hasActiveFilter = filters.some((filter) => filter.value !== null);
+  const hasActiveFilter = filters.some((filter) =>
+    filter.required ? filter.value !== (filter.options[0] ?? null) : filter.value !== null,
+  );
+  const sortFilter = filters.find((filter) => filter.id === "sort");
+  const countyFilter = filters.find((filter) => filter.id === "county");
+  const areaFilter = filters.find((filter) => filter.id === "area");
+  const industryFilter = filters.find((filter) => filter.id === "industry");
   const filterOptions = (
     <div className="flex flex-wrap items-center gap-2">
       {filters.map((filter) => (
@@ -155,59 +175,263 @@ export function FilterBar({
     </div>
   );
   const activeFilterCount = filters.filter((filter) => {
-    if (filter.required) return filter.value !== null;
-    return filter.value !== null || filter.value === null;
+    if (filter.required) return filter.value !== (filter.options[0] ?? null);
+    return filter.value !== null;
   }).length;
+  const matchingCounties = (countyFilter?.options ?? []).filter((county) =>
+    county.toLocaleLowerCase().includes(countySearch.trim().toLocaleLowerCase()),
+  );
+  const visibleCounties = [
+    ...(countyFilter?.value ? [countyFilter.value] : []),
+    ...matchingCounties,
+  ]
+    .filter((county, index, options) => options.indexOf(county) === index)
+    .slice(0, MAX_QUICK_FILTER_OPTIONS);
+  const matchingAreas = (areaFilter?.options ?? []).filter((area) =>
+    area.toLocaleLowerCase().includes(areaSearch.trim().toLocaleLowerCase()),
+  );
+  const visibleAreas = [...(areaFilter?.value ? [areaFilter.value] : []), ...matchingAreas]
+    .filter((area, index, options) => options.indexOf(area) === index)
+    .slice(0, MAX_QUICK_FILTER_OPTIONS);
+  const preferredIndustries = INDUSTRY_QUICK_PICKS.flatMap((preferred) =>
+    (industryFilter?.options ?? []).filter(
+      (option) => option.toLocaleLowerCase() === preferred.toLocaleLowerCase(),
+    ),
+  );
+  const visibleIndustries = [
+    ...new Set([
+      ...(industryFilter?.value ? [industryFilter.value] : []),
+      ...(industrySearch ? [] : preferredIndustries),
+      ...(industryFilter?.options ?? []).filter((industry) =>
+        industry.toLocaleLowerCase().includes(industrySearch.trim().toLocaleLowerCase()),
+      ),
+    ]),
+  ].slice(0, MAX_QUICK_FILTER_OPTIONS);
+  const locationIsAll = !countyFilter?.value && !areaFilter?.value;
+  const remoteIsSelected = !countyFilter?.value && areaFilter?.value === "Remote";
+  const selectCounty = (next: string | null) => {
+    countyFilter?.onChange(next);
+    if (next) areaFilter?.onChange(null);
+  };
+  const selectArea = (next: string | null) => areaFilter?.onChange(next);
   const mobileFilterControls = (
-    <div className="w-full space-y-5 pb-2">
-      {filters.map((filter) => {
-        const optionList = filter.required ? filter.options : ["All", ...filter.options];
-        const selectedValue = filter.required ? filter.value : (filter.value ?? "All");
-
-        return (
-          <div key={filter.id} className="space-y-2.5">
-            <div className="flex items-center justify-between">
-              <p className="text-base font-medium text-foreground">{filter.label}</p>
-            </div>
-            <div
-              className={cn("flex flex-wrap gap-2", optionList.length > 3 && "grid grid-cols-2")}
-            >
-              {optionList.map((option) => {
-                const optionLabel = filter.optionLabel?.(option) ?? option;
-                const isSelected =
-                  option === "All" ? filter.value === null : selectedValue === option;
-                const isTogglePill = optionList.some((item) => item === "All");
+    <div className="flex min-h-0 flex-1 flex-col">
+      <div className="min-h-0 flex-1 space-y-6 overflow-y-auto px-5 py-5">
+        {sortFilter ? (
+          <section aria-labelledby="feed-sort-label" className="space-y-3">
+            <h3 id="feed-sort-label" className="text-sm font-semibold">
+              Sort by
+            </h3>
+            <div className="flex rounded-full bg-muted p-1">
+              {sortFilter.options.map((option) => {
+                const selected = sortFilter.value === option;
                 return (
                   <button
-                    key={`${filter.id}-${option}`}
+                    key={option}
                     type="button"
-                    onClick={() => {
-                      const nextValue = option === "All" ? null : option;
-                      filter.onChange(nextValue);
-                    }}
+                    aria-pressed={selected}
+                    onClick={() => sortFilter.onChange(option)}
                     className={cn(
-                      "min-h-10 rounded-full border px-3 text-sm font-medium transition-all duration-200",
-                      isSelected
-                        ? "border-primary bg-primary text-primary-foreground shadow-sm"
-                        : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
-                      isTogglePill && optionList.length > 3 && "justify-self-stretch",
+                      "min-h-10 flex-1 rounded-full px-2 text-xs font-medium transition-colors sm:text-sm",
+                      selected
+                        ? "bg-background text-foreground shadow-sm"
+                        : "text-muted-foreground hover:text-foreground",
                     )}
                   >
-                    {optionLabel}
+                    {sortFilter.optionLabel?.(option) ?? option}
                   </button>
                 );
               })}
             </div>
-          </div>
-        );
-      })}
-      <button
-        type="button"
-        className="mt-2 flex h-12 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground"
-        onClick={() => setFiltersOpen(false)}
-      >
-        Apply ({activeFilterCount})
-      </button>
+          </section>
+        ) : null}
+
+        {countyFilter ? (
+          <section aria-labelledby="feed-location-label" className="space-y-3">
+            <h3 id="feed-location-label" className="text-sm font-semibold">
+              Location
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {[
+                {
+                  label: "All",
+                  selected: locationIsAll,
+                  onSelect: () => {
+                    selectCounty(null);
+                    selectArea(null);
+                  },
+                },
+                ...LOCATION_QUICK_PICKS.map((location) => ({
+                  label: location,
+                  selected: countyFilter.value === location,
+                  onSelect: () => selectCounty(location),
+                })),
+                {
+                  label: "Remote",
+                  selected: remoteIsSelected,
+                  onSelect: () => {
+                    selectCounty(null);
+                    selectArea("Remote");
+                  },
+                },
+              ].map((choice) => (
+                <button
+                  key={choice.label}
+                  type="button"
+                  aria-pressed={choice.selected}
+                  onClick={choice.onSelect}
+                  className={cn(
+                    "min-h-9 rounded-full border px-3 text-sm font-medium transition-colors",
+                    choice.selected
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={countySearch}
+                onChange={(event) => setCountySearch(event.target.value)}
+                placeholder="Search all counties"
+                aria-label="Search all counties"
+                className="h-10 rounded-xl pl-9"
+              />
+            </label>
+            {visibleCounties.length ? (
+              <div className="flex flex-wrap gap-2">
+                {visibleCounties.map((county) => (
+                  <button
+                    key={county}
+                    type="button"
+                    aria-pressed={countyFilter.value === county}
+                    onClick={() => selectCounty(countyFilter.value === county ? null : county)}
+                    className={cn(
+                      "min-h-9 rounded-full border px-3 text-sm transition-colors",
+                      countyFilter.value === county
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                    )}
+                  >
+                    {county}
+                  </button>
+                ))}
+              </div>
+            ) : countySearch ? (
+              <p className="text-sm text-muted-foreground">No counties found.</p>
+            ) : null}
+          </section>
+        ) : null}
+
+        {areaFilter ? (
+          <section aria-labelledby="feed-area-label" className="space-y-3">
+            <h3 id="feed-area-label" className="text-sm font-semibold">
+              Area <span className="font-normal text-muted-foreground">(optional)</span>
+            </h3>
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={areaSearch}
+                onChange={(event) => setAreaSearch(event.target.value)}
+                placeholder="Search areas"
+                aria-label="Search areas"
+                className="h-10 rounded-xl pl-9"
+              />
+            </label>
+            {visibleAreas.length ? (
+              <div className="flex flex-wrap gap-2">
+                {visibleAreas.map((area) => (
+                  <button
+                    key={area}
+                    type="button"
+                    aria-pressed={areaFilter.value === area}
+                    onClick={() => selectArea(areaFilter.value === area ? null : area)}
+                    className={cn(
+                      "min-h-9 rounded-full border px-3 text-sm transition-colors",
+                      areaFilter.value === area
+                        ? "border-primary bg-primary/10 text-foreground"
+                        : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                    )}
+                  >
+                    {area}
+                  </button>
+                ))}
+              </div>
+            ) : areaSearch ? (
+              <p className="text-sm text-muted-foreground">No areas found.</p>
+            ) : null}
+          </section>
+        ) : null}
+
+        {industryFilter ? (
+          <section aria-labelledby="feed-industry-label" className="space-y-3">
+            <h3 id="feed-industry-label" className="text-sm font-semibold">
+              Industry
+            </h3>
+            <label className="relative block">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                type="search"
+                value={industrySearch}
+                onChange={(event) => setIndustrySearch(event.target.value)}
+                placeholder="Search industries"
+                aria-label="Search industries"
+                className="h-10 rounded-xl pl-9"
+              />
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                aria-pressed={industryFilter.value === null}
+                onClick={() => industryFilter.onChange(null)}
+                className={cn(
+                  "min-h-9 rounded-full border px-3 text-sm font-medium transition-colors",
+                  industryFilter.value === null
+                    ? "border-primary bg-primary/10 text-foreground"
+                    : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                )}
+              >
+                All
+              </button>
+              {visibleIndustries.map((industry) => (
+                <button
+                  key={industry}
+                  type="button"
+                  aria-pressed={industryFilter.value === industry}
+                  onClick={() =>
+                    industryFilter.onChange(industryFilter.value === industry ? null : industry)
+                  }
+                  className={cn(
+                    "min-h-9 rounded-full border px-3 text-sm transition-colors",
+                    industryFilter.value === industry
+                      ? "border-primary bg-primary/10 text-foreground"
+                      : "border-border text-muted-foreground hover:border-primary/40 hover:text-foreground",
+                  )}
+                >
+                  {industry}
+                </button>
+              ))}
+            </div>
+            {industrySearch && visibleIndustries.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No industries found.</p>
+            ) : null}
+          </section>
+        ) : null}
+      </div>
+      <div className="shrink-0 border-t border-border bg-background px-5 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+        <button
+          type="button"
+          className="flex h-12 w-full items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground transition-transform active:scale-[0.98]"
+          onClick={() => setFiltersOpen(false)}
+        >
+          Apply Filters
+        </button>
+      </div>
     </div>
   );
 
@@ -269,17 +493,25 @@ export function FilterBar({
       )}
       {collapsibleFilters ? (
         <Drawer open={isMobile && filtersOpen} onOpenChange={setFiltersOpen}>
-          <DrawerContent className="max-h-[82dvh] overflow-y-auto rounded-t-[2rem] border-border bg-background px-5 pb-[max(1rem,env(safe-area-inset-bottom))]">
-            <DrawerHeader className="flex items-center justify-between border-b border-border px-0 pb-4 text-left">
-              <DrawerTitle className="font-display text-[1.8rem] font-semibold">
-                Filters
-              </DrawerTitle>
+          <DrawerContent className="h-[90dvh] max-h-[90dvh] overflow-hidden rounded-t-[2rem] border-border bg-background p-0">
+            <DrawerHeader className="flex shrink-0 flex-row items-center justify-between border-b border-border px-5 pb-4 pt-3 text-left">
+              <div className="flex items-center gap-2.5">
+                <DrawerTitle className="font-display text-xl font-semibold">Filters</DrawerTitle>
+                {activeFilterCount > 0 ? (
+                  <span className="rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
+                    {activeFilterCount} active
+                  </span>
+                ) : null}
+              </div>
               <button
                 type="button"
-                className="text-sm font-medium text-primary"
+                disabled={!canReset}
+                className="text-sm font-medium text-primary disabled:cursor-not-allowed disabled:text-muted-foreground/50"
                 onClick={() => {
                   onReset();
-                  setFiltersOpen(false);
+                  setCountySearch("");
+                  setAreaSearch("");
+                  setIndustrySearch("");
                 }}
               >
                 Reset

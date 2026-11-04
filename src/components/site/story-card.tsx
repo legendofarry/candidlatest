@@ -446,6 +446,12 @@ export function FeedPostMenu({
       void queryClient.invalidateQueries({ queryKey: ["story-pages"] });
       void queryClient.invalidateQueries({ queryKey: ["stories"] });
     } catch (error) {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: relationshipKey }),
+        queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
+      ]);
+      void queryClient.invalidateQueries({ queryKey: ["story-pages"] });
+      void queryClient.invalidateQueries({ queryKey: ["stories"] });
       notify.error(error instanceof Error ? error.message : "Could not block this account.");
     }
   }

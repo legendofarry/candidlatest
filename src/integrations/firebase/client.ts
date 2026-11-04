@@ -3,7 +3,7 @@ import { getAuth } from "firebase/auth";
 import { getDatabase, type Database } from "firebase/database";
 
 export const firebaseConfig = {
-  apiKey: import.meta.env["VITE_FIREBASE_API_KEY"] ?? "AIzaSyAfuu1wA9oXJvNV5omY1Wg6RD-ncahsDgg",
+  apiKey: import.meta.env["VITE_FIREBASE_API_KEY"],
   authDomain: import.meta.env["VITE_FIREBASE_AUTH_DOMAIN"] ?? "candid-bbef5.firebaseapp.com",
   projectId: import.meta.env["VITE_FIREBASE_PROJECT_ID"] ?? "candid-bbef5",
   storageBucket: import.meta.env["VITE_FIREBASE_STORAGE_BUCKET"] ?? "candid-bbef5.firebasestorage.app",

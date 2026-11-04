@@ -260,12 +260,13 @@ export const getCompanySalaries = createServerFn({ method: "GET" })
   });
 
 export const searchAll = createServerFn({ method: "GET" })
+  .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) =>
     z.object({ q: z.string().max(120).default("") }).parse(input ?? {}),
   )
-  .handler(async ({ data }) => {
+  .handler(async ({ data, context }) => {
     try {
-      return await searchData(data.q);
+      return await searchData(data.q, context.userId);
     } catch (error) {
       if (!isFirebaseReadUnavailable(error)) throw error;
       console.warn("[searchAll] Firebase public read unavailable", error);

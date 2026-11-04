@@ -424,7 +424,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const send = useMutation({
     mutationFn: async () =>
       sendMessage({ data: { conversation_id: id, body: draft, image: imageReceipt } }),
-    onSuccess: () => {
+    onSuccess: (sentMessage) => {
+      if (sentMessage.delivery_state === "not_delivered") {
+        queryClient.setQueryData<ConversationView>(conversationQueryKey, (current) => {
+          if (!current || current.messages.some((message) => message.id === sentMessage.id)) return current;
+          return { ...current, messages: [...current.messages, sentMessage] };
+        });
+      }
       setDraft("");
       imageTicketRef.current = null;
       setImageReceipt(null);
@@ -650,6 +656,9 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                       )}
                     >
                       <span>{clock(message.created_at)}</span>
+                      {mine && message.delivery_state === "not_delivered" ? (
+                        <span className="font-medium text-danger">Not delivered</span>
+                      ) : null}
                       {mine &&
                       !message.is_deleted &&
                       clockNow - new Date(message.created_at).getTime() >= 0 &&
@@ -744,6 +753,11 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               : "border-t border-zinc-800 bg-zinc-950 px-3 pb-[calc(0.6rem+env(safe-area-inset-bottom))] pt-2 text-white sm:border-border sm:bg-background/95 sm:px-6 sm:pb-[calc(0.75rem+env(safe-area-inset-bottom))] sm:pt-3 sm:text-foreground sm:backdrop-blur",
           )}
         >
+          {conversation?.blocked_reason ? (
+            <p className="mx-auto mb-2 w-full max-w-2xl px-2 text-xs text-zinc-400 sm:text-center sm:text-muted-foreground">
+              {conversation.blocked_reason}
+            </p>
+          ) : null}
           <div
             className={cn(
               "flex flex-col gap-2",

@@ -13,6 +13,7 @@ import {
   Pencil,
   Send,
   Trash2,
+  VenetianMask,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -82,6 +83,20 @@ function mergeCommentPages(current: ThreadComment[], incoming: ThreadComment[]) 
   return roots;
 }
 
+function flattenVisibleThreads(roots: ThreadComment[], expanded: Set<string>) {
+  const rows: { comment: ThreadComment; replyingTo: ThreadComment | null }[] = [];
+  const visit = (comment: ThreadComment, parent: ThreadComment | null, includeChildren: boolean) => {
+    rows.push({ comment, replyingTo: parent });
+    if (includeChildren) comment.replies.forEach((reply) => visit(reply, comment, true));
+  };
+  roots.forEach((root) => visit(root, null, expanded.has(root.id)));
+  return rows;
+}
+
+function countReplies(comment: ThreadComment): number {
+  return comment.replies.reduce((count, reply) => count + 1 + countReplies(reply), 0);
+}
+
 function timeAgo(value: string) {
   const diff = Math.max(0, Date.now() - new Date(value).getTime());
   const mins = Math.floor(diff / 60000);
@@ -147,6 +162,7 @@ export function CommentThread({
   const [anonymous, setAnonymous] = useState(false);
   const [anonymousTouched, setAnonymousTouched] = useState(false);
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
+  const [expandedThreads, setExpandedThreads] = useState<Set<string>>(() => new Set());
   const {
     visibleCount: visibleRootCount,
     expandBy: expandRootComments,
@@ -239,6 +255,10 @@ export function CommentThread({
       return bScore - aScore || dateOrder(a, b);
     });
   }, [loadedComments, sortMode]);
+  const flatRows = useMemo(
+    () => flattenVisibleThreads(sortedComments.slice(0, visibleRootCount), expandedThreads),
+    [sortedComments, visibleRootCount, expandedThreads],
+  );
 
   useEffect(() => {
     if (!focusCommentId) return;
@@ -311,12 +331,20 @@ export function CommentThread({
           </p>
         ) : null}
         <AnimatePresence initial={false}>
-          {sortedComments.slice(0, visibleRootCount).map((comment) => (
+          {flatRows.map(({ comment, replyingTo }) => (
             <CommentRow
               key={comment.id}
               comment={comment}
+              replyingTo={replyingTo}
+              replyCount={replyingTo ? 0 : countReplies(comment)}
+              repliesOpen={expandedThreads.has(comment.id)}
+              onToggleReplies={() => setExpandedThreads((current) => {
+                const next = new Set(current);
+                if (next.has(comment.id)) next.delete(comment.id);
+                else next.add(comment.id);
+                return next;
+              })}
               storyId={storyId}
-              depth={0}
               liked={liked}
               reported={reported}
               focusCommentId={focusCommentId}
@@ -433,10 +461,19 @@ export function CommentThread({
                 )}
               </Button>
             </div>
-            <label className="mt-2 flex w-fit items-center gap-2 text-xs text-muted-foreground">
-              <input type="checkbox" checked={anonymous} onChange={(event) => { setAnonymous(event.target.checked); setAnonymousTouched(true); }} />
-              Post as Anonymous member
-            </label>
+            <div className="mt-2 flex items-center gap-2">
+              <button type="button" onClick={() => { setAnonymous((value) => !value); setAnonymousTouched(true); }} aria-label={anonymous ? "Switch to public identity" : "Switch to anonymous identity"} aria-pressed={anonymous} className={cn("relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border text-foreground transition-all duration-200", anonymous ? "border-primary/70 bg-primary/10 shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]" : "border-border bg-secondary")}>
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.span key={anonymous ? "anonymous" : "public"} initial={{ opacity: 0, scale: 0.7, rotate: anonymous ? -12 : 12 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} exit={{ opacity: 0, scale: 0.7, rotate: anonymous ? 12 : -12 }} transition={{ duration: 0.18 }} className="absolute inset-0 grid place-items-center">
+                    {anonymous ? <VenetianMask className="size-5 text-primary" /> : user.photoURL ? <ProfileAvatar photoUrl={user.photoURL} initials={(user.displayName ?? "U").slice(0, 1)} className="size-10" /> : <span className="text-sm font-semibold">{(user.displayName ?? "U").slice(0, 1).toUpperCase()}</span>}
+                  </motion.span>
+                </AnimatePresence>
+                <ChevronDown className={cn("absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-background p-0.5 transition-transform duration-200", anonymous && "rotate-180")} />
+              </button>
+              <span className="text-xs text-muted-foreground">
+                {anonymous ? "Commenting anonymously · tap photo to switch" : "Commenting publicly · tap photo to hide"}
+              </span>
+            </div>
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
@@ -458,8 +495,11 @@ function subtreeContains(comment: ThreadComment, id: string): boolean {
 
 function CommentRow({
   comment,
+  replyingTo,
+  replyCount,
+  repliesOpen,
+  onToggleReplies,
   storyId,
-  depth,
   liked,
   reported,
   focusCommentId,
@@ -468,8 +508,11 @@ function CommentRow({
   onDeleted,
 }: {
   comment: ThreadComment;
+  replyingTo: ThreadComment | null;
+  replyCount: number;
+  repliesOpen: boolean;
+  onToggleReplies: () => void;
   storyId: string;
-  depth: number;
   liked: Set<string>;
   reported: Set<string>;
   focusCommentId?: string | undefined;
@@ -481,10 +524,6 @@ function CommentRow({
   const like = useServerFn(likeComment);
   const edit = useServerFn(editComment);
   const remove = useServerFn(deleteComment);
-  const [open, setOpen] = useState(
-    (depth === 0 && comment.replies.some((r) => r.is_official)) ||
-    (focusCommentId ? subtreeContains(comment, focusCommentId) : false),
-  );
   const [reportOpen, setReportOpen] = useState(false);
   const [localLiked, setLocalLiked] = useState<boolean | null>(null);
   const [localLikes, setLocalLikes] = useState(comment.likes);
@@ -492,7 +531,6 @@ function CommentRow({
   const [editing, setEditing] = useState(false);
   const [editedBody, setEditedBody] = useState(comment.body);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const { visibleCount: visibleReplies, expandBy: expandReplies } = useAutoCollapsingCount(10);
 
   useEffect(() => {
     if (!editing) setEditedBody(comment.body);
@@ -549,8 +587,7 @@ function CommentRow({
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0 }}
-      className={cn("px-4 py-3", depth > 0 && "border-l border-border/60 pl-3")}
-      style={{ marginLeft: depth > 0 ? Math.min(depth, 3) * 16 : 0 }}
+      className="px-4 py-3"
     >
       <div className="flex gap-3">
         <ProfileAvatar
@@ -612,6 +649,11 @@ function CommentRow({
             </div>
           ) : (
             <p className="mt-1 whitespace-pre-line text-sm leading-relaxed">
+              {replyingTo ? (
+                <span className="mr-1 font-semibold text-primary">
+                  @{replyingTo.author_username ?? "anonymous"}
+                </span>
+              ) : null}
               <MentionText text={comment.body} />
               {comment.edited_at && !comment.is_deleted ? (
                 <span className="ml-1 text-xs text-muted-foreground"></span>
@@ -628,17 +670,10 @@ function CommentRow({
             >
               Reply
             </button>
-            {comment.replies.length > 0 ? (
-              <button
-                type="button"
-                className="inline-flex items-center gap-1 hover:text-foreground"
-                onClick={() => setOpen((value) => !value)}
-              >
-                <ChevronDown
-                  className={cn("size-3.5 transition-transform", open && "rotate-180")}
-                />
-                {open ? "Hide" : `View ${formatCount(comment.replies.length)}`}{" "}
-                {comment.replies.length === 1 ? "reply" : "replies"}
+            {replyCount > 0 ? (
+              <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={onToggleReplies} aria-expanded={repliesOpen}>
+                <ChevronDown className={cn("size-3.5 transition-transform", repliesOpen && "rotate-180")} />
+                {repliesOpen ? "Hide replies" : `View ${formatCount(replyCount)} ${replyCount === 1 ? "reply" : "replies"}`}
               </button>
             ) : null}
           </div>
@@ -712,38 +747,6 @@ function CommentRow({
           </DropdownMenu>
         </div>
       </div>
-
-      <AnimatePresence initial={false}>
-        {open
-          ? comment.replies
-            .slice(0, visibleReplies)
-            .map((reply) => (
-              <CommentRow
-                key={reply.id}
-                comment={reply}
-                storyId={storyId}
-                depth={depth + 1}
-                liked={liked}
-                reported={reported}
-                focusCommentId={focusCommentId}
-                onReply={onReply}
-                onChanged={onChanged}
-                onDeleted={onDeleted}
-              />
-            ))
-          : null}
-      </AnimatePresence>
-
-      {open && comment.replies.length > visibleReplies ? (
-        <button
-          type="button"
-          className="ml-12 mt-1 text-xs font-medium text-primary"
-          onClick={(event) => expandReplies(10, event.currentTarget)}
-        >
-          Show 10 more replies · {formatCount(Math.min(visibleReplies, comment.replies.length))} of{" "}
-          {formatCount(comment.replies.length)}
-        </button>
-      ) : null}
 
       <ReportDialog
         open={reportOpen}

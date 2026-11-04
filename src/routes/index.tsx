@@ -62,9 +62,9 @@ export const Route = createFileRoute("/")({
 });
 
 const SORTS = [
-  { key: "new", label: "Newest" },
-  { key: "top", label: "Most upvoted" },
-  { key: "trending", label: "Trending this week" },
+  { key: "new", label: "Latest" },
+  { key: "top", label: "Top rated" },
+  { key: "trending", label: "Most discussed" },
 ] as const;
 
 function FeedPage() {
