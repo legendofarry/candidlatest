@@ -112,7 +112,15 @@ type PendingAction =
   | { type: "unarchive"; id: string };
 
 type NotificationFilter =
-  "all" | "unread" | "follows" | "likes" | "comments" | "mentions" | "messages" | "other";
+  | "all"
+  | "unread"
+  | "follows"
+  | "likes"
+  | "comments"
+  | "mentions"
+  | "messages"
+  | "company_updates"
+  | "other";
 
 const notificationFilters: { id: NotificationFilter; label: string }[] = [
   { id: "all", label: "All notifications" },
@@ -122,6 +130,7 @@ const notificationFilters: { id: NotificationFilter; label: string }[] = [
   { id: "comments", label: "Comments and replies" },
   { id: "mentions", label: "Mentions" },
   { id: "messages", label: "Message reactions" },
+  { id: "company_updates", label: "Company updates" },
   { id: "other", label: "Other" },
 ];
 
@@ -154,6 +163,7 @@ function matchesNotificationFilter(notification: AppNotification, filter: Notifi
   if (filter === "comments") return activity === "comment" || activity === "reply";
   if (filter === "mentions") return activity === "mention";
   if (filter === "messages") return activity === "message_reaction";
+  if (filter === "company_updates") return activity === "company_story";
   return activity === "other";
 }
 
@@ -204,6 +214,9 @@ export function NotificationsOverlay() {
   const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
 
   const unread = all.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0);
+  const companyWatchSyncError = serverPages.data?.pages.find(
+    (page) => page.companyWatchSyncError,
+  )?.companyWatchSyncError;
   const selectedNotifications = matchingNotifications.filter((n) => selectedIds.has(n.id));
   const selectedCount = selectedIds.size;
 
@@ -351,105 +364,119 @@ export function NotificationsOverlay() {
   }
 
   function renderNotificationList() {
-    return matchingNotifications.length === 0 ? (
-      <div className="border-y border-border bg-background px-4 py-12 text-center sm:px-6">
-        <Bell className="mx-auto size-6 text-muted-foreground" />
-        <p className="mt-3 text-sm font-medium text-foreground">
-          {search.trim()
-            ? "No notifications match your search"
-            : tab === "archive"
-              ? "Archive is empty"
-              : "No new notifications"}
-        </p>
-        <p className="mt-1 text-xs text-muted-foreground">
-          {search.trim()
-            ? "Try another word or phrase."
-            : tab === "archive"
-              ? "Archived notifications will show up here."
-              : "Fresh activity will appear here as it happens."}
-        </p>
-        {serverPages.hasNextPage ? (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={serverPages.isFetchingNextPage}
-            className="mt-4"
-            onClick={() => void serverPages.fetchNextPage()}
-          >
-            {serverPages.isFetchingNextPage ? "Loading notifications…" : "Load more notifications"}
-          </Button>
-        ) : null}
-      </div>
-    ) : (
+    return (
       <div className="space-y-3">
-        {pullDistance > 0 || isRefreshing ? (
-          <div
-            className="flex items-center justify-center py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
-            style={{ transform: `translateY(${Math.min(pullDistance * 0.35, 18)}px)` }}
+        {companyWatchSyncError ? (
+          <p
+            role="status"
+            className="mx-4 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-muted-foreground sm:mx-6"
           >
-            <span className={cn("flex items-center gap-2", isRefreshing && "text-primary")}>
-              {isRefreshing ? (
-                <Bell className="size-3.5 animate-spin" />
-              ) : (
-                <Bell className="size-3.5" />
-              )}
-              {isRefreshing
-                ? "Refreshing"
-                : pullDistance >= 72
-                  ? "Release to refresh"
-                  : "Pull to refresh"}
-            </span>
-          </div>
+            {companyWatchSyncError}
+          </p>
         ) : null}
-        <Group
-          label="Today"
-          items={groups.today}
-          onActivate={activate}
-          onOpenActions={setNotificationActionId}
-          onRequest={setPending}
-          selectionMode={selectionMode}
-          selectedIds={selectedIds}
-          onToggleSelected={toggleSelected}
-        />
-        <Group
-          label="Earlier"
-          items={groups.earlier}
-          onActivate={activate}
-          onOpenActions={setNotificationActionId}
-          onRequest={setPending}
-          selectionMode={selectionMode}
-          selectedIds={selectedIds}
-          onToggleSelected={toggleSelected}
-        />
-        {matchingNotifications.length > visibleCount || serverPages.hasNextPage ? (
-          <div className="flex flex-col items-center gap-2 pt-1">
-            <p className="text-xs text-muted-foreground">
-              Showing {formatCount(Math.min(visibleCount, matchingNotifications.length))} of{" "}
-              {formatCount(matchingNotifications.length)} notifications
+        {matchingNotifications.length === 0 ? (
+          <div className="border-y border-border bg-background px-4 py-12 text-center sm:px-6">
+            <Bell className="mx-auto size-6 text-muted-foreground" />
+            <p className="mt-3 text-sm font-medium text-foreground">
+              {search.trim()
+                ? "No notifications match your search"
+                : tab === "archive"
+                  ? "Archive is empty"
+                  : "No new notifications"}
             </p>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={serverPages.isFetchingNextPage}
-              onClick={(event) => {
-                if (visibleCount < matchingNotifications.length) {
-                  expandBy(20, event.currentTarget);
-                } else if (serverPages.hasNextPage) {
-                  const anchor = event.currentTarget;
-                  void serverPages.fetchNextPage().then((result) => {
-                    if (result.isSuccess) expandBy(20, anchor);
-                  });
-                }
-              }}
-            >
-              {serverPages.isFetchingNextPage
-                ? "Loading notifications…"
-                : visibleCount < matchingNotifications.length
-                  ? "Show 20 more"
-                  : "Load next 20 notifications"}
-            </Button>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {search.trim()
+                ? "Try another word or phrase."
+                : tab === "archive"
+                  ? "Archived notifications will show up here."
+                  : "Fresh activity will appear here as it happens."}
+            </p>
+            {serverPages.hasNextPage ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={serverPages.isFetchingNextPage}
+                className="mt-4"
+                onClick={() => void serverPages.fetchNextPage()}
+              >
+                {serverPages.isFetchingNextPage
+                  ? "Loading notifications…"
+                  : "Load more notifications"}
+              </Button>
+            ) : null}
           </div>
-        ) : null}
+        ) : (
+          <div className="space-y-3">
+            {pullDistance > 0 || isRefreshing ? (
+              <div
+                className="flex items-center justify-center py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground"
+                style={{ transform: `translateY(${Math.min(pullDistance * 0.35, 18)}px)` }}
+              >
+                <span className={cn("flex items-center gap-2", isRefreshing && "text-primary")}>
+                  {isRefreshing ? (
+                    <Bell className="size-3.5 animate-spin" />
+                  ) : (
+                    <Bell className="size-3.5" />
+                  )}
+                  {isRefreshing
+                    ? "Refreshing"
+                    : pullDistance >= 72
+                      ? "Release to refresh"
+                      : "Pull to refresh"}
+                </span>
+              </div>
+            ) : null}
+            <Group
+              label="Today"
+              items={groups.today}
+              onActivate={activate}
+              onOpenActions={setNotificationActionId}
+              onRequest={setPending}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleSelected={toggleSelected}
+            />
+            <Group
+              label="Earlier"
+              items={groups.earlier}
+              onActivate={activate}
+              onOpenActions={setNotificationActionId}
+              onRequest={setPending}
+              selectionMode={selectionMode}
+              selectedIds={selectedIds}
+              onToggleSelected={toggleSelected}
+            />
+            {matchingNotifications.length > visibleCount || serverPages.hasNextPage ? (
+              <div className="flex flex-col items-center gap-2 pt-1">
+                <p className="text-xs text-muted-foreground">
+                  Showing {formatCount(Math.min(visibleCount, matchingNotifications.length))} of{" "}
+                  {formatCount(matchingNotifications.length)} notifications
+                </p>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={serverPages.isFetchingNextPage}
+                  onClick={(event) => {
+                    if (visibleCount < matchingNotifications.length) {
+                      expandBy(20, event.currentTarget);
+                    } else if (serverPages.hasNextPage) {
+                      const anchor = event.currentTarget;
+                      void serverPages.fetchNextPage().then((result) => {
+                        if (result.isSuccess) expandBy(20, anchor);
+                      });
+                    }
+                  }}
+                >
+                  {serverPages.isFetchingNextPage
+                    ? "Loading notifications…"
+                    : visibleCount < matchingNotifications.length
+                      ? "Show 20 more"
+                      : "Load next 20 notifications"}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        )}
       </div>
     );
   }

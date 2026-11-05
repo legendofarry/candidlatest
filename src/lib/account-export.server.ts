@@ -12,7 +12,10 @@ export async function buildAccountExport(userId: string) {
   const profileSnapshot = await db.collection("profiles").doc(userId).get();
   if (!profileSnapshot.exists) throw new Error("Your account profile could not be found.");
   const profile = profileSnapshot.data() ?? {};
-  const conversations = await db.collection("conversations").where("participant_ids", "array-contains", userId).get();
+  const conversations = await db
+    .collection("conversations")
+    .where("participant_ids", "array-contains", userId)
+    .get();
   const conversationRows = conversations.docs.map((doc) => {
     const row = doc.data();
     return {
@@ -23,26 +26,46 @@ export async function buildAccountExport(userId: string) {
       preferences: row.preferences?.[userId] ?? {},
     };
   });
-  const messages = (await Promise.all(conversationRows.map(async (conversation) => {
-    const rows = await db.collection("messages").where("conversation_id", "==", conversation.id).get();
-    return rows.docs.map((doc) => {
-      const row = doc.data();
-      return {
-        id: doc.id,
-        conversation_id: conversation.id,
-        sender_id: row.sender_id,
-        body: row.body,
-        created_at: row.created_at,
-        read_at: row.sender_id === userId ? row.read_at : null,
-        image: row.image ? { public_id: row.image.public_id, format: row.image.format, bytes: row.image.bytes } : null,
-        reactions: row.reactions ?? {},
-        is_deleted: row.is_deleted === true,
-      };
-    });
-  }))).flat();
+  const messages = (
+    await Promise.all(
+      conversationRows.map(async (conversation) => {
+        const rows = await db
+          .collection("messages")
+          .where("conversation_id", "==", conversation.id)
+          .get();
+        return rows.docs.map((doc) => {
+          const row = doc.data();
+          return {
+            id: doc.id,
+            conversation_id: conversation.id,
+            sender_id: row.sender_id,
+            body: row.body,
+            created_at: row.created_at,
+            read_at: row.sender_id === userId ? row.read_at : null,
+            image: row.image
+              ? { public_id: row.image.public_id, format: row.image.format, bytes: row.image.bytes }
+              : null,
+            reactions: row.reactions ?? {},
+            is_deleted: row.is_deleted === true,
+          };
+        });
+      }),
+    )
+  ).flat();
 
-  const [stories, comments, followsIn, followsOut, salaryReports, companyRatings, notifications,
-    storyLikes, commentLikes, savedStories] = await Promise.all([
+  const [
+    stories,
+    comments,
+    followsIn,
+    followsOut,
+    salaryReports,
+    companyRatings,
+    notifications,
+    storyLikes,
+    commentLikes,
+    savedStories,
+    companyWatches,
+  ] = await Promise.all([
     collectOwned("stories", "author_id", userId),
     collectOwned("comments", "author_id", userId),
     collectOwned("follows", "following_id", userId),
@@ -53,21 +76,43 @@ export async function buildAccountExport(userId: string) {
     collectOwned("story_likes", "user_id", userId),
     collectOwned("comment_likes", "user_id", userId),
     collectOwned("story_saves", "user_id", userId),
+    collectOwned("company_watches", "user_id", userId),
   ]);
 
-  const safeProfile = Object.fromEntries([
-    "id", "handle", "username", "display_name", "bio", "photo_url", "cover_photo_url",
-    "county", "area", "industry", "created_at", "profile_visibility", "account_status",
-    "subscription_tier", "subscription_status", "subscription_started_at", "subscription_period_ends_at",
-  ].filter((key) => profile[key] !== undefined).map((key) => [key, profile[key]]));
+  const safeProfile = Object.fromEntries(
+    [
+      "id",
+      "handle",
+      "username",
+      "display_name",
+      "bio",
+      "photo_url",
+      "cover_photo_url",
+      "county",
+      "area",
+      "industry",
+      "created_at",
+      "profile_visibility",
+      "account_status",
+      "subscription_tier",
+      "subscription_status",
+      "subscription_started_at",
+      "subscription_period_ends_at",
+    ]
+      .filter((key) => profile[key] !== undefined)
+      .map((key) => [key, profile[key]]),
+  );
 
   return {
     schema_version: 1,
     exported_at: new Date().toISOString(),
-    notice: "This export includes your Candid profile and contributions. It excludes passwords, login credentials, private employment evidence, internal moderation records, and other members’ private profile data.",
+    notice:
+      "This export includes your Candid profile, contributions, and watched companies. It excludes passwords, login credentials, private employment evidence, internal moderation records, and other members’ private profile data.",
     profile: safeProfile,
     privacy_settings: (await db.collection("privacy_settings").doc(userId).get()).data() ?? {},
-    stories: stories.map(({ evidence_status: _evidenceStatus, moderation_note: _moderationNote, ...story }) => story),
+    stories: stories.map(
+      ({ evidence_status: _evidenceStatus, moderation_note: _moderationNote, ...story }) => story,
+    ),
     comments,
     followers: followsIn,
     following: followsOut,
@@ -77,6 +122,7 @@ export async function buildAccountExport(userId: string) {
     story_likes: storyLikes,
     comment_likes: commentLikes,
     saved_stories: savedStories,
+    watched_companies: companyWatches,
     conversations: conversationRows,
     messages,
   };

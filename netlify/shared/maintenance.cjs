@@ -134,6 +134,7 @@ async function purgeAccount(userId) {
     ["votes", "user_id", "==", userId],
     ["comment_likes", "user_id", "==", userId],
     ["story_saves", "user_id", "==", userId],
+    ["company_watches", "user_id", "==", userId],
     ["employment_evidence", "user_id", "==", userId],
     ["employment_evidence_uploads", "user_id", "==", userId],
     ["payment_proof_uploads", "user_id", "==", userId],

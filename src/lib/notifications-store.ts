@@ -12,6 +12,7 @@ export type NotificationActivityType =
   | "comment_like"
   | "mention"
   | "message_reaction"
+  | "company_story"
   | "other";
 
 /** Where a notification should take the user when it is actionable. */

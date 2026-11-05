@@ -7,6 +7,7 @@ import { ScoreBadge } from "@/routes/companies.index";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CompanyIntelPanel } from "@/components/site/company-intel";
+import { CompanyWatchButton } from "@/components/site/company-watch-button";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { formatCount } from "@/lib/utils";
 
@@ -127,16 +128,24 @@ function CompanyPage() {
             </p>
             {profile?.descriptor ? <p className="mt-3 max-w-4xl">{profile.descriptor}</p> : null}
           </div>
-          <div className="text-right">
-            <ScoreBadge value={score?.overall ?? null} />
-            <p className="mt-2 text-xs text-muted-foreground">
-              {formatCount(score?.story_count)} stories · {formatCount(score?.rating_count)} ratings
-            </p>
-            {score?.would_work_again_pct !== null && score?.would_work_again_pct !== undefined ? (
-              <p className="text-xs text-verified">
-                {Math.round(Number(score.would_work_again_pct))}% would work here again
+          <div className="flex flex-col items-start gap-3 sm:items-end">
+            <div className="text-left sm:text-right">
+              <ScoreBadge value={score?.overall ?? null} />
+              <p className="mt-2 text-xs text-muted-foreground">
+                {formatCount(score?.story_count)} stories · {formatCount(score?.rating_count)}{" "}
+                ratings
               </p>
-            ) : null}
+              {score?.would_work_again_pct !== null && score?.would_work_again_pct !== undefined ? (
+                <p className="text-xs text-verified">
+                  {Math.round(Number(score.would_work_again_pct))}% would work here again
+                </p>
+              ) : null}
+            </div>
+            <CompanyWatchButton
+              companyId={company.id}
+              companySlug={company.slug}
+              companyName={company.name}
+            />
           </div>
         </div>
       </section>

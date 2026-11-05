@@ -184,6 +184,22 @@ export const Route = createFileRoute("/api/public/owner/actions")({
             }
             if (input.status === "published" && typeof story["company_id"] === "string") {
               try {
+                const { recordCompanyWatchEvent } = await import("@/lib/company-watch.server");
+                await recordCompanyWatchEvent({
+                  storyId: input.id,
+                  companyId: story["company_id"],
+                  companyName:
+                    typeof story["company_name"] === "string" ? story["company_name"] : "a company",
+                  companySlug:
+                    typeof story["company_slug"] === "string" ? story["company_slug"] : "",
+                  storyTitle: typeof story["title"] === "string" ? story["title"] : "New story",
+                  authorId: typeof story["author_id"] === "string" ? story["author_id"] : null,
+                  publishedAt: timestamp,
+                });
+              } catch (error) {
+                console.error("Could not record company watch event for approved story", error);
+              }
+              try {
                 const [{ pushServerNotification }, companyOwners] = await Promise.all([
                   import("@/lib/notifications.server"),
                   db

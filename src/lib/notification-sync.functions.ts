@@ -14,9 +14,21 @@ export const syncMyNotifications = createServerFn({ method: "POST" })
       .parse(input ?? {}),
   )
   .handler(async ({ context, data }) => {
-    const { listServerNotifications } = await import("./notifications.server");
+    const [{ listServerNotifications }, { syncCompanyWatchNotifications }] = await Promise.all([
+      import("./notifications.server"),
+      import("./company-watch.server"),
+    ]);
+    let companyWatchSyncError: string | null = null;
+    try {
+      await syncCompanyWatchNotifications(context.userId);
+    } catch (error) {
+      console.error("[syncMyNotifications] company watch notifications failed", error);
+      companyWatchSyncError =
+        "Company Watch alerts could not be refreshed. Pull down to try again.";
+    }
     const page = await listServerNotifications(context.userId, data.limit, data.cursor);
     return {
+      companyWatchSyncError,
       items: page.items.map((item) => ({
         id: item.id,
         category: item.category ?? "activity",

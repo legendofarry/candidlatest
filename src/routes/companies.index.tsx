@@ -3,6 +3,7 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import {
   ArrowUpRight,
+  Bell,
   Building2,
   Check,
   ListFilter,
@@ -113,14 +114,25 @@ function CompaniesPage() {
             Every employer Kenyans have tagged here, with culture scores from member ratings and
             AI-researched background.
           </p>
-          <Button
-            asChild
-            className="mt-5 h-12 w-full rounded-full bg-lime-300 text-slate-950 shadow-none hover:bg-lime-200"
-          >
-            <Link to="/compare">
-              <Scale className="size-4" /> Compare employers
-            </Link>
-          </Button>
+          <div className="mt-5 grid grid-cols-2 gap-2">
+            <Button
+              asChild
+              className="h-12 rounded-full bg-lime-300 text-slate-950 shadow-none hover:bg-lime-200"
+            >
+              <Link to="/compare">
+                <Scale className="size-4" /> Compare
+              </Link>
+            </Button>
+            <Button
+              asChild
+              variant="outline"
+              className="h-12 rounded-full border-white/30 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+            >
+              <Link to="/companies/watched">
+                <Bell className="size-4" /> Watched
+              </Link>
+            </Button>
+          </div>
         </section>
 
         <div className="mt-4">
@@ -277,11 +289,18 @@ function CompaniesPage() {
                 AI-researched background.
               </p>
             </div>
-            <Button asChild variant="outline" className="shrink-0">
-              <Link to="/compare">
-                <Scale className="size-4" /> Compare employers
-              </Link>
-            </Button>
+            <div className="flex shrink-0 gap-2">
+              <Button asChild variant="outline">
+                <Link to="/companies/watched">
+                  <Bell className="size-4" /> Watched
+                </Link>
+              </Button>
+              <Button asChild variant="outline">
+                <Link to="/compare">
+                  <Scale className="size-4" /> Compare employers
+                </Link>
+              </Button>
+            </div>
           </div>
         </header>
 

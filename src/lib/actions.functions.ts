@@ -451,6 +451,20 @@ export const createStory = createServerFn({ method: "POST" })
     // Tell the company's claimed account it was tagged in a new live story.
     if (created.status === "published") {
       try {
+        const { recordCompanyWatchEvent } = await import("./company-watch.server");
+        await recordCompanyWatchEvent({
+          storyId: created.id,
+          companyId: company.id,
+          companyName: company.name,
+          companySlug: company.slug,
+          storyTitle: created.title,
+          authorId: created.author_id,
+          publishedAt: created.created_at,
+        });
+      } catch (error) {
+        console.error("[createStory] company watch event could not be recorded", error);
+      }
+      try {
         const [{ pushServerNotification, resolveMentionedUserIds }, owners, actorSnap] =
           await Promise.all([
             import("./notifications.server"),
@@ -459,18 +473,22 @@ export const createStory = createServerFn({ method: "POST" })
           ]);
         const actorProfile = actorSnap.data() as
           { username?: string | null; photo_url?: string | null } | undefined;
-        const actor = data.is_anonymous ? undefined : {
-          id: context.userId,
-          username: actorProfile?.username ?? null,
-          photoUrl: actorProfile?.photo_url ?? null,
-        };
+        const actor = data.is_anonymous
+          ? undefined
+          : {
+              id: context.userId,
+              username: actorProfile?.username ?? null,
+              photoUrl: actorProfile?.photo_url ?? null,
+            };
         if (!owners.empty) {
           await Promise.all(
             owners.docs.map((doc) =>
               pushServerNotification({
                 userId: doc.id,
                 kind: "info",
-                title: data.is_anonymous ? `An anonymous member shared a story about ${company.name}` : `${company.name} was tagged in a new story`,
+                title: data.is_anonymous
+                  ? `An anonymous member shared a story about ${company.name}`
+                  : `${company.name} was tagged in a new story`,
                 description: `“${created.title}”`,
                 link: `/stories/${created.id}`,
                 actor: actor ?? null,
@@ -696,7 +714,7 @@ export const castVote = createServerFn({ method: "POST" })
     const field = data.kind === "up" ? "upvotes" : "metoo";
     const storyOwner = await storyRef.get();
     const ownerId = String(storyOwner.get("author_id") ?? "");
-    if (ownerId && await accountsBlockEachOther(context.userId, ownerId)) {
+    if (ownerId && (await accountsBlockEachOther(context.userId, ownerId))) {
       throw new Error("This post is unavailable.");
     }
     return db.runTransaction(async (transaction) => {
@@ -749,7 +767,7 @@ export const addComment = createServerFn({ method: "POST" })
     if (!currentStory || currentStory["status"] !== "published")
       throw new Error("Story not found.");
     const storyAuthorId = String(currentStory["author_id"] ?? "");
-    if (storyAuthorId && await accountsBlockEachOther(context.userId, storyAuthorId)) {
+    if (storyAuthorId && (await accountsBlockEachOther(context.userId, storyAuthorId))) {
       throw new Error("This post is unavailable.");
     }
     const parentCommentSnap = data.parent_id
@@ -766,7 +784,7 @@ export const addComment = createServerFn({ method: "POST" })
       throw new Error("That comment is no longer available to reply to.");
     }
     const parentAuthorId = String(parentComment?.["author_id"] ?? "");
-    if (parentAuthorId && await accountsBlockEachOther(context.userId, parentAuthorId)) {
+    if (parentAuthorId && (await accountsBlockEachOther(context.userId, parentAuthorId))) {
       throw new Error("This comment is unavailable.");
     }
 
@@ -794,9 +812,9 @@ export const addComment = createServerFn({ method: "POST" })
       ...data,
       author_id: context.userId,
       is_anonymous: data.is_anonymous,
-      author_handle: data.is_anonymous ? "Anonymous member" : profile?.handle ?? "Candid member",
-      author_username: data.is_anonymous ? null : profile?.username ?? null,
-      author_photo_url: data.is_anonymous ? null : profile?.photo_url ?? null,
+      author_handle: data.is_anonymous ? "Anonymous member" : (profile?.handle ?? "Candid member"),
+      author_username: data.is_anonymous ? null : (profile?.username ?? null),
+      author_photo_url: data.is_anonymous ? null : (profile?.photo_url ?? null),
       author_membership_tier: getEffectiveMembershipTier(profile),
       author_verified: !data.is_anonymous && verification?.badge_status === "claimed",
       is_official: !data.is_anonymous && isOfficial,
@@ -814,12 +832,18 @@ export const addComment = createServerFn({ method: "POST" })
     try {
       const { pushServerNotification, resolveMentionedUserIds } =
         await import("./notifications.server");
-      const authorName = data.is_anonymous ? "An anonymous member" : profile?.username ? `@${profile.username}` : "Someone";
-      const actor = data.is_anonymous ? undefined : {
-        id: context.userId,
-        username: profile?.username ?? null,
-        photoUrl: profile?.photo_url ?? null,
-      };
+      const authorName = data.is_anonymous
+        ? "An anonymous member"
+        : profile?.username
+          ? `@${profile.username}`
+          : "Someone";
+      const actor = data.is_anonymous
+        ? undefined
+        : {
+            id: context.userId,
+            username: profile?.username ?? null,
+            photoUrl: profile?.photo_url ?? null,
+          };
       const storyTitle =
         typeof currentStory?.["title"] === "string" ? currentStory["title"] : "a story";
       const targets = new Map<
@@ -897,7 +921,7 @@ export const likeComment = createServerFn({ method: "POST" })
     const comment = commentSnap.data() as
       { likes?: number; author_id?: string | null; story_id?: string; body?: string } | undefined;
     const current = Number(comment?.likes ?? 0);
-    if (comment?.author_id && await accountsBlockEachOther(context.userId, comment.author_id)) {
+    if (comment?.author_id && (await accountsBlockEachOther(context.userId, comment.author_id))) {
       throw new Error("This comment is unavailable.");
     }
 

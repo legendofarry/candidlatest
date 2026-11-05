@@ -33,6 +33,7 @@ import { Route as VerifyEmailRouteImport } from './routes/verify-email'
 import { Route as BillingCheckoutRouteImport } from './routes/billing.checkout'
 import { Route as CompaniesIndexRouteImport } from './routes/companies.index'
 import { Route as CompaniesSlugRouteImport } from './routes/companies.$slug'
+import { Route as CompaniesWatchedRouteImport } from './routes/companies.watched'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as MessagesIdRouteImport } from './routes/messages.$id'
 import { Route as SalariesIndexRouteImport } from './routes/salaries.index'
@@ -169,6 +170,11 @@ const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
   path: '/companies/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CompaniesWatchedRoute = CompaniesWatchedRouteImport.update({
+  id: '/companies/watched',
+  path: '/companies/watched',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const MessagesIndexRoute = MessagesIndexRouteImport.update({
   id: '/messages/',
   path: '/messages/',
@@ -269,6 +275,7 @@ export interface FileRoutesByFullPath {
   '/verify-email': typeof VerifyEmailRoute
   '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/companies/watched': typeof CompaniesWatchedRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
@@ -309,6 +316,7 @@ export interface FileRoutesByTo {
   '/verify-email': typeof VerifyEmailRoute
   '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/companies/watched': typeof CompaniesWatchedRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
@@ -351,6 +359,7 @@ export interface FileRoutesById {
   '/verify-email': typeof VerifyEmailRoute
   '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
+  '/companies/watched': typeof CompaniesWatchedRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
@@ -394,6 +403,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/billing/checkout'
     | '/companies/$slug'
+    | '/companies/watched'
     | '/messages/$id'
     | '/salaries/$slug'
     | '/stories/$id'
@@ -434,6 +444,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/billing/checkout'
     | '/companies/$slug'
+    | '/companies/watched'
     | '/messages/$id'
     | '/salaries/$slug'
     | '/stories/$id'
@@ -475,6 +486,7 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/billing/checkout'
     | '/companies/$slug'
+    | '/companies/watched'
     | '/messages/$id'
     | '/salaries/$slug'
     | '/stories/$id'
@@ -516,6 +528,7 @@ export interface RootRouteChildren {
   SupportRoute: typeof SupportRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
+  CompaniesWatchedRoute: typeof CompaniesWatchedRoute
   MessagesIdRoute: typeof MessagesIdRoute
   StoriesIdRoute: typeof StoriesIdRoute
   UUsernameRoute: typeof UUsernameRoute
@@ -702,6 +715,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CompaniesSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/companies/watched': {
+      id: '/companies/watched'
+      path: '/companies/watched'
+      fullPath: '/companies/watched'
+      preLoaderRoute: typeof CompaniesWatchedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/messages/': {
       id: '/messages/'
       path: '/messages'
@@ -858,6 +878,7 @@ const rootRouteChildren: RootRouteChildren = {
   SupportRoute: SupportRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
+  CompaniesWatchedRoute: CompaniesWatchedRoute,
   MessagesIdRoute: MessagesIdRoute,
   StoriesIdRoute: StoriesIdRoute,
   UUsernameRoute: UUsernameRoute,
