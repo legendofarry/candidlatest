@@ -231,7 +231,7 @@ function MyContributionsPage() {
         : (counts?.stories ?? 0) + (counts?.comments ?? 0);
 
   return (
-    <main className="min-h-dvh bg-[#f5f6f1] pb-28 md:bg-background md:pb-12">
+    <main className="min-h-dvh bg-background pb-28 md:pb-12">
       <FloatingBackButton
         onClick={() => void navigate({ to: "/profile" })}
         className="hidden md:inline-flex"
@@ -325,11 +325,7 @@ function MyContributionsPage() {
                   ))}
                 </div>
               </div>
-              <Button
-                asChild
-                size="sm"
-                className="rounded-full bg-[#09170e] px-4 text-white hover:bg-[#14251a]"
-              >
+              <Button asChild size="sm" className="rounded-full">
                 <Link to="/billing">{maxPinnedStories === 0 ? "Manage" : "Manage"}</Link>
               </Button>
             </div>
@@ -355,9 +351,9 @@ function MyContributionsPage() {
         ) : null}
 
         <section className="w-full min-w-0">
-          <div className="sticky top-16 z-30 space-y-3 bg-[#f5f6f1]/95 px-0 py-2 backdrop-blur-md sm:top-16 sm:px-6 sm:py-4 md:border-y md:border-border md:bg-background/95 md:px-8">
+          <div className="sticky top-16 z-30 space-y-3 bg-background/95 px-0 py-2 backdrop-blur-md sm:top-16 sm:px-6 sm:py-4 md:border-y md:border-border md:px-8">
             <div className="flex flex-col gap-3">
-              <div className="grid w-full grid-cols-3 rounded-full bg-[#eceee7] p-1 md:hidden">
+              <div className="grid w-full grid-cols-3 rounded-full bg-secondary p-1 md:hidden">
                 {(["all", "stories", "comments"] as const).map((item) => (
                   <button
                     key={item}
@@ -367,7 +363,7 @@ function MyContributionsPage() {
                     className={cn(
                       "min-h-9 rounded-full px-2 text-sm font-medium capitalize transition-colors",
                       category === item
-                        ? "bg-white text-foreground shadow-sm"
+                        ? "bg-card text-foreground shadow-sm"
                         : "text-muted-foreground",
                     )}
                   >
@@ -417,7 +413,7 @@ function MyContributionsPage() {
                   className={cn(
                     "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors md:border",
                     status === value
-                      ? "bg-[#09170e] text-white md:border-primary/35 md:bg-primary/10 md:text-foreground"
+                      ? "bg-primary text-primary-foreground md:border-primary/35 md:bg-primary/10 md:text-foreground"
                       : "bg-card text-muted-foreground md:border-border md:bg-transparent hover:bg-secondary",
                   )}
                 >
@@ -784,7 +780,9 @@ function ContributionRow({
           <span
             className={cn(
               "flex size-10 shrink-0 items-center justify-center rounded-full",
-              isStory ? "bg-lime-100 text-[#263716]" : "bg-[#d0f3f2] text-[#122d2d]",
+              isStory
+                ? "bg-primary/15 text-primary"
+                : "bg-sky-500/15 text-sky-700 dark:text-sky-300",
             )}
           >
             {isStory ? <PenLine className="size-5" /> : <MessageSquareText className="size-5" />}
@@ -850,7 +848,7 @@ function ContributionRow({
                 asChild
                 size="sm"
                 variant="secondary"
-                className="min-h-10 flex-1 rounded-full bg-[#eceee7] text-foreground hover:bg-[#e2e5dc]"
+                className="min-h-10 flex-1 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
               >
                 <Link
                   to={href}
@@ -866,22 +864,14 @@ function ContributionRow({
               </span>
             )}
             {isStory && canEdit ? (
-              <Button
-                asChild
-                size="sm"
-                className="min-h-10 flex-1 rounded-full bg-[#09170e] text-white hover:bg-[#14251a]"
-              >
+              <Button asChild size="sm" className="min-h-10 flex-1 rounded-full">
                 <Link to="/post" search={{ edit: item.id }}>
                   <PenLine className="size-4" /> Edit
                 </Link>
               </Button>
             ) : null}
             {!isStory && canEdit ? (
-              <Button
-                size="sm"
-                className="min-h-10 flex-1 rounded-full bg-[#09170e] text-white hover:bg-[#14251a]"
-                onClick={onEdit}
-              >
+              <Button size="sm" className="min-h-10 flex-1 rounded-full" onClick={onEdit}>
                 <PenLine className="size-4" /> Edit
               </Button>
             ) : null}
@@ -903,7 +893,7 @@ function ContributionRow({
                   variant="secondary"
                   className={cn(
                     "size-10 shrink-0 rounded-full",
-                    isPinned ? "bg-lime-100 text-[#263716]" : "bg-secondary",
+                    isPinned ? "bg-primary/15 text-primary" : "bg-secondary",
                   )}
                   disabled={pinning || pinLimitReached}
                   onClick={onTogglePin}
@@ -925,7 +915,7 @@ function ContributionRow({
                 size="icon"
                 variant="ghost"
                 aria-label={`Remove ${isStory ? "story" : "comment"}`}
-                className="size-10 shrink-0 rounded-full bg-rose-100 text-rose-600 hover:bg-rose-200 hover:text-rose-700"
+                className="size-10 shrink-0 rounded-full bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive"
                 onClick={onDelete}
               >
                 <Trash2 className="size-4" />

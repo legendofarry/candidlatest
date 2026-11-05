@@ -13,7 +13,6 @@ import {
   Pencil,
   Send,
   Trash2,
-  VenetianMask,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -41,6 +40,7 @@ import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import { MentionText, MentionTextarea } from "@/components/site/mention-textarea";
+import { AnonymousPostingToggle } from "@/components/site/anonymous-posting-toggle";
 import type { MembershipTier } from "@/lib/membership";
 
 export type ThreadComment = {
@@ -85,7 +85,11 @@ function mergeCommentPages(current: ThreadComment[], incoming: ThreadComment[]) 
 
 function flattenVisibleThreads(roots: ThreadComment[], expanded: Set<string>) {
   const rows: { comment: ThreadComment; replyingTo: ThreadComment | null }[] = [];
-  const visit = (comment: ThreadComment, parent: ThreadComment | null, includeChildren: boolean) => {
+  const visit = (
+    comment: ThreadComment,
+    parent: ThreadComment | null,
+    includeChildren: boolean,
+  ) => {
     rows.push({ comment, replyingTo: parent });
     if (includeChildren) comment.replies.forEach((reply) => visit(reply, comment, true));
   };
@@ -269,7 +273,10 @@ export function CommentThread({
   }, [focusCommentId, revealRootCount, sortedComments, visibleRootCount]);
 
   const commentMutation = useMutation({
-    mutationFn: () => post({ data: { story_id: storyId, parent_id: replyTo?.id ?? null, body, is_anonymous: anonymous } }),
+    mutationFn: () =>
+      post({
+        data: { story_id: storyId, parent_id: replyTo?.id ?? null, body, is_anonymous: anonymous },
+      }),
     onSuccess: () => {
       const addedTopLevelComment = replyTo === null;
       setBody("");
@@ -290,13 +297,13 @@ export function CommentThread({
       className={cn(
         "rounded-2xl border border-border bg-card",
         fullWidth &&
-        "relative left-1/2 -ml-[50vw] w-screen rounded-none border-x-0 border-y border-border/70 bg-transparent pb-[calc(6rem+env(safe-area-inset-bottom))] md:left-auto md:ml-[-1.5rem] md:w-[calc(100%+3rem)] md:pb-0",
+          "relative left-1/2 -ml-[50vw] w-screen rounded-none border-x-0 border-y border-border/70 bg-transparent pb-[calc(6rem+env(safe-area-inset-bottom))] md:left-auto md:ml-[-1.5rem] md:w-[calc(100%+3rem)] md:pb-0",
         panelMode &&
-        !fitContent &&
-        "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
+          !fitContent &&
+          "flex min-h-0 flex-1 flex-col overflow-hidden rounded-none border-0 bg-transparent",
         panelMode &&
-        fitContent &&
-        "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
+          fitContent &&
+          "flex flex-col overflow-hidden rounded-none border-0 bg-transparent",
       )}
     >
       <header
@@ -338,12 +345,14 @@ export function CommentThread({
               replyingTo={replyingTo}
               replyCount={replyingTo ? 0 : countReplies(comment)}
               repliesOpen={expandedThreads.has(comment.id)}
-              onToggleReplies={() => setExpandedThreads((current) => {
-                const next = new Set(current);
-                if (next.has(comment.id)) next.delete(comment.id);
-                else next.add(comment.id);
-                return next;
-              })}
+              onToggleReplies={() =>
+                setExpandedThreads((current) => {
+                  const next = new Set(current);
+                  if (next.has(comment.id)) next.delete(comment.id);
+                  else next.add(comment.id);
+                  return next;
+                })
+              }
               storyId={storyId}
               liked={liked}
               reported={reported}
@@ -404,7 +413,7 @@ export function CommentThread({
         className={cn(
           "sticky bottom-0 rounded-b-2xl border-t border-border bg-card/95 p-3 backdrop-blur",
           fullWidth &&
-          "fixed inset-x-0 bottom-0 z-30 rounded-none border-t border-border/70 bg-background/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:sticky md:inset-x-auto md:z-auto md:pb-3",
+            "fixed inset-x-0 bottom-0 z-30 rounded-none border-t border-border/70 bg-background/95 pb-[max(0.75rem,env(safe-area-inset-bottom))] md:sticky md:inset-x-auto md:z-auto md:pb-3",
           panelMode && "relative shrink-0 rounded-none",
         )}
       >
@@ -441,13 +450,32 @@ export function CommentThread({
               </div>
             ) : null}
             <div className="flex items-end gap-2">
-              <MentionTextarea
-                rows={1}
-                value={body}
-                onValueChange={setBody}
-                placeholder="Add a comment…"
-                className="min-h-10 resize-none bg-background"
-              />
+              <div
+                className={cn(
+                  "relative flex-1 overflow-hidden rounded-2xl border bg-background/80 transition-all duration-200",
+                  anonymous
+                    ? "border-violet-400/60 bg-violet-500/[0.06] shadow-[0_0_0_1px_rgba(168,85,247,0.15),0_18px_42px_-28px_hsl(var(--primary)/0.9)]"
+                    : "border-border/80 bg-card/80",
+                )}
+              >
+                <MentionTextarea
+                  rows={1}
+                  value={body}
+                  onValueChange={setBody}
+                  placeholder="Add a comment…"
+                  className="min-h-11 resize-none border-0 bg-transparent pr-20 text-sm shadow-none focus-visible:ring-0"
+                />
+                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background via-background/70 to-transparent" />
+                <AnonymousPostingToggle
+                  anonymous={anonymous}
+                  onToggle={() => {
+                    setAnonymous((value) => !value);
+                    setAnonymousTouched(true);
+                  }}
+                  user={user}
+                  className="absolute bottom-2 right-2 z-10"
+                />
+              </div>
               <Button
                 size="icon"
                 disabled={body.trim().length < 2 || commentMutation.isPending}
@@ -460,19 +488,6 @@ export function CommentThread({
                   <Send className="size-4" />
                 )}
               </Button>
-            </div>
-            <div className="mt-2 flex items-center gap-2">
-              <button type="button" onClick={() => { setAnonymous((value) => !value); setAnonymousTouched(true); }} aria-label={anonymous ? "Switch to public identity" : "Switch to anonymous identity"} aria-pressed={anonymous} className={cn("relative grid size-10 shrink-0 place-items-center overflow-hidden rounded-full border text-foreground transition-all duration-200", anonymous ? "border-primary/70 bg-primary/10 shadow-[0_0_0_3px_hsl(var(--primary)/0.12)]" : "border-border bg-secondary")}>
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.span key={anonymous ? "anonymous" : "public"} initial={{ opacity: 0, scale: 0.7, rotate: anonymous ? -12 : 12 }} animate={{ opacity: 1, scale: 1, rotate: 0 }} exit={{ opacity: 0, scale: 0.7, rotate: anonymous ? 12 : -12 }} transition={{ duration: 0.18 }} className="absolute inset-0 grid place-items-center">
-                    {anonymous ? <VenetianMask className="size-5 text-primary" /> : user.photoURL ? <ProfileAvatar photoUrl={user.photoURL} initials={(user.displayName ?? "U").slice(0, 1)} className="size-10" /> : <span className="text-sm font-semibold">{(user.displayName ?? "U").slice(0, 1).toUpperCase()}</span>}
-                  </motion.span>
-                </AnimatePresence>
-                <ChevronDown className={cn("absolute -bottom-0.5 -right-0.5 size-4 rounded-full bg-background p-0.5 transition-transform duration-200", anonymous && "rotate-180")} />
-              </button>
-              <span className="text-xs text-muted-foreground">
-                {anonymous ? "Commenting anonymously · tap photo to switch" : "Commenting publicly · tap photo to hide"}
-              </span>
             </div>
           </>
         ) : (
@@ -671,9 +686,18 @@ function CommentRow({
               Reply
             </button>
             {replyCount > 0 ? (
-              <button type="button" className="inline-flex items-center gap-1 hover:text-foreground" onClick={onToggleReplies} aria-expanded={repliesOpen}>
-                <ChevronDown className={cn("size-3.5 transition-transform", repliesOpen && "rotate-180")} />
-                {repliesOpen ? "Hide replies" : `View ${formatCount(replyCount)} ${replyCount === 1 ? "reply" : "replies"}`}
+              <button
+                type="button"
+                className="inline-flex items-center gap-1 hover:text-foreground"
+                onClick={onToggleReplies}
+                aria-expanded={repliesOpen}
+              >
+                <ChevronDown
+                  className={cn("size-3.5 transition-transform", repliesOpen && "rotate-180")}
+                />
+                {repliesOpen
+                  ? "Hide replies"
+                  : `View ${formatCount(replyCount)} ${replyCount === 1 ? "reply" : "replies"}`}
               </button>
             ) : null}
           </div>

@@ -1,13 +1,31 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { ArrowUpRight, Building2, Scale, Search } from "lucide-react";
+import {
+  ArrowUpRight,
+  Building2,
+  Check,
+  ListFilter,
+  Scale,
+  Search,
+  SlidersHorizontal,
+  Star,
+  TrendingUp,
+} from "lucide-react";
 import { listCompanyScores } from "@/lib/public.functions";
 import { FilterBar } from "@/components/site/filter-bar";
 import { cn, formatCount } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
+import { Input } from "@/components/ui/input";
 
 const companiesQuery = queryOptions({
   queryKey: ["company-scores"],
@@ -41,6 +59,9 @@ function CompaniesPage() {
   const { data } = useSuspenseQuery(companiesQuery);
   const [q, setQ] = useState("");
   const [industry, setIndustry] = useState<string | null>(null);
+  const [industryDrawerOpen, setIndustryDrawerOpen] = useState(false);
+  const [industrySearch, setIndustrySearch] = useState("");
+  const [sortDrawerOpen, setSortDrawerOpen] = useState(false);
   const [sort, setSort] = useState<SortKey>("discussed");
   const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(24);
 
@@ -48,6 +69,15 @@ function CompaniesPage() {
     () => [...new Set(data.companies.map((c) => c.industry).filter(Boolean))].sort() as string[],
     [data.companies],
   );
+  const filteredIndustries = industries.filter((item) =>
+    item.toLocaleLowerCase().includes(industrySearch.trim().toLocaleLowerCase()),
+  );
+  const sortOptions = [
+    { value: "discussed", label: "Most discussed", icon: TrendingUp },
+    { value: "score", label: "Best rated", icon: Star },
+    { value: "az", label: "A–Z", icon: ListFilter },
+  ] as const;
+  const selectedSort = sortOptions.find((option) => option.value === sort) ?? sortOptions[0];
 
   const rows = useMemo(() => {
     let list = data.companies.filter((c) =>
@@ -109,18 +139,132 @@ function CompaniesPage() {
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <button
               type="button"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-lime-200 px-4 py-2 text-sm font-semibold text-slate-900"
+              aria-haspopup="dialog"
+              aria-expanded={sortDrawerOpen}
+              onClick={() => setSortDrawerOpen(true)}
+              className="inline-flex shrink-0 items-center gap-2 rounded-full bg-lime-200 px-4 py-2 text-sm font-semibold text-slate-900 transition-transform active:scale-95"
             >
-              Most discussed
+              <selectedSort.icon className="size-4" />
+              {selectedSort.label}
             </button>
             <button
               type="button"
-              className="inline-flex shrink-0 items-center gap-2 rounded-full border border-border bg-transparent px-4 py-2 text-sm font-medium text-muted-foreground"
+              aria-haspopup="dialog"
+              aria-expanded={industryDrawerOpen}
+              onClick={() => setIndustryDrawerOpen(true)}
+              className={cn(
+                "inline-flex max-w-[70vw] shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors",
+                industry
+                  ? "border-lime-200 bg-lime-200 text-slate-900"
+                  : "border-border bg-transparent text-muted-foreground",
+              )}
             >
-              Industry
+              <SlidersHorizontal className="size-4 shrink-0" />
+              <span className="truncate">{industry ?? "Industry"}</span>
             </button>
           </div>
         </div>
+        <Drawer
+          open={industryDrawerOpen}
+          onOpenChange={(open) => {
+            setIndustryDrawerOpen(open);
+            if (!open) setIndustrySearch("");
+          }}
+        >
+          <DrawerContent className="h-[min(78dvh,38rem)] max-h-[85dvh] overflow-hidden rounded-t-[1.5rem] border-border bg-background">
+            <DrawerHeader className="shrink-0 pb-3 text-left">
+              <DrawerTitle className="font-display">Industry</DrawerTitle>
+              <DrawerDescription>
+                {industry
+                  ? `Showing ${industry} employers`
+                  : "Choose an industry to filter employers"}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="px-4 pb-3">
+              <label className="relative block">
+                <Search className="pointer-events-none absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  autoFocus
+                  value={industrySearch}
+                  onChange={(event) => setIndustrySearch(event.target.value)}
+                  placeholder="Search industries"
+                  aria-label="Search industries"
+                  className="h-11 rounded-xl pl-10"
+                />
+              </label>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+              <button
+                type="button"
+                aria-pressed={industry === null}
+                onClick={() => {
+                  setIndustry(null);
+                  resetVisibleCount();
+                  setIndustryDrawerOpen(false);
+                  setIndustrySearch("");
+                }}
+                className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm transition-colors hover:bg-secondary/70"
+              >
+                <span className="min-w-0 flex-1">All industries</span>
+                {industry === null ? <Check className="size-4 text-primary" /> : null}
+              </button>
+              {filteredIndustries.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  aria-pressed={industry === item}
+                  onClick={() => {
+                    setIndustry(item);
+                    resetVisibleCount();
+                    setIndustryDrawerOpen(false);
+                    setIndustrySearch("");
+                  }}
+                  className="flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm transition-colors hover:bg-secondary/70"
+                >
+                  <span className="min-w-0 flex-1">{item}</span>
+                  {industry === item ? <Check className="size-4 text-primary" /> : null}
+                </button>
+              ))}
+              {filteredIndustries.length === 0 ? (
+                <p className="px-3 py-8 text-center text-sm text-muted-foreground">
+                  No industries found.
+                </p>
+              ) : null}
+            </div>
+          </DrawerContent>
+        </Drawer>
+        <Drawer open={sortDrawerOpen} onOpenChange={setSortDrawerOpen}>
+          <DrawerContent className="max-h-[70dvh] overflow-hidden rounded-t-[1.5rem] border-border bg-background">
+            <DrawerHeader className="shrink-0 pb-3 text-left">
+              <DrawerTitle className="font-display">Sort employers</DrawerTitle>
+              <DrawerDescription>Choose how employers are ordered.</DrawerDescription>
+            </DrawerHeader>
+            <div className="space-y-1 px-3 pb-[max(1.25rem,env(safe-area-inset-bottom))]">
+              {sortOptions.map(({ value, label, icon: Icon }) => (
+                <button
+                  key={value}
+                  type="button"
+                  aria-pressed={sort === value}
+                  onClick={() => {
+                    setSort(value);
+                    resetVisibleCount();
+                    setSortDrawerOpen(false);
+                  }}
+                  className={cn(
+                    "flex min-h-12 w-full items-center gap-3 rounded-xl px-3 text-left text-sm transition-colors",
+                    sort === value
+                      ? "bg-primary/10 font-medium text-primary"
+                      : "hover:bg-secondary/70",
+                  )}
+                >
+                  <Icon className="size-4 shrink-0" />
+                  <span className="min-w-0 flex-1">{label}</span>
+                  {sort === value ? <Check className="size-4" /> : null}
+                </button>
+              ))}
+            </div>
+          </DrawerContent>
+        </Drawer>
       </div>
 
       <div className="hidden md:block">

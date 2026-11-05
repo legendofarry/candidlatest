@@ -442,10 +442,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         className={cn(
           "relative",
           !fullscreenRoute &&
-          pathname !== "/post" &&
-          pathname !== "/profile" &&
-          !pathname.startsWith("/u/") &&
-          (directConversationRoute ? "w-full md:app-shell" : "app-shell"),
+            pathname !== "/post" &&
+            pathname !== "/profile" &&
+            !pathname.startsWith("/u/") &&
+            (directConversationRoute || pathname === "/my-contributions"
+              ? "w-full md:app-shell"
+              : "app-shell"),
         )}
       >
         <aside

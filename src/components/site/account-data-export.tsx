@@ -22,17 +22,40 @@ export function AccountDataExport() {
       URL.revokeObjectURL(url);
       notify.success("Your account export is ready.");
     } catch (error) {
-      notify.error(error instanceof Error ? error.message : "Could not prepare your account export.");
+      notify.error(
+        error instanceof Error ? error.message : "Could not prepare your account export.",
+      );
     } finally {
       setLoading(false);
     }
   }
 
-  return <div className="flex flex-col gap-3 overflow-hidden rounded-2xl border border-border/50 bg-card/40 p-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 sm:rounded-none sm:border-x-0 sm:border-t-0 sm:border-y sm:border-border sm:bg-transparent sm:p-0 sm:py-4">
-    <div><p className="text-sm font-medium">Download your account data</p></div>
-    <Button type="button" variant="outline" disabled={loading} onClick={() => void download()} className="shrink-0">
-      {loading ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Download className="mr-2 size-4" />}
-      {loading ? "Preparing…" : "Download data"}
-    </Button>
-  </div>;
+  return (
+    <div className="flex items-center gap-3 border-b border-border/50 px-4 py-3.5 last:border-b-0">
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+        <Download className="size-4" />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-sm font-medium">Your data</p>
+        <p className="text-xs text-muted-foreground">Export a copy</p>
+      </div>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label={loading ? "Preparing account data export" : "Download account data"}
+        title={loading ? "Preparing…" : "Download account data"}
+        aria-busy={loading}
+        disabled={loading}
+        onClick={() => void download()}
+        className="group size-10 shrink-0 rounded-full border border-border/60 bg-background/70 text-muted-foreground shadow-sm transition-all hover:border-primary/30 hover:bg-primary/10 hover:text-primary active:scale-95"
+      >
+        {loading ? (
+          <LoaderCircle className="size-4 animate-spin" />
+        ) : (
+          <Download className="size-4 transition-transform duration-200 group-hover:translate-y-0.5 motion-reduce:transition-none" />
+        )}
+      </Button>
+    </div>
+  );
 }

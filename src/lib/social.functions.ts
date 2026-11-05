@@ -207,28 +207,31 @@ export const getMyContributions = createServerFn({ method: "POST" })
         commentsRef.doc(data.cursor.comments.id),
       );
     }
-    const [stories, comments, storyCount, commentCount] = await Promise.all([
-      data.category === "comments"
-        ? Promise.resolve(null)
-        : storiesQuery.limit(data.limit + 1).get(),
-      data.category === "stories"
-        ? Promise.resolve(null)
-        : commentsQuery.limit(data.limit + 1).get(),
-      data.cursor
-        ? Promise.resolve(null)
-        : (data.status === "all"
-            ? storiesRef.where("author_id", "==", context.userId)
-            : storiesRef.where("author_id", "==", context.userId).where("status", "==", data.status)
-          ).count(),
-      data.cursor
-        ? Promise.resolve(null)
-        : (data.status === "all"
-            ? commentsRef.where("author_id", "==", context.userId)
-            : commentsRef
-                .where("author_id", "==", context.userId)
-                .where("status", "==", data.status)
-          ).count(),
-    ]);
+    const storyCountQuery =
+      data.status === "all"
+        ? storiesRef.where("author_id", "==", context.userId)
+        : storiesRef.where("author_id", "==", context.userId).where("status", "==", data.status);
+    const commentCountQuery =
+      data.status === "all"
+        ? commentsRef.where("author_id", "==", context.userId)
+        : commentsRef.where("author_id", "==", context.userId).where("status", "==", data.status);
+    const [stories, comments, storyCount, commentCount, deletedStoryCount, deletedCommentCount] =
+      await Promise.all([
+        data.category === "comments"
+          ? Promise.resolve(null)
+          : storiesQuery.limit(data.limit + 1).get(),
+        data.category === "stories"
+          ? Promise.resolve(null)
+          : commentsQuery.limit(data.limit + 1).get(),
+        data.cursor ? Promise.resolve(null) : storyCountQuery.count(),
+        data.cursor ? Promise.resolve(null) : commentCountQuery.count(),
+        data.cursor
+          ? Promise.resolve(null)
+          : storyCountQuery.where("author_deleted", "==", true).count(),
+        data.cursor
+          ? Promise.resolve(null)
+          : commentCountQuery.where("is_deleted", "==", true).count(),
+      ]);
     const storyRows =
       stories?.docs.map((doc) => ({ ...doc.data(), id: doc.id, type: "story" as const })) ?? [];
     const commentRows =
@@ -269,30 +272,39 @@ export const getMyContributions = createServerFn({ method: "POST" })
       (data.category !== "comments" &&
         storyRows.length > items.filter((item) => item.type === "story").length);
     return {
-      items: items.map((item) => ({
-        id: item.id,
-        type: item.type,
-        title:
-          item.type === "story"
-            ? String(item["title"] ?? "Your story")
-            : String(item["body"] ?? "Your comment").slice(0, 160),
-        body: String(item[item.type === "story" ? "body" : "body"] ?? ""),
-        createdAt: String(item["created_at"] ?? ""),
-        status: String(item["status"] ?? "published"),
-        storyId: item.type === "comment" ? String(item["story_id"] ?? "") : item.id,
-        storyTitle:
-          item.type === "comment"
-            ? (storyTitles.get(String(item["story_id"] ?? ""))?.title ?? "Workplace story")
-            : String(item["title"] ?? "Your story"),
-        storyStatus:
-          item.type === "comment"
-            ? (storyTitles.get(String(item["story_id"] ?? ""))?.status ?? "hidden")
-            : String(item["status"] ?? "published"),
-        companyName: item.type === "story" ? String(item["company_name"] ?? "") : null,
-        isDeleted: item.type === "comment" && item["is_deleted"] === true,
-        authorDeleted: item.type === "story" && item["author_deleted"] === true,
-      })),
-      counts: { stories: storyCount, comments: commentCount },
+      items: items
+        .filter(
+          (item) =>
+            !(item.type === "story" && item["author_deleted"] === true) &&
+            !(item.type === "comment" && item["is_deleted"] === true),
+        )
+        .map((item) => ({
+          id: item.id,
+          type: item.type,
+          title:
+            item.type === "story"
+              ? String(item["title"] ?? "Your story")
+              : String(item["body"] ?? "Your comment").slice(0, 160),
+          body: String(item[item.type === "story" ? "body" : "body"] ?? ""),
+          createdAt: String(item["created_at"] ?? ""),
+          status: String(item["status"] ?? "published"),
+          storyId: item.type === "comment" ? String(item["story_id"] ?? "") : item.id,
+          storyTitle:
+            item.type === "comment"
+              ? (storyTitles.get(String(item["story_id"] ?? ""))?.title ?? "Workplace story")
+              : String(item["title"] ?? "Your story"),
+          storyStatus:
+            item.type === "comment"
+              ? (storyTitles.get(String(item["story_id"] ?? ""))?.status ?? "hidden")
+              : String(item["status"] ?? "published"),
+          companyName: item.type === "story" ? String(item["company_name"] ?? "") : null,
+          isDeleted: item.type === "comment" && item["is_deleted"] === true,
+          authorDeleted: item.type === "story" && item["author_deleted"] === true,
+        })),
+      counts: {
+        stories: Math.max(0, (storyCount ?? 0) - (deletedStoryCount ?? 0)),
+        comments: Math.max(0, (commentCount ?? 0) - (deletedCommentCount ?? 0)),
+      },
       hasMore,
       nextCursor: hasMore ? nextCursor : null,
     };
