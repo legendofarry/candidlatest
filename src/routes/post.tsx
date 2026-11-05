@@ -15,8 +15,10 @@ import {
   MapPin,
   PenLine,
   Paperclip,
+  RefreshCw,
   Save,
   ShieldCheck,
+  Sparkles,
   Trash2,
   X,
 } from "lucide-react";
@@ -29,7 +31,7 @@ import {
   getStoryForEdit,
   updateStory,
 } from "@/lib/actions.functions";
-import { buildStoryDraft } from "@/lib/story-draft";
+import { generateStoryDrafts } from "@/lib/story-draft.functions";
 import {
   discardEmploymentEvidenceUpload,
   issueEmploymentEvidenceUpload,
@@ -51,6 +53,7 @@ import { allKenyaAreas, areasForCounty, KENYA_LOCATIONS } from "@/lib/kenya-loca
 import { CommunityPostComposer } from "@/components/site/community-post-composer";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { getPrivacySettings } from "@/lib/messaging.functions";
+import { Switch } from "@/components/ui/switch";
 
 const filtersQuery = queryOptions({ queryKey: ["filters"], queryFn: () => getFilterOptions() });
 
@@ -163,6 +166,7 @@ function WorkplaceStoryComposer() {
   const findCompany = useServerFn(findOrCreateCompany);
   const create = useServerFn(createStory);
   const fetchStoryForEdit = useServerFn(getStoryForEdit);
+  const generateStoryDraftsFn = useServerFn(generateStoryDrafts);
   const update = useServerFn(updateStory);
   const issueEvidenceUpload = useServerFn(issueEmploymentEvidenceUpload);
   const discardEvidenceUpload = useServerFn(discardEmploymentEvidenceUpload);
@@ -185,7 +189,16 @@ function WorkplaceStoryComposer() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [anonymous, setAnonymous] = useState(false);
-  const [storyDraftedFromAnswers, setStoryDraftedFromAnswers] = useState(false);
+  const [aiAssistOpen, setAiAssistOpen] = useState(false);
+  const [aiContext, setAiContext] = useState("");
+  const [aiDrafts, setAiDrafts] = useState<{
+    variants: {
+      title: string;
+      body: string;
+      approach: "direct" | "conversational" | "reflective";
+    }[];
+  } | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
   const [wouldReturn, setWouldReturn] = useState<boolean | null>(null);
   const [evidenceNote, setEvidenceNote] = useState("");
   const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
@@ -204,7 +217,6 @@ function WorkplaceStoryComposer() {
   const [savedDraftKey, setSavedDraftKey] = useState<string | null>(null);
   const [draftReadyForUser, setDraftReadyForUser] = useState<string | null>(null);
   const storageFailureNotified = useRef(false);
-  const writingAttemptKey = useRef<string | null>(null);
   const storyDraftUserId = user?.uid;
   const isEditing = Boolean(editStoryId);
 
@@ -252,21 +264,32 @@ function WorkplaceStoryComposer() {
     };
   }, [editStoryId, fetchStoryForEdit, user]);
 
-  const generateFromEarlierAnswers = useCallback(() => {
-    const draft = buildStoryDraft({
-      company: companyName,
-      industry,
-      county,
-      reasons,
-      position,
-      tenure,
-      roleLevel,
-      wouldReturn,
-    });
-    setTitle(draft.title);
-    setBody(draft.body);
-    setStoryDraftedFromAnswers(true);
-  }, [companyName, county, industry, position, reasons, roleLevel, tenure, wouldReturn]);
+  async function generateAiStoryDrafts() {
+    setAiGenerating(true);
+    try {
+      const result = await generateStoryDraftsFn({
+        data: {
+          company: companyName,
+          industry,
+          county,
+          reasons,
+          customReason,
+          position,
+          tenure,
+          roleLevel,
+          wouldReturn,
+          storyNotes: aiContext,
+          currentTitle: title,
+          currentBody: body,
+        },
+      });
+      setAiDrafts(result);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Could not generate story drafts.");
+    } finally {
+      setAiGenerating(false);
+    }
+  }
 
   useEffect(() => {
     if (!evidenceFile) {
@@ -315,36 +338,6 @@ function WorkplaceStoryComposer() {
   };
   const storyDraftKey = JSON.stringify(storyDraft);
   const hasUnsavedDraftChanges = dirty && savedDraftKey !== storyDraftKey;
-
-  useEffect(() => {
-    if (step !== 3 || title.trim() || body.trim()) return;
-    const attemptKey = JSON.stringify({
-      companyName,
-      industry,
-      county,
-      reasons,
-      position,
-      tenure,
-      roleLevel,
-      wouldReturn,
-    });
-    if (writingAttemptKey.current === attemptKey) return;
-    writingAttemptKey.current = attemptKey;
-    generateFromEarlierAnswers();
-  }, [
-    body,
-    companyName,
-    county,
-    generateFromEarlierAnswers,
-    industry,
-    position,
-    reasons,
-    roleLevel,
-    step,
-    tenure,
-    title,
-    wouldReturn,
-  ]);
 
   useEffect(() => {
     if (isEditing || !storyDraftUserId) {
@@ -1170,34 +1163,133 @@ function WorkplaceStoryComposer() {
 
                       {step === 3 ? (
                         <>
-                          <div className="rounded-2xl border border-primary/25 bg-primary/[0.04] p-4">
-                            <div className="flex flex-wrap items-center justify-between gap-3">
-                              <div>
-                                <h2 className="flex items-center gap-2 text-sm font-semibold">
-                                  <FileText className="size-4 text-primary" /> Smart draft from your
-                                  answers
-                                </h2>
-                                <p className="mt-1 text-xs text-muted-foreground">
-                                  This draft uses a local writing helper, so no AI service is called
-                                  to create it. Add details only you know, then edit it below.
-                                </p>
+                          {!isEditing ? (
+                            <section
+                              className={cn(
+                                "overflow-hidden rounded-2xl border transition-colors",
+                                aiAssistOpen
+                                  ? "border-primary/35 bg-primary/[0.035]"
+                                  : "border-border/80 bg-card/60",
+                              )}
+                            >
+                              <div className="flex items-center gap-3 p-3.5 sm:p-4">
+                                <span
+                                  className={cn(
+                                    "grid size-10 shrink-0 place-items-center rounded-xl transition-colors",
+                                    aiAssistOpen
+                                      ? "bg-primary text-primary-foreground"
+                                      : "bg-secondary text-muted-foreground",
+                                  )}
+                                >
+                                  <Sparkles className="size-5" />
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                  <Label
+                                    htmlFor="ai-story-assist"
+                                    className="text-sm font-semibold"
+                                  >
+                                    AI writing assist
+                                  </Label>
+                                  <p className="mt-0.5 text-xs text-muted-foreground">
+                                    Optional · your story stays yours
+                                  </p>
+                                </div>
+                                <Switch
+                                  id="ai-story-assist"
+                                  checked={aiAssistOpen}
+                                  onCheckedChange={setAiAssistOpen}
+                                  disabled={aiGenerating}
+                                  aria-label="Use AI writing assist"
+                                />
                               </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                onClick={generateFromEarlierAnswers}
-                              >
-                                <FileText className="size-4" /> Rebuild from answers
-                              </Button>
-                            </div>
-                            {storyDraftedFromAnswers ? (
-                              <p className="mt-3 text-xs text-muted-foreground">
-                                Draft created from your answers. Check it for accuracy before
-                                continuing.
-                              </p>
-                            ) : null}
-                          </div>
+                              {aiAssistOpen ? (
+                                <div className="space-y-3 border-t border-border/70 px-3.5 py-4 sm:px-4">
+                                  <div className="space-y-1">
+                                    <Label htmlFor="ai-story-notes" className="text-xs font-medium">
+                                      What actually happened?{" "}
+                                      <span className="font-normal text-muted-foreground">
+                                        (optional, but makes drafts more personal)
+                                      </span>
+                                    </Label>
+                                    <Textarea
+                                      id="ai-story-notes"
+                                      rows={3}
+                                      maxLength={1800}
+                                      value={aiContext}
+                                      onChange={(event) => {
+                                        setAiContext(event.target.value);
+                                        setAiDrafts(null);
+                                      }}
+                                      placeholder="Add the real details you want included. Avoid naming individual colleagues."
+                                      className="resize-y bg-background/80 text-sm"
+                                    />
+                                    <p className="text-right text-[11px] text-muted-foreground">
+                                      {aiContext.length}/1800
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-col gap-3 rounded-xl bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between">
+                                    <p className="text-xs leading-relaxed text-muted-foreground">
+                                      Your answers and notes are sent to our AI provider to create
+                                      drafts. It may make mistakes—review every detail before use.
+                                      Up to 5 generations daily.
+                                    </p>
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="sm"
+                                      disabled={aiGenerating}
+                                      onClick={() => void generateAiStoryDrafts()}
+                                      className="shrink-0"
+                                    >
+                                      {aiGenerating ? (
+                                        <LoaderCircle className="size-4 animate-spin" />
+                                      ) : aiDrafts ? (
+                                        <RefreshCw className="size-4" />
+                                      ) : (
+                                        <Sparkles className="size-4" />
+                                      )}
+                                      {aiGenerating
+                                        ? "Creating drafts…"
+                                        : aiDrafts
+                                          ? "Try three more"
+                                          : "Create 3 drafts"}
+                                    </Button>
+                                  </div>
+                                  {aiDrafts ? (
+                                    <div className="space-y-3" aria-live="polite">
+                                      {aiDrafts.variants.map((draft, index) => (
+                                        <article
+                                          key={`${draft.approach}-${index}`}
+                                          className="rounded-xl border border-border/80 bg-background/80 p-3.5"
+                                        >
+                                          <div className="mb-2 flex items-center justify-between gap-2">
+                                            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-primary">
+                                              <Sparkles className="size-3.5" />
+                                              {draft.approach}
+                                            </span>
+                                            <Button
+                                              type="button"
+                                              size="sm"
+                                              onClick={() => {
+                                                setTitle(draft.title);
+                                                setBody(draft.body);
+                                              }}
+                                            >
+                                              Use this draft
+                                            </Button>
+                                          </div>
+                                          <h3 className="font-semibold">{draft.title}</h3>
+                                          <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
+                                            {draft.body}
+                                          </p>
+                                        </article>
+                                      ))}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ) : null}
+                            </section>
+                          ) : null}
                           <div className="space-y-2">
                             <Label htmlFor="title">Headline</Label>
                             <Input

@@ -291,9 +291,9 @@ function BillingPage() {
                     </p>
                   ) : null}
                   {!isOfficial &&
-                  membership?.source === "paid" &&
-                  membership.assignedTier === "premium" &&
-                  !membership.cancelAtPeriodEnd ? (
+                    membership?.source === "paid" &&
+                    membership.assignedTier === "premium" &&
+                    !membership.cancelAtPeriodEnd ? (
                     <Button
                       className="mt-3 rounded-xl"
                       variant="outline"
@@ -360,14 +360,6 @@ function BillingPage() {
                 <section className="mt-10">
                   <div className="mb-5">
                     <h2 className="font-display text-2xl font-semibold">Available packages</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Every new account starts on Free. Stories, reactions, notifications, privacy,
-                      safety and full control of your own contributions stay available to everyone.
-                      Premium raises selected usage limits and adds story pins.
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      Paid access starts after manual payment verification.
-                    </p>
                   </div>
                   <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-2">
                     {(["basic", "premium"] as const).map((tier) => {
@@ -469,7 +461,7 @@ function BillingPage() {
                                         ? "Free scheduled"
                                         : "Move to Free at expiry"
                                       : renew ||
-                                          (tier === membership?.assignedTier && canRenewPremium)
+                                        (tier === membership?.assignedTier && canRenewPremium)
                                         ? "Renew Premium"
                                         : `Choose ${plan.name}`}
                             <ChevronRight className="ml-auto size-4" />
@@ -686,9 +678,9 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime())
     ? "—"
     : date.toLocaleDateString("en-KE", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-        timeZone: "Africa/Nairobi",
-      });
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      timeZone: "Africa/Nairobi",
+    });
 }

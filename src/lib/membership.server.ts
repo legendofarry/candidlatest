@@ -160,7 +160,7 @@ export async function switchMembership(
 /** Reserve a quota slot with Firestore update-time preconditions to serialize concurrent requests. */
 export async function consumeMembershipQuota(
   userId: string,
-  feature: "story_catchups" | "new_conversations" | "salary_reports",
+  feature: "story_catchups" | "new_conversations" | "salary_reports" | "story_drafts",
   limit: number,
   period: "day" | "month",
   initialUsed = 0,
@@ -207,7 +207,7 @@ export async function consumeMembershipQuota(
 
 export async function releaseMembershipQuota(
   userId: string,
-  feature: "story_catchups" | "new_conversations" | "salary_reports",
+  feature: "story_catchups" | "new_conversations" | "salary_reports" | "story_drafts",
   period: "day" | "month",
 ) {
   const now = new Date();
