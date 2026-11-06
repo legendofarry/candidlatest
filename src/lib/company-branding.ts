@@ -54,3 +54,18 @@ export function getCompanyBrand(name: string) {
 export function getCompanyBrandLogoUrl(domain: string) {
   return `https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=128`;
 }
+
+/** Brand colour for any employer: mapped brand hue, or a stable generated hue from the name. */
+export function getCompanyAccent(name: string) {
+  const brand = getCompanyBrand(name);
+  if (brand) return brand.color;
+  let hash = 0;
+  for (const char of normalizeCompanyName(name)) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
+  return `hsl(${hash % 360} 72% 56%)`;
+}
+
+export function getCompanyMonogram(name: string) {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  const letters = words.length > 1 ? `${words[0]![0]}${words[1]![0]}` : name.trim().slice(0, 2);
+  return letters.toUpperCase();
+}
