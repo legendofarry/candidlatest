@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { Camera, Eye, ImagePlus, Loader2, RotateCcw, Upload, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,12 +11,30 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerHeader,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 import { saveMyProfilePhoto } from "@/lib/onboarding.functions";
 import { notify } from "@/lib/notifications-store";
 import { PRESET_AVATARS, presetAvatarUrl } from "@/lib/preset-avatars";
 
 const MAX_FILE_SIZE = 20 * 1024 * 1024;
+const MOBILE_VIEWPORT_QUERY = "(max-width: 639px)";
 export const DEFAULT_PROFILE_COVER_URL = "/images/candid-community-cover.png";
+
+function subscribeToMobileViewport(onChange: () => void) {
+  const mediaQuery = window.matchMedia(MOBILE_VIEWPORT_QUERY);
+  mediaQuery.addEventListener("change", onChange);
+  return () => mediaQuery.removeEventListener("change", onChange);
+}
+
+function getIsMobileViewport() {
+  return window.matchMedia(MOBILE_VIEWPORT_QUERY).matches;
+}
 
 function avatarDeliveryUrl(url: string) {
   return url.startsWith("/")
@@ -241,6 +259,11 @@ export function ProfilePhotoPicker({
   const [actionsOpen, setActionsOpen] = useState(false);
   const [viewerOpen, setViewerOpen] = useState(false);
   const [savingPreset, setSavingPreset] = useState(false);
+  const isMobileViewport = useSyncExternalStore(
+    subscribeToMobileViewport,
+    getIsMobileViewport,
+    () => false,
+  );
 
   useEffect(() => {
     if (!file) {
@@ -413,6 +436,114 @@ export function ProfilePhotoPicker({
     window.setTimeout(() => inputRef.current?.click(), 0);
   }
 
+  const photoActionsBody = (
+    <>
+      <p
+        role="note"
+        className="rounded-xl border border-border bg-secondary/50 p-3 text-sm leading-relaxed text-muted-foreground"
+      >
+        Your profile photo is public and appears beside your posts and comments. A real photo could
+        make you recognizable even when you use an alias. Adding a photo is optional; you can use an
+        illustration or leave it blank.
+      </p>
+      <div className="flex flex-col items-center gap-4 py-2">
+        <ProfileAvatar
+          photoUrl={previewUrl ?? photoUrl}
+          initials={initials}
+          className="size-36 border-2 border-border shadow-sm"
+        />
+        {file ? (
+          <p className="max-w-full truncate text-sm text-muted-foreground">{file.name}</p>
+        ) : null}
+      </div>
+      {!file ? (
+        <div className="space-y-2">
+          <p className="text-sm font-medium">Choose a character avatar</p>
+          <div className="grid grid-cols-6 gap-2">
+            {PRESET_AVATARS.map((id) => {
+              const url = presetAvatarUrl(id);
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  disabled={savingPreset || uploading}
+                  aria-label={`Use ${id.replace("candid-", "")} character avatar`}
+                  title={`Use ${id.replace("candid-", "")} avatar`}
+                  onClick={() => void choosePresetAvatar(id)}
+                  className="rounded-full outline-none ring-offset-2 transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
+                >
+                  <img src={url} alt="" className="aspect-square w-full rounded-full" />
+                </button>
+              );
+            })}
+          </div>
+          {savingPreset ? <p className="text-xs text-muted-foreground">Saving avatar…</p> : null}
+        </div>
+      ) : null}
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+    </>
+  );
+
+  const photoActionsFooter = (
+    <DialogFooter className="gap-2 sm:flex-row sm:justify-center sm:space-x-0 [&>button]:w-full sm:[&>button]:w-auto">
+      {file ? (
+        <>
+          {!uploading ? (
+            <Button type="button" variant="outline" onClick={openFilePicker}>
+              <Camera className="size-4" /> Choose another
+            </Button>
+          ) : null}
+          <Button type="button" onClick={() => void upload()} disabled={uploading}>
+            {uploading ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Upload className="size-4" />
+            )}
+            {uploading ? "Uploading…" : "Upload photo"}
+          </Button>
+          {uploading ? (
+            <Button type="button" variant="ghost" onClick={cancelUpload}>
+              <X className="size-4" /> Cancel
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                setFile(null);
+                setError(null);
+              }}
+            >
+              <RotateCcw className="size-4" /> Clear
+            </Button>
+          )}
+        </>
+      ) : (
+        <>
+          {photoUrl ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setActionsOpen(false);
+                setViewerOpen(true);
+              }}
+            >
+              <Eye className="size-4" /> View photo
+            </Button>
+          ) : null}
+          <Button type="button" onClick={openFilePicker}>
+            <Camera className="size-4" /> {photoUrl ? "Update photo" : "Add photo"}
+          </Button>
+        </>
+      )}
+    </DialogFooter>
+  );
+
   return (
     <div
       className={
@@ -469,120 +600,55 @@ export function ProfilePhotoPicker({
           event.currentTarget.value = "";
         }}
       />
-      <Dialog open={actionsOpen} onOpenChange={setActionsOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{file ? "Update profile photo" : "Profile photo"}</DialogTitle>
-            <DialogDescription>
-              {file
-                ? "Check the preview, then decide whether to upload it."
-                : "View your photo, choose an illustration, or select a character avatar."}
-            </DialogDescription>
-          </DialogHeader>
-          <p
-            role="note"
-            className="rounded-xl border border-border bg-secondary/50 p-3 text-sm leading-relaxed text-muted-foreground"
-          >
-            Your profile photo is public and appears beside your posts and comments. A real photo
-            could make you recognizable even when you use an alias. Adding a photo is optional; you
-            can use an illustration or leave it blank.
-          </p>
-          <div className="flex flex-col items-center gap-4 py-2">
-            <ProfileAvatar
-              photoUrl={previewUrl ?? photoUrl}
-              initials={initials}
-              className="size-36 border-2 border-border shadow-sm"
-            />
-            {file ? (
-              <p className="max-w-full truncate text-sm text-muted-foreground">{file.name}</p>
-            ) : null}
-          </div>
-          {!file ? (
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Choose a character avatar</p>
-              <div className="grid grid-cols-6 gap-2">
-                {PRESET_AVATARS.map((id) => {
-                  const url = presetAvatarUrl(id);
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      disabled={savingPreset || uploading}
-                      aria-label={`Use ${id.replace("candid-", "")} character avatar`}
-                      title={`Use ${id.replace("candid-", "")} avatar`}
-                      onClick={() => void choosePresetAvatar(id)}
-                      className="rounded-full outline-none ring-offset-2 transition hover:scale-105 focus-visible:ring-2 focus-visible:ring-primary disabled:opacity-50"
-                    >
-                      <img src={url} alt="" className="aspect-square w-full rounded-full" />
-                    </button>
-                  );
-                })}
+      {isMobileViewport ? (
+        <Drawer open={actionsOpen} onOpenChange={setActionsOpen}>
+          <DrawerContent className="max-h-[94dvh] rounded-t-[2rem] border-border bg-background px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-24px_70px_-24px_rgba(0,0,0,0.65)]">
+            <DrawerHeader className="shrink-0 p-0 pb-4 pt-3 text-left">
+              <div className="flex items-start justify-between gap-4">
+                <div className="space-y-1">
+                  <DrawerTitle>{file ? "Update profile photo" : "Profile photo"}</DrawerTitle>
+                  <DrawerDescription>
+                    {file
+                      ? "Check the preview, then decide whether to upload it."
+                      : "Choose a photo, illustration, or character avatar."}
+                  </DrawerDescription>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="-mr-2 -mt-2 size-9 shrink-0 rounded-full"
+                  aria-label="Close profile photo options"
+                  onClick={() => setActionsOpen(false)}
+                >
+                  <X className="size-4" />
+                </Button>
               </div>
-              {savingPreset ? (
-                <p className="text-xs text-muted-foreground">Saving avatar…</p>
-              ) : null}
+            </DrawerHeader>
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain pb-4">
+              {photoActionsBody}
             </div>
-          ) : null}
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
-          <DialogFooter className="gap-2 sm:flex-row sm:justify-center sm:space-x-0">
-            {file ? (
-              <>
-                {!uploading ? (
-                  <Button type="button" variant="outline" onClick={openFilePicker}>
-                    <Camera className="size-4" /> Choose another
-                  </Button>
-                ) : null}
-                <Button type="button" onClick={() => void upload()} disabled={uploading}>
-                  {uploading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Upload className="size-4" />
-                  )}
-                  {uploading ? "Uploading…" : "Upload photo"}
-                </Button>
-                {uploading ? (
-                  <Button type="button" variant="ghost" onClick={cancelUpload}>
-                    <X className="size-4" /> Cancel
-                  </Button>
-                ) : (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => {
-                      setFile(null);
-                      setError(null);
-                    }}
-                  >
-                    <RotateCcw className="size-4" /> Clear
-                  </Button>
-                )}
-              </>
-            ) : (
-              <>
-                {photoUrl ? (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setActionsOpen(false);
-                      setViewerOpen(true);
-                    }}
-                  >
-                    <Eye className="size-4" /> View photo
-                  </Button>
-                ) : null}
-                <Button type="button" onClick={openFilePicker}>
-                  <Camera className="size-4" /> {photoUrl ? "Update photo" : "Add photo"}
-                </Button>
-              </>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+            <div className="-mx-5 shrink-0 border-t border-border/70 bg-background/95 px-5 pt-4 backdrop-blur-xl">
+              {photoActionsFooter}
+            </div>
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={actionsOpen} onOpenChange={setActionsOpen}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>{file ? "Update profile photo" : "Profile photo"}</DialogTitle>
+              <DialogDescription>
+                {file
+                  ? "Check the preview, then decide whether to upload it."
+                  : "View your photo, choose an illustration, or select a character avatar."}
+              </DialogDescription>
+            </DialogHeader>
+            {photoActionsBody}
+            {photoActionsFooter}
+          </DialogContent>
+        </Dialog>
+      )}
       <Dialog open={viewerOpen} onOpenChange={setViewerOpen}>
         <DialogContent
           hideCloseButton

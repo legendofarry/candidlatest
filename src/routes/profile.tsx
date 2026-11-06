@@ -271,7 +271,6 @@ function ProfilePage() {
                           )}
                           {nextUsernameChangeAt === null ? (
                             <p className="px-2 py-1 text-xs text-muted-foreground">
-                              Username changes are limited to once every 2 weeks.
                             </p>
                           ) : null}
                         </DropdownMenuContent>

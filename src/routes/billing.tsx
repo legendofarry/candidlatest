@@ -125,6 +125,7 @@ function BillingPage() {
   const billingHistory = data?.history ?? [];
   const membership = data?.membership;
   const currentTier = membership?.tier ?? "basic";
+  const isFreeTier = currentTier === "basic";
   const isOfficial = membership?.accountType === "official";
   const plans = data?.packages;
   const awaiting = data?.payments.find(
@@ -153,11 +154,6 @@ function BillingPage() {
             <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
               {isOfficial ? "Official Candid access" : "Your membership"}
             </h1>
-            <p className="mt-3 text-sm text-muted-foreground">
-              {isOfficial
-                ? "Premium access is complimentary for the official Candid account."
-                : "Manage your package and payment history."}
-            </p>
           </header>
 
           {billing.isLoading ? (
@@ -199,32 +195,78 @@ function BillingPage() {
                         transform: membershipCardFlipped ? "rotateY(180deg)" : "rotateY(0deg)",
                       }}
                     >
-                      <div className="absolute inset-0 overflow-hidden rounded-[1.35rem] border border-white/10 bg-gradient-to-br from-[#192326] via-[#101719] to-[#080c0e] p-5 text-white shadow-xl [backface-visibility:hidden] sm:p-6">
+                      <div
+                        className={cn(
+                          "absolute inset-0 overflow-hidden rounded-[1.35rem] border p-5 text-white shadow-xl [backface-visibility:hidden] sm:p-6",
+                          isFreeTier
+                            ? "border-slate-400/15 bg-gradient-to-br from-[#252b35] via-[#171c25] to-[#0d1118]"
+                            : "border-white/10 bg-gradient-to-br from-[#192326] via-[#101719] to-[#080c0e]",
+                        )}
+                      >
                         <div
                           aria-hidden="true"
-                          className="pointer-events-none absolute -right-12 -top-20 size-56 rounded-full border border-lime-300/10 bg-lime-300/[0.04] shadow-[0_0_0_26px_rgba(190,242,100,0.025),0_0_0_54px_rgba(190,242,100,0.02)]"
+                          className={cn(
+                            "pointer-events-none absolute -right-12 -top-20 size-56 rounded-full",
+                            isFreeTier
+                              ? "border border-slate-300/[0.08] bg-slate-300/[0.025] shadow-[0_0_0_26px_rgba(203,213,225,0.018),0_0_0_54px_rgba(203,213,225,0.012)]"
+                              : "border border-lime-300/10 bg-lime-300/[0.04] shadow-[0_0_0_26px_rgba(190,242,100,0.025),0_0_0_54px_rgba(190,242,100,0.02)]",
+                          )}
                         />
                         <div className="relative flex items-start justify-between gap-3">
                           <div className="flex items-center gap-2">
-                            <span className="flex size-8 items-center justify-center rounded-xl bg-lime-300 text-slate-950">
+                            <span
+                              className={cn(
+                                "flex size-8 items-center justify-center rounded-xl",
+                                isFreeTier
+                                  ? "bg-slate-300 text-slate-900"
+                                  : "bg-lime-300 text-slate-950",
+                              )}
+                            >
                               <Flame className="size-4" />
                             </span>
                             <span className="font-display text-sm font-semibold tracking-wide">
                               Candid
                             </span>
                           </div>
-                          <span className="rounded-full border border-lime-200/20 bg-lime-200/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[.16em] text-lime-200">
+                          <span
+                            className={cn(
+                              "rounded-full border px-3 py-1 text-[10px] font-semibold uppercase tracking-[.16em]",
+                              isFreeTier
+                                ? "border-slate-300/15 bg-slate-300/[0.07] text-slate-300"
+                                : "border-lime-200/20 bg-lime-200/10 text-lime-200",
+                            )}
+                          >
                             {statusLabel(membership?.status, membership?.source)}
                           </span>
                         </div>
                         <div className="relative mt-5 flex items-center gap-3">
                           <div
                             aria-hidden="true"
-                            className="grid size-10 grid-cols-2 overflow-hidden rounded-lg border border-amber-100/30 bg-gradient-to-br from-amber-100/90 to-amber-400/70 p-1"
+                            className={cn(
+                              "grid size-10 grid-cols-2 overflow-hidden rounded-lg border p-1",
+                              isFreeTier
+                                ? "border-slate-300/20 bg-gradient-to-br from-slate-300/80 to-slate-500/60"
+                                : "border-amber-100/30 bg-gradient-to-br from-amber-100/90 to-amber-400/70",
+                            )}
                           >
-                            <span className="rounded-tl border-b border-r border-amber-900/25" />
-                            <span className="rounded-tr border-b border-amber-900/25" />
-                            <span className="rounded-bl border-r border-amber-900/25" />
+                            <span
+                              className={cn(
+                                "rounded-tl border-b border-r",
+                                isFreeTier ? "border-slate-800/20" : "border-amber-900/25",
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                "rounded-tr border-b",
+                                isFreeTier ? "border-slate-800/20" : "border-amber-900/25",
+                              )}
+                            />
+                            <span
+                              className={cn(
+                                "rounded-bl border-r",
+                                isFreeTier ? "border-slate-800/20" : "border-amber-900/25",
+                              )}
+                            />
                             <span className="rounded-br" />
                           </div>
                           <CreditCard aria-hidden="true" className="size-5 text-white/50" />
@@ -238,7 +280,12 @@ function BillingPage() {
                               {capitalize(currentTier)}
                             </p>
                           </div>
-                          <p className="text-right text-xs font-medium text-lime-200">
+                          <p
+                            className={cn(
+                              "text-right text-xs font-medium",
+                              isFreeTier ? "text-slate-300" : "text-lime-200",
+                            )}
+                          >
                             {membership?.source === "paid" ? "CANDID MEMBER" : "CANDID COMMUNITY"}
                           </p>
                         </div>
@@ -251,8 +298,21 @@ function BillingPage() {
                           </div>
                         ) : null}
                       </div>
-                      <div className="absolute inset-0 overflow-hidden rounded-[1.35rem] border border-white/10 bg-gradient-to-br from-[#182225] via-[#0e1416] to-[#080b0c] p-5 text-white shadow-xl [backface-visibility:hidden] [transform:rotateY(180deg)] sm:p-6">
-                        <div aria-hidden="true" className="-mx-5 mt-2 h-10 bg-[#050708] sm:-mx-6" />
+                      <div
+                        className={cn(
+                          "absolute inset-0 overflow-hidden rounded-[1.35rem] border p-5 text-white shadow-xl [backface-visibility:hidden] [transform:rotateY(180deg)] sm:p-6",
+                          isFreeTier
+                            ? "border-slate-400/15 bg-gradient-to-br from-[#252b35] via-[#171c25] to-[#0d1118]"
+                            : "border-white/10 bg-gradient-to-br from-[#182225] via-[#0e1416] to-[#080b0c]",
+                        )}
+                      >
+                        <div
+                          aria-hidden="true"
+                          className={cn(
+                            "-mx-5 mt-2 h-10 sm:-mx-6",
+                            isFreeTier ? "bg-[#090c12]" : "bg-[#050708]",
+                          )}
+                        />
                         <div className="mt-5 grid grid-cols-2 gap-3">
                           <div className="rounded-xl border border-white/10 bg-white/[0.04] p-3">
                             <p className="text-[10px] uppercase tracking-[.15em] text-white/50">
@@ -277,7 +337,12 @@ function BillingPage() {
                           <p className="text-[10px] uppercase tracking-[.18em] text-white/45">
                             Candid membership
                           </p>
-                          <span className="text-xs font-semibold text-lime-200">
+                          <span
+                            className={cn(
+                              "text-xs font-semibold",
+                              isFreeTier ? "text-slate-300" : "text-lime-200",
+                            )}
+                          >
                             {capitalize(currentTier)} ·{" "}
                             {statusLabel(membership?.status, membership?.source)}
                           </span>

@@ -139,13 +139,10 @@ export function AccountLifecycleSettings() {
                 <AlertDialogTitle className="pt-1 font-display text-xl font-semibold tracking-tight sm:text-2xl">
                   Account controls
                 </AlertDialogTitle>
-                <AlertDialogDescription className="max-w-sm text-sm leading-relaxed">
-                  Choose an action.
-                </AlertDialogDescription>
               </AlertDialogHeader>
             </div>
           </div>
-          <div className="grid gap-3 px-5 py-5 sm:px-7 sm:py-6">
+          <div className="grid grid-cols-2 gap-3  py-5 px-5 sm:py-6">
             <motion.div
               initial={reduceMotion ? false : { opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -153,7 +150,7 @@ export function AccountLifecycleSettings() {
             >
               <Button
                 variant="outline"
-                className="group h-auto min-h-14 justify-start gap-3 rounded-2xl border-border/70 bg-background px-4 py-3 text-left shadow-sm transition-all hover:border-primary/40 hover:bg-primary/[0.03] hover:shadow-md active:scale-[0.99]"
+                className="group h-auto min-h-14 w-full justify-start gap-3 rounded-2xl border-border/70 bg-background py-3 text-left shadow-sm transition-all hover:border-primary/40 hover:bg-primary/[0.03] hover:shadow-md active:scale-[0.99]"
                 disabled={busy}
                 onClick={() => void submit("deactivate")}
               >
@@ -161,10 +158,7 @@ export function AccountLifecycleSettings() {
                   <UserRoundMinus className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-foreground">Pause account</span>
-                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                    Hidden for up to 7 days
-                  </span>
+                  <span className="block font-semibold text-foreground">Pause</span>
                 </span>
                 <motion.span
                   aria-hidden="true"
@@ -183,7 +177,7 @@ export function AccountLifecycleSettings() {
             >
               <Button
                 variant="outline"
-                className="group h-auto min-h-14 justify-start gap-3 rounded-2xl border-destructive/25 bg-destructive/[0.025] px-4 py-3 text-left shadow-sm transition-all hover:border-destructive/50 hover:bg-destructive/[0.06] hover:shadow-md active:scale-[0.99]"
+                className="group h-auto min-h-14 w-full justify-start gap-3 rounded-2xl border-destructive/25 bg-destructive/[0.025] px-4 py-3 text-left shadow-sm transition-all hover:border-destructive/50 hover:bg-destructive/[0.06] hover:shadow-md active:scale-[0.99]"
                 disabled={busy}
                 onClick={() => void submit("delete")}
               >
@@ -191,10 +185,7 @@ export function AccountLifecycleSettings() {
                   <Trash2 className="size-4" />
                 </span>
                 <span className="min-w-0 flex-1">
-                  <span className="block font-semibold text-destructive">Delete account</span>
-                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
-                    48-hour recovery window
-                  </span>
+                  <span className="block font-semibold text-destructive">Delete</span>
                 </span>
                 <motion.span
                   aria-hidden="true"

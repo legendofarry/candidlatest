@@ -524,16 +524,14 @@ function PublicProfilePage() {
             ) : null}
           </div>
 
-          <div className="border-b border-border py-2 text-left sm:py-3">
-            {profile.role_label ? (
-              <p className="font-medium">{profile.role_label}</p>
-            ) : (
-              <p className="text-sm text-muted-foreground">No intro added yet.</p>
-            )}
-            {profile.followsYou && !profile.isSelf ? (
-              <p className="mt-1 text-xs text-muted-foreground">Follows you</p>
-            ) : null}
-          </div>
+          {profile.role_label || (profile.followsYou && !profile.isSelf) ? (
+            <div className="border-b border-border py-2 text-left sm:py-3">
+              {profile.role_label ? <p className="font-medium">{profile.role_label}</p> : null}
+              {profile.followsYou && !profile.isSelf ? (
+                <p className="mt-1 text-xs text-muted-foreground">Follows you</p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="flex flex-wrap gap-x-4 gap-y-2 pt-3 text-xs text-muted-foreground sm:text-sm">
             {profile.contributions.joined_at ? (
               <span className="inline-flex items-center gap-1.5">
@@ -641,8 +639,8 @@ function PublicProfilePage() {
             </p>
           </section>
         ) : pinnedStories.length ? (
-          <section className="mx-4 mb-3 overflow-hidden rounded-2xl border border-primary/25 bg-primary/[0.035] sm:mx-5">
-            <div className="flex items-center justify-between gap-3 border-b border-primary/10 px-4 py-3 sm:px-5">
+          <section className="mx-4 mb-3 overflow-hidden rounded-2xl border border-primary/40 bg-primary/10 shadow-[0_8px_28px_-18px_hsl(var(--primary)/0.55)] sm:mx-5">
+            <div className="flex items-center justify-between gap-3 border-b border-primary/20 bg-primary/10 px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2">
                 <Pin className="size-4 text-primary" />
                 <h2 className="font-semibold">Pinned stories</h2>
@@ -653,9 +651,12 @@ function PublicProfilePage() {
                 </Link>
               ) : null}
             </div>
-            <div className="divide-y divide-primary/10">
+            <div className="divide-y divide-primary/15">
               {pinnedStories.map((story) => (
-                <article key={story.id} className="px-4 py-3 sm:px-5">
+                <article
+                  key={story.id}
+                  className="border-l-[3px] border-primary bg-primary/[0.035] px-4 py-3 sm:px-5"
+                >
                   <p className="text-xs text-muted-foreground">
                     {story.post_type === "announcement"
                       ? "Candid"

@@ -346,11 +346,6 @@ export function PrivacySettings() {
             <DrawerTitle>
               {mobilePanel === "blocked" ? "Blocked accounts" : "Privacy & messages"}
             </DrawerTitle>
-            <DrawerDescription>
-              {mobilePanel === "blocked"
-                ? "Accounts you block cannot contact you or appear in your suggestions."
-                : "Choose who can see your profile and message you."}
-            </DrawerDescription>
           </DrawerHeader>
           <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(2rem,env(safe-area-inset-bottom))]">
             {mobilePanel === "blocked" ? blockedAccounts : settingsContent}
