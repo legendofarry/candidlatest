@@ -831,3 +831,61 @@
 .appearance-chat-preview[data-bubble-shape="soft"] [data-chat-area] > p {
   border-radius: 1.75rem;
 }
+
+/* Company intelligence hero + watch radar */
+@keyframes aura-breathe {
+  0%, 100% { opacity: 0.55; transform: translate3d(0, 0, 0) scale(1); }
+  50% { opacity: 0.9; transform: translate3d(2%, -3%, 0) scale(1.08); }
+}
+@keyframes aura-drift {
+  0%, 100% { transform: translate3d(0, 0, 0) rotate(0deg); }
+  50% { transform: translate3d(-4%, 3%, 0) rotate(12deg); }
+}
+@keyframes hero-resolve {
+  from { opacity: 0; filter: blur(14px); transform: translateY(10px) scale(0.985); }
+  to { opacity: 1; filter: blur(0); transform: none; }
+}
+@keyframes hud-scan {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+@keyframes sonar-ping {
+  0% { transform: scale(1); opacity: 0.7; }
+  100% { transform: scale(2.6); opacity: 0; }
+}
+@keyframes reticle-lock {
+  0% { transform: scale(1.6) rotate(-90deg); opacity: 0; }
+  60% { transform: scale(0.9) rotate(8deg); opacity: 1; }
+  100% { transform: scale(1) rotate(0); opacity: 1; }
+}
+@keyframes ring-draw {
+  from { stroke-dashoffset: var(--ring-length); }
+}
+
+@utility aura-breathe {
+  animation: aura-breathe 9s ease-in-out infinite;
+}
+@utility aura-drift {
+  animation: aura-drift 14s ease-in-out infinite;
+}
+@utility hero-resolve {
+  animation: hero-resolve 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility hud-scan {
+  animation: hud-scan 3.2s cubic-bezier(0.4, 0, 0.2, 1) 0.4s 1 both;
+}
+@utility sonar-ping {
+  animation: sonar-ping 2.2s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+@utility reticle-lock {
+  animation: reticle-lock 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@utility ring-draw {
+  animation: ring-draw 1.4s cubic-bezier(0.22, 1, 0.36, 1) 0.25s both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aura-breathe, .aura-drift, .hud-scan, .sonar-ping, .ring-draw, .hero-resolve, .reticle-lock {
+    animation: none !important;
+  }
+}
