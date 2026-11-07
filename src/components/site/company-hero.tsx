@@ -1,4 +1,6 @@
 import { useState, type CSSProperties } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { BadgeCheck, Banknote, MessageSquareText, Scale, Sparkles, TrendingDown, TrendingUp, Users } from "lucide-react";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { CompanyWatchButton } from "@/components/site/company-watch-button";
@@ -8,6 +10,7 @@ import {
   getCompanyBrandLogoUrl,
   getCompanyMonogram,
 } from "@/lib/company-branding";
+import { getCompanyBrandInfo } from "@/lib/company.functions";
 import { formatCount } from "@/lib/utils";
 
 type Score = {
@@ -43,8 +46,17 @@ export function getCompanySignal(score: Score | undefined) {
 }
 
 export function CompanyHero({ company, score, descriptor, stories }: Props) {
-  const accent = getCompanyAccent(company.name);
+  const fetchBrand = useServerFn(getCompanyBrandInfo);
+  const discovered = useQuery({
+    queryKey: ["company-brand", company.id],
+    queryFn: () => fetchBrand({ data: { company_id: company.id } }),
+    staleTime: 24 * 60 * 60 * 1000,
+    retry: false,
+  }).data;
   const brand = getCompanyBrand(company.name);
+  const accent = discovered?.color ?? getCompanyAccent(company.name);
+  const logoUrl = discovered?.logoUrl ?? (brand ? getCompanyBrandLogoUrl(brand.domain) : null);
+  const fallbackLogoUrl = discovered?.domain ? getCompanyBrandLogoUrl(discovered.domain) : null;
   const overall = num(score?.overall);
   const signal = getCompanySignal(score);
   const monthAgo = Date.now() - 30 * 24 * 60 * 60 * 1000;
@@ -89,7 +101,7 @@ export function CompanyHero({ company, score, descriptor, stories }: Props) {
       <div className="grid gap-7 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
         <div className="min-w-0">
           <div className="flex items-start gap-4">
-            <BrandMark name={company.name} domain={brand?.domain ?? null} accent={accent} status={status} />
+            <BrandMark name={company.name} logoUrl={logoUrl} fallbackLogoUrl={fallbackLogoUrl} accent={accent} status={status} />
             <div className="min-w-0 pt-1">
               <SignalCapsule tone={signal.tone} label={signal.label} />
               <h1 className="mt-2 flex flex-wrap items-center gap-2 font-display text-3xl font-semibold leading-tight tracking-tight md:text-5xl">
@@ -127,8 +139,9 @@ export function CompanyHero({ company, score, descriptor, stories }: Props) {
   );
 }
 
-function BrandMark({ name, domain, accent, status }: { name: string; domain: string | null; accent: string; status: string }) {
-  const [logoOk, setLogoOk] = useState(true);
+function BrandMark({ name, logoUrl, fallbackLogoUrl, accent, status }: { name: string; logoUrl: string | null; fallbackLogoUrl: string | null; accent: string; status: string }) {
+  const [failed, setFailed] = useState<string[]>([]);
+  const src = [logoUrl, fallbackLogoUrl].find((url) => url && !failed.includes(url)) ?? null;
   return (
     <div className="relative shrink-0">
       <div
@@ -140,13 +153,13 @@ function BrandMark({ name, domain, accent, status }: { name: string; domain: str
         aria-hidden="true"
         className="relative grid size-[4.5rem] place-items-center overflow-hidden rounded-[1.4rem] border border-border/60 md:size-20"
         style={
-          domain && logoOk
+          src
             ? { background: "oklch(0.99 0 0)" }
             : { background: `linear-gradient(140deg, ${accent}, color-mix(in oklab, ${accent} 45%, black))` }
         }
       >
-        {domain && logoOk ? (
-          <img src={getCompanyBrandLogoUrl(domain)} alt="" className="size-[70%] object-contain" onError={() => setLogoOk(false)} />
+        {src ? (
+          <img src={src} alt="" className="size-[70%] object-contain" onError={() => setFailed((list) => [...list, src])} />
         ) : (
           <span className="font-display text-2xl font-bold tracking-tight" style={{ color: "oklch(0.99 0 0)" }}>
             {getCompanyMonogram(name)}
