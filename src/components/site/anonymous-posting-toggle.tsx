@@ -1,8 +1,22 @@
-import { VenetianMask } from "lucide-react";
+import { VenetianMask, Globe2 } from "lucide-react";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { cn } from "@/lib/utils";
 import type { User } from "firebase/auth";
 
+function buzz() {
+  try {
+    navigator.vibrate?.(12);
+  } catch {
+    /* haptics are optional */
+  }
+}
+
+/**
+ * Compact identity chip for composers. Flip it and your face pixelates into a
+ * mosaic, a ghost surfaces, redaction tape wipes across your name and a light
+ * ring starts orbiting. Pair the surrounding field with `anon-field` +
+ * `data-anon` so the whole composer reacts too.
+ */
 export function AnonymousPostingToggle({
   anonymous,
   onToggle,
@@ -14,37 +28,76 @@ export function AnonymousPostingToggle({
   user?: Pick<User, "photoURL" | "displayName"> | null;
   className?: string;
 }) {
-  const initial = (user?.displayName ?? "U").slice(0, 1).toUpperCase();
+  const name = user?.displayName?.trim() || "";
+  const initial = (name || "U").slice(0, 1).toUpperCase();
 
   return (
     <button
       type="button"
-      onClick={onToggle}
+      onClick={() => {
+        buzz();
+        onToggle();
+      }}
       aria-label={anonymous ? "Switch to public identity" : "Switch to anonymous identity"}
       aria-pressed={anonymous}
-      className={cn(
-        "inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-[10px] font-medium transition-all duration-200 shadow-sm backdrop-blur-sm",
-        anonymous
-          ? "border-violet-400/60 bg-gradient-to-r from-violet-500/90 via-fuchsia-500/85 to-primary/90 text-white shadow-[0_8px_24px_-14px_hsl(var(--primary)/0.85)]"
-          : "border-border bg-background/90 text-muted-foreground hover:text-foreground",
-        className,
-      )}
+      className={cn("anon-toggle", className)}
     >
-      <span
-        className={cn(
-          "grid size-5 place-items-center overflow-hidden rounded-full border transition-all duration-200",
-          anonymous ? "border-white/30 bg-white/12" : "border-border bg-muted",
-        )}
-      >
-        {anonymous ? (
-          <VenetianMask className="size-3.5" />
-        ) : user?.photoURL ? (
-          <ProfileAvatar photoUrl={user.photoURL} initials={initial} className="size-5" />
-        ) : (
-          <span className="text-[9px] font-semibold">{initial}</span>
-        )}
+      <span className="anon-ring" aria-hidden />
+      <span className="anon-toggle__avatar" aria-hidden>
+        <span className="anon-toggle__face">
+          {user?.photoURL ? (
+            <ProfileAvatar photoUrl={user.photoURL} initials={initial} className="size-full" />
+          ) : (
+            <span className="font-semibold">{initial}</span>
+          )}
+        </span>
+        <span className="anon-toggle__mosaic" />
+        <span className="anon-toggle__ghost">
+          <VenetianMask className="size-4" />
+        </span>
       </span>
-      <span>{anonymous ? "Anon" : "Public"}</span>
+      <span className="anon-toggle__label" aria-live="polite">
+        <span className="anon-toggle__name">Public</span>
+        <span className="anon-toggle__tape">Anonymous</span>
+      </span>
+    </button>
+  );
+}
+
+/** Segmented "Public | Anonymous" switch with a gliding thumb, for settings. */
+export function AnonymousModeSwitch({
+  anonymous,
+  onToggle,
+  disabled,
+  className,
+}: {
+  anonymous: boolean;
+  onToggle: () => void;
+  disabled?: boolean;
+  className?: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={anonymous}
+      aria-label="Post anonymously by default"
+      disabled={disabled}
+      onClick={() => {
+        buzz();
+        onToggle();
+      }}
+      className={cn("anon-switch disabled:opacity-60", className)}
+    >
+      <span className="anon-switch__thumb" aria-hidden>
+        <span className="anon-ring" />
+      </span>
+      <span className="anon-switch__seg" data-seg="public">
+        <Globe2 className="size-4" aria-hidden /> Public
+      </span>
+      <span className="anon-switch__seg" data-seg="anon">
+        <VenetianMask className="size-4" aria-hidden /> Anonymous
+      </span>
     </button>
   );
 }

@@ -889,3 +889,355 @@
     animation: none !important;
   }
 }
+
+/* ───────────────────────────────────────────────────────────────
+   Identity "redaction" controls — anonymous / public switching.
+   Going anonymous blurs your face into a mosaic, a ghost surfaces,
+   and a strip of redaction tape slides over your name while a
+   light ring orbits the control.
+   ─────────────────────────────────────────────────────────────── */
+@property --anon-a {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes anon-orbit {
+  to {
+    --anon-a: 360deg;
+  }
+}
+
+@keyframes anon-scan {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 0 12px;
+  }
+}
+
+@keyframes anon-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.92);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.anon-toggle,
+.anon-switch {
+  --anon-ease: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --anon-wipe: cubic-bezier(0.7, 0, 0.2, 1);
+  --anon-ink-1: oklch(0.24 0.07 295);
+  --anon-ink-2: oklch(0.15 0.04 275);
+  --anon-ring: conic-gradient(
+    from var(--anon-a),
+    oklch(0.78 0.22 330),
+    oklch(0.7 0.2 275),
+    oklch(0.86 0.18 195),
+    oklch(0.85 0.2 125),
+    oklch(0.78 0.22 330)
+  );
+}
+
+.anon-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: var(--anon-ring);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask:
+    linear-gradient(#000 0 0) content-box exclude,
+    linear-gradient(#000 0 0);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.45s ease;
+  animation: anon-orbit 3.4s linear infinite;
+}
+
+/* ── Compact chip (inside composers) ── */
+.anon-toggle {
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  height: 2rem;
+  padding: 0 0.7rem 0 0.2rem;
+  border-radius: 9999px;
+  color: var(--muted-foreground);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  background: color-mix(in oklab, var(--background) 80%, transparent);
+  box-shadow:
+    inset 0 0 0 1px var(--border),
+    0 1px 2px oklch(0 0 0 / 0.06);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition:
+    color 0.35s ease,
+    background 0.5s ease,
+    box-shadow 0.5s ease,
+    transform 0.3s var(--anon-ease);
+}
+.anon-toggle:hover {
+  color: var(--foreground);
+}
+.anon-toggle:active {
+  transform: scale(0.95);
+}
+.anon-toggle:focus-visible,
+.anon-switch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.anon-toggle[aria-pressed="true"] {
+  color: #fff;
+  background: linear-gradient(135deg, var(--anon-ink-1), var(--anon-ink-2));
+  box-shadow:
+    inset 0 0 0 1px oklch(1 0 0 / 0.08),
+    0 12px 28px -12px oklch(0.62 0.25 305 / 0.75);
+}
+.anon-toggle[aria-pressed="true"] .anon-ring,
+.anon-switch[aria-checked="true"] .anon-ring {
+  opacity: 1;
+}
+
+.anon-toggle__avatar {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 1.6rem;
+  height: 1.6rem;
+  border-radius: 9999px;
+  overflow: hidden;
+  background: var(--muted);
+  font-size: 10px;
+  color: var(--foreground);
+  transition: transform 0.55s var(--anon-ease);
+}
+.anon-toggle[aria-pressed="true"] .anon-toggle__avatar {
+  transform: rotate(-8deg) scale(1.04);
+  background: oklch(1 0 0 / 0.1);
+}
+.anon-toggle__face {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 100%;
+  transition:
+    filter 0.5s ease,
+    transform 0.55s var(--anon-ease);
+}
+.anon-toggle[aria-pressed="true"] .anon-toggle__face {
+  filter: blur(1.6px) grayscale(1) contrast(1.4);
+  transform: scale(1.35);
+}
+.anon-toggle__mosaic {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  background: repeating-conic-gradient(oklch(1 0 0 / 0.22) 0 25%, oklch(0 0 0 / 0.22) 0 50%) 0 0 / 4px
+    4px;
+  mix-blend-mode: soft-light;
+  transition: opacity 0.4s ease;
+}
+.anon-toggle[aria-pressed="true"] .anon-toggle__mosaic {
+  opacity: 1;
+}
+.anon-toggle__ghost {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  opacity: 0;
+  transform: scale(0.3) rotate(-35deg);
+  transition:
+    opacity 0.3s ease 0.1s,
+    transform 0.6s var(--anon-ease) 0.1s;
+}
+.anon-toggle[aria-pressed="true"] .anon-toggle__ghost {
+  opacity: 1;
+  transform: none;
+}
+
+.anon-toggle__label {
+  position: relative;
+  display: inline-grid;
+  min-width: 3.6rem;
+  max-width: 5.5rem;
+  overflow: hidden;
+  border-radius: 0.3rem;
+}
+.anon-toggle__label > * {
+  grid-area: 1 / 1;
+  white-space: nowrap;
+}
+.anon-toggle__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0.28rem 0;
+  transition: opacity 0.3s ease 0.12s;
+}
+.anon-toggle[aria-pressed="true"] .anon-toggle__name {
+  opacity: 0;
+  transition-delay: 0s;
+}
+.anon-toggle__tape {
+  display: grid;
+  place-items: center;
+  padding: 0.28rem 0.45rem;
+  border-radius: 0.3rem;
+  background: oklch(0.97 0.02 300);
+  color: oklch(0.2 0.06 290);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  transform: translateX(-108%);
+  transition: transform 0.55s var(--anon-wipe);
+}
+.anon-toggle[aria-pressed="true"] .anon-toggle__tape {
+  transform: none;
+}
+
+/* ── Segmented switch (settings) ── */
+.anon-switch {
+  position: relative;
+  isolation: isolate;
+  display: inline-grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: stretch;
+  height: 2.75rem;
+  width: 15.5rem;
+  max-width: 100%;
+  padding: 3px;
+  border-radius: 9999px;
+  background: var(--muted);
+  box-shadow: inset 0 1px 3px oklch(0 0 0 / 0.12);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.anon-switch__thumb {
+  position: absolute;
+  z-index: 0;
+  top: 3px;
+  bottom: 3px;
+  left: 3px;
+  width: calc(50% - 3px);
+  border-radius: 9999px;
+  background: var(--background);
+  box-shadow:
+    0 1px 2px oklch(0 0 0 / 0.12),
+    0 6px 14px -8px oklch(0 0 0 / 0.25);
+  transition:
+    transform 0.6s var(--anon-ease),
+    background 0.5s ease,
+    box-shadow 0.5s ease;
+}
+.anon-switch[aria-checked="true"] .anon-switch__thumb {
+  transform: translateX(100%);
+  background: linear-gradient(135deg, var(--anon-ink-1), var(--anon-ink-2));
+  box-shadow: 0 10px 26px -10px oklch(0.62 0.25 305 / 0.8);
+}
+.anon-switch__thumb .anon-ring {
+  padding: 1.5px;
+}
+.anon-switch__seg {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted-foreground);
+  transition: color 0.4s ease;
+}
+.anon-switch[aria-checked="false"] .anon-switch__seg[data-seg="public"],
+.anon-switch[aria-checked="true"] .anon-switch__seg[data-seg="anon"] {
+  color: var(--foreground);
+}
+.anon-switch[aria-checked="true"] .anon-switch__seg[data-seg="anon"] {
+  color: #fff;
+}
+.anon-switch__seg svg {
+  transition: transform 0.55s var(--anon-ease);
+}
+.anon-switch[aria-checked="true"] .anon-switch__seg[data-seg="anon"] svg,
+.anon-switch[aria-checked="false"] .anon-switch__seg[data-seg="public"] svg {
+  transform: scale(1.15) rotate(-6deg);
+}
+
+/* ── The composer surface reacts when anonymity is on ── */
+.anon-field {
+  transition:
+    border-color 0.5s ease,
+    background-color 0.5s ease,
+    box-shadow 0.6s ease;
+}
+.anon-field::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  border-radius: inherit;
+  opacity: 0;
+  background:
+    repeating-linear-gradient(
+      to bottom,
+      oklch(0.6 0.2 300 / 0.07) 0 1px,
+      transparent 1px 4px
+    ),
+    radial-gradient(120% 80% at 100% 100%, oklch(0.65 0.25 305 / 0.14), transparent 60%);
+  background-size:
+    100% 12px,
+    100% 100%;
+  transition: opacity 0.6s ease;
+  animation: anon-scan 1.4s linear infinite;
+}
+.anon-field[data-anon="true"] {
+  border-color: oklch(0.65 0.2 300 / 0.55);
+  box-shadow:
+    0 0 0 1px oklch(0.65 0.25 305 / 0.18),
+    0 20px 44px -26px oklch(0.6 0.25 305 / 0.85);
+}
+.anon-field[data-anon="true"]::after {
+  opacity: 1;
+}
+.anon-field > * {
+  position: relative;
+  z-index: 1;
+}
+.anon-field > .anon-toggle {
+  position: absolute;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .anon-ring,
+  .anon-field::after {
+    animation: none;
+  }
+  .anon-toggle,
+  .anon-toggle * ,
+  .anon-switch,
+  .anon-switch * {
+    transition-duration: 0.01ms !important;
+    transition-delay: 0s !important;
+  }
+}
