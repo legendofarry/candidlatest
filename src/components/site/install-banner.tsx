@@ -5,7 +5,7 @@ import { ArrowDownToLine, Check, CheckCircle2, Flame, Loader2, Share, Smartphone
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { registerFirebaseServiceWorker } from "@/integrations/firebase/client";
-import { isPwaInstalled, markPwaInstalled, rememberInstallPrompt, requestPwaInstall, type InstallProgress } from "@/lib/pwa-install";
+import { clearPwaInstalled, isPwaInstalled, markPwaInstalled, rememberInstallPrompt, requestPwaInstall, type InstallProgress } from "@/lib/pwa-install";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 
 const DISMISS_KEY = "candid-install-banner-dismissed-at";
@@ -74,6 +74,7 @@ export function InstallBanner() {
   useEffect(() => {
     const capturePrompt = (event: Event) => {
       event.preventDefault();
+      clearPwaInstalled();
       rememberInstallPrompt(event);
       setPromptEvent(event as InstallPromptEvent);
     };
