@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnonymousModeSwitch } from "@/components/site/anonymous-posting-toggle";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Link } from "@tanstack/react-router";
@@ -279,16 +280,16 @@ export function PrivacySettings() {
         </div>
       </div>
 
-      <div className="flex items-center justify-between gap-4 border-t border-border pt-4">
+      <div className="flex flex-col gap-4 border-t border-border pt-4">
         <div>
           <p className="text-sm font-medium">Post new stories and comments anonymously</p>
           <p className="mt-1 text-xs text-muted-foreground">Your identity stays hidden from other members. You and moderators can still manage and review your contributions. Existing posts are unchanged.</p>
         </div>
-        <button type="button" role="switch" aria-checked={data?.anonymous_contributions_default ?? false}
+        <AnonymousModeSwitch
+          anonymous={data?.anonymous_contributions_default ?? false}
           disabled={isLoading}
-          onClick={() => void saveSettings({ data: { anonymous_contributions_default: !(data?.anonymous_contributions_default ?? false) } }).then(() => queryClient.invalidateQueries({ queryKey: ["privacy-settings"] })).catch((error) => notify.error(error instanceof Error ? error.message : "Could not save anonymity settings."))}
-          className={cn("h-6 w-11 shrink-0 rounded-full p-1 transition-colors", data?.anonymous_contributions_default ? "bg-primary" : "bg-muted")}
-        ><span className={cn("block size-4 rounded-full bg-white transition-transform", data?.anonymous_contributions_default && "translate-x-5")} /></button>
+          onToggle={() => void saveSettings({ data: { anonymous_contributions_default: !(data?.anonymous_contributions_default ?? false) } }).then(() => queryClient.invalidateQueries({ queryKey: ["privacy-settings"] })).catch((error) => notify.error(error instanceof Error ? error.message : "Could not save anonymity settings."))}
+        />
       </div>
 
       <div>

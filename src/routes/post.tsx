@@ -1303,11 +1303,10 @@ function WorkplaceStoryComposer() {
                             <Label htmlFor="body">Your story</Label>
                             <div
                               className={cn(
-                                "relative overflow-hidden rounded-2xl border bg-background/80 transition-all duration-200",
-                                anonymous
-                                  ? "border-violet-400/60 bg-violet-500/[0.07] shadow-[0_0_0_1px_rgba(168,85,247,0.18),0_18px_42px_-24px_hsl(var(--primary)/0.9)]"
-                                  : "border-border/80 bg-card/80",
+                                "anon-field relative overflow-hidden rounded-2xl border bg-card/80",
+                                !anonymous && "border-border/80",
                               )}
+                              data-anon={anonymous}
                             >
                               <MentionTextarea
                                 id="body"
@@ -1323,7 +1322,7 @@ function WorkplaceStoryComposer() {
                                   anonymous={anonymous}
                                   onToggle={() => setAnonymous((value) => !value)}
                                   user={user}
-                                  className="absolute bottom-2.5 right-2.5 z-10"
+                                  className="absolute bottom-2 right-2 z-10"
                                 />
                               ) : null}
                             </div>
