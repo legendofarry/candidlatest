@@ -21,6 +21,15 @@ export function markPwaInstalled() {
   catch { /* standalone display mode remains available */ }
 }
 
+/**
+ * The browser only fires `beforeinstallprompt` when the app is NOT installed, so
+ * seeing it proves any stored "installed" flag is stale (e.g. after uninstalling).
+ */
+export function clearPwaInstalled() {
+  try { window.localStorage.removeItem(INSTALLED_KEY); }
+  catch { /* nothing to clear */ }
+}
+
 function reportProgress(state: InstallProgress) {
   if (typeof window !== "undefined") {
     window.dispatchEvent(new CustomEvent("candid:pwa-install-progress", { detail: state }));
