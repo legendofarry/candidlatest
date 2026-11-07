@@ -3,15 +3,10 @@ import { queryOptions, useSuspenseQuery } from "@tanstack/react-query";
 import { Sparkles } from "lucide-react";
 import { getCompany } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
-import { ScoreBadge } from "@/routes/companies.index";
+import { CompanyHero } from "@/components/site/company-hero";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { CompanyIntelPanel } from "@/components/site/company-intel";
-import { CompanyWatchButton } from "@/components/site/company-watch-button";
-import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
-import { formatCount } from "@/lib/utils";
-import { getCompanyBrand, getCompanyBrandLogoUrl } from "@/lib/company-branding";
-import { useState } from "react";
 
 const companyQuery = (slug: string) =>
   queryOptions({
@@ -115,62 +110,10 @@ function CompanyPage() {
   const { data } = useSuspenseQuery(companyQuery(slug));
   if (!data) return null;
   const { company, score, profile, stories } = data;
-  const brand = getCompanyBrand(company.name);
 
   return (
     <div className="space-y-8">
-      <section
-        className="mesh-hero animate-fade relative isolate overflow-hidden rounded-3xl border border-border p-6 md:p-10"
-        style={
-          brand
-            ? {
-                borderColor: `${brand.color}66`,
-                backgroundImage: `radial-gradient(ellipse at 12% 0%, ${brand.color}33, transparent 62%), linear-gradient(110deg, ${brand.color}1c, transparent 74%)`,
-              }
-            : undefined
-        }
-      >
-        <div className="flex flex-wrap items-start justify-between gap-4">
-          <div className="flex min-w-0 items-center gap-4">
-            {brand ? (
-              <CompanyBrandMark
-                key={`${company.slug}:${brand.domain}`}
-                companyName={company.name}
-                domain={brand.domain}
-              />
-            ) : null}
-            <div className="min-w-0">
-              <h1 className="flex flex-wrap items-center gap-2 text-3xl font-semibold md:text-4xl">
-                {company.name}
-                {company.verified ? <CompanyVerifiedBadge className="size-6" /> : null}
-              </h1>
-              <p className="mt-2 text-sm text-muted-foreground">
-                {company.industry} · {company.county}
-              </p>
-              {profile?.descriptor ? <p className="mt-3 max-w-4xl">{profile.descriptor}</p> : null}
-            </div>
-          </div>
-          <div className="flex flex-col items-start gap-3 sm:items-end">
-            <div className="text-left sm:text-right">
-              <ScoreBadge value={score?.overall ?? null} />
-              <p className="mt-2 text-xs text-muted-foreground">
-                {formatCount(score?.story_count)} stories · {formatCount(score?.rating_count)}{" "}
-                ratings
-              </p>
-              {score?.would_work_again_pct !== null && score?.would_work_again_pct !== undefined ? (
-                <p className="text-xs text-verified">
-                  {Math.round(Number(score.would_work_again_pct))}% would work here again
-                </p>
-              ) : null}
-            </div>
-            <CompanyWatchButton
-              companyId={company.id}
-              companySlug={company.slug}
-              companyName={company.name}
-            />
-          </div>
-        </div>
-      </section>
+      <CompanyHero company={company} score={score} descriptor={profile?.descriptor ?? null} stories={stories} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 self-start space-y-4">
@@ -277,28 +220,6 @@ function CompanyPage() {
           </div>
         </aside>
       </div>
-    </div>
-  );
-}
-
-function CompanyBrandMark({ companyName, domain }: { companyName: string; domain: string }) {
-  const [logoAvailable, setLogoAvailable] = useState(true);
-
-  return (
-    <div
-      aria-hidden="true"
-      className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-black/10 bg-white p-2 shadow-sm"
-    >
-      {logoAvailable ? (
-        <img
-          src={getCompanyBrandLogoUrl(domain)}
-          alt=""
-          className="size-full object-contain"
-          onError={() => setLogoAvailable(false)}
-        />
-      ) : (
-        <span className="text-2xl font-bold text-slate-800">{companyName.trim().charAt(0)}</span>
-      )}
     </div>
   );
 }
