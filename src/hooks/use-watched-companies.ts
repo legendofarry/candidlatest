@@ -15,5 +15,6 @@ export function useWatchedCompanies() {
     staleTime: 60_000,
   });
   const ids = useMemo(() => new Set((query.data ?? []).map((w) => w.company_id)), [query.data]);
-  return { ...query, ids };
+  const slugs = useMemo(() => new Set((query.data ?? []).map((w) => w.company_slug)), [query.data]);
+  return { ...query, ids, slugs };
 }

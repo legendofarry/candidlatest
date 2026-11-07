@@ -101,7 +101,11 @@ function WatchedCompaniesPage() {
             const accent = getCompanyAccent(watch.company_name);
             const overall = score?.overall !== null && score?.overall !== undefined ? Number(score.overall) : null;
             const signal = getCompanySignal(score);
-            const fresh = watch.last_notified_at && Date.now() - Date.parse(watch.last_notified_at) < 7 * 864e5;
+            const fresh = Boolean(
+              watch.last_notified_event_id &&
+                watch.last_notified_at &&
+                Date.now() - Date.parse(watch.last_notified_at) < 7 * 864e5,
+            );
             return (
               <li
                 key={watch.company_id}
@@ -127,7 +131,6 @@ function WatchedCompaniesPage() {
                         boxShadow: `0 8px 24px -10px ${accent}`,
                       }}
                     >
-                      {getCompanyMonogram(watch.company_name)}
                     </span>
                     <span className="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-background">
                       <span className="relative inline-flex size-2">

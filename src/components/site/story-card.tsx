@@ -9,6 +9,7 @@ import {
   Flag,
   MapPin,
   MoreHorizontal,
+  Radar,
   Share2,
   UserRoundPlus,
   UserRoundX,
@@ -95,11 +96,13 @@ export function StoryCard({
   index = 0,
   discussionOpen = false,
   onToggleDiscussion,
+  trackedCompany = false,
 }: {
   story: PublicStory;
   index?: number;
   discussionOpen?: boolean;
   onToggleDiscussion?: (() => void) | undefined;
+  trackedCompany?: boolean;
 }) {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -273,6 +276,11 @@ export function StoryCard({
         )}
         {story.tenure ? <span>· {story.tenure}</span> : null}
         {story.role_level ? <span>· {story.role_level}</span> : null}
+        {trackedCompany ? (
+          <span className="inline-flex items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 font-medium text-primary">
+            <Radar className="size-3" /> In your radar
+          </span>
+        ) : null}
       </div>
 
       <div className="absolute right-3 top-4 z-20 sm:right-5">

@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useInfiniteQuery, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { Activity, Flame, PenLine, Sparkles, TrendingUp, X } from "lucide-react";
+import { Activity, Flame, PenLine, Radar, Sparkles, TrendingUp, X } from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { getFilterOptions, listStories, listStoryPage } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
@@ -17,6 +17,7 @@ import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
+import { useWatchedCompanies } from "@/hooks/use-watched-companies";
 import {
   Drawer,
   DrawerContent,
@@ -69,6 +70,7 @@ const SORTS = [
 
 function FeedPage() {
   const { user } = useAuth();
+  const watchedCompanies = useWatchedCompanies();
   const { data: filters } = useSuspenseQuery(filtersQuery);
   const { data: initialFeed } = useSuspenseQuery(feedQuery);
   const [sort, setSort] = useState<"new" | "top" | "trending">("new");
@@ -76,6 +78,7 @@ function FeedPage() {
   const [county, setCounty] = useState<string | null>(null);
   const [area, setArea] = useState<string | null>(null);
   const [q, setQ] = useState("");
+  const [radarOnly, setRadarOnly] = useState(false);
   const [activeDiscussion, setActiveDiscussion] = useState<PublicStory | null>(null);
   const [pulseSheetOpen, setPulseSheetOpen] = useState(false);
   const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(20);
@@ -86,7 +89,7 @@ function FeedPage() {
    */
   const isDefaultView = sort === "new" && industry === null && county === null && area === null;
 
-  useEffect(() => resetVisibleCount(), [sort, industry, county, area, q, resetVisibleCount]);
+  useEffect(() => resetVisibleCount(), [sort, industry, county, area, q, radarOnly, resetVisibleCount]);
 
   const feedPages = useInfiniteQuery({
     queryKey: ["story-pages", user?.uid ?? null, sort, industry, county, area],
@@ -103,8 +106,8 @@ function FeedPage() {
   const areaOptions = county ? (filters.areasByCounty[county] ?? []) : filters.areas;
 
   const needle = q.trim().toLowerCase();
-  const stories = (feedPages.data?.pages.flatMap((page) => page.stories) ?? []).filter((story) =>
-    needle
+  const stories = (feedPages.data?.pages.flatMap((page) => page.stories) ?? []).filter((story) => {
+    const matchesSearch = needle
       ? [
           story.title,
           story.body,
@@ -114,8 +117,15 @@ function FeedPage() {
           .join(" ")
           .toLowerCase()
           .includes(needle)
-      : true,
-  );
+      : true;
+    const matchesRadar =
+      !radarOnly ||
+      Boolean(
+        (story.company_id && watchedCompanies.ids.has(story.company_id)) ||
+          (story.company_slug && watchedCompanies.slugs.has(story.company_slug)),
+      );
+    return matchesSearch && matchesRadar;
+  });
 
   function scrollToFeed() {
     requestAnimationFrame(() =>
@@ -124,7 +134,7 @@ function FeedPage() {
   }
 
   const canReset =
-    Boolean(needle) || industry !== null || county !== null || area !== null || sort !== "new";
+    Boolean(needle) || industry !== null || county !== null || area !== null || sort !== "new" || radarOnly;
 
   return (
     <div className="space-y-5 md:space-y-8">
@@ -226,6 +236,31 @@ function FeedPage() {
         className={`grid gap-6 ${activeDiscussion ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : "grid-cols-1"}`}
       >
         <div id="feed" className="min-w-0 scroll-mt-20 space-y-0">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            {user?.emailVerified ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={radarOnly ? "default" : "outline"}
+                aria-pressed={radarOnly}
+                onClick={() => setRadarOnly((current) => !current)}
+                className="rounded-full"
+              >
+                <Radar className={`size-4 ${radarOnly ? "animate-pulse" : ""}`} />
+                My Radar
+                <span className="ml-1 tabular-nums opacity-75">{watchedCompanies.data?.length ?? 0}</span>
+              </Button>
+            ) : (
+              <Button asChild size="sm" variant="outline" className="rounded-full">
+                <Link to={user ? "/verify-email" : "/auth"}>
+                  <Radar className="size-4" /> My Radar
+                </Link>
+              </Button>
+            )}
+            {radarOnly ? (
+              <span className="text-xs text-muted-foreground">Stories from employers you track</span>
+            ) : null}
+          </div>
           <FilterBar
             query={q}
             onQueryChange={setQ}
@@ -237,6 +272,7 @@ function FeedPage() {
               setCounty(null);
               setArea(null);
               setSort("new");
+              setRadarOnly(false);
             }}
             collapsibleFilters
             filters={[
@@ -285,7 +321,13 @@ function FeedPage() {
             </div>
           ) : stories.length === 0 ? (
             <p className="rounded-2xl border border-border p-8 text-center text-sm text-muted-foreground">
-              No stories match these filters yet.
+              {radarOnly && watchedCompanies.data?.length === 0
+                ? "Your radar is empty. Track an employer from its company page to see their stories here."
+                : radarOnly && feedPages.hasNextPage
+                  ? "No tracked-company stories in this batch yet. Load more to continue scanning."
+                  : radarOnly
+                    ? "No stories from your tracked companies yet."
+                    : "No stories match these filters yet."}
             </p>
           ) : (
             stories
@@ -295,6 +337,10 @@ function FeedPage() {
                   key={story.id}
                   story={story}
                   index={index}
+                  trackedCompany={Boolean(
+                    (story.company_id && watchedCompanies.ids.has(story.company_id)) ||
+                      (story.company_slug && watchedCompanies.slugs.has(story.company_slug)),
+                  )}
                   discussionOpen={activeDiscussion?.id === story.id}
                   onToggleDiscussion={() =>
                     setActiveDiscussion((current) => (current?.id === story.id ? null : story))
