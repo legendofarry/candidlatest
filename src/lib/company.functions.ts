@@ -48,6 +48,21 @@ export const getCompanyIntel = createServerFn({ method: "GET" })
     }
   });
 
+/** Automatically finds the employer's real logo and brand colour; no member input needed. */
+export const getCompanyBrandInfo = createServerFn({ method: "GET" })
+  .inputValidator((input: unknown) =>
+    z.object({ company_id: z.string().min(1).max(120) }).parse(input),
+  )
+  .handler(async ({ data }) => {
+    try {
+      const { resolveCompanyBrand } = await import("./company-brand.server");
+      return await resolveCompanyBrand(data.company_id);
+    } catch (error) {
+      console.error("[getCompanyBrandInfo]", error);
+      return { domain: null, color: null, logoUrl: null };
+    }
+  });
+
 export const getMyCompanyRating = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) => z.object({ company_id: z.string().min(1) }).parse(input))
