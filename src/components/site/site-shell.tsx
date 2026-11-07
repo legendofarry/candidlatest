@@ -445,6 +445,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             pathname !== "/post" &&
             pathname !== "/profile" &&
             !pathname.startsWith("/u/") &&
+            !pathname.startsWith("/stories/") &&
             (directConversationRoute || pathname === "/my-contributions"
               ? "w-full md:app-shell"
               : "app-shell"),
