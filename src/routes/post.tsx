@@ -8,13 +8,9 @@ import {
   ArrowLeft,
   ArrowRight,
   Building2,
-  FileText,
-  Image as ImageIcon,
-  Lock,
   LoaderCircle,
   MapPin,
   PenLine,
-  Paperclip,
   RefreshCw,
   Save,
   ShieldCheck,
@@ -32,10 +28,6 @@ import {
   updateStory,
 } from "@/lib/actions.functions";
 import { generateStoryDrafts } from "@/lib/story-draft.functions";
-import {
-  discardEmploymentEvidenceUpload,
-  issueEmploymentEvidenceUpload,
-} from "@/lib/evidence-upload.functions";
 import { findCompanyMatches } from "@/lib/company-match";
 import { knownKenyanEmployers } from "@/lib/kenyan-employers";
 import { useAuth } from "@/hooks/useAuth";
@@ -71,31 +63,6 @@ const REASONS = [
 
 const TENURES = ["Under 6 months", "6–12 months", "1–2 years", "3–5 years", "5+ years"];
 const LEVELS = ["Intern", "Entry level", "Mid level", "Senior", "Management"];
-const MAX_EVIDENCE_BYTES = 5 * 1024 * 1024;
-const EVIDENCE_MIME_TYPES = ["image/jpeg", "image/png", "image/webp", "application/pdf"] as const;
-
-type EvidenceUploadReceipt = {
-  ticket_id: string;
-  public_id: string;
-  version: number;
-  signature: string;
-  resource_type: "image";
-  type: "authenticated";
-  format: string;
-  bytes: number;
-};
-
-type CloudinaryUploadResult = {
-  public_id: string;
-  version: number;
-  signature: string;
-  resource_type: string;
-  type: string;
-  format: string;
-  bytes: number;
-  error?: { message?: string };
-};
-
 type StoryDraft = {
   version: 1;
   step: number;
@@ -112,7 +79,6 @@ type StoryDraft = {
   title: string;
   body: string;
   wouldReturn: boolean | null;
-  evidenceNote: string;
 };
 
 export const Route = createFileRoute("/post")({
@@ -168,8 +134,6 @@ function WorkplaceStoryComposer() {
   const fetchStoryForEdit = useServerFn(getStoryForEdit);
   const generateStoryDraftsFn = useServerFn(generateStoryDrafts);
   const update = useServerFn(updateStory);
-  const issueEvidenceUpload = useServerFn(issueEmploymentEvidenceUpload);
-  const discardEvidenceUpload = useServerFn(discardEmploymentEvidenceUpload);
 
   const [step, setStep] = useState(0);
   const [companyName, setCompanyName] = useState("");
@@ -200,18 +164,9 @@ function WorkplaceStoryComposer() {
   } | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [wouldReturn, setWouldReturn] = useState<boolean | null>(null);
-  const [evidenceNote, setEvidenceNote] = useState("");
-  const [evidenceFile, setEvidenceFile] = useState<File | null>(null);
-  const [evidencePreviewUrl, setEvidencePreviewUrl] = useState<string | null>(null);
-  const [evidenceUpload, setEvidenceUpload] = useState<EvidenceUploadReceipt | null>(null);
-  const [evidenceTicketId, setEvidenceTicketId] = useState<string | null>(null);
-  const [evidenceError, setEvidenceError] = useState("");
   const [publishError, setPublishError] = useState("");
   const [editLoading, setEditLoading] = useState(Boolean(editStoryId));
   const [editLoaded, setEditLoaded] = useState(false);
-  const [uploadingEvidence, setUploadingEvidence] = useState(false);
-  const uploadLock = useRef(false);
-  const uploadAbortController = useRef<AbortController | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [discardOpen, setDiscardOpen] = useState(false);
   const [savedDraftKey, setSavedDraftKey] = useState<string | null>(null);
@@ -291,16 +246,6 @@ function WorkplaceStoryComposer() {
     }
   }
 
-  useEffect(() => {
-    if (!evidenceFile) {
-      setEvidencePreviewUrl(null);
-      return;
-    }
-    const preview = URL.createObjectURL(evidenceFile);
-    setEvidencePreviewUrl(preview);
-    return () => URL.revokeObjectURL(preview);
-  }, [evidenceFile]);
-
   const dirty =
     companyName.trim().length > 0 ||
     industry.trim().length > 0 ||
@@ -314,9 +259,7 @@ function WorkplaceStoryComposer() {
     position.trim().length > 0 ||
     title.trim().length > 0 ||
     body.trim().length > 0 ||
-    wouldReturn !== null ||
-    evidenceNote.trim().length > 0 ||
-    Boolean(evidenceFile || evidenceUpload);
+    wouldReturn !== null;
 
   const storyDraft: StoryDraft = {
     version: 1,
@@ -334,7 +277,6 @@ function WorkplaceStoryComposer() {
     title,
     body,
     wouldReturn,
-    evidenceNote,
   };
   const storyDraftKey = JSON.stringify(storyDraft);
   const hasUnsavedDraftChanges = dirty && savedDraftKey !== storyDraftKey;
@@ -370,7 +312,6 @@ function WorkplaceStoryComposer() {
           title: typeof parsed.title === "string" ? parsed.title : "",
           body: typeof parsed.body === "string" ? parsed.body : "",
           wouldReturn: typeof parsed.wouldReturn === "boolean" ? parsed.wouldReturn : null,
-          evidenceNote: typeof parsed.evidenceNote === "string" ? parsed.evidenceNote : "",
         };
         setStep(restored.step);
         setCompanyName(restored.companyName);
@@ -386,7 +327,6 @@ function WorkplaceStoryComposer() {
         setTitle(restored.title);
         setBody(restored.body);
         setWouldReturn(restored.wouldReturn);
-        setEvidenceNote(restored.evidenceNote);
         setSavedDraftKey(JSON.stringify(restored));
       }
     } catch {
@@ -527,125 +467,10 @@ function WorkplaceStoryComposer() {
     setCustomReason("");
   }
 
-  async function selectEvidenceFile(file: File | undefined) {
-    setEvidenceError("");
-    if (!file) return;
-    if (!EVIDENCE_MIME_TYPES.includes(file.type as (typeof EVIDENCE_MIME_TYPES)[number])) {
-      setEvidenceError("Choose a JPG, PNG, WebP, or PDF file.");
-      return;
-    }
-    if (file.size > MAX_EVIDENCE_BYTES) {
-      setEvidenceError("Proof files must be 5 MB or smaller.");
-      return;
-    }
-
-    if (evidenceTicketId && evidenceTicketId !== evidenceUpload?.ticket_id) {
-      try {
-        await discardEvidenceUpload({ data: { ticketId: evidenceTicketId } });
-      } catch (error) {
-        setEvidenceError(
-          error instanceof Error ? error.message : "Could not remove the old upload.",
-        );
-        return;
-      }
-    }
-    setEvidenceFile(file);
-    setEvidenceUpload(null);
-    setEvidenceTicketId(null);
-  }
-
-  async function removeEvidenceFile() {
-    if (uploadingEvidence || submitting) return;
-    setEvidenceError("");
-    if (evidenceTicketId) {
-      try {
-        await discardEvidenceUpload({ data: { ticketId: evidenceTicketId } });
-      } catch (error) {
-        setEvidenceError(
-          error instanceof Error ? error.message : "Could not remove the proof file.",
-        );
-        return;
-      }
-    }
-    setEvidenceFile(null);
-    setEvidenceUpload(null);
-    setEvidenceTicketId(null);
-  }
-
-  async function uploadEvidenceFile(file: File): Promise<EvidenceUploadReceipt> {
-    if (uploadLock.current) throw new Error("The proof file is already uploading.");
-    uploadLock.current = true;
-    setUploadingEvidence(true);
-    const controller = new AbortController();
-    uploadAbortController.current = controller;
-
-    try {
-      if (evidenceTicketId) {
-        await discardEvidenceUpload({ data: { ticketId: evidenceTicketId } });
-        setEvidenceTicketId(null);
-      }
-      const ticket = await issueEvidenceUpload({
-        data: { size: file.size, mimeType: file.type as (typeof EVIDENCE_MIME_TYPES)[number] },
-      });
-      setEvidenceTicketId(ticket.ticketId);
-      const form = new FormData();
-      form.append("file", file);
-      form.append("api_key", ticket.apiKey);
-      form.append("timestamp", String(ticket.timestamp));
-      form.append("public_id", ticket.publicId);
-      form.append("type", ticket.type);
-      form.append("overwrite", String(ticket.overwrite));
-      form.append("signature", ticket.signature);
-
-      const response = await fetch(
-        `https://api.cloudinary.com/v1_1/${encodeURIComponent(ticket.cloudName)}/image/upload`,
-        { method: "POST", body: form, signal: controller.signal },
-      );
-      const result = (await response.json()) as CloudinaryUploadResult;
-      if (!response.ok) {
-        throw new Error(result.error?.message || "Cloudinary could not upload this file.");
-      }
-      if (
-        result.public_id !== ticket.publicId ||
-        result.resource_type !== "image" ||
-        result.type !== "authenticated" ||
-        !Number.isInteger(result.version) ||
-        typeof result.signature !== "string" ||
-        typeof result.format !== "string" ||
-        result.bytes !== file.size
-      ) {
-        throw new Error("Cloudinary returned an unexpected proof file. Please retry the upload.");
-      }
-
-      const receipt: EvidenceUploadReceipt = {
-        ticket_id: ticket.ticketId,
-        public_id: result.public_id,
-        version: result.version,
-        signature: result.signature,
-        resource_type: "image",
-        type: "authenticated",
-        format: result.format,
-        bytes: result.bytes,
-      };
-      setEvidenceUpload(receipt);
-      setEvidenceTicketId(ticket.ticketId);
-      setEvidenceError("");
-      return receipt;
-    } finally {
-      uploadLock.current = false;
-      uploadAbortController.current = null;
-      setUploadingEvidence(false);
-    }
-  }
-
   async function submit() {
     setPublishError("");
-    setEvidenceError("");
     setSubmitting(true);
     try {
-      let uploadedProof = evidenceUpload;
-      if (evidenceFile && !uploadedProof) uploadedProof = await uploadEvidenceFile(evidenceFile);
-
       if (
         companyName.trim().length < 2 ||
         /^(n\/?a|none|unknown|not applicable)$/i.test(companyName.trim())
@@ -658,11 +483,6 @@ function WorkplaceStoryComposer() {
       const company = await findCompany({
         data: { name: companyName.trim(), industry: industry || null, county: county || null },
       });
-
-      const evidence =
-        evidenceNote.trim() || uploadedProof
-          ? { note: evidenceNote.trim() || null, upload: uploadedProof }
-          : null;
 
       const storyData = {
         company_id: company.id,
@@ -679,7 +499,6 @@ function WorkplaceStoryComposer() {
         industry: industry || company.industry || null,
         would_work_again: wouldReturn,
         ...(isEditing ? {} : { is_anonymous: anonymous }),
-        evidence,
       };
       const result = isEditing
         ? await update({ data: { ...storyData, story_id: editStoryId! } })
@@ -695,12 +514,9 @@ function WorkplaceStoryComposer() {
     } catch (error) {
       const message =
         error instanceof Error
-          ? error.name === "AbortError"
-            ? "Proof upload canceled. Your story was not submitted."
-            : error.message
+          ? error.message
           : "Something went wrong while publishing your story.";
       setPublishError(message);
-      if (message.includes("Proof uploads are not configured")) setEvidenceError(message);
       toast.error("Could not publish story", { description: message });
     } finally {
       setSubmitting(false);
@@ -1360,165 +1176,12 @@ function WorkplaceStoryComposer() {
                             </li>
                           </ul>
 
-                          {!isEditing ? (
-                            <div className="space-y-3 rounded-2xl border border-border bg-secondary/30 p-4">
-                              <h3 className="flex items-center gap-2 font-semibold">
-                                <Lock className="size-4 text-primary" /> Prove you worked there
-                                (optional, private)
-                              </h3>
-                              <p className="text-xs text-muted-foreground">
-                                Add a document or image that can help moderators review your story.
-                                Proof is uploaded to restricted Cloudinary storage, is{" "}
-                                <span className="font-medium text-foreground">never published</span>
-                                , and is never shown to the employer. If attached, AI checks it for
-                                relevance and exposed sensitive details; this does not verify that
-                                the story is true.
-                              </p>
-                              <p className="text-xs text-muted-foreground">
-                                Paid via M-Pesa from your boss's personal number? That's normal for
-                                small businesses — just add a short note below telling us.
-                              </p>
-
-                              <Textarea
-                                rows={2}
-                                value={evidenceNote}
-                                onChange={(event) => setEvidenceNote(event.target.value)}
-                                placeholder="Optional private note, e.g. “Salary came from the owner's personal M-Pesa.”"
-                              />
-
-                              <div className="space-y-3 border-t border-border/70 pt-3">
-                                <div className="flex flex-wrap items-center justify-between gap-2">
-                                  <div>
-                                    <p className="text-sm font-medium">Attach proof (optional)</p>
-                                    <p className="text-xs text-muted-foreground">
-                                      JPG, PNG, WebP, or PDF · up to 5 MB
-                                    </p>
-                                  </div>
-                                  <label
-                                    className={cn(
-                                      "inline-flex cursor-pointer items-center gap-2 rounded-xl border border-border bg-background px-3 py-2 text-sm font-medium hover:border-primary/50",
-                                      uploadingEvidence && "pointer-events-none opacity-60",
-                                      evidenceUpload && "pointer-events-none opacity-60",
-                                    )}
-                                  >
-                                    <Paperclip className="size-4" />
-                                    {evidenceFile
-                                      ? evidenceUpload
-                                        ? "Uploaded"
-                                        : "Choose another"
-                                      : "Choose file"}
-                                    <input
-                                      type="file"
-                                      className="sr-only"
-                                      accept=".jpg,.jpeg,.png,.webp,.pdf,image/jpeg,image/png,image/webp,application/pdf"
-                                      disabled={
-                                        uploadingEvidence || submitting || Boolean(evidenceUpload)
-                                      }
-                                      onChange={(event) => {
-                                        void selectEvidenceFile(event.currentTarget.files?.[0]);
-                                        event.currentTarget.value = "";
-                                      }}
-                                    />
-                                  </label>
-                                </div>
-
-                                {evidenceFile ? (
-                                  <div className="flex items-center gap-3 rounded-xl border border-border bg-background/70 p-3">
-                                    {evidenceFile.type.startsWith("image/") &&
-                                    evidencePreviewUrl ? (
-                                      <img
-                                        src={evidencePreviewUrl}
-                                        alt="Selected proof preview"
-                                        className="size-14 rounded-lg object-cover"
-                                      />
-                                    ) : (
-                                      <span className="flex size-14 shrink-0 items-center justify-center rounded-lg bg-secondary text-muted-foreground">
-                                        <FileText className="size-6" />
-                                      </span>
-                                    )}
-                                    <div className="min-w-0 flex-1">
-                                      <p className="truncate text-sm font-medium">
-                                        {evidenceFile.name}
-                                      </p>
-                                      <p className="text-xs text-muted-foreground">
-                                        {(evidenceFile.size / (1024 * 1024)).toFixed(2)} MB
-                                      </p>
-                                    </div>
-                                    {uploadingEvidence ? (
-                                      <button
-                                        type="button"
-                                        className="text-xs text-muted-foreground underline underline-offset-4"
-                                        onClick={() => uploadAbortController.current?.abort()}
-                                      >
-                                        Cancel
-                                      </button>
-                                    ) : evidenceUpload ? (
-                                      <button
-                                        type="button"
-                                        aria-label="Remove proof file"
-                                        disabled={submitting}
-                                        onClick={() => void removeEvidenceFile()}
-                                        className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                                      >
-                                        <X className="size-4" />
-                                      </button>
-                                    ) : evidenceTicketId ? (
-                                      <button
-                                        type="button"
-                                        aria-label="Remove proof file"
-                                        disabled={submitting}
-                                        onClick={() => void removeEvidenceFile()}
-                                        className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                                      >
-                                        <X className="size-4" />
-                                      </button>
-                                    ) : (
-                                      <>
-                                        <ImageIcon className="size-5 shrink-0 text-muted-foreground" />
-                                        <button
-                                          type="button"
-                                          aria-label="Remove selected proof file"
-                                          disabled={submitting}
-                                          onClick={() => void removeEvidenceFile()}
-                                          className="rounded-full p-1 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                                        >
-                                          <X className="size-4" />
-                                        </button>
-                                      </>
-                                    )}
-                                  </div>
-                                ) : null}
-
-                                {evidenceError ? (
-                                  <p role="alert" className="text-xs text-danger">
-                                    {evidenceError}
-                                  </p>
-                                ) : null}
-                                {evidenceUpload ? (
-                                  <p className="text-xs text-primary">
-                                    Proof uploaded securely. It will be attached when you submit the
-                                    story.
-                                  </p>
-                                ) : evidenceFile ? (
-                                  <p className="text-xs text-muted-foreground">
-                                    It will upload securely when you publish. Remove it above to
-                                    publish without proof.
-                                  </p>
-                                ) : null}
-                              </div>
-                            </div>
-                          ) : null}
-
                           <Button
                             className="w-full glow-primary"
-                            disabled={submitting || uploadingEvidence}
+                            disabled={submitting}
                             onClick={submit}
                           >
-                            {uploadingEvidence ? (
-                              <>
-                                <LoaderCircle className="size-4 animate-spin" /> Uploading proof…
-                              </>
-                            ) : submitting ? (
+                            {submitting ? (
                               "Screening and publishing…"
                             ) : isEditing ? (
                               "Submit changes for approval"
