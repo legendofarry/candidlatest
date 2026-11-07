@@ -92,6 +92,8 @@ export const Route = createFileRoute("/api/public/owner/stats")({
               payment_reference: payment["payment_reference"],
               transaction_code: payment["transaction_code"] ?? null,
               payer_phone: payment["payer_phone"] ?? null,
+              payer_provider: payment["payer_provider"] ?? null,
+              payer_name: payment["payer_name"] ?? null,
               submitted_at: payment["submitted_at"] ?? null,
               proof_url: proofUrl,
             };
