@@ -70,7 +70,7 @@ export function CompanyHero({ company, score, descriptor, stories }: Props) {
   return (
     <section
       style={vars}
-      className="hero-resolve relative isolate overflow-hidden border-y border-border/60 -mx-4 px-4 py-8 sm:mx-0 sm:rounded-3xl sm:border sm:px-8 md:py-10"
+      className="hero-resolve relative isolate overflow-hidden border-y border-border/60 px-4 py-8 max-sm:ml-[calc(50%-50vw)] max-sm:w-screen sm:rounded-3xl sm:border sm:px-8 md:py-10"
     >
       {/* Living brand aura */}
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 bg-background" />

@@ -131,7 +131,12 @@ function StoryPage() {
   };
 
   return (
-    <article className={cn("w-full pb-8", !isAnnouncement && "mx-auto max-w-4xl")}>
+    <article
+      className={cn(
+        "w-full pb-8 max-md:ml-[calc(50%-50vw)] max-md:w-screen",
+        !isAnnouncement && "mx-auto max-w-4xl",
+      )}
+    >
       <div
         className={cn(
           "sticky top-0 z-20 border-b border-border bg-background/95 backdrop-blur-md transition-all duration-300",

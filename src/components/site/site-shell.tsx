@@ -580,7 +580,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               pathname === "/support" ||
               directConversationRoute
               ? "p-0 md:pb-0"
-              : "pt-6",
+              : /^\/(companies|stories)\/[^/]+/.test(pathname)
+                ? "pt-0 md:pt-6"
+                : "pt-6",
             !fullscreenRoute &&
             pathname !== "/support" &&
             !messagesInboxRoute &&
