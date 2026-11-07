@@ -41,6 +41,8 @@ export const submitMyPayment = createServerFn({ method: "POST" })
     paymentId: z.string().uuid(),
     transactionCode: z.string().trim().max(12).nullable().optional(),
     payerPhone: z.string().trim().max(20).nullable().optional(),
+    payerProvider: z.enum(["mpesa", "airtel"]).nullable().optional(),
+    payerName: z.string().trim().max(80).nullable().optional(),
     proof: z.object({
       ticketId: z.string().uuid(),
       publicId: z.string().min(1).max(300),
@@ -53,7 +55,22 @@ export const submitMyPayment = createServerFn({ method: "POST" })
   }).parse(input))
   .handler(async ({ data, context }) => {
     const { submitManualPayment } = await import("./billing.server");
-    return submitManualPayment(context.userId, data.paymentId, data.transactionCode ?? null, data.payerPhone ?? null, data.proof);
+    return submitManualPayment(context.userId, data.paymentId, data.transactionCode ?? null, data.payerPhone ?? null, data.proof, {
+      provider: data.payerProvider ?? null,
+      name: data.payerName ?? null,
+    });
+  });
+
+export const saveMyPayerProfile = createServerFn({ method: "POST" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({
+    provider: z.enum(["mpesa", "airtel"]),
+    phone: z.string().trim().min(1).max(20),
+    accountName: z.string().trim().min(1).max(80),
+  }).parse(input))
+  .handler(async ({ data, context }) => {
+    const { saveMyPayerProfile: save } = await import("./billing.server");
+    return save(context.userId, data);
   });
 
 export const cancelMyPaymentRequest = createServerFn({ method: "POST" })

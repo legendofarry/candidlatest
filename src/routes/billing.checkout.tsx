@@ -123,7 +123,9 @@ function CheckoutPage() {
       return submitPayment({ data: {
         paymentId: request.payment.id,
         transactionCode: transactionCode.trim() || null,
-        payerPhone: phone.trim() || null,
+        payerPhone: (phone.trim() || billing.data?.payerProfile?.phone) ?? null,
+        payerProvider: billing.data?.payerProfile?.provider ?? null,
+        payerName: billing.data?.payerProfile?.accountName ?? null,
         proof,
       } });
     },
@@ -181,7 +183,7 @@ function CheckoutPage() {
                       <form className="mt-5 grid gap-4" onSubmit={(event) => { event.preventDefault(); submitMutation.mutate(); }}>
                         <label className="grid gap-2 text-sm font-medium">M-Pesa confirmation image<input type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setReceiptFile(event.currentTarget.files?.[0] ?? null)} className="block w-full rounded-xl border bg-background p-3 text-sm file:mr-3 file:rounded-lg file:border-0 file:bg-primary/10 file:px-3 file:py-2 file:font-medium" />{receiptFile ? <span className="text-xs text-muted-foreground">Selected: {receiptFile.name}</span> : <span className="text-xs text-muted-foreground">JPG, PNG, or WebP · up to 5 MB</span>}</label>
                         <label className="grid gap-2 text-sm font-medium">Transaction code <span className="text-xs font-normal text-muted-foreground">Optional if it’s visible in your receipt</span><input className="h-12 rounded-xl border bg-background px-4 font-normal uppercase tracking-wide" autoComplete="off" maxLength={12} value={transactionCode} onChange={(event) => setTransactionCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""))} placeholder="e.g. QWE123ABC" /></label>
-                        <label className="grid gap-2 text-sm font-medium">Payer phone <span className="text-xs font-normal text-muted-foreground">Optional</span><input className="h-12 rounded-xl border bg-background px-4 font-normal" autoComplete="tel" maxLength={20} value={phone} onChange={(event) => setPhone(event.target.value)} placeholder="07… or +254…" /></label>
+                        <label className="grid gap-2 text-sm font-medium">Payer phone <span className="text-xs font-normal text-muted-foreground">{billing.data?.payerProfile ? `Using your saved ${billing.data.payerProfile.phone} unless you change it` : "Optional"}</span><input className="h-12 rounded-xl border bg-background px-4 font-normal" autoComplete="tel" maxLength={20} value={phone} onChange={(event) => setPhone(event.target.value)} placeholder={billing.data?.payerProfile?.phone || "07… or +254…"} /></label>
                         <p className="text-xs leading-5 text-muted-foreground">Your receipt is stored privately and only used to verify this payment. Membership stays unchanged until Candid confirms it.</p>
                         <Button className="h-12 rounded-xl" type="submit" disabled={isBusy || !receiptFile}>{submitMutation.isPending ? <><Loader2 className="size-4 animate-spin" />Sending proof…</> : <><ImagePlus className="size-4" />I’ve paid — send proof</>}</Button>
                       </form>

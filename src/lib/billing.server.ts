@@ -103,6 +103,8 @@ type PaymentRequest = {
   created_at: string;
   transaction_code?: string | null;
   payer_phone?: string | null;
+  payer_provider?: "mpesa" | "airtel" | null;
+  payer_name?: string | null;
   submitted_at?: string | null;
   reviewed_at?: string | null;
   rejection_reason?: string | null;
@@ -208,13 +210,22 @@ export async function readBillingConfig(): Promise<BillingConfig> {
 
 export async function getMyBillingSummary(userId: string) {
   const db = getFirestoreDb();
-  const [profileSnapshot, paymentsSnapshot, periodsSnapshot] = await Promise.all([
+  const [profileSnapshot, paymentsSnapshot, periodsSnapshot, payerSnapshot] = await Promise.all([
     db.collection("profiles").doc(userId).get(),
     db.collection("manual_payment_requests").where("user_id", "==", userId).get(),
     db.collection("subscription_periods").where("user_id", "==", userId).get(),
+    db.collection("payer_profiles").doc(userId).get(),
   ]);
   const profile = profileSnapshot.data() ?? {};
+  const payer = payerSnapshot.data();
   return {
+    payerProfile: payer
+      ? {
+          provider: (payer.provider === "airtel" ? "airtel" : "mpesa") as "mpesa" | "airtel",
+          phone: String(payer.phone ?? ""),
+          accountName: String(payer.account_name ?? ""),
+        }
+      : null,
     membership: {
       accountType: profile.account_type ?? "individual",
       canSelfSwitch: canSelfSwitchMembership(profile),
@@ -381,6 +392,32 @@ export async function createManualPaymentRequest(
 }
 
 const submitBuckets = new Map<string, { count: number; resetAt: number }>();
+const KENYAN_PHONE = /^(?:\+?254|0)\d{9}$/;
+
+export async function saveMyPayerProfile(
+  userId: string,
+  input: { provider: "mpesa" | "airtel"; phone: string; accountName: string },
+) {
+  const phone = input.phone.trim();
+  const accountName = input.accountName.trim().replace(/\s+/g, " ");
+  if (!KENYAN_PHONE.test(phone.replace(/[\s-]/g, "")))
+    throw new Error("Enter the Kenyan phone number you will pay from, e.g. 0712 345 678.");
+  if (accountName.length < 3)
+    throw new Error("Enter the full name registered on that mobile money account.");
+  const saved = {
+    provider: input.provider,
+    phone,
+    account_name: accountName.slice(0, 80),
+    updated_at: new Date().toISOString(),
+  };
+  await getFirestoreDb().collection("payer_profiles").doc(userId).set(saved);
+  return {
+    provider: saved.provider,
+    phone: saved.phone,
+    accountName: saved.account_name,
+  };
+}
+
 export async function submitManualPayment(
   userId: string,
   paymentId: string,
@@ -394,6 +431,10 @@ export async function submitManualPayment(
     format: string;
     bytes: number;
     type: string;
+  },
+  payer: { provider: "mpesa" | "airtel" | null; name: string | null } = {
+    provider: null,
+    name: null,
   },
 ) {
   const nowMs = Date.now();
@@ -410,11 +451,16 @@ export async function submitManualPayment(
   const code = rawCode?.trim().toUpperCase() || null;
   if (code && !/^[A-Z0-9]{8,12}$/.test(code))
     throw new Error("Enter a valid M-Pesa transaction code or leave it blank.");
-  const phone = payerPhone?.trim() || null;
+  let phone = payerPhone?.trim() || null;
   if (phone && !/^(?:\+?254|0)\d{9}$/.test(phone.replace(/[\s-]/g, "")))
     throw new Error("Enter a valid Kenyan phone number or leave it blank.");
 
   const db = getFirestoreDb();
+  // Fall back to the member's saved payment details so admins always see who paid.
+  const savedPayer = (await db.collection("payer_profiles").doc(userId).get()).data();
+  if (!phone && savedPayer?.phone) phone = String(savedPayer.phone);
+  const payerProvider = payer.provider ?? (savedPayer?.provider === "airtel" ? "airtel" : savedPayer ? "mpesa" : null);
+  const payerName = payer.name?.trim().slice(0, 80) || (savedPayer?.account_name ? String(savedPayer.account_name) : null);
   const paymentRef = db.collection("manual_payment_requests").doc(paymentId);
   const paymentSnapshot = await paymentRef.get();
   if (!paymentSnapshot.exists) throw new Error("Payment request not found.");
@@ -470,6 +516,8 @@ export async function submitManualPayment(
       status: "pending_verification",
       transaction_code: code,
       payer_phone: phone,
+      payer_provider: payerProvider,
+      payer_name: payerName,
       proof: {
         ticket_id: proof.ticketId,
         public_id: proof.publicId,

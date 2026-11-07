@@ -26,6 +26,7 @@ import {
   cancelMyPaymentRequest,
   getMyBilling,
   requestMyBasicDowngrade,
+  saveMyPayerProfile,
 } from "@/lib/billing.functions";
 import { switchMyMembership } from "@/lib/membership.functions";
 import { useAuth } from "@/hooks/useAuth";
@@ -39,38 +40,13 @@ export const Route = createFileRoute("/billing")({
 function BillingPage() {
   const [membershipCardFlipped, setMembershipCardFlipped] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"mpesa" | "airtel">("mpesa");
-  const [businessNumber, setBusinessNumber] = useState("0715938110");
-  const [accountName, setAccountName] = useState("");
-  const [savedPaymentMethod, setSavedPaymentMethod] = useState<{
-    provider: "mpesa" | "airtel";
-    number: string;
-    accountName: string;
-  } | null>(null);
+  const [payerPhone, setPayerPhone] = useState("");
+  const [payerName, setPayerName] = useState("");
+  const [payerError, setPayerError] = useState("");
   const [billingSheet, setBillingSheet] = useState<"payment-method" | "payment-history" | null>(
     null,
   );
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const nextSaved = window.localStorage.getItem("candid.savedPaymentMethod");
-    if (!nextSaved) return;
-    try {
-      const parsed = JSON.parse(nextSaved) as {
-        provider?: "mpesa" | "airtel";
-        number?: string;
-        accountName?: string;
-      };
-      if (parsed.provider && parsed.number) {
-        setSavedPaymentMethod({
-          provider: parsed.provider,
-          number: parsed.number,
-          accountName: parsed.accountName ?? "",
-        });
-      }
-    } catch {
-      window.localStorage.removeItem("candid.savedPaymentMethod");
-    }
-  }, []);
   const isCheckout = useRouterState({
     select: ({ location }) => location.pathname === "/billing/checkout",
   });
@@ -109,6 +85,18 @@ function BillingPage() {
     onError: (error) =>
       window.alert(error instanceof Error ? error.message : "Could not update your package."),
   });
+  const savePayer = useServerFn(saveMyPayerProfile);
+  const savePayerMutation = useMutation({
+    mutationFn: () =>
+      savePayer({ data: { provider: paymentMethod, phone: payerPhone, accountName: payerName } }),
+    onSuccess: async () => {
+      setPayerError("");
+      await queryClient.invalidateQueries({ queryKey: ["billing"] });
+      setBillingSheet(null);
+    },
+    onError: (error) =>
+      setPayerError(error instanceof Error ? error.message : "Could not save your payment details."),
+  });
   const cancelPaymentMutation = useMutation({
     mutationFn: (paymentId: string) => cancelPayment({ data: { paymentId } }),
     onSuccess: async () => {
@@ -134,12 +122,12 @@ function BillingPage() {
   const canRenewPremium = membership?.source === "paid" && membership.assignedTier === "premium";
 
   useEffect(() => {
-    if (!data?.paymentDetails) return;
-    const nextProvider = data.paymentDetails.mode === "airtel" ? "airtel" : "mpesa";
-    setPaymentMethod(nextProvider);
-    setBusinessNumber(data.paymentDetails.business_number || "0715938110");
-    setAccountName(data.paymentDetails.account_name || "");
-  }, [data?.paymentDetails]);
+    const saved = data?.payerProfile;
+    if (!saved) return;
+    setPaymentMethod(saved.provider);
+    setPayerPhone(saved.phone);
+    setPayerName(saved.accountName);
+  }, [data?.payerProfile]);
 
   if (isCheckout) return <Outlet />;
 
@@ -389,9 +377,13 @@ function BillingPage() {
                         </span>
                         <div>
                           <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                            Payment method
+                            Paying from
                           </p>
-                          <h2 className="mt-1 font-display text-lg font-semibold">Saved account</h2>
+                          <h2 className="mt-1 font-display text-lg font-semibold">
+                            {data?.payerProfile
+                              ? `${data.payerProfile.provider === "mpesa" ? "M-Pesa" : "Airtel"} · ${data.payerProfile.phone}`
+                              : "Add your payment details"}
+                          </h2>
                         </div>
                       </div>
                       <ChevronRight className="size-4 text-muted-foreground" />
@@ -549,87 +541,86 @@ function BillingPage() {
           {billingSheet === "payment-method" ? (
             <>
               <DrawerHeader className="text-left">
-                <DrawerTitle>Payment method</DrawerTitle>
+                <DrawerTitle>Your payment details</DrawerTitle>
                 <DrawerDescription>
-                  Update your saved M-Pesa or Airtel account for future payments.
+                  The mobile money account you will pay <span className="font-medium text-foreground">from</span>.
+                  When you pay, the Candid team sees these details next to your payment so we can
+                  match it and activate your plan faster.
                 </DrawerDescription>
               </DrawerHeader>
-              <div className="mt-2 space-y-4 pb-2">
-                <div className="grid grid-cols-2 gap-2 rounded-full border border-border bg-secondary/50 p-1">
-                  {(["mpesa", "airtel"] as const).map((provider) => (
-                    <button
-                      key={provider}
-                      type="button"
-                      onClick={() => setPaymentMethod(provider)}
-                      className={cn(
-                        "rounded-full px-3 py-2 text-sm font-medium transition-colors",
-                        paymentMethod === provider
-                          ? "bg-background text-foreground shadow-sm"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {provider === "mpesa" ? "M-Pesa" : "Airtel"}
-                    </button>
-                  ))}
+              <form
+                className="mt-2 space-y-4 pb-2"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  setPayerError("");
+                  savePayerMutation.mutate();
+                }}
+              >
+                <div>
+                  <p className="mb-2 text-sm font-medium">1. Which service do you pay with?</p>
+                  <div className="grid grid-cols-2 gap-2 rounded-full border border-border bg-secondary/50 p-1">
+                    {(["mpesa", "airtel"] as const).map((provider) => (
+                      <button
+                        key={provider}
+                        type="button"
+                        onClick={() => setPaymentMethod(provider)}
+                        aria-pressed={paymentMethod === provider}
+                        className={cn(
+                          "rounded-full px-3 py-2 text-sm font-medium transition-colors",
+                          paymentMethod === provider
+                            ? "bg-background text-foreground shadow-sm"
+                            : "text-muted-foreground",
+                        )}
+                      >
+                        {provider === "mpesa" ? "M-Pesa" : "Airtel Money"}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <label className="grid gap-2 text-sm font-medium">
-                  Business number
+                <label className="grid gap-1.5 text-sm font-medium">
+                  2. Phone number you will pay with
                   <Input
-                    value={businessNumber}
-                    onChange={(event) => setBusinessNumber(event.target.value)}
-                    placeholder={paymentMethod === "mpesa" ? "0715938110" : "0770000000"}
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={payerPhone}
+                    onChange={(event) => setPayerPhone(event.target.value)}
+                    placeholder={paymentMethod === "mpesa" ? "0712 345 678" : "0733 123 456"}
                   />
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Your own {paymentMethod === "mpesa" ? "M-Pesa" : "Airtel Money"} number — the
+                    one the money leaves from.
+                  </span>
                 </label>
-                <label className="grid gap-2 text-sm font-medium">
-                  Account name
+                <label className="grid gap-1.5 text-sm font-medium">
+                  3. Official name on that account
                   <Input
-                    value={accountName}
-                    onChange={(event) => setAccountName(event.target.value)}
-                    placeholder="Candid"
+                    autoComplete="name"
+                    value={payerName}
+                    onChange={(event) => setPayerName(event.target.value)}
+                    placeholder="e.g. Jane Wanjiru Mwangi"
                   />
+                  <span className="text-xs font-normal text-muted-foreground">
+                    Exactly as it shows on your {paymentMethod === "mpesa" ? "M-Pesa" : "Airtel Money"}{" "}
+                    confirmation message.
+                  </span>
                 </label>
-                <Button
-                  type="button"
-                  className="w-full rounded-xl"
-                  onClick={() => {
-                    const nextSaved = {
-                      provider: paymentMethod,
-                      number: businessNumber,
-                      accountName,
-                    };
-                    setSavedPaymentMethod(nextSaved);
-                    if (typeof window !== "undefined") {
-                      window.localStorage.setItem(
-                        "candid.savedPaymentMethod",
-                        JSON.stringify(nextSaved),
-                      );
-                    }
-                    setBillingSheet(null);
-                  }}
-                >
-                  Save payment method
-                </Button>
-                {savedPaymentMethod ? (
-                  <dl className="divide-y divide-border text-sm">
-                    <div className="flex justify-between gap-4 py-3">
-                      <dt className="text-muted-foreground">Provider</dt>
-                      <dd className="text-right font-medium">
-                        {savedPaymentMethod.provider === "mpesa" ? "M-Pesa" : "Airtel"}
-                      </dd>
-                    </div>
-                    <div className="flex justify-between gap-4 py-3">
-                      <dt className="text-muted-foreground">Number</dt>
-                      <dd className="text-right font-semibold">{savedPaymentMethod.number}</dd>
-                    </div>
-                    {savedPaymentMethod.accountName ? (
-                      <div className="flex justify-between gap-4 py-3">
-                        <dt className="text-muted-foreground">Account name</dt>
-                        <dd className="text-right font-medium">{savedPaymentMethod.accountName}</dd>
-                      </div>
-                    ) : null}
-                  </dl>
+                {payerError ? (
+                  <p role="alert" className="text-sm text-destructive">
+                    {payerError}
+                  </p>
                 ) : null}
-              </div>
+                <Button
+                  type="submit"
+                  className="w-full rounded-xl"
+                  disabled={savePayerMutation.isPending}
+                >
+                  {savePayerMutation.isPending ? "Saving…" : "Save my payment details"}
+                </Button>
+                <p className="text-center text-xs text-muted-foreground">
+                  Candid&apos;s own pay-to number is shown at checkout, not here.
+                </p>
+              </form>
             </>
           ) : (
             <>
