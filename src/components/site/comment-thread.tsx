@@ -7,12 +7,9 @@ import {
   BadgeCheck,
   ChevronDown,
   CornerDownRight,
-  AtSign,
   Heart,
-  Loader2,
   MoreHorizontal,
   Pencil,
-  Send,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -40,11 +37,9 @@ import { MembershipBadge } from "@/components/site/membership-badge";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { ConfirmDialog } from "@/components/site/confirm-dialog";
-import { MentionText, MentionTextarea } from "@/components/site/mention-textarea";
-import { AnonymousPostingToggle } from "@/components/site/anonymous-posting-toggle";
+import { MentionText } from "@/components/site/mention-textarea";
+import { CommentComposer } from "@/components/site/comment-composer";
 import type { MembershipTier } from "@/lib/membership";
-import { QuickEmojiReactions } from "@/components/site/quick-emoji-reactions";
-import { appendEmoji } from "@/lib/composer-utils";
 
 export type ThreadComment = {
   id: string;
@@ -168,7 +163,6 @@ export function CommentThread({
   const [body, setBody] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   const [anonymousTouched, setAnonymousTouched] = useState(false);
-  const [emojiOpen, setEmojiOpen] = useState(false);
   const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(() => new Set());
@@ -285,7 +279,6 @@ export function CommentThread({
     onSuccess: () => {
       const addedTopLevelComment = replyTo === null;
       setBody("");
-      setEmojiOpen(false);
       setReplyTo(null);
       setAnonymousTouched(false);
       setAnonymous(privacySettings?.anonymous_contributions_default ?? false);
@@ -425,108 +418,51 @@ export function CommentThread({
       >
         {user ? (
           <>
-            {replyTo ? (
-              <div className="mb-2 flex items-center gap-2 rounded-lg bg-secondary/60 px-3 py-1.5 text-xs">
-                <CornerDownRight className="size-3.5" />
-                Replying to{" "}
-                {replyTo.author_username ? (
-                  <>
-                    <Link
-                      to="/u/$username"
-                      params={{ username: replyTo.author_username }}
-                      className="font-medium hover:text-primary"
+            <CommentComposer
+              user={user}
+              value={body}
+              onValueChange={setBody}
+              anonymous={anonymous}
+              onToggleAnonymous={() => {
+                setAnonymous((value) => !value);
+                setAnonymousTouched(true);
+              }}
+              onSubmit={() => commentMutation.mutate()}
+              pending={commentMutation.isPending}
+              textareaRef={commentInputRef}
+              banner={
+                replyTo ? (
+                  <div className="flex items-center gap-2 border-l-2 border-primary pl-3 text-xs text-muted-foreground">
+                    <CornerDownRight className="size-3.5" />
+                    <span>Replying to</span>
+                    {replyTo.author_username ? (
+                      <>
+                        <Link
+                          to="/u/$username"
+                          params={{ username: replyTo.author_username }}
+                          className="font-medium text-foreground hover:text-primary"
+                        >
+                          @{replyTo.author_username}
+                        </Link>
+                        <MembershipBadge
+                          tier={replyTo.author_membership_tier}
+                          official={replyTo.author_username?.toLowerCase() === "candid"}
+                        />
+                      </>
+                    ) : (
+                      <span className="font-medium text-foreground">comment</span>
+                    )}
+                    <button
+                      type="button"
+                      className="ml-auto rounded-full px-2 py-0.5 hover:bg-muted hover:text-foreground"
+                      onClick={() => setReplyTo(null)}
                     >
-                      @{replyTo.author_username}
-                    </Link>
-                    <MembershipBadge
-                      tier={replyTo.author_membership_tier}
-                      official={replyTo.author_username?.toLowerCase() === "candid"}
-                    />
-                  </>
-                ) : (
-                  "comment"
-                )}
-                <button
-                  type="button"
-                  className="ml-auto text-muted-foreground hover:text-foreground"
-                  onClick={() => setReplyTo(null)}
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : null}
-            <div
-              className="anon-field composer-capsule relative overflow-hidden rounded-[1.4rem] border bg-card/80"
-              data-anon={anonymous}
-              data-ready={body.trim().length >= 2}
-            >
-              <div className="flex items-start gap-2 px-3 pt-3">
-                <ProfileAvatar
-                  photoUrl={anonymous ? null : user.photoURL}
-                  initials={(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}
-                  className="mt-1 size-8 shrink-0 ring-2 ring-background"
-                />
-                <MentionTextarea
-                  textareaRef={commentInputRef}
-                  rows={1}
-                  value={body}
-                  onValueChange={setBody}
-                  placeholder={anonymous ? "Say it anonymously…" : "Add a comment…"}
-                  className="min-h-11 resize-none border-0 bg-transparent px-1 pb-1 pt-2 text-sm shadow-none focus-visible:ring-0"
-                />
-              </div>
-              <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
-                <div className="flex items-center">
-                  <QuickEmojiReactions
-                    open={emojiOpen}
-                    onOpenChange={setEmojiOpen}
-                    onSelect={(emoji) => setBody((value) => appendEmoji(value, emoji))}
-                    className="flex items-center"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Mention someone"
-                    title="Mention someone"
-                    className="size-9 rounded-full text-muted-foreground hover:text-primary"
-                    onClick={() => {
-                      setBody((value) => appendEmoji(value, "@"));
-                      requestAnimationFrame(() => {
-                        const input = commentInputRef.current;
-                        if (!input) return;
-                        const end = input.value.length;
-                        input.focus();
-                        input.setSelectionRange(end, end);
-                      });
-                    }}
-                  >
-                    <AtSign className="size-[18px]" />
-                  </Button>
-                </div>
-                <AnonymousPostingToggle
-                  anonymous={anonymous}
-                  onToggle={() => {
-                    setAnonymous((value) => !value);
-                    setAnonymousTouched(true);
-                  }}
-                  user={user}
-                />
-                <button
-                  type="button"
-                  className="composer-send"
-                  disabled={body.trim().length < 2 || commentMutation.isPending}
-                  onClick={() => commentMutation.mutate()}
-                  aria-label="Post comment"
-                >
-                  {commentMutation.isPending ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <Send className="size-4" />
-                  )}
-                </button>
-              </div>
-            </div>
+                      Cancel
+                    </button>
+                  </div>
+                ) : null
+              }
+            />
           </>
         ) : (
           <p className="text-sm text-muted-foreground">
