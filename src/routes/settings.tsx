@@ -369,7 +369,7 @@ function SettingsPage() {
               </>
             ) : null}
 
-            {user?.email?.trim().toLowerCase() === "karimiarrison@gmail.com" &&
+            {profile.data?.canClaimOfficialAccount &&
               profile.data?.accountType !== "official" ? (
               <SettingsGroup title="Official Candid account">
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">

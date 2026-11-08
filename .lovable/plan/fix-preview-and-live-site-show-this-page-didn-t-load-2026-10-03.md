@@ -24,7 +24,7 @@ Swap the Firebase admin library for a small built-in replacement that talks to F
 ## Technical details
 
 - New `src/lib/firestore-rest.server.ts`: JWT (RS256 via `crypto.subtle`, scope `datastore`) → token cached until expiry. Value encoding/decoding to/from Firestore REST `Value` types (strings, numbers, booleans, null, timestamps → ISO strings as today, arrays, maps). Queries via `:runQuery`. Batches/transactions via `:commit` (transactions use `beginTransaction` + `commit`).
-- `firebase.server.ts` keeps `getFirestoreDb()` / `getFirebaseAuth()` exports but returns the REST shim and a `verifyIdToken` built on `jose` `createRemoteJWKSet` (securetoken issuer `https://securetoken.google.com/candid-431db`, audience = project id).
+- `firebase.server.ts` keeps `getFirestoreDb()` / `getFirebaseAuth()` exports but returns the REST shim and a `verifyIdToken` built on `jose` `createRemoteJWKSet` (securetoken issuer `https://securetoken.google.com/your-firebase-project-id`, audience = project id).
 - Only call sites using features the shim doesn't cover get adjusted. A quick audit found no `FieldValue`/`Timestamp` imports, 1 batch and 2 transactions.
 - `bun remove firebase-admin`, `bun add jose`.
 - Also: rotating the Firebase key (your action) is still recommended.

@@ -316,7 +316,9 @@ export async function claimUsername(
 
 /** Link the reserved official Candid handle to its verified owner login. */
 export async function claimOfficialCandidAccount(userId: string, email: string) {
-  if (email.trim().toLowerCase() !== "karimiarrison@gmail.com") {
+  const normalizedEmail = email.trim().toLowerCase();
+  const developerEmail = process.env["DEVELOPER_EMAIL"]?.trim().toLowerCase();
+  if (!developerEmail || normalizedEmail !== developerEmail) {
     throw new Error("This login is not authorized to claim the Candid account.");
   }
 
@@ -392,7 +394,7 @@ export async function claimOfficialCandidAccount(userId: string, email: string) 
     );
     tx.set(
       officialAccountRef,
-      { user_id: userId, email: "karimiarrison@gmail.com", linked_at: now },
+      { user_id: userId, email: normalizedEmail, linked_at: now },
       { merge: true },
     );
 

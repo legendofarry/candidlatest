@@ -26,8 +26,13 @@ export const getOnboardingState = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     const { readProfile } = await import("./onboarding.server");
     const profile = await readProfile(context.userId);
+    const developerEmail = process.env["DEVELOPER_EMAIL"]?.trim().toLowerCase();
+    const userEmail = context.claims.email?.trim().toLowerCase();
     return {
       needsOnboarding: !profile?.username,
+      canClaimOfficialAccount: Boolean(
+        developerEmail && userEmail === developerEmail && context.claims.email_verified === true,
+      ),
       username: profile?.username ?? null,
       photoUrl: profile?.photo_url ?? null,
       coverUrl: profile?.cover_url ?? null,

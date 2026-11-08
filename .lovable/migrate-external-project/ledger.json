@@ -2,8 +2,8 @@
   "source": "https://github.com/legendofarry/candid.git",
   "capabilities": [
     {"capability":"application code and routes","source":"GitHub repository","outcome":"preserve","status":"verified","next_action":"none"},
-    {"capability":"Firebase authentication identities","source":"Firebase Auth (candid-431db)","outcome":"preserve","status":"verified","next_action":"none"},
-    {"capability":"Firestore schema and records","source":"Firestore project candid-431db via admin service account","outcome":"preserve","status":"verified","next_action":"none"},
+    {"capability":"Firebase authentication identities","source":"Firebase Auth (configured project)","outcome":"preserve","status":"verified","next_action":"none"},
+    {"capability":"Firestore schema and records","source":"Firestore project via admin service account","outcome":"preserve","status":"verified","next_action":"none"},
     {"capability":"authorization","source":"Firebase token middleware and owner API key","outcome":"preserve","status":"verified","next_action":"none"},
     {"capability":"uploaded file bytes","source":"none detected","outcome":"preserve","status":"verified","next_action":"none"},
     {"capability":"OpenRouter AI","source":"OPENROUTER_API_KEY","outcome":"preserve","status":"verified","next_action":"none"},
