@@ -1,8 +1,20 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useInfiniteQuery, useQuery, useSuspenseQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
-import { Activity, Flame, PenLine, Radar, Sparkles, TrendingUp, X } from "lucide-react";
+import {
+  Activity,
+  Bookmark,
+  Flame,
+  Navigation,
+  PenLine,
+  Radar,
+  Sparkles,
+  TrendingUp,
+  UserCheck,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import { useServerFn } from "@tanstack/react-start";
 import { getFilterOptions, listStories, listStoryPage } from "@/lib/public.functions";
 import { StoryCard } from "@/components/site/story-card";
@@ -18,6 +30,10 @@ import { getOnboardingState } from "@/lib/onboarding.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { useWatchedCompanies } from "@/hooks/use-watched-companies";
+import { useNearMe } from "@/hooks/use-near-me";
+import { NearMePanel, type NearEmployer } from "@/components/site/near-me-panel";
+import { NearMeSheet } from "@/components/site/near-me-sheet";
+import { getLensStories, getNearMeFeed } from "@/lib/near-me.functions";
 import {
   Drawer,
   DrawerContent,
@@ -78,7 +94,12 @@ function FeedPage() {
   const [county, setCounty] = useState<string | null>(null);
   const [area, setArea] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [radarOnly, setRadarOnly] = useState(false);
+  const [lens, setLens] = useState<null | "radar" | "following" | "saved" | "near">(null);
+  const radarOnly = lens === "radar";
+  const [nearSheetOpen, setNearSheetOpen] = useState(false);
+  const nearMe = useNearMe();
+  const fetchNearFeed = useServerFn(getNearMeFeed);
+  const fetchLens = useServerFn(getLensStories);
   const [activeDiscussion, setActiveDiscussion] = useState<PublicStory | null>(null);
   const [pulseSheetOpen, setPulseSheetOpen] = useState(false);
   const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(20);
@@ -89,9 +110,49 @@ function FeedPage() {
    */
   const isDefaultView = sort === "new" && industry === null && county === null && area === null;
 
-  useEffect(() => resetVisibleCount(), [sort, industry, county, area, q, radarOnly, resetVisibleCount]);
+  useEffect(() => resetVisibleCount(), [sort, industry, county, area, q, lens, resetVisibleCount]);
+
+  // Bring the Near me lens back for members who left it on last time.
+  const restoredNear = useRef(false);
+  useEffect(() => {
+    if (restoredNear.current || !nearMe.location) return;
+    restoredNear.current = true;
+    if (nearMe.on) setLens("near");
+  }, [nearMe.location, nearMe.on]);
+
+  // Without a location there is nothing to look near, so drop the lens once the sheet closes.
+  useEffect(() => {
+    if (lens === "near" && !nearSheetOpen && !nearMe.location) setLens(null);
+  }, [lens, nearSheetOpen, nearMe.location]);
+
+  const nearActive = lens === "near" && Boolean(nearMe.location);
+  const lensActive = lens === "following" || lens === "saved";
+  const pagedFeed = !nearActive && !lensActive;
+
+  const nearFeed = useQuery({
+    queryKey: [
+      "near-me-feed",
+      user?.uid ?? null,
+      nearMe.location?.lat.toFixed(3),
+      nearMe.location?.lng.toFixed(3),
+      nearMe.radius,
+    ],
+    queryFn: () =>
+      fetchNearFeed({
+        data: { lat: nearMe.location!.lat, lng: nearMe.location!.lng, radiusKm: nearMe.radius },
+      }),
+    enabled: nearActive,
+    staleTime: 60_000,
+  });
+  const lensFeed = useQuery({
+    queryKey: ["lens-stories", user?.uid ?? null, lens],
+    queryFn: () => fetchLens({ data: { lens: lens as "following" | "saved" } }),
+    enabled: lensActive && Boolean(user?.emailVerified),
+    staleTime: 30_000,
+  });
 
   const feedPages = useInfiniteQuery({
+    enabled: pagedFeed,
     queryKey: ["story-pages", user?.uid ?? null, sort, industry, county, area],
     initialPageParam: null as { createdAt: string; id: string } | null,
     queryFn: ({ pageParam }) =>
@@ -106,7 +167,27 @@ function FeedPage() {
   const areaOptions = county ? (filters.areasByCounty[county] ?? []) : filters.areas;
 
   const needle = q.trim().toLowerCase();
-  const stories = (feedPages.data?.pages.flatMap((page) => page.stories) ?? []).filter((story) => {
+  const sourceStories = (
+    nearActive
+      ? (nearFeed.data?.stories ?? [])
+      : lensActive
+        ? (lensFeed.data?.stories ?? [])
+        : (feedPages.data?.pages.flatMap((page) => page.stories) ?? [])
+  ) as PublicStory[];
+  const feedPending = nearActive
+    ? nearFeed.isPending
+    : lensActive
+      ? lensFeed.isPending
+      : feedPages.isPending;
+  const sameText = (a: string | null | undefined, b: string | null) =>
+    (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+  const stories = sourceStories.filter((story) => {
+    // Near me, Following and Saved load their own lists, so the filters apply here instead.
+    if (!pagedFeed) {
+      if (industry && !sameText(story.industry, industry)) return false;
+      if (county && !sameText(story.county, county)) return false;
+      if (area && !sameText(story.area, area)) return false;
+    }
     const matchesSearch = needle
       ? [
           story.title,
@@ -134,7 +215,7 @@ function FeedPage() {
   }
 
   const canReset =
-    Boolean(needle) || industry !== null || county !== null || area !== null || sort !== "new" || radarOnly;
+    Boolean(needle) || industry !== null || county !== null || area !== null || sort !== "new" || lens !== null;
 
   return (
     <div className="space-y-5 md:space-y-8">
@@ -236,31 +317,43 @@ function FeedPage() {
         className={`grid gap-6 ${activeDiscussion ? "lg:grid-cols-[minmax(0,1fr)_22rem]" : "grid-cols-1"}`}
       >
         <div id="feed" className="min-w-0 scroll-mt-20 space-y-0">
-          <div className="mb-3 flex items-center justify-between gap-3">
-            {user?.emailVerified ? (
-              <Button
-                type="button"
-                size="sm"
-                variant={radarOnly ? "default" : "outline"}
-                aria-pressed={radarOnly}
-                onClick={() => setRadarOnly((current) => !current)}
-                className="rounded-full"
-              >
-                <Radar className={`size-4 ${radarOnly ? "animate-pulse" : ""}`} />
-                My Radar
-                <span className="ml-1 tabular-nums opacity-75">{watchedCompanies.data?.length ?? 0}</span>
-              </Button>
-            ) : (
-              <Button asChild size="sm" variant="outline" className="rounded-full">
-                <Link to={user ? "/verify-email" : "/auth"}>
-                  <Radar className="size-4" /> My Radar
-                </Link>
-              </Button>
-            )}
-            {radarOnly ? (
-              <span className="text-xs text-muted-foreground">Stories from employers you track</span>
-            ) : null}
-          </div>
+          <FeedChips
+            verified={Boolean(user?.emailVerified)}
+            signedIn={Boolean(user)}
+            lens={lens}
+            sort={sort}
+            radarCount={watchedCompanies.data?.length ?? 0}
+            nearLabel={nearMe.location?.label ?? null}
+            onLens={(next) => {
+              setLens((current) => (current === next ? null : next));
+              nearMe.setOn(false);
+            }}
+            onTrending={() => {
+              if (lens === "following" || lens === "saved" || lens === "near") {
+                setLens(null);
+                nearMe.setOn(false);
+                setSort("trending");
+              } else setSort((current) => (current === "trending" ? "new" : "trending"));
+            }}
+            onNear={() => {
+              if (lens === "near") {
+                setLens(null);
+                nearMe.setOn(false);
+              } else {
+                setLens("near");
+                if (nearMe.location) nearMe.setOn(true);
+                else setNearSheetOpen(true);
+              }
+            }}
+          />
+          {nearActive ? (
+            <NearMePanel
+              employers={(nearFeed.data?.employers ?? []) as NearEmployer[]}
+              loading={nearFeed.isPending}
+              onChange={() => setNearSheetOpen(true)}
+            />
+          ) : null}
+          <NearMeSheet open={nearSheetOpen} onOpenChange={setNearSheetOpen} />
           <FilterBar
             query={q}
             onQueryChange={setQ}
@@ -272,7 +365,8 @@ function FeedPage() {
               setCounty(null);
               setArea(null);
               setSort("new");
-              setRadarOnly(false);
+              setLens(null);
+              nearMe.setOn(false);
             }}
             collapsibleFilters
             filters={[
@@ -312,7 +406,7 @@ function FeedPage() {
             ]}
           />
 
-          {feedPages.isPending ? (
+          {feedPending ? (
             <div className="space-y-4">
               <PulseLoader label="Loading stories" />
               {[0, 1, 2].map((i) => (
@@ -321,7 +415,13 @@ function FeedPage() {
             </div>
           ) : stories.length === 0 ? (
             <p className="rounded-2xl border border-border p-8 text-center text-sm text-muted-foreground">
-              {radarOnly && watchedCompanies.data?.length === 0
+              {nearActive
+                ? `No stories within ${nearMe.radius} km yet. Try searching wider from Change above.`
+                : lens === "following"
+                  ? "No stories from people you follow yet. Follow members from their profiles to see their stories here."
+                  : lens === "saved"
+                    ? "You haven't saved any stories yet. Tap the bookmark on a story to keep it here."
+                    : radarOnly && watchedCompanies.data?.length === 0
                 ? "Your radar is empty. Track an employer from its company page to see their stories here."
                 : radarOnly && feedPages.hasNextPage
                   ? "No tracked-company stories in this batch yet. Load more to continue scanning."
@@ -348,7 +448,7 @@ function FeedPage() {
                 />
               ))
           )}
-          {stories.length > visibleCount || feedPages.hasNextPage ? (
+          {stories.length > visibleCount || (pagedFeed && feedPages.hasNextPage) ? (
             <div className="flex justify-center py-3">
               <Button
                 variant="outline"
@@ -409,6 +509,98 @@ function FeedPage() {
           </div>
         </aside>
       ) : null}
+    </div>
+  );
+}
+
+function FeedChips({
+  verified,
+  signedIn,
+  lens,
+  sort,
+  radarCount,
+  nearLabel,
+  onLens,
+  onTrending,
+  onNear,
+}: {
+  verified: boolean;
+  signedIn: boolean;
+  lens: null | "radar" | "following" | "saved" | "near";
+  sort: "new" | "top" | "trending";
+  radarCount: number;
+  nearLabel: string | null;
+  onLens: (lens: "radar" | "following" | "saved") => void;
+  onTrending: () => void;
+  onNear: () => void;
+}) {
+  const chip = (active: boolean) =>
+    `h-9 shrink-0 gap-1.5 rounded-full px-3.5 text-sm ${active ? "" : "bg-background"}`;
+  const renderGated = ({
+    id,
+    label,
+    icon: Icon,
+    count,
+  }: {
+    id: "radar" | "following" | "saved";
+    label: string;
+    icon: LucideIcon;
+    count?: number;
+  }) => {
+    const active = lens === id;
+    if (!verified) {
+      return (
+        <Button asChild variant="outline" className={chip(false)}>
+          <Link to={signedIn ? "/verify-email" : "/auth"}>
+            <Icon className="size-4" /> {label}
+          </Link>
+        </Button>
+      );
+    }
+    return (
+      <Button
+        type="button"
+        variant={active ? "default" : "outline"}
+        aria-pressed={active}
+        onClick={() => onLens(id)}
+        className={chip(active)}
+      >
+        <Icon className={`size-4 ${active && id === "radar" ? "animate-pulse" : ""}`} />
+        {label}
+        {count !== undefined ? (
+          <span className="tabular-nums opacity-75">{count}</span>
+        ) : null}
+      </Button>
+    );
+  };
+  return (
+    <div
+      role="group"
+      aria-label="Feed shortcuts"
+      className="-mx-3 mb-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
+    >
+      {renderGated({ id: "radar", label: "My Radar", icon: Radar, count: radarCount })}
+      {renderGated({ id: "following", label: "Following", icon: UserCheck })}
+      {renderGated({ id: "saved", label: "Saved", icon: Bookmark })}
+      <Button
+        type="button"
+        variant={sort === "trending" && (lens === null || lens === "radar") ? "default" : "outline"}
+        aria-pressed={sort === "trending" && (lens === null || lens === "radar")}
+        onClick={onTrending}
+        className={chip(sort === "trending" && (lens === null || lens === "radar"))}
+      >
+        <Flame className="size-4" /> Trending
+      </Button>
+      <Button
+        type="button"
+        variant={lens === "near" ? "default" : "outline"}
+        aria-pressed={lens === "near"}
+        onClick={onNear}
+        className={chip(lens === "near")}
+      >
+        <Navigation className="size-4" />
+        {lens === "near" && nearLabel ? `Near ${nearLabel}` : "Near me"}
+      </Button>
     </div>
   );
 }

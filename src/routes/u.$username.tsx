@@ -325,7 +325,7 @@ function PublicProfilePage() {
   );
 
   return (
-    <div className="-mt-4 w-full overflow-x-clip bg-background text-foreground md:mt-0">
+    <div className="w-full overflow-x-clip bg-background text-foreground">
       <motion.section
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}

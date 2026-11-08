@@ -9,6 +9,7 @@ import {
   Flag,
   MapPin,
   MoreHorizontal,
+  Navigation,
   Radar,
   Share2,
   UserRoundPlus,
@@ -78,6 +79,8 @@ export type PublicStory = {
   author_photo_url?: string | null;
   author_membership_tier?: MembershipTier;
   post_type?: "workplace_story" | "announcement";
+  /** Set on Near me results: how this story relates to the member's position. */
+  near?: { match: "employer" | "area" | "county"; distance_km: number | null; label: string };
   media?: {
     url: string;
     resource_type: "image" | "video";
@@ -274,6 +277,11 @@ export function StoryCard({
             {story.area ? ` · ${story.area}` : ""}
           </span>
         )}
+        {story.near ? (
+          <span className="inline-flex items-center gap-1 font-medium text-primary">
+            · <Navigation className="size-3" /> {story.near.label}
+          </span>
+        ) : null}
         {story.tenure ? <span>· {story.tenure}</span> : null}
         {story.role_level ? <span>· {story.role_level}</span> : null}
         {trackedCompany ? (

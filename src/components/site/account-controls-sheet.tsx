@@ -16,7 +16,7 @@ export type AccountAction = "deactivate" | "delete";
 
 const SPRING = { type: "spring", stiffness: 420, damping: 34 } as const;
 
-function Aurora({ still }: { still: boolean }) {
+export function Aurora({ still }: { still: boolean }) {
   const a = "bg-primary/30";
   const b = "bg-sky-400/25";
   return (
@@ -45,7 +45,7 @@ function Aurora({ still }: { still: boolean }) {
 }
 
 /** The icon orb with a soft expanding ring. */
-function Orb({ icon: Icon, className, still }: { icon: LucideIcon; className?: string; still: boolean }) {
+export function Orb({ icon: Icon, className, still }: { icon: LucideIcon; className?: string; still: boolean }) {
   return (
     <span className="relative inline-flex">
       {still ? null : (

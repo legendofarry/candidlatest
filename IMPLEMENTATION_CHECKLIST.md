@@ -62,6 +62,10 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 
 - [x] Deactivation hides profile/search and records permanent deletion after seven days.
 - [x] Deletion grace period is 48 hours, with reactivation and a Netlify scheduled Auth + Firestore purge.
+- [x] Pausing an account now plays a full-screen "peel the screen into black" animation with a cancellable logout notice; signing back in within seven days resumes the account. Deleting shows a cancellable 10-second countdown before the 48-hour grace period starts.
+- [x] Add feed shortcut chips (My Radar, Following, Saved, Trending, Near me).
+- [x] Add Near me. Exact position stays on the member's device (localStorage); a bottom sheet/dialog explains why before the browser prompt and always offers choosing a county/area instead. Stories and employers are matched by story pin, then employer position, then named area; employers without a position are looked up once on OpenStreetMap and cached on the company record.
+- [x] Add opt-in "People nearby": mutual (both must opt in), limited to people the member follows or who follow them, stored server-side only as a ~5 km cell in `near_me_presence`, shown as an area and a coarse distance band, excludes blocked/inactive accounts and anonymous contributions, and is purged with the account.
 
 ## Deployment follow-up
 
@@ -71,3 +75,4 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 - [ ] Confirm Firebase service-account credentials are available to Netlify Functions at runtime.
 - [ ] Set the RTDB URL in production browser-build and server environments, then rebuild/redeploy the app.
 - [ ] Configure a production TURN service with short-lived credentials before relying on calls across mobile networks.
+- [ ] Review OpenStreetMap Nominatim usage (employer lookups run at most two per Near me request, cached for 30 days); move to a paid geocoder if volume grows.

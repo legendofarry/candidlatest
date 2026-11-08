@@ -158,6 +158,7 @@ async function purgeAccount(userId) {
     "privacy_settings",
     "notification_preferences",
     "feed_preferences",
+    "near_me_presence",
     "device_tokens",
     "profiles",
   ]) {
