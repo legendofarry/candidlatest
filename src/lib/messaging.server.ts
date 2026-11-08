@@ -502,7 +502,8 @@ export async function savePrivacySettings(
     who_can_message: input.whoCanMessage ?? previous.who_can_message,
     profile_visibility: input.profileVisibility ?? previous.profile_visibility,
     mention_audience: input.mentionAudience ?? previous.mention_audience,
-    anonymous_contributions_default: input.anonymousContributionsDefault ?? previous.anonymous_contributions_default,
+    anonymous_contributions_default:
+      input.anonymousContributionsDefault ?? previous.anonymous_contributions_default,
     message_theme: previous.message_theme,
     updated_at: updatedAt,
   };
@@ -519,14 +520,18 @@ export async function savePrivacySettings(
     );
   }
   if (input.mentionAudience || input.anonymousContributionsDefault !== undefined) {
-    batch.set(db.collection("privacy_settings").doc(userId), {
-      user_id: userId,
-      ...(input.mentionAudience ? { mention_audience: input.mentionAudience } : {}),
-      ...(input.anonymousContributionsDefault !== undefined
-        ? { anonymous_contributions_default: input.anonymousContributionsDefault }
-        : {}),
-      updated_at: updatedAt,
-    }, { merge: true });
+    batch.set(
+      db.collection("privacy_settings").doc(userId),
+      {
+        user_id: userId,
+        ...(input.mentionAudience ? { mention_audience: input.mentionAudience } : {}),
+        ...(input.anonymousContributionsDefault !== undefined
+          ? { anonymous_contributions_default: input.anonymousContributionsDefault }
+          : {}),
+        updated_at: updatedAt,
+      },
+      { merge: true },
+    );
   }
   if (input.profileVisibility) {
     batch.set(
@@ -554,9 +559,14 @@ export async function saveMessageTheme(userId: string, theme: (typeof MESSAGE_TH
     if (access.tier === "basic") throw new Error("This chat theme is available with Premium.");
   }
   const db = getFirestoreDb();
-  await db.collection("privacy_settings").doc(userId).set({
-    user_id: userId, message_theme: theme, updated_at: now(),
-  }, { merge: true });
+  await db.collection("privacy_settings").doc(userId).set(
+    {
+      user_id: userId,
+      message_theme: theme,
+      updated_at: now(),
+    },
+    { merge: true },
+  );
   return { message_theme: theme };
 }
 
@@ -573,7 +583,8 @@ export async function readChatPreferences(userId: string) {
 }
 
 export async function saveChatPreferences(userId: string, json: string, updatedAt: number) {
-  if (json.length > CHAT_PREFS_MAX_CHARS) throw new Error("Your chat settings are too large to save.");
+  if (json.length > CHAT_PREFS_MAX_CHARS)
+    throw new Error("Your chat settings are too large to save.");
   let parsed: unknown;
   try {
     parsed = JSON.parse(json);
@@ -585,12 +596,15 @@ export async function saveChatPreferences(userId: string, json: string, updatedA
   const access = await getUserMembershipEntitlements(userId);
   if (access.tier === "basic") prefs = stripPremiumPresets(prefs);
   const saved = JSON.stringify(prefs);
-  await getFirestoreDb().collection("chat_preferences").doc(userId).set({
-    user_id: userId,
-    data: saved,
-    updated_at: Math.max(0, Math.floor(updatedAt)),
-    saved_at: now(),
-  });
+  await getFirestoreDb()
+    .collection("chat_preferences")
+    .doc(userId)
+    .set({
+      user_id: userId,
+      data: saved,
+      updated_at: Math.max(0, Math.floor(updatedAt)),
+      saved_at: now(),
+    });
   return { ok: true as const, data: saved };
 }
 
@@ -598,7 +612,8 @@ export async function saveChatPreferences(userId: string, json: string, updatedA
 export async function readConversationPreferences(userId: string, conversationId: string) {
   const snapshot = await getFirestoreDb().collection("conversations").doc(conversationId).get();
   const conversation = snapshot.data() as ConversationRecord | undefined;
-  if (!snapshot.exists || !conversation?.participant_ids.includes(userId)) throw new Error("Conversation not found.");
+  if (!snapshot.exists || !conversation?.participant_ids.includes(userId))
+    throw new Error("Conversation not found.");
   const preference = conversation.preferences?.[userId] ?? {};
   return {
     archived: preference.archived === true,
@@ -692,7 +707,9 @@ async function readAllPairRecords(collection: string, field: string, ids: string
     let query = db.collection(collection).where(field, "in", ids).orderBy("__name__", "asc");
     if (cursor) query = query.startAfter(db.collection(collection).doc(cursor));
     const page = await query.limit(300).get();
-    records.push(...page.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, any> })));
+    records.push(
+      ...page.docs.map((doc) => ({ id: doc.id, data: doc.data() as Record<string, any> })),
+    );
     const last = page.docs.at(-1);
     if (page.size < 300 || !last) break;
     cursor = last.id;
@@ -704,64 +721,106 @@ async function readAllPairRecords(collection: string, field: string, ids: string
 async function removePairInteractions(firstId: string, secondId: string) {
   const db = getFirestoreDb();
   const pair = [firstId, secondId];
-  const [pairFollows, pairStoryLikes, pairStoryFollows, pairVotes, pairComments, pairCommentLikes] = await Promise.all([
-    Promise.all([
-      db.collection("follows").doc(`${firstId}:${secondId}`).get(),
-      db.collection("follows").doc(`${secondId}:${firstId}`).get(),
-    ]),
-    readAllPairRecords("story_likes", "user_id", pair),
-    readAllPairRecords("story_follows", "user_id", pair),
-    readAllPairRecords("votes", "user_id", pair),
-    readAllPairRecords("comments", "author_id", pair),
-    readAllPairRecords("comment_likes", "user_id", pair),
-  ]);
+  const [pairFollows, pairStoryLikes, pairStoryFollows, pairVotes, pairComments, pairCommentLikes] =
+    await Promise.all([
+      Promise.all([
+        db.collection("follows").doc(`${firstId}:${secondId}`).get(),
+        db.collection("follows").doc(`${secondId}:${firstId}`).get(),
+      ]),
+      readAllPairRecords("story_likes", "user_id", pair),
+      readAllPairRecords("story_follows", "user_id", pair),
+      readAllPairRecords("votes", "user_id", pair),
+      readAllPairRecords("comments", "author_id", pair),
+      readAllPairRecords("comment_likes", "user_id", pair),
+    ]);
 
-  const storyIds = [...new Set([
-    ...pairStoryLikes.map((item) => String(item.data["story_id"] ?? "")),
-    ...pairStoryFollows.map((item) => String(item.data["story_id"] ?? "")),
-    ...pairVotes.map((item) => String(item.data["story_id"] ?? "")),
-    ...pairComments.map((item) => String(item.data["story_id"] ?? "")),
-  ].filter(Boolean))];
+  const storyIds = [
+    ...new Set(
+      [
+        ...pairStoryLikes.map((item) => String(item.data["story_id"] ?? "")),
+        ...pairStoryFollows.map((item) => String(item.data["story_id"] ?? "")),
+        ...pairVotes.map((item) => String(item.data["story_id"] ?? "")),
+        ...pairComments.map((item) => String(item.data["story_id"] ?? "")),
+      ].filter(Boolean),
+    ),
+  ];
   const stories = await Promise.all(storyIds.map((id) => db.collection("stories").doc(id).get()));
-  const storyById = new Map(stories.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const));
-  const parentIds = [...new Set(pairComments.map((item) => String(item.data["parent_id"] ?? "")).filter(Boolean))];
-  const parentDocs = await Promise.all(parentIds.map((id) => db.collection("comments").doc(id).get()));
-  const parentById = new Map(parentDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const));
+  const storyById = new Map(
+    stories.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const),
+  );
+  const parentIds = [
+    ...new Set(pairComments.map((item) => String(item.data["parent_id"] ?? "")).filter(Boolean)),
+  ];
+  const parentDocs = await Promise.all(
+    parentIds.map((id) => db.collection("comments").doc(id).get()),
+  );
+  const parentById = new Map(
+    parentDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const),
+  );
   const pairSet = new Set(pair);
   const isCounterpart = (actorId: string, ownerId: unknown) =>
     pairSet.has(actorId) && pairSet.has(String(ownerId ?? "")) && actorId !== ownerId;
 
   const storyLikeDeletes = pairStoryLikes.filter((item) =>
-    isCounterpart(String(item.data["user_id"] ?? ""), storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id")),
+    isCounterpart(
+      String(item.data["user_id"] ?? ""),
+      storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id"),
+    ),
   );
   const storyFollowDeletes = pairStoryFollows.filter((item) =>
-    isCounterpart(String(item.data["user_id"] ?? ""), storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id")),
+    isCounterpart(
+      String(item.data["user_id"] ?? ""),
+      storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id"),
+    ),
   );
   const voteDeletes = pairVotes.filter((item) =>
-    isCounterpart(String(item.data["user_id"] ?? ""), storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id")),
+    isCounterpart(
+      String(item.data["user_id"] ?? ""),
+      storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id"),
+    ),
   );
   const commentsToRemove = pairComments.filter((item) => {
     const ownerId = storyById.get(String(item.data["story_id"] ?? ""))?.get("author_id");
     const parentOwnerId = parentById.get(String(item.data["parent_id"] ?? ""))?.get("author_id");
-    return (isCounterpart(String(item.data["author_id"] ?? ""), ownerId) ||
-      isCounterpart(String(item.data["author_id"] ?? ""), parentOwnerId)) && !item.data["is_deleted"];
+    return (
+      (isCounterpart(String(item.data["author_id"] ?? ""), ownerId) ||
+        isCounterpart(String(item.data["author_id"] ?? ""), parentOwnerId)) &&
+      !item.data["is_deleted"]
+    );
   });
   const removedCommentIds = new Set(commentsToRemove.map((item) => item.id));
-  const commentIds = [...new Set([
-    ...pairCommentLikes.map((item) => String(item.data["comment_id"] ?? "")),
-    ...commentsToRemove.map((item) => item.id),
-  ].filter(Boolean))];
-  const commentDocs = await Promise.all(commentIds.map((id) => db.collection("comments").doc(id).get()));
-  const commentById = new Map(commentDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const));
+  const commentIds = [
+    ...new Set(
+      [
+        ...pairCommentLikes.map((item) => String(item.data["comment_id"] ?? "")),
+        ...commentsToRemove.map((item) => item.id),
+      ].filter(Boolean),
+    ),
+  ];
+  const commentDocs = await Promise.all(
+    commentIds.map((id) => db.collection("comments").doc(id).get()),
+  );
+  const commentById = new Map(
+    commentDocs.filter((doc) => doc.exists).map((doc) => [doc.id, doc] as const),
+  );
   const commentLikeDeletes = pairCommentLikes.filter((item) => {
     const comment = commentById.get(String(item.data["comment_id"] ?? ""));
-    return removedCommentIds.has(String(item.data["comment_id"] ?? "")) ||
-      isCounterpart(String(item.data["user_id"] ?? ""), comment?.get("author_id"));
+    return (
+      removedCommentIds.has(String(item.data["comment_id"] ?? "")) ||
+      isCounterpart(String(item.data["user_id"] ?? ""), comment?.get("author_id"))
+    );
   });
 
-  const storyMetricDeltas = new Map<string, {
-    likes: number; followers: number; comments: number; upvotes: number; metoo: number;
-  }>();
+  const storyMetricDeltas = new Map<
+    string,
+    {
+      likes: number;
+      followers: number;
+      comments: number;
+      upvotes: number;
+      metoo: number;
+    }
+  >();
   const metricFor = (id: string) => {
     if (!storyById.has(id)) return null;
     let metric = storyMetricDeltas.get(id);
@@ -797,15 +856,27 @@ async function removePairInteractions(firstId: string, secondId: string) {
     commentLikeCounts.set(commentId, (commentLikeCounts.get(commentId) ?? 0) + 1);
   }
   const operations: Array<(batch: ReturnType<typeof db.batch>) => void> = [];
-  for (const follow of pairFollows) if (follow.exists) operations.push((batch) => batch.delete(follow.ref));
+  for (const follow of pairFollows)
+    if (follow.exists) operations.push((batch) => batch.delete(follow.ref));
   // Delete interaction docs from their own collections.
-  for (const item of storyLikeDeletes) operations.push((batch) => batch.delete(db.collection("story_likes").doc(item.id)));
-  for (const item of storyFollowDeletes) operations.push((batch) => batch.delete(db.collection("story_follows").doc(item.id)));
-  for (const item of voteDeletes) operations.push((batch) => batch.delete(db.collection("votes").doc(item.id)));
-  for (const item of commentLikeDeletes) operations.push((batch) => batch.delete(db.collection("comment_likes").doc(item.id)));
-  for (const item of commentsToRemove) operations.push((batch) => batch.update(db.collection("comments").doc(item.id), {
-    body: "", likes: 0, is_deleted: true, counter_adjusted_on_delete: true, deleted_at: now(),
-  }));
+  for (const item of storyLikeDeletes)
+    operations.push((batch) => batch.delete(db.collection("story_likes").doc(item.id)));
+  for (const item of storyFollowDeletes)
+    operations.push((batch) => batch.delete(db.collection("story_follows").doc(item.id)));
+  for (const item of voteDeletes)
+    operations.push((batch) => batch.delete(db.collection("votes").doc(item.id)));
+  for (const item of commentLikeDeletes)
+    operations.push((batch) => batch.delete(db.collection("comment_likes").doc(item.id)));
+  for (const item of commentsToRemove)
+    operations.push((batch) =>
+      batch.update(db.collection("comments").doc(item.id), {
+        body: "",
+        likes: 0,
+        is_deleted: true,
+        counter_adjusted_on_delete: true,
+        deleted_at: now(),
+      }),
+    );
   for (const [storyId, metric] of storyMetricDeltas) {
     const delta: Record<string, ReturnType<typeof FieldValue.increment>> = {};
     if (metric.likes) delta["likes"] = FieldValue.increment(metric.likes);
@@ -818,9 +889,12 @@ async function removePairInteractions(firstId: string, secondId: string) {
   for (const [commentId, removedLikes] of commentLikeCounts) {
     if (removedCommentIds.has(commentId)) continue;
     const comment = commentById.get(commentId);
-    if (comment) operations.push((batch) => batch.update(comment.ref, {
-      likes: FieldValue.increment(-removedLikes),
-    }));
+    if (comment)
+      operations.push((batch) =>
+        batch.update(comment.ref, {
+          likes: FieldValue.increment(-removedLikes),
+        }),
+      );
   }
   for (let offset = 0; offset < operations.length; offset += 400) {
     const batch = db.batch();
@@ -1205,7 +1279,10 @@ export async function readConversation(
   const gate = cursor
     ? { allowed: true as const, reason: null }
     : blockedBetween
-      ? { allowed: true as const, reason: "This account is blocked. Messages you send here will not be delivered." }
+      ? {
+          allowed: true as const,
+          reason: "This account is blocked. Messages you send here will not be delivered.",
+        }
       : await canMessage(userId, otherId);
 
   return {
@@ -1221,7 +1298,9 @@ export async function readConversation(
     can_send: gate.allowed,
     blocked_reason: blockedBetween
       ? "This account is blocked. Messages you send here will not be delivered."
-      : gate.allowed ? null : gate.reason,
+      : gate.allowed
+        ? null
+        : gate.reason,
   };
 }
 
@@ -1304,7 +1383,9 @@ export async function sendMessage(input: {
     reactions: {},
     image,
     is_deleted: false,
-    ...(blockedBetween ? { undelivered_to: otherId, delivery_state: "not_delivered" as const } : { delivery_state: "sent" as const }),
+    ...(blockedBetween
+      ? { undelivered_to: otherId, delivery_state: "not_delivered" as const }
+      : { delivery_state: "sent" as const }),
   };
   const batch = db.batch();
   batch.set(messageRef, message);
@@ -1486,6 +1567,49 @@ export async function toggleReaction(userId: string, messageId: string, emoji: s
 }
 
 /** Public-facing profile used by the chat header and profile detail screen. */
+export async function readAccountProfileAvatars(usernames: string[], viewerId: string) {
+  const db = getFirestoreDb();
+  const uniqueUsernames = [...new Set(usernames.map((username) => username.trim().toLowerCase()))];
+  const usernameSnapshots = await Promise.all(
+    uniqueUsernames.map((username) => db.collection("usernames").doc(username).get()),
+  );
+  const entries = usernameSnapshots.flatMap((snapshot, index) => {
+    const userId = (snapshot.data() as { user_id?: string } | undefined)?.user_id;
+    return userId ? [{ username: uniqueUsernames[index]!, userId }] : [];
+  });
+  const profiles = await Promise.all(
+    entries.map(async ({ username, userId }) => ({
+      username,
+      userId,
+      snapshot: await db.collection("profiles").doc(userId).get(),
+    })),
+  );
+  const availableProfiles = profiles.filter(({ snapshot }) => {
+    const profile = snapshot.data() as ProfileRecord | undefined;
+    return (
+      snapshot.exists &&
+      profile &&
+      !profile.banned &&
+      profile.account_status !== "deactivated" &&
+      profile.account_status !== "deletion_pending"
+    );
+  });
+  const visibleProfiles = await Promise.all(
+    availableProfiles.map(async ({ username, userId, snapshot }) => ({
+      username,
+      userId,
+      profile: snapshot.data() as ProfileRecord,
+      blocked: await accountsBlockEachOther(viewerId, userId),
+    })),
+  );
+  return Object.fromEntries(
+    visibleProfiles.flatMap(({ blocked, username, profile }) => {
+      const photoURL = profile.photo_url;
+      return !blocked && typeof photoURL === "string" ? [[username, photoURL]] : [];
+    }),
+  );
+}
+
 export async function readPublicProfile(username: string, viewerId: string | null) {
   const db = getFirestoreDb();
   const usernameSnap = await db.collection("usernames").doc(username.trim().toLowerCase()).get();
@@ -1502,7 +1626,8 @@ export async function readPublicProfile(username: string, viewerId: string | nul
     profile.account_status === "deletion_pending"
   )
     return null;
-  if (viewerId && viewerId !== userId && await accountsBlockEachOther(viewerId, userId)) return null;
+  if (viewerId && viewerId !== userId && (await accountsBlockEachOther(viewerId, userId)))
+    return null;
   const pinnedLimit = getMembershipEntitlements(
     getEffectiveMembershipTier(profile),
   ).maxPinnedStories;
@@ -1547,35 +1672,47 @@ export async function readPublicProfile(username: string, viewerId: string | nul
   const isSelf = viewerId === userId;
   const isPrivate = profile.profile_visibility === "private";
   const canViewContributions = !isPrivate || isSelf || viewerFollowStatus === "accepted";
-  const [storyCount, commentCount, anonymousStoryCount, anonymousCommentCount, stories] = canViewContributions
-    ? await Promise.all([
-        db
-          .collection("stories")
-          .where("author_id", "==", userId)
-          .where("status", "==", "published")
-          .count(),
-        db
-          .collection("comments")
-          .where("author_id", "==", userId)
-          .where("status", "==", "published")
-          .count(),
-        db.collection("stories").where("author_id", "==", userId).where("status", "==", "published").where("is_anonymous", "==", true).count(),
-        db.collection("comments").where("author_id", "==", userId).where("status", "==", "published").where("is_anonymous", "==", true).count(),
-        db
-          .collection("stories")
-          .where("author_id", "==", userId)
-          .where("status", "==", "published")
-          .orderBy("created_at", "desc")
-          .orderBy("__name__", "desc")
-          .limit(31)
-          .get(),
-      ])
-    : [0, 0, 0, 0, null];
+  const [storyCount, commentCount, anonymousStoryCount, anonymousCommentCount, stories] =
+    canViewContributions
+      ? await Promise.all([
+          db
+            .collection("stories")
+            .where("author_id", "==", userId)
+            .where("status", "==", "published")
+            .count(),
+          db
+            .collection("comments")
+            .where("author_id", "==", userId)
+            .where("status", "==", "published")
+            .count(),
+          db
+            .collection("stories")
+            .where("author_id", "==", userId)
+            .where("status", "==", "published")
+            .where("is_anonymous", "==", true)
+            .count(),
+          db
+            .collection("comments")
+            .where("author_id", "==", userId)
+            .where("status", "==", "published")
+            .where("is_anonymous", "==", true)
+            .count(),
+          db
+            .collection("stories")
+            .where("author_id", "==", userId)
+            .where("status", "==", "published")
+            .orderBy("created_at", "desc")
+            .orderBy("__name__", "desc")
+            .limit(31)
+            .get(),
+        ])
+      : [0, 0, 0, 0, null];
   const storyDocs = stories?.docs ?? [];
   const storySize = stories?.size ?? 0;
   const newestStoryDocsById = new Map(storyDocs.map((doc) => [doc.id, doc] as const));
   const profileStories = await Promise.all(
-    storyDocs.filter((doc) => doc.get("is_anonymous") !== true)
+    storyDocs
+      .filter((doc) => doc.get("is_anonymous") !== true)
       .slice(0, 30)
       .map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
   );
@@ -1593,7 +1730,8 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       .filter((doc) => doc.exists)
       .map(async (doc) => {
         const story = doc.data() as StoryRecord;
-        if (story.author_id !== userId || story.status !== "published" || story.is_anonymous) return null;
+        if (story.author_id !== userId || story.status !== "published" || story.is_anonymous)
+          return null;
         const alreadyLoaded = profileStoriesById.get(doc.id);
         if (alreadyLoaded) return { ...alreadyLoaded, is_pinned: true };
         return publicProfileStory(doc.id, story, doc.updateTime, true);
@@ -1690,7 +1828,7 @@ export async function readPublicProfileStories(
     profile?.account_status === "deletion_pending"
   )
     return { stories: [], hasMore: false, nextCursor: null };
-  if (viewerId && viewerId !== userId && await accountsBlockEachOther(viewerId, userId)) {
+  if (viewerId && viewerId !== userId && (await accountsBlockEachOther(viewerId, userId))) {
     return { stories: [], hasMore: false, nextCursor: null };
   }
   if (profile?.profile_visibility === "private" && viewerId !== userId) {
@@ -1716,7 +1854,9 @@ export async function readPublicProfileStories(
   const last = docs.at(-1);
   return {
     stories: await Promise.all(
-      docs.filter((doc) => doc.get("is_anonymous") !== true).map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
+      docs
+        .filter((doc) => doc.get("is_anonymous") !== true)
+        .map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
     ),
     hasMore: snapshot.size > 30,
     nextCursor:
@@ -1727,7 +1867,11 @@ export async function readPublicProfileStories(
 }
 
 /** Cursor-paged public follower directory. Each request reads one bounded page. */
-export async function readPublicProfileFollowers(username: string, cursor: string | null, viewerId: string) {
+export async function readPublicProfileFollowers(
+  username: string,
+  cursor: string | null,
+  viewerId: string,
+) {
   const db = getFirestoreDb();
   const usernameSnap = await db.collection("usernames").doc(username.trim().toLowerCase()).get();
   const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
@@ -1742,7 +1886,7 @@ export async function readPublicProfileFollowers(username: string, cursor: strin
     profile?.account_status === "deletion_pending"
   )
     return { followers: [], hasMore: false, nextCursor: null };
-  if (viewerId !== userId && await accountsBlockEachOther(viewerId, userId)) {
+  if (viewerId !== userId && (await accountsBlockEachOther(viewerId, userId))) {
     return { followers: [], hasMore: false, nextCursor: null };
   }
 

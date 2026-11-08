@@ -4,6 +4,7 @@ import {
   forgetRememberedAccount,
   getRememberedAccounts,
   rememberAccount,
+  updateRememberedAccountPhotos,
   type RememberedAccount,
 } from "./account-switching.ts";
 
@@ -48,6 +49,24 @@ test("refreshing account metadata does not erase previously saved profile detail
   rememberAccount({ ...account("member", 2), photoURL: null });
 
   assert.equal(getRememberedAccounts()[0]?.photoURL, "https://example.com/avatar.png");
+});
+
+test("profile photo lookup fills missing saved avatars without replacing existing photos", () => {
+  rememberAccount({ ...account("avatar", 1), photoURL: null });
+  rememberAccount({ ...account("existing", 2), photoURL: "https://example.com/existing.png" });
+
+  const updated = updateRememberedAccountPhotos({
+    AVATAR: "https://example.com/avatar.png",
+    existing: "https://example.com/new.png",
+  });
+
+  assert.deepEqual(
+    updated.map(({ uid, photoURL, lastUsedAt }) => ({ uid, photoURL, lastUsedAt })),
+    [
+      { uid: "existing", photoURL: "https://example.com/existing.png", lastUsedAt: 2 },
+      { uid: "avatar", photoURL: "https://example.com/avatar.png", lastUsedAt: 1 },
+    ],
+  );
 });
 
 test("forgetting an account removes only that account", () => {

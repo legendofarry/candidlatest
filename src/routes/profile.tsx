@@ -45,7 +45,7 @@ import {
   ProfilePhotoPicker,
 } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
-import { AccountSwitcher, AccountSwitcherMenuItem } from "@/components/site/account-switcher";
+import { AccountSwitcher } from "@/components/site/account-switcher";
 import { getPublicProfile } from "@/lib/messaging.functions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -53,7 +53,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
@@ -159,10 +158,6 @@ function ProfilePage() {
     : user?.email
       ? `anon-${user.uid.slice(0, 6)}`
       : "Guest";
-  const nextUsernameChangeAt = onboarding.data?.usernameChangedAt
-    ? Date.parse(onboarding.data.usernameChangedAt) + 14 * 24 * 60 * 60 * 1000
-    : null;
-
   return (
     <div className="min-h-screen bg-background">
       <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
@@ -172,6 +167,7 @@ function ProfilePage() {
           onOpenChange={setAccountSwitcherOpen}
           user={user}
           username={onboarding.data?.username ?? null}
+          profilePhotoUrl={onboarding.data?.photoUrl ?? null}
         />
       ) : null}
       <section className="min-h-screen px-3 pb-4 sm:px-5 md:px-8 md:py-8">
@@ -242,73 +238,16 @@ function ProfilePage() {
                 )}
                 <div className="min-w-0">
                   <h1 className="mt-1 flex items-center gap-1.5 truncate text-xl font-semibold md:text-2xl">
-                    {onboarding.data?.username ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label={`Options for ${handle}`}
-                            className="inline-flex min-w-0 items-center gap-1 rounded-sm text-inherit transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            <span className="truncate">{handle}</span>
-                            <ChevronDown className="size-4 shrink-0" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuLabel>{handle}</DropdownMenuLabel>
-                          {user ? (
-                            <>
-                              <AccountSwitcherMenuItem
-                                onOpen={() => setAccountSwitcherOpen(true)}
-                              />
-                              <DropdownMenuSeparator />
-                            </>
-                          ) : null}
-                          <DropdownMenuItem asChild>
-                            <Link to="/u/$username" params={{ username: onboarding.data.username }}>
-                              <Link2 className="size-4" /> View public profile
-                            </Link>
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          {nextUsernameChangeAt !== null && Date.now() < nextUsernameChangeAt ? (
-                            <>
-                              <DropdownMenuItem disabled>
-                                <PenLine className="size-4" /> Change username
-                              </DropdownMenuItem>
-                              <p className="px-2 py-1 text-xs text-muted-foreground">
-                                Available after{" "}
-                                {new Date(nextUsernameChangeAt).toLocaleDateString("en-KE")}.
-                              </p>
-                            </>
-                          ) : (
-                            <DropdownMenuItem asChild>
-                              <Link to="/onboarding" search={{ editUsername: true }}>
-                                <PenLine className="size-4" /> Change username
-                              </Link>
-                            </DropdownMenuItem>
-                          )}
-                          {nextUsernameChangeAt === null ? (
-                            <p className="px-2 py-1 text-xs text-muted-foreground"></p>
-                          ) : null}
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    ) : user ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <button
-                            type="button"
-                            aria-label="Account options"
-                            className="inline-flex min-w-0 items-center gap-1 rounded-sm text-inherit transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          >
-                            <span className="truncate">{handle}</span>
-                            <ChevronDown className="size-4 shrink-0" />
-                          </button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start">
-                          <DropdownMenuLabel>{handle}</DropdownMenuLabel>
-                          <AccountSwitcherMenuItem onOpen={() => setAccountSwitcherOpen(true)} />
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                    {user ? (
+                      <button
+                        type="button"
+                        aria-label="Switch accounts"
+                        onClick={() => setAccountSwitcherOpen(true)}
+                        className="inline-flex min-w-0 items-center gap-1 rounded-sm text-inherit transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      >
+                        <span className="truncate">{handle}</span>
+                        <ChevronDown className="size-4 shrink-0" />
+                      </button>
                     ) : (
                       handle
                     )}
@@ -319,6 +258,41 @@ function ProfilePage() {
                       tier={onboarding.data?.membership?.tier}
                       official={onboarding.data?.accountType === "official"}
                     />
+                    {user ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Profile and account settings"
+                            title="Profile and account settings"
+                            className="size-8 shrink-0 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                          >
+                            <Settings className="size-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start" className="w-64 rounded-2xl p-1.5">
+                          <DropdownMenuLabel className="px-3 py-2">
+                            Profile & account
+                          </DropdownMenuLabel>
+                          <DropdownMenuItem
+                            asChild
+                            className="min-h-11 cursor-pointer rounded-xl px-3"
+                          >
+                            <Link to="/settings">
+                              <Settings className="size-4 text-primary" />
+                              <span className="flex flex-col">
+                                <span className="font-medium">Settings and updates</span>
+                                <span className="text-xs text-muted-foreground">
+                                  Profile, privacy and preferences
+                                </span>
+                              </span>
+                            </Link>
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : null}
                   </h1>
                   <p className="truncate text-sm text-muted-foreground">
                     {loading ? "Checking your session…" : user ? "" : "Not signed in"}
@@ -338,15 +312,10 @@ function ProfilePage() {
                 ) : null}
               </motion.div>
               {user && onboarding.data?.username ? (
-                <div className="mt-4 grid grid-cols-2 gap-2 border-t border-border pt-4">
+                <div className="mt-4 grid grid-cols-1 gap-2 border-t border-border pt-4">
                   <Button asChild className="h-11 rounded-xl">
                     <Link to="/post">
                       <PenLine className="size-4" /> Share a story
-                    </Link>
-                  </Button>
-                  <Button asChild variant="secondary" className="h-11 rounded-xl">
-                    <Link to="/u/$username" params={{ username: onboarding.data.username }}>
-                      <Link2 className="size-4" /> View public profile
                     </Link>
                   </Button>
                 </div>

@@ -61,6 +61,26 @@ export function rememberAccount(account: RememberedAccount) {
   return updated;
 }
 
+export function updateRememberedAccountPhotos(photosByUsername: Record<string, string>) {
+  const normalizedPhotos = new Map(
+    Object.entries(photosByUsername).map(([username, photoURL]) => [
+      username.toLowerCase(),
+      photoURL,
+    ]),
+  );
+  const accounts = getRememberedAccounts();
+  let changed = false;
+  const updated = accounts.map((account) => {
+    if (account.photoURL || !account.username) return account;
+    const photoURL = normalizedPhotos.get(account.username.toLowerCase());
+    if (!photoURL) return account;
+    changed = true;
+    return { ...account, photoURL };
+  });
+  if (changed) saveAccounts(updated);
+  return updated;
+}
+
 export function forgetRememberedAccount(uid: string) {
   const accounts = getRememberedAccounts().filter((account) => account.uid !== uid);
   saveAccounts(accounts);
