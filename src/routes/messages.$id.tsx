@@ -571,7 +571,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           </span>
         </button>
         <MessageAppearanceSettings
-          contactName={partner?.username ? `@${partner.username}` : undefined}
+          {...(partner?.username ? { contactName: `@${partner.username}` } : {})}
           className="size-10 text-current hover:bg-black/5 hover:text-current max-sm:text-white max-sm:hover:bg-white/10"
         />
       </header>

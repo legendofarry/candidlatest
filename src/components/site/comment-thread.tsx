@@ -449,22 +449,19 @@ export function CommentThread({
                 </button>
               </div>
             ) : null}
-            <div className="flex items-end gap-2">
-              <div
-                className={cn(
-                  "anon-field relative flex-1 overflow-hidden rounded-2xl border bg-card/80",
-                  !anonymous && "border-border/80",
-                )}
-                data-anon={anonymous}
-              >
-                <MentionTextarea
-                  rows={1}
-                  value={body}
-                  onValueChange={setBody}
-                  placeholder="Add a comment…"
-                  className="min-h-11 resize-none border-0 bg-transparent pr-32 text-sm shadow-none focus-visible:ring-0"
-                />
-                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-background via-background/70 to-transparent" />
+            <div
+              className="anon-field composer-capsule relative overflow-hidden rounded-[1.4rem] border bg-card/80"
+              data-anon={anonymous}
+              data-ready={body.trim().length >= 2}
+            >
+              <MentionTextarea
+                rows={1}
+                value={body}
+                onValueChange={setBody}
+                placeholder={anonymous ? "Say it anonymously…" : "Add a comment…"}
+                className="min-h-11 resize-none border-0 bg-transparent px-4 pb-1 pt-3 text-sm shadow-none focus-visible:ring-0"
+              />
+              <div className="flex items-center justify-between gap-2 px-2 pb-2">
                 <AnonymousPostingToggle
                   anonymous={anonymous}
                   onToggle={() => {
@@ -472,21 +469,21 @@ export function CommentThread({
                     setAnonymousTouched(true);
                   }}
                   user={user}
-                  className="absolute bottom-1.5 right-1.5 z-10"
                 />
+                <button
+                  type="button"
+                  className="composer-send"
+                  disabled={body.trim().length < 2 || commentMutation.isPending}
+                  onClick={() => commentMutation.mutate()}
+                  aria-label="Post comment"
+                >
+                  {commentMutation.isPending ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <Send className="size-4" />
+                  )}
+                </button>
               </div>
-              <Button
-                size="icon"
-                disabled={body.trim().length < 2 || commentMutation.isPending}
-                onClick={() => commentMutation.mutate()}
-                aria-label="Post comment"
-              >
-                {commentMutation.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Send className="size-4" />
-                )}
-              </Button>
             </div>
           </>
         ) : (

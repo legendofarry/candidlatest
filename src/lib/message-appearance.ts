@@ -117,7 +117,7 @@ export function getMessageAppearanceStyle(appearance: MessageAppearance): CSSPro
     ?.slice(0, 3)
     .map((part) => parseInt(part, 16)) ?? [0, 0, 0];
   const outgoingInk =
-    (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 > 150 ? "#202124" : "#ffffff";
+    ((rgb[0] ?? 0) * 299 + (rgb[1] ?? 0) * 587 + (rgb[2] ?? 0) * 114) / 1000 > 150 ? "#202124" : "#ffffff";
   return {
     // The Default appearance follows the site's live light/dark tokens. Explicit
     // appearances remain fixed so a user's chosen chat look is predictable.
