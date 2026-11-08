@@ -37,167 +37,14 @@ function useOverlayChrome(
 }
 
 /* -------------------------------------------------------------------------- */
-/* Pause: the professor folds the screen away                                 */
+/* Pause: the screen is peeled away square by square                         */
 /* -------------------------------------------------------------------------- */
 
-type Phase = "walkin" | "fold" | "pack" | "walkout" | "message" | "committing";
+type Phase = "fold" | "message" | "committing";
 
-const WALK_IN_MS = 1500;
 const FOLD_MS = 5200;
 const PIECE_MS = 850;
-const PACK_MS = 1000;
-const WALK_OUT_MS = 1400;
 const GRACE_MS = 5000;
-
-const COAT = "#8a5a34";
-const SKIN = "#f7cfa6";
-const INK = "#2a1a10";
-
-/** An original cartoon professor drawn in SVG. Limbs animate with the current phase. */
-function Professor({ phase }: { phase: Phase }) {
-  const walking = phase === "walkin" || phase === "walkout";
-  const folding = phase === "fold";
-  const packing = phase === "pack";
-  const open = phase === "walkin" || phase === "fold";
-  const step = { repeat: Infinity, duration: 0.5, ease: "easeInOut" } as const;
-  const rest = { duration: 0.25 } as const;
-
-  return (
-    <svg viewBox="0 0 150 210" width="150" height="210" aria-hidden="true" className="overflow-visible">
-      <ellipse cx="75" cy="203" rx="42" ry="5" fill="rgba(0,0,0,0.25)" />
-
-      <motion.g
-        style={{ originX: 0.5, originY: 1 }}
-        animate={walking ? { y: [0, -5, 0], rotate: [-2, 2, -2] } : { y: 0, rotate: 0 }}
-        transition={walking ? step : rest}
-      >
-        {/* legs */}
-        <motion.g
-          style={{ originX: 0.5, originY: 0 }}
-          animate={walking ? { rotate: [-22, 22, -22] } : { rotate: 0 }}
-          transition={walking ? step : rest}
-        >
-          <rect x="57" y="146" width="15" height="44" rx="7" fill="#3a3f4b" />
-          <ellipse cx="65" cy="192" rx="12" ry="6" fill="#1c1c1f" />
-        </motion.g>
-        <motion.g
-          style={{ originX: 0.5, originY: 0 }}
-          animate={walking ? { rotate: [22, -22, 22] } : { rotate: 0 }}
-          transition={walking ? step : rest}
-        >
-          <rect x="78" y="146" width="15" height="44" rx="7" fill="#3a3f4b" />
-          <ellipse cx="86" cy="192" rx="12" ry="6" fill="#1c1c1f" />
-        </motion.g>
-
-        {/* briefcase arm (viewer's left) */}
-        <line x1="52" y1="94" x2="25" y2="146" stroke={COAT} strokeWidth="13" strokeLinecap="round" />
-
-        {/* torso */}
-        <path
-          d="M47 84 Q75 74 103 84 L109 152 Q75 160 41 152 Z"
-          fill={COAT}
-          stroke={INK}
-          strokeWidth="2"
-          strokeLinejoin="round"
-        />
-        <path d="M65 79 L85 79 L75 112 Z" fill="#fbfaf6" stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
-        <path d="M75 84 L64 78 L64 90 Z M75 84 L86 78 L86 90 Z" fill="#d6293a" stroke={INK} strokeWidth="1.2" />
-        <circle cx="75" cy="84" r="3" fill="#a81b2b" />
-        <circle cx="75" cy="124" r="2.2" fill={INK} />
-        <circle cx="75" cy="138" r="2.2" fill={INK} />
-        <rect x="52" y="106" width="9" height="12" rx="3" fill="#6c4325" opacity="0.7" />
-
-        {/* folding arm (viewer's right) */}
-        <motion.g
-          style={{ originX: 0.5, originY: 0 }}
-          animate={
-            folding
-              ? { rotate: [24, -38, 24] }
-              : walking
-                ? { rotate: [-14, 14, -14] }
-                : { rotate: 0 }
-          }
-          transition={folding ? { repeat: Infinity, duration: 0.45, ease: "easeInOut" } : walking ? step : rest}
-        >
-          <rect x="94" y="88" width="13" height="52" rx="6.5" fill={COAT} />
-          <circle cx="100.5" cy="142" r="7" fill={SKIN} stroke={INK} strokeWidth="1.5" />
-        </motion.g>
-
-        {/* head */}
-        <motion.g
-          style={{ originX: 0.5, originY: 1 }}
-          animate={walking ? { rotate: [-3, 3, -3] } : folding ? { rotate: [0, 2, 0] } : { rotate: 0 }}
-          transition={walking || folding ? step : rest}
-        >
-          <circle cx="47" cy="47" r="9" fill="#f3f3f3" stroke={INK} strokeWidth="1.5" />
-          <circle cx="103" cy="47" r="9" fill="#f3f3f3" stroke={INK} strokeWidth="1.5" />
-          <circle cx="51" cy="36" r="7" fill="#f3f3f3" stroke={INK} strokeWidth="1.5" />
-          <circle cx="99" cy="36" r="7" fill="#f3f3f3" stroke={INK} strokeWidth="1.5" />
-          <circle cx="75" cy="50" r="27" fill={SKIN} stroke={INK} strokeWidth="2" />
-          <circle cx="65" cy="50" r="9.5" fill="rgba(255,255,255,0.55)" stroke={INK} strokeWidth="2.4" />
-          <circle cx="85" cy="50" r="9.5" fill="rgba(255,255,255,0.55)" stroke={INK} strokeWidth="2.4" />
-          <path d="M74.5 49 h1" stroke={INK} strokeWidth="2.4" />
-          <motion.circle
-            cx="65"
-            r="2.6"
-            fill={INK}
-            animate={{ cy: folding ? 53 : 50 }}
-            transition={rest}
-          />
-          <motion.circle
-            cx="85"
-            r="2.6"
-            fill={INK}
-            animate={{ cy: folding ? 53 : 50 }}
-            transition={rest}
-          />
-          <ellipse cx="75" cy="59" rx="5.5" ry="4.2" fill="#efb98d" stroke={INK} strokeWidth="1" />
-          <path
-            d="M62 66 Q68.5 60 75 65 Q81.5 60 88 66 Q81 72 75 68 Q69 72 62 66 Z"
-            fill="#f7f7f7"
-            stroke={INK}
-            strokeWidth="1.2"
-            strokeLinejoin="round"
-          />
-          <path d="M69 74 Q75 78 81 74" fill="none" stroke={INK} strokeWidth="1.8" strokeLinecap="round" />
-          {/* mortarboard */}
-          <path d="M44 27 L75 14 L106 27 L75 38 Z" fill="#17171c" stroke={INK} strokeWidth="1.5" strokeLinejoin="round" />
-          <path d="M60 33 L60 40 Q75 46 90 40 L90 33" fill="#17171c" />
-          <path d="M106 27 L108 44" stroke="#e6b422" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="108" cy="46" r="2.8" fill="#e6b422" />
-        </motion.g>
-
-        {/* briefcase */}
-        <motion.g
-          style={{ originX: 0.5, originY: 0.5 }}
-          animate={packing ? { scale: [1, 1.14, 1], y: [0, -4, 0] } : { scale: 1, y: 0 }}
-          transition={{ duration: 0.45, delay: packing ? 0.35 : 0 }}
-        >
-          <rect x="4" y="164" width="40" height="26" rx="4" fill="#4a3322" stroke={INK} strokeWidth="1.8" />
-          <motion.rect
-            x="7"
-            y="164"
-            width="34"
-            height="6"
-            fill="#120b06"
-            animate={{ opacity: open ? 1 : 0 }}
-            transition={rest}
-          />
-          <motion.g
-            style={{ originX: 0.5, originY: 0 }}
-            animate={{ scaleY: open ? -1 : 1 }}
-            transition={{ type: "spring", stiffness: 260, damping: 16 }}
-          >
-            <rect x="4" y="150" width="40" height="14" rx="4" fill="#5a3f2a" stroke={INK} strokeWidth="1.8" />
-          </motion.g>
-          <rect x="20" y="159" width="8" height="9" rx="2" fill="#e6b422" stroke={INK} strokeWidth="1" />
-          <path d="M14 150 Q24 138 34 150" fill="none" stroke={INK} strokeWidth="3" strokeLinecap="round" />
-          <circle cx="25" cy="146" r="7" fill={SKIN} stroke={INK} strokeWidth="1.5" />
-        </motion.g>
-      </motion.g>
-    </svg>
-  );
-}
 
 export function PauseFoldOverlay({
   onCancel,
@@ -207,7 +54,7 @@ export function PauseFoldOverlay({
   onCommit: () => Promise<void>;
 }) {
   const still = Boolean(useReducedMotion());
-  const [phase, setPhase] = useState<Phase>(still ? "message" : "walkin");
+  const [phase, setPhase] = useState<Phase>(still ? "message" : "fold");
   const [secs, setSecs] = useState(Math.ceil(GRACE_MS / 1000));
   const cancelRef = useRef<HTMLButtonElement>(null);
   const commitRef = useRef(onCommit);
@@ -219,17 +66,11 @@ export function PauseFoldOverlay({
   };
   useOverlayChrome(handleCancel, cancelRef, phase === "committing");
 
-  // The choreography: walk in, fold, pack, walk out, then the message.
+  // Once the last square has flown off, the screen is black and the message appears.
   useEffect(() => {
     if (still) return;
-    const marks: [Phase, number][] = [
-      ["fold", WALK_IN_MS],
-      ["pack", WALK_IN_MS + FOLD_MS + PIECE_MS],
-      ["walkout", WALK_IN_MS + FOLD_MS + PIECE_MS + PACK_MS],
-      ["message", WALK_IN_MS + FOLD_MS + PIECE_MS + PACK_MS + WALK_OUT_MS],
-    ];
-    const timers = marks.map(([next, at]) => window.setTimeout(() => setPhase(next), at));
-    return () => timers.forEach((timer) => window.clearTimeout(timer));
+    const timer = window.setTimeout(() => setPhase("message"), FOLD_MS + PIECE_MS);
+    return () => window.clearTimeout(timer);
   }, [still]);
 
   // Short grace window on the message screen, then the pause is applied.
@@ -253,26 +94,23 @@ export function PauseFoldOverlay({
     cancelRef.current?.focus();
   }, [phase]);
 
-  // Tiles are peeled outward from the professor's hands, speeding up as the fold goes on.
+  // Tiles peel outward from the middle of the screen, speeding up as the fold goes on.
   const tiles = useMemo(() => {
     const size = view.w < 640 ? 56 : 84;
     const cols = Math.ceil(view.w / size);
     const rows = Math.ceil(view.h / size);
-    const targetX = view.w / 2 - 51;
-    const targetY = view.h - 80;
-    const handX = view.w / 2;
-    const handY = view.h - 90;
-    const raw: { cx: number; cy: number; left: number; top: number; score: number }[] = [];
+    const originX = view.w / 2;
+    const originY = view.h / 2;
+    const raw: { cx: number; left: number; top: number; score: number }[] = [];
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < cols; col += 1) {
         const cx = col * size + size / 2;
         const cy = row * size + size / 2;
         raw.push({
           cx,
-          cy,
           left: col * size,
           top: row * size,
-          score: Math.hypot(cx - handX, cy - handY) * (0.82 + Math.random() * 0.36),
+          score: Math.hypot(cx - originX, cy - originY) * (0.82 + Math.random() * 0.36),
         });
       }
     }
@@ -284,15 +122,14 @@ export function PauseFoldOverlay({
       top: tile.top,
       size,
       delay: Math.round(FOLD_MS * (1 - Math.pow(1 - index / count, 1.8))),
-      dx: Math.round(targetX - tile.cx),
-      dy: Math.round(targetY - tile.cy),
-      rot: Math.round((Math.random() * 2 - 1) * 220),
+      dx: Math.round((tile.cx - originX) * 0.12 + (Math.random() * 2 - 1) * 30),
+      dy: -Math.round(70 + Math.random() * 90),
+      rot: Math.round((Math.random() * 2 - 1) * 160),
     }));
   }, [view]);
 
-  const leaving = phase === "walkout" || phase === "message" || phase === "committing";
-  const showStage = phase !== "message" && phase !== "committing";
-  const solid = phase === "pack" || phase === "walkout" || phase === "message" || phase === "committing";
+  const showStage = phase === "fold";
+  const solid = phase !== "fold";
 
   if (typeof document === "undefined") return null;
   return createPortal(
@@ -306,7 +143,7 @@ export function PauseFoldOverlay({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.4 }}
     >
-      {!still && phase !== "walkin" ? (
+      {!still ? (
         <div aria-hidden="true" className="absolute inset-0">
           {tiles.map((tile) => (
             <div
@@ -340,21 +177,6 @@ export function PauseFoldOverlay({
             />
           ))}
         </div>
-      ) : null}
-
-      {!still && showStage ? (
-        <motion.div
-          className="pointer-events-none absolute bottom-7 z-10"
-          style={{ left: "calc(50% - 75px)", width: 150, height: 210 }}
-          initial={{ x: -(view.w / 2 + 140) }}
-          animate={{ x: leaving ? view.w / 2 + 140 : 0 }}
-          transition={{
-            duration: (leaving ? WALK_OUT_MS : WALK_IN_MS) / 1000,
-            ease: "easeInOut",
-          }}
-        >
-          <Professor phase={phase} />
-        </motion.div>
       ) : null}
 
       <AnimatePresence>
