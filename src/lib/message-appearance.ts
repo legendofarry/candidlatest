@@ -19,6 +19,144 @@ export * from "./chat-prefs-model.ts";
 
 const STORAGE_PREFIX = "candid_chat_prefs:v2:";
 const LEGACY_PREFIX = "candid_message_appearance:";
+import { useCallback, useEffect, useSyncExternalStore, type CSSProperties } from "react";
+
+export const APPEARANCE_PRESETS = [
+  "default",
+  "cloud",
+  "midnight",
+  "matcha",
+  "sunset",
+  "ocean",
+  "paper-doodles",
+] as const;
+export type AppearancePreset = (typeof APPEARANCE_PRESETS)[number];
+export type WallpaperStyle = "plain" | "solid" | "gradient" | "doodles";
+export type DoodleStyle = "waves" | "leaves" | "circles";
+export type PatternIntensity = "off" | "subtle" | "more";
+export type BubbleShape = "standard" | "soft";
+
+export type MessageAppearance = {
+  preset: AppearancePreset;
+  wallpaper: WallpaperStyle;
+  wallpaperColor: string;
+  gradient: number;
+  doodle: DoodleStyle;
+  bubbleColor: string;
+  patternIntensity: PatternIntensity;
+  bubbleShape: BubbleShape;
+};
+
+export const DEFAULT_MESSAGE_APPEARANCE: MessageAppearance = {
+  preset: "default",
+  wallpaper: "doodles",
+  wallpaperColor: "#191c1f",
+  gradient: 0,
+  doodle: "waves",
+  bubbleColor: "#c96f4a",
+  patternIntensity: "subtle",
+  bubbleShape: "standard",
+};
+
+export const APPEARANCE_PALETTES = {
+  default: {
+    label: "Default",
+    surface: "#f7f4ed",
+    ink: "#292722",
+    incoming: "#ffffff",
+    outgoing: "#c96f4a",
+    border: "#e5ded2",
+    wallpaper: "doodles",
+  },
+  cloud: {
+    label: "Cloud",
+    surface: "#f2efe8",
+    ink: "#292722",
+    incoming: "#fffdf9",
+    outgoing: "#a68a62",
+    border: "#e7dfd1",
+    wallpaper: "plain",
+  },
+  midnight: {
+    label: "Midnight",
+    surface: "#191c1f",
+    ink: "#f1f3f5",
+    incoming: "#262b30",
+    outgoing: "#3c617c",
+    border: "#33383d",
+    wallpaper: "plain",
+  },
+  matcha: {
+    label: "Matcha",
+    surface: "#edf0e3",
+    ink: "#31372b",
+    incoming: "#f8f9f2",
+    outgoing: "#a7b58d",
+    border: "#dce2cd",
+    wallpaper: "doodles",
+  },
+  sunset: {
+    label: "Sunset",
+    surface: "#fbefe4",
+    ink: "#44342b",
+    incoming: "#fff8f1",
+    outgoing: "#f6b486",
+    border: "#f0ddca",
+    wallpaper: "plain",
+  },
+  ocean: {
+    label: "Ocean",
+    surface: "#eaf2f5",
+    ink: "#263943",
+    incoming: "#f7fbfc",
+    outgoing: "#3174a4",
+    border: "#d5e4eb",
+    wallpaper: "plain",
+  },
+  "paper-doodles": {
+    label: "Paper Doodles",
+    surface: "#f4f0e9",
+    ink: "#302c25",
+    incoming: "#ffffff",
+    outgoing: "#c96f4a",
+    border: "#e7ded0",
+    wallpaper: "doodles",
+  },
+} as const;
+
+export const APPEARANCE_GRADIENTS = [
+  "linear-gradient(135deg, #f3e7d8, #eadce4)",
+  "linear-gradient(135deg, #e5e9f2, #dce5ee)",
+  "linear-gradient(135deg, #e8eddf, #dce5dc)",
+];
+
+export function getMessageAppearanceStyle(appearance: MessageAppearance): CSSProperties {
+  const preset = APPEARANCE_PALETTES[appearance.preset];
+  const usesAppTheme = appearance.preset === "default";
+  const rgb = appearance.bubbleColor
+    .match(/[\da-f]{2}/gi)
+    ?.slice(0, 3)
+    .map((part) => parseInt(part, 16)) ?? [0, 0, 0];
+  const outgoingInk =
+    ((rgb[0] ?? 0) * 299 + (rgb[1] ?? 0) * 587 + (rgb[2] ?? 0) * 114) / 1000 > 150 ? "#202124" : "#ffffff";
+  return {
+    // The Default appearance follows the site's live light/dark tokens. Explicit
+    // appearances remain fixed so a user's chosen chat look is predictable.
+    "--chat-surface": usesAppTheme ? "var(--background)" : preset.surface,
+    "--chat-ink": usesAppTheme ? "var(--foreground)" : preset.ink,
+    "--chat-incoming": usesAppTheme ? "var(--card)" : preset.incoming,
+    "--chat-incoming-ink": usesAppTheme
+      ? "var(--card-foreground)"
+      : preset.surface === "#191c1f" ? "#f1f3f5" : "#292722",
+    "--chat-outgoing": usesAppTheme ? "var(--primary)" : appearance.bubbleColor,
+    "--chat-outgoing-ink": usesAppTheme ? "var(--primary-foreground)" : outgoingInk,
+    "--chat-border": usesAppTheme ? "var(--border)" : preset.border,
+    "--chat-wallpaper-color": appearance.wallpaperColor,
+    "--chat-gradient": APPEARANCE_GRADIENTS[appearance.gradient],
+  } as CSSProperties;
+}
+
+const STORAGE_PREFIX = "candid_message_appearance:";
 const listeners = new Map<string, Set<() => void>>();
 const snapshots = new Map<string, ChatPrefs>();
 const pendingPush = new Map<string, boolean>();

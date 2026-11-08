@@ -701,6 +701,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
             onOpenImage: setOpenImageUrl,
             onLeave: () => void navigate({ to: "/messages" }),
           }}
+          {...(partner?.username ? { contactName: `@${partner.username}` } : {})}
           className="size-10 text-current hover:bg-black/5 hover:text-current max-sm:text-white max-sm:hover:bg-white/10"
         />
           </>

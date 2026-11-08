@@ -1,22 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Clock3, Ellipsis, RotateCcw, Trash2, UserRoundMinus, X } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { Clock3, Ellipsis, RotateCcw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { changeMyAccountLifecycle, getMyAccountLifecycle } from "@/lib/account-lifecycle.functions";
 import { notify } from "@/lib/notifications-store";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AccountControlsSheet } from "@/components/site/account-controls-sheet";
 
 export function AccountLifecycleSettings() {
   const { user } = useAuth();
@@ -25,8 +15,6 @@ export function AccountLifecycleSettings() {
   const changeLifecycle = useServerFn(changeMyAccountLifecycle);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const isMobile = useIsMobile();
-  const reduceMotion = useReducedMotion();
   const { data } = useQuery({
     queryKey: ["account-lifecycle", user?.uid ?? null],
     queryFn: () => getLifecycle(),
@@ -106,6 +94,12 @@ export function AccountLifecycleSettings() {
         </Button>
       ) : null}
 
+      <AccountControlsSheet
+        open={actionsOpen}
+        onOpenChange={setActionsOpen}
+        busy={busy}
+        onSubmit={(action) => void submit(action)}
+      />
       <AlertDialog open={actionsOpen} onOpenChange={setActionsOpen}>
         <AlertDialogContent
           className={
@@ -119,7 +113,7 @@ export function AccountLifecycleSettings() {
               aria-hidden="true"
               className="pointer-events-none absolute -right-10 -top-20 size-48 rounded-full border border-primary/15 bg-primary/10"
               animate={
-                reduceMotion ? undefined : { scale: [1, 1.24, 1], opacity: [0.35, 0.7, 0.35] }
+                reduceMotion ? {} : { scale: [1, 1.24, 1], opacity: [0.35, 0.7, 0.35] }
               }
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -127,7 +121,7 @@ export function AccountLifecycleSettings() {
               aria-hidden="true"
               className="pointer-events-none absolute -right-4 -top-14 size-36 rounded-full border border-sky-400/20"
               animate={
-                reduceMotion ? undefined : { scale: [1.18, 1, 1.18], opacity: [0.2, 0.55, 0.2] }
+                reduceMotion ? {} : { scale: [1.18, 1, 1.18], opacity: [0.2, 0.55, 0.2] }
               }
               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -163,7 +157,7 @@ export function AccountLifecycleSettings() {
                 <motion.span
                   aria-hidden="true"
                   className="text-muted-foreground"
-                  whileHover={reduceMotion ? undefined : { x: 3 }}
+                  whileHover={reduceMotion ? {} : { x: 3 }}
                   transition={{ duration: 0.18 }}
                 >
                   <ChevronRight className="size-4" />
@@ -190,7 +184,7 @@ export function AccountLifecycleSettings() {
                 <motion.span
                   aria-hidden="true"
                   className="text-destructive/70"
-                  whileHover={reduceMotion ? undefined : { x: 3 }}
+                  whileHover={reduceMotion ? {} : { x: 3 }}
                   transition={{ duration: 0.18 }}
                 >
                   <ChevronRight className="size-4" />
