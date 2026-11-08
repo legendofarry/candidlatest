@@ -1313,3 +1313,46 @@
     transition-delay: 0s !important;
   }
 }
+
+/* Account pause: the professor peels the screen square by square. Each tile has a black cell
+   that appears at its delay, and a paper square that lifts, folds and flies into the briefcase. */
+@keyframes acct-cell-in {
+  to {
+    opacity: 1;
+  }
+}
+@keyframes acct-paper-peel {
+  0% {
+    opacity: 1;
+    transform: perspective(260px) translate3d(0, 0, 0) rotateX(0deg) rotate(0deg) scale(1);
+  }
+  14% {
+    opacity: 1;
+    transform: perspective(260px) translate3d(0, -8px, 0) rotateX(-32deg) rotate(0deg) scale(1.06);
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: perspective(260px) translate3d(var(--dx), var(--dy), 0) rotateX(-60deg)
+      rotate(var(--rot)) scale(0.1);
+  }
+}
+.acct-cell {
+  opacity: 0;
+  animation: acct-cell-in 90ms linear forwards;
+  animation-delay: var(--d);
+}
+.acct-paper {
+  opacity: 0;
+  transform-origin: 50% 0;
+  will-change: transform, opacity;
+  animation: acct-paper-peel 850ms ease-in forwards;
+  animation-delay: var(--d);
+}
+@media (prefers-reduced-motion: reduce) {
+  .acct-paper {
+    display: none;
+  }
+}

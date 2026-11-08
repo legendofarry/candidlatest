@@ -1,70 +1,24 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  CalendarClock,
-  ChevronLeft,
   ChevronRight,
-  EyeOff,
-  Loader2,
-  RotateCcw,
   Trash2,
   UserRoundCog,
   UserRoundMinus,
   type LucideIcon,
 } from "lucide-react";
-import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import { Drawer as DrawerPrimitive } from "vaul";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
 export type AccountAction = "deactivate" | "delete";
-type Step = "choose" | AccountAction;
 
 const SPRING = { type: "spring", stiffness: 420, damping: 34 } as const;
 
-/** Aurora colours per step, so the whole sheet shifts mood as you move through it. */
-const AURORA: Record<Step, [string, string]> = {
-  choose: ["bg-primary/30", "bg-sky-400/25"],
-  deactivate: ["bg-amber-400/35", "bg-orange-300/25"],
-  delete: ["bg-red-400/30", "bg-rose-300/25"],
-};
-
-const DETAILS: Record<
-  AccountAction,
-  {
-    title: string;
-    lead: string;
-    icon: LucideIcon;
-    orb: string;
-    points: { icon: LucideIcon; text: string }[];
-  }
-> = {
-  deactivate: {
-    title: "Pause your account?",
-    lead: "A break you can undo.",
-    icon: UserRoundMinus,
-    orb: "bg-amber-500/15 text-amber-600",
-    points: [
-      { icon: EyeOff, text: "Your account is hidden from other people." },
-      { icon: CalendarClock, text: "You have 7 days to come back and keep it." },
-      { icon: RotateCcw, text: "Reactivate any time from Settings." },
-    ],
-  },
-  delete: {
-    title: "Delete your account?",
-    lead: "This ends your time on Candid.",
-    icon: Trash2,
-    orb: "bg-destructive/15 text-destructive",
-    points: [
-      { icon: CalendarClock, text: "Deletion is scheduled, not instant." },
-      { icon: RotateCcw, text: "You have 48 hours to cancel it from Settings." },
-      { icon: Trash2, text: "After that, it is final." },
-    ],
-  },
-};
-
-function Aurora({ step, still }: { step: Step; still: boolean }) {
-  const [a, b] = AURORA[step];
+function Aurora({ still }: { still: boolean }) {
+  const a = "bg-primary/30";
+  const b = "bg-sky-400/25";
   return (
     <div
       aria-hidden="true"
@@ -172,224 +126,51 @@ function ActionRow({
   );
 }
 
-/** Hold-to-confirm: a deliberate press fills the button, so nobody deletes an account by accident. */
-function HoldToConfirm({
-  label,
-  busy,
-  onConfirm,
-}: {
-  label: string;
-  busy: boolean;
-  onConfirm: () => void;
-}) {
-  const [holding, setHolding] = useState(false);
-  const holdingRef = useRef(false);
-
-  function start() {
-    if (busy) return;
-    holdingRef.current = true;
-    setHolding(true);
-  }
-  function stop() {
-    holdingRef.current = false;
-    setHolding(false);
-  }
-
-  return (
-    <div className="space-y-2">
-      <button
-        type="button"
-        disabled={busy}
-        onPointerDown={start}
-        onPointerUp={stop}
-        onPointerLeave={stop}
-        onPointerCancel={stop}
-        onBlur={stop}
-        onContextMenu={(event) => event.preventDefault()}
-        onKeyDown={(event) => {
-          if ((event.key === " " || event.key === "Enter") && !event.repeat) {
-            event.preventDefault();
-            start();
-          }
-        }}
-        onKeyUp={(event) => {
-          if (event.key === " " || event.key === "Enter") stop();
-        }}
-        className="relative flex h-14 w-full touch-none select-none items-center justify-center overflow-hidden rounded-2xl bg-destructive/10 font-display text-base font-semibold text-destructive outline-none focus-visible:ring-2 focus-visible:ring-destructive/50 disabled:opacity-70"
-      >
-        <span className="flex items-center gap-2">
-          {busy ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
-          {busy ? "Updating your account…" : label}
-        </span>
-        <motion.span
-          aria-hidden="true"
-          className="absolute inset-0 flex items-center justify-center gap-2 bg-destructive text-destructive-foreground"
-          initial={false}
-          animate={{ clipPath: holding && !busy ? "inset(0 0% 0 0)" : "inset(0 100% 0 0)" }}
-          transition={{ duration: holding ? 1.1 : 0.25, ease: holding ? "linear" : "easeOut" }}
-          onAnimationComplete={() => {
-            if (holdingRef.current) {
-              holdingRef.current = false;
-              setHolding(false);
-              onConfirm();
-            }
-          }}
-        >
-          <Trash2 className="size-4" />
-          {label}
-        </motion.span>
-      </button>
-      <p className="text-center text-xs text-muted-foreground">Press and hold to confirm</p>
-    </div>
-  );
-}
-
 function Controls({
   busy,
-  onSubmit,
+  onSelect,
   onClose,
   still,
 }: {
   busy: boolean;
-  onSubmit: (action: AccountAction) => void;
+  onSelect: (action: AccountAction) => void;
   onClose: () => void;
   still: boolean;
 }) {
-  const [step, setStep] = useState<Step>("choose");
-  const [direction, setDirection] = useState(1);
-
-  function go(next: Step) {
-    setDirection(next === "choose" ? -1 : 1);
-    setStep(next);
-  }
-
-  const slide = {
-    initial: (d: number) => ({ opacity: 0, x: still ? 0 : d * 36 }),
-    animate: { opacity: 1, x: 0 },
-    exit: (d: number) => ({ opacity: 0, x: still ? 0 : d * -36 }),
-  };
-
   return (
     <div className="relative">
-      <Aurora step={step} still={still} />
-      <motion.div layout={!still} transition={SPRING} className="relative">
-        <AnimatePresence mode="wait" custom={direction} initial={false}>
-          {step === "choose" ? (
-            <motion.div
-              key="choose"
-              custom={direction}
-              variants={slide}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.2, ease: "easeOut" }}
-            >
-              <div className="px-6 pb-6 pt-8">
-                <Orb icon={UserRoundCog} className="bg-background/80 text-primary" still={still} />
-                <h2 className="mt-4 font-display text-2xl font-semibold tracking-tight">
-                  Account controls
-                </h2>
-                <p className="mt-1 text-sm text-muted-foreground">
-                  Need a breather, or ready to leave? Nothing happens until you confirm.
-                </p>
-              </div>
-              <ActionRow
-                icon={UserRoundMinus}
-                tone="amber"
-                title="Pause my account"
-                hint="Hide it for now. Come back within 7 days."
-                index={0}
-                disabled={busy}
-                onClick={() => go("deactivate")}
-                still={still}
-              />
-              <ActionRow
-                icon={Trash2}
-                tone="red"
-                title="Delete my account"
-                hint="Scheduled for removal, with 48 hours to cancel."
-                index={1}
-                disabled={busy}
-                onClick={() => go("delete")}
-                still={still}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key={step}
-              custom={direction}
-              variants={slide}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              transition={{ duration: 0.2, ease: "easeOut" }}
-            >
-              {(() => {
-                const detail = DETAILS[step];
-                return (
-                  <>
-                    <div className="px-6 pb-5 pt-6">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => go("choose")}
-                        className="-ml-2 mb-4 inline-flex items-center gap-1 rounded-full px-2 py-1 text-sm font-medium text-muted-foreground outline-none transition-colors hover:bg-background/70 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
-                      >
-                        <ChevronLeft className="size-4" />
-                        Back
-                      </button>
-                      <Orb icon={detail.icon} className={cn("bg-background/80", detail.orb)} still={still} />
-                      <h2 className="mt-4 font-display text-2xl font-semibold tracking-tight">
-                        {detail.title}
-                      </h2>
-                      <p className="mt-1 text-sm text-muted-foreground">{detail.lead}</p>
-                    </div>
-                    <ul className="border-t border-border/60">
-                      {detail.points.map((point, index) => (
-                        <motion.li
-                          key={point.text}
-                          initial={still ? false : { opacity: 0, x: 16 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ ...SPRING, delay: still ? 0 : 0.08 + index * 0.07 }}
-                          className="flex items-center gap-4 border-b border-border/60 px-6 py-4"
-                        >
-                          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted text-muted-foreground">
-                            <point.icon className="size-4" />
-                          </span>
-                          <span className="text-sm leading-snug">{point.text}</span>
-                        </motion.li>
-                      ))}
-                    </ul>
-                    <div className="px-6 pb-2 pt-5">
-                      {step === "delete" ? (
-                        <HoldToConfirm
-                          label="Delete my account"
-                          busy={busy}
-                          onConfirm={() => onSubmit("delete")}
-                        />
-                      ) : (
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => onSubmit("deactivate")}
-                          className="flex h-14 w-full items-center justify-center gap-2 rounded-2xl bg-amber-500 font-display text-base font-semibold text-white outline-none transition-transform focus-visible:ring-2 focus-visible:ring-amber-500/50 active:scale-[0.985] disabled:opacity-70"
-                        >
-                          {busy ? (
-                            <Loader2 className="size-4 animate-spin" />
-                          ) : (
-                            <UserRoundMinus className="size-4" />
-                          )}
-                          {busy ? "Updating your account…" : "Pause my account"}
-                        </button>
-                      )}
-                    </div>
-                  </>
-                );
-              })()}
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </motion.div>
+      <Aurora still={still} />
+      <div className="relative">
+        <div className="px-6 pb-6 pt-8">
+          <Orb icon={UserRoundCog} className="bg-background/80 text-primary" still={still} />
+          <h2 className="mt-4 font-display text-2xl font-semibold tracking-tight">
+            Account controls
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Need a breather, or ready to leave? Nothing happens until you confirm.
+          </p>
+        </div>
+        <ActionRow
+          icon={UserRoundMinus}
+          tone="amber"
+          title="Pause my account"
+          hint="Hide it for now. Come back within 7 days."
+          index={0}
+          disabled={busy}
+          onClick={() => onSelect("deactivate")}
+          still={still}
+        />
+        <ActionRow
+          icon={Trash2}
+          tone="red"
+          title="Delete my account"
+          hint="Scheduled for removal, with 48 hours to cancel."
+          index={1}
+          disabled={busy}
+          onClick={() => onSelect("delete")}
+          still={still}
+        />
+      </div>
       <div className="relative px-6 pb-2 pt-2">
         <button
           type="button"
@@ -408,12 +189,12 @@ export function AccountControlsSheet({
   open,
   onOpenChange,
   busy,
-  onSubmit,
+  onSelect,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   busy: boolean;
-  onSubmit: (action: AccountAction) => void;
+  onSelect: (action: AccountAction) => void;
 }) {
   const isMobile = useIsMobile();
   const still = Boolean(useReducedMotion());
@@ -443,7 +224,7 @@ export function AccountControlsSheet({
               <Controls
                 key={session}
                 busy={busy}
-                onSubmit={onSubmit}
+                onSelect={onSelect}
                 onClose={() => guardedChange(false)}
                 still={still}
               />
@@ -468,7 +249,7 @@ export function AccountControlsSheet({
           <Controls
             key={session}
             busy={busy}
-            onSubmit={onSubmit}
+            onSelect={onSelect}
             onClose={() => guardedChange(false)}
             still={still}
           />

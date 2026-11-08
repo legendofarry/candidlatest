@@ -1,27 +1,35 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import { AnimatePresence } from "motion/react";
 import { Clock3, Ellipsis, RotateCcw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { changeMyAccountLifecycle, getMyAccountLifecycle } from "@/lib/account-lifecycle.functions";
 import { notify } from "@/lib/notifications-store";
 import { Button } from "@/components/ui/button";
-import { AccountControlsSheet } from "@/components/site/account-controls-sheet";
+import { AccountControlsSheet, type AccountAction } from "@/components/site/account-controls-sheet";
+import {
+  DeleteCountdownOverlay,
+  PauseFoldOverlay,
+} from "@/components/site/account-exit-overlays";
 
 export function AccountLifecycleSettings() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const getLifecycle = useServerFn(getMyAccountLifecycle);
   const changeLifecycle = useServerFn(changeMyAccountLifecycle);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [flow, setFlow] = useState<AccountAction | null>(null);
   const { data } = useQuery({
     queryKey: ["account-lifecycle", user?.uid ?? null],
     queryFn: () => getLifecycle(),
     enabled: Boolean(user),
   });
 
-  async function submit(action: "delete" | "deactivate" | "reactivate") {
+  async function submit(action: "reactivate") {
     setBusy(true);
     try {
       await changeLifecycle({ data: { action } });
@@ -42,6 +50,36 @@ export function AccountLifecycleSettings() {
     } finally {
       setBusy(false);
     }
+  }
+
+  /** Runs after the pause animation or delete countdown finishes without being cancelled. */
+  async function commitFlow(action: AccountAction) {
+    setBusy(true);
+    try {
+      await changeLifecycle({ data: { action } });
+      if (action === "deactivate") {
+        // Paused accounts are logged out; logging back in within 7 days resumes them.
+        await signOut();
+        await navigate({ to: "/" });
+      } else {
+        await queryClient.invalidateQueries({ queryKey: ["account-lifecycle", user?.uid] });
+        await queryClient.invalidateQueries({ queryKey: ["onboarding-state", user?.uid] });
+        notify.success("Account deletion scheduled. You have 48 hours to cancel.");
+      }
+    } catch (error) {
+      notify.error(
+        error instanceof Error ? error.message : "Could not update your account status.",
+      );
+    } finally {
+      setFlow(null);
+      setBusy(false);
+    }
+  }
+
+  function startFlow(action: AccountAction) {
+    setActionsOpen(false);
+    // Let the sheet slide away before the full-screen moment begins.
+    window.setTimeout(() => setFlow(action), 280);
   }
 
   if (!user) return null;
@@ -98,8 +136,25 @@ export function AccountLifecycleSettings() {
         open={actionsOpen}
         onOpenChange={setActionsOpen}
         busy={busy}
-        onSubmit={(action) => void submit(action)}
+        onSelect={startFlow}
       />
+
+      <AnimatePresence>
+        {flow === "deactivate" ? (
+          <PauseFoldOverlay
+            key="pause"
+            onCancel={() => setFlow(null)}
+            onCommit={() => commitFlow("deactivate")}
+          />
+        ) : null}
+        {flow === "delete" ? (
+          <DeleteCountdownOverlay
+            key="delete"
+            onCancel={() => setFlow(null)}
+            onCommit={() => commitFlow("delete")}
+          />
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }

@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useServerFn } from "@tanstack/react-start";
 import { getOnboardingState } from "@/lib/onboarding.functions";
+import { changeMyAccountLifecycle, getMyAccountLifecycle } from "@/lib/account-lifecycle.functions";
 import { useAuth } from "@/hooks/useAuth";
 import {
   firebaseAuthErrorCode,
@@ -108,6 +109,8 @@ function AuthPage() {
   const [authError, setAuthError] = useState<string | null>(null);
   const [accountError, setAccountError] = useState<string | null>(null);
   const fetchOnboardingState = useServerFn(getOnboardingState);
+  const fetchLifecycle = useServerFn(getMyAccountLifecycle);
+  const changeLifecycle = useServerFn(changeMyAccountLifecycle);
 
   useEffect(() => {
     if (authLoading || !user || busy || accountError) return;
@@ -125,7 +128,15 @@ function AuthPage() {
       return;
     }
     let active = true;
-    void fetchOnboardingState()
+    // A paused account resumes the moment its owner logs back in.
+    void fetchLifecycle()
+      .then(async (lifecycle) => {
+        if (lifecycle.status === "deactivated") {
+          await changeLifecycle({ data: { action: "reactivate" } });
+          toast.success("Welcome back. Your account is active again.");
+        }
+        return fetchOnboardingState();
+      })
       .then((state) => {
         if (active) void navigate({ to: state.needsOnboarding ? "/onboarding" : "/" });
       })
@@ -140,7 +151,7 @@ function AuthPage() {
     return () => {
       active = false;
     };
-  }, [authLoading, user, fetchOnboardingState, navigate, mode, busy, accountError]);
+  }, [authLoading, user, fetchOnboardingState, fetchLifecycle, changeLifecycle, navigate, mode, busy, accountError]);
 
   if (authLoading) {
     return (
