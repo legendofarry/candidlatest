@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -7,6 +7,7 @@ import {
   BadgeCheck,
   ChevronDown,
   CornerDownRight,
+  AtSign,
   Heart,
   Loader2,
   MoreHorizontal,
@@ -42,6 +43,8 @@ import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import { MentionText, MentionTextarea } from "@/components/site/mention-textarea";
 import { AnonymousPostingToggle } from "@/components/site/anonymous-posting-toggle";
 import type { MembershipTier } from "@/lib/membership";
+import { QuickEmojiReactions } from "@/components/site/quick-emoji-reactions";
+import { appendEmoji } from "@/lib/composer-utils";
 
 export type ThreadComment = {
   id: string;
@@ -165,6 +168,8 @@ export function CommentThread({
   const [body, setBody] = useState("");
   const [anonymous, setAnonymous] = useState(false);
   const [anonymousTouched, setAnonymousTouched] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const [replyTo, setReplyTo] = useState<ThreadComment | null>(null);
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(() => new Set());
   const {
@@ -280,6 +285,7 @@ export function CommentThread({
     onSuccess: () => {
       const addedTopLevelComment = replyTo === null;
       setBody("");
+      setEmojiOpen(false);
       setReplyTo(null);
       setAnonymousTouched(false);
       setAnonymous(privacySettings?.anonymous_contributions_default ?? false);
@@ -454,14 +460,50 @@ export function CommentThread({
               data-anon={anonymous}
               data-ready={body.trim().length >= 2}
             >
-              <MentionTextarea
-                rows={1}
-                value={body}
-                onValueChange={setBody}
-                placeholder={anonymous ? "Say it anonymously…" : "Add a comment…"}
-                className="min-h-11 resize-none border-0 bg-transparent px-4 pb-1 pt-3 text-sm shadow-none focus-visible:ring-0"
-              />
-              <div className="flex items-center justify-between gap-2 px-2 pb-2">
+              <div className="flex items-start gap-2 px-3 pt-3">
+                <ProfileAvatar
+                  photoUrl={anonymous ? null : user.photoURL}
+                  initials={(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}
+                  className="mt-1 size-8 shrink-0 ring-2 ring-background"
+                />
+                <MentionTextarea
+                  textareaRef={commentInputRef}
+                  rows={1}
+                  value={body}
+                  onValueChange={setBody}
+                  placeholder={anonymous ? "Say it anonymously…" : "Add a comment…"}
+                  className="min-h-11 resize-none border-0 bg-transparent px-1 pb-1 pt-2 text-sm shadow-none focus-visible:ring-0"
+                />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
+                <div className="flex items-center">
+                  <QuickEmojiReactions
+                    open={emojiOpen}
+                    onOpenChange={setEmojiOpen}
+                    onSelect={(emoji) => setBody((value) => appendEmoji(value, emoji))}
+                    className="flex items-center"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Mention someone"
+                    title="Mention someone"
+                    className="size-9 rounded-full text-muted-foreground hover:text-primary"
+                    onClick={() => {
+                      setBody((value) => appendEmoji(value, "@"));
+                      requestAnimationFrame(() => {
+                        const input = commentInputRef.current;
+                        if (!input) return;
+                        const end = input.value.length;
+                        input.focus();
+                        input.setSelectionRange(end, end);
+                      });
+                    }}
+                  >
+                    <AtSign className="size-[18px]" />
+                  </Button>
+                </div>
                 <AnonymousPostingToggle
                   anonymous={anonymous}
                   onToggle={() => {

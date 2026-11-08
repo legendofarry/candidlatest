@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowLeft,
   BadgeCheck,
-  Camera,
   Check,
   CheckCheck,
   Copy,
@@ -47,6 +46,8 @@ import {
 } from "@/lib/message-appearance";
 import { ChatWallpaper } from "@/components/site/chat-wallpaper";
 import { ChatForwardDialog } from "@/components/site/chat-forward-dialog";
+import { QuickEmojiReactions } from "@/components/site/quick-emoji-reactions";
+import { appendEmoji } from "@/lib/composer-utils";
 import { onValue, ref } from "firebase/database";
 import { firebaseRealtimeDb } from "@/integrations/firebase/client";
 import {
@@ -139,6 +140,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const conversationQueryKey = ["conversation", id, user?.uid ?? null] as const;
 
   const [draft, setDraft] = useState("");
+  const [composerEmojiOpen, setComposerEmojiOpen] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
   const [reactionPickerFor, setReactionPickerFor] = useState<string | null>(null);
   const [openImageUrl, setOpenImageUrl] = useState<string | null>(null);
@@ -161,7 +163,10 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [selecting]);
-  const [partnerPresence, setPartnerPresence] = useState<{ online: boolean; lastChanged: number | null }>({ online: false, lastChanged: null });
+  const [partnerPresence, setPartnerPresence] = useState<{
+    online: boolean;
+    lastChanged: number | null;
+  }>({ online: false, lastChanged: null });
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageTicketRef = useRef<string | null>(null);
   const discardUploadRef = useRef(discardImageUpload);
@@ -451,11 +456,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     onSuccess: (sentMessage) => {
       if (sentMessage.delivery_state === "not_delivered") {
         queryClient.setQueryData<ConversationView>(conversationQueryKey, (current) => {
-          if (!current || current.messages.some((message) => message.id === sentMessage.id)) return current;
+          if (!current || current.messages.some((message) => message.id === sentMessage.id))
+            return current;
           return { ...current, messages: [...current.messages, sentMessage] };
         });
       }
       setDraft("");
+      setComposerEmojiOpen(false);
       imageTicketRef.current = null;
       setImageReceipt(null);
       setImageTicketId(null);
@@ -585,7 +592,8 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     pressTimer.current = null;
   };
   const startPress = (message: (typeof messages)[number], event: React.PointerEvent) => {
-    if (selecting || message.is_deleted || (event.pointerType === "mouse" && event.button !== 0)) return;
+    if (selecting || message.is_deleted || (event.pointerType === "mouse" && event.button !== 0))
+      return;
     if ((event.target as HTMLElement).closest("button, a")) return;
     cancelPress();
     pressTimer.current = window.setTimeout(() => {
@@ -595,11 +603,17 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     }, 420);
   };
   const selectedMessages = messages.filter((message) => selected.has(message.id));
-  const selectedText = selectedMessages.filter((message) => message.body).map((message) => message.body).join("\n");
+  const selectedText = selectedMessages
+    .filter((message) => message.body)
+    .map((message) => message.body)
+    .join("\n");
   const canDeleteSelected =
     selectedMessages.length > 0 &&
     selectedMessages.every(
-      (message) => message.sender_id === user?.uid && !message.is_deleted && clockNow - new Date(message.created_at).getTime() <= 120_000,
+      (message) =>
+        message.sender_id === user?.uid &&
+        !message.is_deleted &&
+        clockNow - new Date(message.created_at).getTime() <= 120_000,
     );
   const copySelected = async () => {
     try {
@@ -612,7 +626,8 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   };
   const reactSelected = (emoji: string) => {
     for (const message of selectedMessages) {
-      if (!(message.reactions?.[emoji] ?? []).includes(user?.uid ?? "")) toggleReaction.mutate({ message_id: message.id, emoji });
+      if (!(message.reactions?.[emoji] ?? []).includes(user?.uid ?? ""))
+        toggleReaction.mutate({ message_id: message.id, emoji });
     }
     setSelectReactOpen(false);
     clearSelection();
@@ -624,7 +639,9 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   function jumpToMessage(messageId: string) {
     const element = document.getElementById(`msg-${messageId}`);
     if (!element) {
-      toast.error("That message isn't loaded", { description: "Load older messages, then try again." });
+      toast.error("That message isn't loaded", {
+        description: "Load older messages, then try again.",
+      });
       return;
     }
     skipNextAutoScroll.current = true;
@@ -639,280 +656,403 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
       style={getMessageAppearanceStyle(appearance)}
       className={cn(
         "candid-message-theme flex h-full min-h-0 w-full flex-col overflow-hidden",
-        inSidebar ? cn("mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none") : cn("bg-black sm:bg-background"),
+        inSidebar
+          ? cn("mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none")
+          : cn("bg-black sm:bg-background"),
       )}
     >
-      <header className={cn(
-        "sticky top-0 z-30 flex shrink-0 items-center gap-2 transition-colors",
-        inSidebar ? cn("glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur") : cn("border-b border-zinc-800 bg-zinc-950 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white sm:border-border sm:bg-background/95 sm:px-5 sm:py-3.5 sm:text-foreground sm:backdrop-blur"),
-      )} data-chat-header>
+      <header
+        className={cn(
+          "sticky top-0 z-30 flex shrink-0 items-center gap-2 transition-colors",
+          inSidebar
+            ? cn("glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur")
+            : cn(
+                "border-b border-zinc-800 bg-zinc-950 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white sm:border-border sm:bg-background/95 sm:px-5 sm:py-3.5 sm:text-foreground sm:backdrop-blur",
+              ),
+        )}
+        data-chat-header
+      >
         {selecting ? (
           <div className="flex w-full items-center gap-1">
-            <Button type="button" variant="ghost" size="icon" aria-label="Cancel selection" className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10" onClick={clearSelection}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Cancel selection"
+              className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10"
+              onClick={clearSelection}
+            >
               <X className="size-5" />
             </Button>
-            <span className="flex-1 px-1 font-semibold" aria-live="polite">{selected.size} selected</span>
-            <Button type="button" variant="ghost" size="icon" aria-label="Copy selected messages" title="Copy" disabled={!selectedText} className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10" onClick={() => void copySelected()}>
+            <span className="flex-1 px-1 font-semibold" aria-live="polite">
+              {selected.size} selected
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Copy selected messages"
+              title="Copy"
+              disabled={!selectedText}
+              className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10"
+              onClick={() => void copySelected()}
+            >
               <Copy className="size-5" />
             </Button>
             <Popover open={selectReactOpen} onOpenChange={setSelectReactOpen}>
               <PopoverTrigger asChild>
-                <Button type="button" variant="ghost" size="icon" aria-label="React to selected messages" title="React" className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  aria-label="React to selected messages"
+                  title="React"
+                  className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10"
+                >
                   <Smile className="size-5" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="z-[120] w-auto rounded-full p-1.5" align="end">
                 <div className="flex gap-1">
                   {EMOJI.map((emoji) => (
-                    <button key={emoji} type="button" onClick={() => reactSelected(emoji)} className="rounded-full px-1.5 py-1 text-base transition-transform hover:scale-125">
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => reactSelected(emoji)}
+                      className="rounded-full px-1.5 py-1 text-base transition-transform hover:scale-125"
+                    >
                       {emoji}
                     </button>
                   ))}
                 </div>
               </PopoverContent>
             </Popover>
-            <Button type="button" variant="ghost" size="icon" aria-label="Forward selected messages" title="Forward" disabled={!selectedText} className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10" onClick={() => setForwardOpen(true)}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Forward selected messages"
+              title="Forward"
+              disabled={!selectedText}
+              className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10"
+              onClick={() => setForwardOpen(true)}
+            >
               <Forward className="size-5" />
             </Button>
-            <Button type="button" variant="ghost" size="icon" aria-label="Delete selected messages for everyone" title={canDeleteSelected ? "Delete for everyone" : "You can delete your own messages for 2 minutes after sending"} disabled={!canDeleteSelected} className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10" onClick={deleteSelected}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              aria-label="Delete selected messages for everyone"
+              title={
+                canDeleteSelected
+                  ? "Delete for everyone"
+                  : "You can delete your own messages for 2 minutes after sending"
+              }
+              disabled={!canDeleteSelected}
+              className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10"
+              onClick={deleteSelected}
+            >
               <Trash2 className="size-5" />
             </Button>
           </div>
         ) : (
           <>
-        {!inSidebar ? <Button type="button" variant="ghost" size="icon" aria-label="Back to messages" className="size-9 shrink-0 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => void navigate({ to: "/messages" })}><ArrowLeft className="size-5" /></Button> : null}
-        <button type="button" onClick={() => { if (partner) void navigate({ to: "/u/$username", params: { username: partner.username } }); }} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={!partner} aria-label={partner ? `View @${partner.username}'s profile` : undefined}>
-          <ProfileAvatar photoUrl={partner?.photo_url} initials={partner?.username?.slice(0, 2) ?? "··"} className="size-10 shrink-0 font-display uppercase" />
-          <span className="min-w-0">
-            <span className="flex items-center gap-1.5 font-semibold">
-              {partner ? `@${partner.username}` : isLoading ? "Loading conversation…" : "Member"}
-              {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
-              <MembershipBadge tier={partner?.membership_tier} official={partner?.official} />
-            </span>
-            <span className="flex items-center gap-1.5 text-xs text-zinc-400 sm:text-muted-foreground">{partnerPresence.online ? <span className="size-2 rounded-full bg-emerald-500" /> : null}{partner?.official ? "Official Candid account" : partnerActivity}</span>
-          </span>
-        </button>
-        <MessageAppearanceSettings
-          chat={{
-            conversationId: id,
-            partner: partner ?? null,
-            messages,
-            onJumpToMessage: jumpToMessage,
-            onOpenImage: setOpenImageUrl,
-            onLeave: () => void navigate({ to: "/messages" }),
-          }}
-          {...(partner?.username ? { contactName: `@${partner.username}` } : {})}
-          className="size-10 text-current hover:bg-black/5 hover:text-current max-sm:text-white max-sm:hover:bg-white/10"
-        />
+            {!inSidebar ? (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                aria-label="Back to messages"
+                className="size-10 shrink-0 rounded-full text-current hover:bg-black/5 hover:text-current sm:hover:bg-accent"
+                onClick={() => void navigate({ to: "/messages" })}
+              >
+                <ArrowLeft className="size-5" />
+              </Button>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => {
+                if (partner)
+                  void navigate({ to: "/u/$username", params: { username: partner.username } });
+              }}
+              className="flex min-w-0 flex-1 items-center gap-3 text-left"
+              disabled={!partner}
+              aria-label={partner ? `View @${partner.username}'s profile` : undefined}
+            >
+              <ProfileAvatar
+                photoUrl={partner?.photo_url}
+                initials={partner?.username?.slice(0, 2) ?? "··"}
+                className="size-10 shrink-0 font-display uppercase"
+              />
+              <span className="min-w-0">
+                <span className="flex items-center gap-1.5 font-semibold">
+                  {partner
+                    ? `@${partner.username}`
+                    : isLoading
+                      ? "Loading conversation…"
+                      : "Member"}
+                  {partner?.verified ? <BadgeCheck className="size-4 text-primary" /> : null}
+                  <MembershipBadge tier={partner?.membership_tier} official={partner?.official} />
+                </span>
+                <span className="flex items-center gap-1.5 text-xs text-zinc-400 sm:text-muted-foreground">
+                  {partnerPresence.online ? (
+                    <span className="size-2 rounded-full bg-emerald-500" />
+                  ) : null}
+                  {partner?.official ? "Official Candid account" : partnerActivity}
+                </span>
+              </span>
+            </button>
+            <MessageAppearanceSettings
+              chat={{
+                conversationId: id,
+                partner: partner ?? null,
+                messages,
+                onJumpToMessage: jumpToMessage,
+                onOpenImage: setOpenImageUrl,
+                onLeave: () => void navigate({ to: "/messages" }),
+              }}
+              {...(partner?.username ? { contactName: `@${partner.username}` } : {})}
+              className="size-10 text-current hover:bg-black/5 hover:text-current"
+            />
           </>
         )}
       </header>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
-      <ChatWallpaper look={appearance} />
-      <div
-        data-chat-area
-        className={cn(
-          "relative z-10 h-full min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          inSidebar ? cn("space-y-3 pb-4") : cn("px-3 py-5 text-white sm:px-6 sm:text-foreground"),
-        )}
-      >
-          <div data-chat-list className={cn("flex flex-col gap-3", !inSidebar && "mx-auto w-full max-w-2xl")}>
-          {conversation?.hasOlder ? (
-            <div className="flex justify-center">
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                disabled={loadingOlder}
-                onClick={() => void loadOlderMessages()}
-              >
-                {loadingOlder ? "Loading…" : "Load older messages"}
-              </Button>
-            </div>
-          ) : null}
-          {isLoading ? (
-            <div className="flex justify-center py-10">
-              <Loader2 className="size-5 animate-spin text-muted-foreground" />
-            </div>
-          ) : messages.length === 0 ? (
-            <div className="flex min-h-40 flex-1 items-center justify-center py-10 text-center">
-              <p className="text-sm text-zinc-400 sm:text-muted-foreground">No messages yet — say hello.</p>
-            </div>
-          ) : null}
-
-          <AnimatePresence initial={false}>
-            {messages.map((message, messageIndex) => {
-              const mine = message.sender_id === user?.uid;
-              const nextMessage = messages[messageIndex + 1];
-              const showPartnerAvatar = !mine && (!nextMessage || nextMessage.sender_id !== message.sender_id);
-              const reactions = Object.entries(message.reactions ?? {}).filter(
-                ([, ids]) => ids.length > 0,
-              );
-              return (
-                <motion.div
-                  key={message.id}
-                  id={`msg-${message.id}`}
-                  layout
-                  initial={{ opacity: 0, y: 10, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  data-selected={selected.has(message.id)}
-                  role={selecting && !message.is_deleted ? "checkbox" : undefined}
-                  aria-checked={selecting && !message.is_deleted ? selected.has(message.id) : undefined}
-                  onPointerDown={(event) => startPress(message, event)}
-                  onPointerUp={cancelPress}
-                  onPointerLeave={cancelPress}
-                  onPointerCancel={cancelPress}
-                  onPointerMove={(event) => {
-                    if (Math.abs(event.movementX) + Math.abs(event.movementY) > 6) cancelPress();
-                  }}
-                  onContextMenu={(event) => {
-                    if (message.is_deleted) return;
-                    event.preventDefault();
-                    if (!selecting) toggleSelect(message);
-                  }}
-                  onClick={() => {
-                    if (selecting) toggleSelect(message);
-                  }}
-                  className={cn(
-                    "relative flex [-webkit-touch-callout:none]",
-                    mine ? "justify-end" : "justify-start",
-                    selecting && "chat-select-row pl-8",
-                  )}
+        <ChatWallpaper look={appearance} />
+        <div
+          data-chat-area
+          className={cn(
+            "relative z-10 h-full min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+            inSidebar
+              ? cn("space-y-3 pb-4")
+              : cn("px-3 py-5 text-white sm:px-6 sm:text-foreground"),
+          )}
+        >
+          <div
+            data-chat-list
+            className={cn("flex flex-col gap-3", !inSidebar && "mx-auto w-full max-w-2xl")}
+          >
+            {conversation?.hasOlder ? (
+              <div className="flex justify-center">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  disabled={loadingOlder}
+                  onClick={() => void loadOlderMessages()}
                 >
-                  {selecting && !message.is_deleted ? (
-                    <span className="chat-select-check absolute left-0 top-1/2 -translate-y-1/2" aria-hidden>
-                      <Check className="size-3.5" strokeWidth={3} />
-                    </span>
-                  ) : null}
-                  {!mine && showPartnerAvatar ? <ProfileAvatar photoUrl={partner?.photo_url} initials={partner?.username?.slice(0, 2) ?? "··"} className="mb-5 mr-2 size-7 shrink-0 self-end sm:hidden" /> : null}
-                  <div
-                    className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start", selecting && "pointer-events-none")}
-                  >
-                    {message.is_deleted ? (
-                      <div className="rounded-3xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm italic text-zinc-400 sm:border-border/70 sm:bg-transparent sm:text-muted-foreground">
-                        This message was deleted
-                      </div>
-                    ) : (
-                      <>
-                        {message.image?.delivery_url ? (
-                          <button
-                            type="button"
-                            onClick={() => setOpenImageUrl(message.image!.delivery_url)}
-                            className="max-w-full overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                            aria-label="View shared image full screen"
-                          >
-                            <img
-                              src={message.image.delivery_url}
-                              alt="Image shared in chat"
-                              loading="lazy"
-                              className="max-h-80 max-w-full cursor-zoom-in object-contain"
-                            />
-                          </button>
-                        ) : null}
-                        {message.body ? (
-                          <div
-                            className={cn(
-                              "candid-message-bubble rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-relaxed shadow-sm sm:rounded-3xl sm:text-sm",
-                              mine
-                                ? "candid-message-sent rounded-br-md bg-gradient-to-br from-primary to-lime-400 text-zinc-950 sm:bg-primary sm:text-primary-foreground"
-                                : "candid-message-received rounded-bl-md bg-[#262626] text-white sm:border sm:border-border sm:bg-card sm:text-foreground",
-                            )}
-                          >
-                            <p className="candid-message-text whitespace-pre-wrap">{message.body}</p>
-                          </div>
-                        ) : null}
-                      </>
-                    )}
+                  {loadingOlder ? "Loading…" : "Load older messages"}
+                </Button>
+              </div>
+            ) : null}
+            {isLoading ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="size-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : messages.length === 0 ? (
+              <div className="flex min-h-40 flex-1 items-center justify-center py-10 text-center">
+                <p className="text-sm text-zinc-400 sm:text-muted-foreground">
+                  No messages yet — say hello.
+                </p>
+              </div>
+            ) : null}
 
+            <AnimatePresence initial={false}>
+              {messages.map((message, messageIndex) => {
+                const mine = message.sender_id === user?.uid;
+                const nextMessage = messages[messageIndex + 1];
+                const showPartnerAvatar =
+                  !mine && (!nextMessage || nextMessage.sender_id !== message.sender_id);
+                const reactions = Object.entries(message.reactions ?? {}).filter(
+                  ([, ids]) => ids.length > 0,
+                );
+                return (
+                  <motion.div
+                    key={message.id}
+                    id={`msg-${message.id}`}
+                    layout
+                    initial={{ opacity: 0, y: 10, scale: 0.98 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    data-selected={selected.has(message.id)}
+                    role={selecting && !message.is_deleted ? "checkbox" : undefined}
+                    aria-checked={
+                      selecting && !message.is_deleted ? selected.has(message.id) : undefined
+                    }
+                    onPointerDown={(event) => startPress(message, event)}
+                    onPointerUp={cancelPress}
+                    onPointerLeave={cancelPress}
+                    onPointerCancel={cancelPress}
+                    onPointerMove={(event) => {
+                      if (Math.abs(event.movementX) + Math.abs(event.movementY) > 6) cancelPress();
+                    }}
+                    onContextMenu={(event) => {
+                      if (message.is_deleted) return;
+                      event.preventDefault();
+                      if (!selecting) toggleSelect(message);
+                    }}
+                    onClick={() => {
+                      if (selecting) toggleSelect(message);
+                    }}
+                    className={cn(
+                      "relative flex [-webkit-touch-callout:none]",
+                      mine ? "justify-end" : "justify-start",
+                      selecting && "chat-select-row pl-8",
+                    )}
+                  >
+                    {selecting && !message.is_deleted ? (
+                      <span
+                        className="chat-select-check absolute left-0 top-1/2 -translate-y-1/2"
+                        aria-hidden
+                      >
+                        <Check className="size-3.5" strokeWidth={3} />
+                      </span>
+                    ) : null}
+                    {!mine && showPartnerAvatar ? (
+                      <ProfileAvatar
+                        photoUrl={partner?.photo_url}
+                        initials={partner?.username?.slice(0, 2) ?? "··"}
+                        className="mb-5 mr-2 size-7 shrink-0 self-end sm:hidden"
+                      />
+                    ) : null}
                     <div
                       className={cn(
-                        "mt-1 flex items-center gap-1.5 px-1 text-[11px] text-zinc-500 sm:text-muted-foreground",
-                        mine ? "justify-end" : "justify-start",
+                        "flex max-w-[82%] flex-col",
+                        mine ? "items-end" : "items-start",
+                        selecting && "pointer-events-none",
                       )}
                     >
-                      <span>{clock(message.created_at)}</span>
-                      {mine && message.delivery_state === "not_delivered" ? (
-                        <span className="font-medium text-danger">Not delivered</span>
-                      ) : null}
-                      {mine &&
-                      !message.is_deleted &&
-                      clockNow - new Date(message.created_at).getTime() >= 0 &&
-                      clockNow - new Date(message.created_at).getTime() <= 120_000 ? (
-                        <button
-                          type="button"
-                          aria-label="Delete message for everyone"
-                          title="Delete for everyone"
-                          disabled={removeMessage.isPending}
-                          onClick={() => removeMessage.mutate(message.id)}
-                          className="rounded p-0.5 hover:text-danger disabled:opacity-50"
-                        >
-                          <Trash2 className="size-3.5" />
-                        </button>
-                      ) : null}
-                      {!message.is_deleted ? (
-                        <Popover
-                          open={reactionPickerFor === message.id}
-                          onOpenChange={(open) => setReactionPickerFor(open ? message.id : null)}
-                        >
-                          <PopoverTrigger asChild>
+                      {message.is_deleted ? (
+                        <div className="rounded-3xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm italic text-zinc-400 sm:border-border/70 sm:bg-transparent sm:text-muted-foreground">
+                          This message was deleted
+                        </div>
+                      ) : (
+                        <>
+                          {message.image?.delivery_url ? (
                             <button
                               type="button"
-                              aria-label="React to message"
-                              className="rounded-full p-0.5 transition-colors hover:text-foreground"
+                              onClick={() => setOpenImageUrl(message.image!.delivery_url)}
+                              className="max-w-full overflow-hidden rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                              aria-label="View shared image full screen"
                             >
-                              <Smile className="size-3.5" />
+                              <img
+                                src={message.image.delivery_url}
+                                alt="Image shared in chat"
+                                loading="lazy"
+                                className="max-h-80 max-w-full cursor-zoom-in object-contain"
+                              />
                             </button>
-                          </PopoverTrigger>
-                          <PopoverContent
-                            className="z-[120] w-auto rounded-full p-1.5"
-                            align="center"
-                          >
-                            <div className="flex gap-1">
-                              {EMOJI.map((emoji) => (
-                                <button
-                                  key={emoji}
-                                  type="button"
-                                  onClick={() => {
-                                    toggleReaction.mutate({ message_id: message.id, emoji });
-                                    setReactionPickerFor(null);
-                                  }}
-                                  className="rounded-full px-1.5 py-1 text-base transition-transform hover:scale-125"
-                                >
-                                  {emoji}
-                                </button>
-                              ))}
+                          ) : null}
+                          {message.body ? (
+                            <div
+                              className={cn(
+                                "candid-message-bubble rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-relaxed shadow-sm sm:rounded-3xl sm:text-sm",
+                                mine
+                                  ? "candid-message-sent rounded-br-md bg-gradient-to-br from-primary to-lime-400 text-zinc-950 sm:bg-primary sm:text-primary-foreground"
+                                  : "candid-message-received rounded-bl-md bg-[#262626] text-white sm:border sm:border-border sm:bg-card sm:text-foreground",
+                              )}
+                            >
+                              <p className="candid-message-text whitespace-pre-wrap">
+                                {message.body}
+                              </p>
                             </div>
-                          </PopoverContent>
-                        </Popover>
-                      ) : null}
-                      {mine ? (
-                        <CheckCheck className={cn("size-3.5", message.read_at && "text-primary")} />
+                          ) : null}
+                        </>
+                      )}
+
+                      <div
+                        className={cn(
+                          "mt-1 flex items-center gap-1.5 px-1 text-[11px] text-zinc-500 sm:text-muted-foreground",
+                          mine ? "justify-end" : "justify-start",
+                        )}
+                      >
+                        <span>{clock(message.created_at)}</span>
+                        {mine && message.delivery_state === "not_delivered" ? (
+                          <span className="font-medium text-danger">Not delivered</span>
+                        ) : null}
+                        {mine &&
+                        !message.is_deleted &&
+                        clockNow - new Date(message.created_at).getTime() >= 0 &&
+                        clockNow - new Date(message.created_at).getTime() <= 120_000 ? (
+                          <button
+                            type="button"
+                            aria-label="Delete message for everyone"
+                            title="Delete for everyone"
+                            disabled={removeMessage.isPending}
+                            onClick={() => removeMessage.mutate(message.id)}
+                            className="rounded p-0.5 hover:text-danger disabled:opacity-50"
+                          >
+                            <Trash2 className="size-3.5" />
+                          </button>
+                        ) : null}
+                        {!message.is_deleted ? (
+                          <Popover
+                            open={reactionPickerFor === message.id}
+                            onOpenChange={(open) => setReactionPickerFor(open ? message.id : null)}
+                          >
+                            <PopoverTrigger asChild>
+                              <button
+                                type="button"
+                                aria-label="React to message"
+                                className="rounded-full p-0.5 transition-colors hover:text-foreground"
+                              >
+                                <Smile className="size-3.5" />
+                              </button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="z-[120] w-auto rounded-full p-1.5"
+                              align="center"
+                            >
+                              <div className="flex gap-1">
+                                {EMOJI.map((emoji) => (
+                                  <button
+                                    key={emoji}
+                                    type="button"
+                                    onClick={() => {
+                                      toggleReaction.mutate({ message_id: message.id, emoji });
+                                      setReactionPickerFor(null);
+                                    }}
+                                    className="rounded-full px-1.5 py-1 text-base transition-transform hover:scale-125"
+                                  >
+                                    {emoji}
+                                  </button>
+                                ))}
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        ) : null}
+                        {mine ? (
+                          <CheckCheck
+                            className={cn("size-3.5", message.read_at && "text-primary")}
+                          />
+                        ) : null}
+                      </div>
+
+                      {!message.is_deleted && reactions.length > 0 ? (
+                        <div className={cn("mt-1 flex gap-1", mine ? "justify-end" : "")}>
+                          {reactions.map(([emoji, ids]) => (
+                            <button
+                              key={emoji}
+                              type="button"
+                              onClick={() =>
+                                toggleReaction.mutate({ message_id: message.id, emoji })
+                              }
+                              className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-white sm:border-border sm:bg-card sm:text-foreground"
+                            >
+                              {emoji} {ids.length}
+                            </button>
+                          ))}
+                        </div>
                       ) : null}
                     </div>
-
-                    {!message.is_deleted && reactions.length > 0 ? (
-                      <div className={cn("mt-1 flex gap-1", mine ? "justify-end" : "")}>
-                        {reactions.map(([emoji, ids]) => (
-                          <button
-                            key={emoji}
-                            type="button"
-                            onClick={() => toggleReaction.mutate({ message_id: message.id, emoji })}
-                            className="rounded-full border border-zinc-700 bg-zinc-900 px-2 py-0.5 text-xs text-white sm:border-border sm:bg-card sm:text-foreground"
-                          >
-                            {emoji} {ids.length}
-                          </button>
-                        ))}
-                      </div>
-                    ) : null}
-                  </div>
-                </motion.div>
-              );
-            })}
-          </AnimatePresence>
-          <div ref={bottomRef} />
+                  </motion.div>
+                );
+              })}
+            </AnimatePresence>
+            <div ref={bottomRef} />
+          </div>
         </div>
-      </div>
       </div>
 
       {conversation && !conversation.can_send ? (
@@ -938,9 +1078,8 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           ) : null}
           <div
             className={cn(
-              "flex flex-col gap-2",
-              !inSidebar &&
-                "mx-auto w-full max-w-2xl rounded-full bg-[#262626] p-1 sm:rounded-2xl sm:border sm:border-border sm:bg-card sm:p-1.5 sm:shadow-sm",
+              "mx-auto flex w-full max-w-2xl flex-col gap-1.5 rounded-[1.4rem] border border-border/80 bg-card/95 p-2 shadow-[0_8px_28px_rgba(0,0,0,0.12)] transition-colors focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10",
+              inSidebar && "max-w-none",
             )}
           >
             {imagePreview ? (
@@ -968,7 +1107,27 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 ) : null}
               </div>
             ) : null}
-            <div data-composer-controls className="flex items-end gap-2">
+            <div className="flex items-start gap-2 px-1 pt-1">
+              <ProfileAvatar
+                photoUrl={user?.photoURL}
+                initials={(user?.displayName || user?.email || "U").slice(0, 1).toUpperCase()}
+                className="mt-1 size-8 shrink-0 ring-2 ring-background"
+              />
+              <Textarea
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" && !event.shiftKey && behavior.sendOnEnter) {
+                    event.preventDefault();
+                    if (draft.trim() || imageReceipt) send.mutate();
+                  }
+                }}
+                rows={1}
+                placeholder="Write a message"
+                className="max-h-32 min-h-11 flex-1 resize-none border-0 bg-transparent px-1 py-2 text-sm text-foreground placeholder:text-muted-foreground focus-visible:ring-0"
+              />
+            </div>
+            <div data-composer-controls className="flex items-center gap-1.5 px-1">
               <input
                 ref={imageInputRef}
                 type="file"
@@ -981,34 +1140,29 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               />
               <Button
                 type="button"
-                size="icon"
                 variant="ghost"
+                size="icon"
                 aria-label="Attach image"
                 title="Attach image"
                 disabled={uploadingImage || send.isPending || !conversation?.can_send}
                 onClick={() => imageInputRef.current?.click()}
-                className="size-11 shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground sm:size-10 sm:bg-transparent sm:text-foreground sm:hover:bg-accent"
+                className="size-9 shrink-0 rounded-full"
               >
-                <Camera className="size-5 sm:hidden" />
-                <ImagePlus className="hidden size-5 sm:block" />
+                <ImagePlus className="size-[18px]" />
               </Button>
-              <Textarea
-                value={draft}
-                onChange={(event) => setDraft(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey && behavior.sendOnEnter) {
-                    event.preventDefault();
-                    if (draft.trim() || imageReceipt) send.mutate();
-                  }
-                }}
-                rows={1}
-                placeholder="Write a message"
-                className="max-h-32 min-h-10 flex-1 resize-none border-0 bg-transparent px-2.5 py-2 text-white placeholder:text-zinc-400 focus-visible:ring-0 sm:text-foreground sm:placeholder:text-muted-foreground"
+              <QuickEmojiReactions
+                open={composerEmojiOpen}
+                onOpenChange={setComposerEmojiOpen}
+                onSelect={(emoji) => setDraft((value) => appendEmoji(value, emoji))}
+                className="flex items-center"
               />
+              <span className="ml-auto mr-2 text-[11px] text-muted-foreground">
+                Private message
+              </span>
               <Button
                 type="button"
                 size="icon"
-                className="glow-primary rounded-full"
+                className="glow-primary size-10 shrink-0 rounded-full"
                 data-chat-send
                 aria-label="Send message"
                 disabled={send.isPending || uploadingImage || (!draft.trim() && !imageReceipt)}
@@ -1025,7 +1179,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
         </div>
       )}
 
-      <ChatForwardDialog open={forwardOpen} onOpenChange={setForwardOpen} text={selectedText} fromConversationId={id} onDone={clearSelection} />
+      <ChatForwardDialog
+        open={forwardOpen}
+        onOpenChange={setForwardOpen}
+        text={selectedText}
+        fromConversationId={id}
+        onDone={clearSelection}
+      />
 
       <Dialog open={Boolean(openImageUrl)} onOpenChange={(open) => !open && setOpenImageUrl(null)}>
         <DialogContent
@@ -1033,7 +1193,9 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           className="!inset-0 !left-0 !top-0 !h-[100dvh] !max-w-none !translate-x-0 !translate-y-0 rounded-none border-0 bg-black/95 p-4 sm:p-10 lg:p-16"
         >
           <DialogTitle className="sr-only">Shared image</DialogTitle>
-          <DialogDescription className="sr-only">A full-screen image shared in this conversation.</DialogDescription>
+          <DialogDescription className="sr-only">
+            A full-screen image shared in this conversation.
+          </DialogDescription>
           <DialogClose asChild>
             <Button
               type="button"
@@ -1056,7 +1218,11 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               aria-label="Download image"
               title="Download image"
             >
-              {downloadingImage ? <Loader2 className="size-5 animate-spin" /> : <Download className="size-5" />}
+              {downloadingImage ? (
+                <Loader2 className="size-5 animate-spin" />
+              ) : (
+                <Download className="size-5" />
+              )}
             </Button>
           ) : null}
           {openImageUrl ? (

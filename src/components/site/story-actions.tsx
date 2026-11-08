@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ArrowBigUp, Loader2, MessageSquare, Send, Users } from "lucide-react";
+import { ArrowBigUp, AtSign, Loader2, MessageSquare, Send, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from "@/components/ui/drawer";
 import { notify as toast } from "@/lib/notifications-store";
 import { addComment, castVote } from "@/lib/actions.functions";
@@ -17,6 +16,12 @@ import { StorySocial } from "@/components/site/story-social";
 import { cn, formatCount } from "@/lib/utils";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { getStoryEngagement } from "@/lib/social.functions";
+import { getPrivacySettings } from "@/lib/messaging.functions";
+import { AnonymousPostingToggle } from "@/components/site/anonymous-posting-toggle";
+import { MentionTextarea } from "@/components/site/mention-textarea";
+import { QuickEmojiReactions } from "@/components/site/quick-emoji-reactions";
+import { appendEmoji } from "@/lib/composer-utils";
+import { ProfileAvatar } from "@/components/site/profile-photo";
 
 /** Inline vote + comment bar so people can act without leaving the feed. */
 export function StoryActions({
@@ -46,6 +51,7 @@ export function StoryActions({
   const vote = useServerFn(castVote);
   const getEngagement = useServerFn(getStoryEngagement);
   const comment = useServerFn(addComment);
+  const fetchPrivacy = useServerFn(getPrivacySettings);
   const [nearViewport, setNearViewport] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const voteIntentRef = useRef<{ up: boolean | null; metoo: boolean | null }>({
@@ -57,6 +63,10 @@ export function StoryActions({
   const [open, setOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [body, setBody] = useState("");
+  const [anonymous, setAnonymous] = useState(false);
+  const [anonymousTouched, setAnonymousTouched] = useState(false);
+  const [emojiOpen, setEmojiOpen] = useState(false);
+  const commentInputRef = useRef<HTMLTextAreaElement>(null);
   const [optimistic, setOptimistic] = useState<{ up: number; metoo: number; comments: number }>({
     up: 0,
     metoo: 0,
@@ -68,6 +78,16 @@ export function StoryActions({
     queryFn: () => getStory({ data: { id: storyId } }),
     enabled: open || sheetOpen || discussionOpen,
   });
+  const privacy = useQuery({
+    queryKey: ["privacy-settings", user?.uid ?? null],
+    queryFn: () => fetchPrivacy(),
+    enabled: Boolean(user),
+  });
+  useEffect(() => {
+    if (!anonymousTouched && privacy.data) {
+      setAnonymous(privacy.data.anonymous_contributions_default);
+    }
+  }, [anonymousTouched, privacy.data]);
   const engagement = useQuery({
     queryKey: ["story-engagement", storyId, user?.uid ?? "anon"],
     queryFn: () => getEngagement({ data: { story_id: storyId } }),
@@ -155,9 +175,15 @@ export function StoryActions({
   }, [upvotes, metoo]);
 
   const commentMutation = useMutation({
-    mutationFn: () => comment({ data: { story_id: storyId, parent_id: null, body } }),
+    mutationFn: () =>
+      comment({
+        data: { story_id: storyId, parent_id: null, body, is_anonymous: anonymous },
+      }),
     onSuccess: () => {
       setBody("");
+      setEmojiOpen(false);
+      setAnonymousTouched(false);
+      setAnonymous(privacy.data?.anonymous_contributions_default ?? false);
       setOptimistic((prev) => ({ ...prev, comments: prev.comments + 1 }));
       void queryClient.invalidateQueries({ queryKey: ["story", storyId] });
       void queryClient.invalidateQueries({ queryKey: ["story-pages"] });
@@ -223,30 +249,85 @@ export function StoryActions({
       {open ? (
         <div className="animate-fade mt-3 space-y-3 border-t border-border/70 pt-3">
           {user ? (
-            <div className="space-y-2">
-              <Textarea
-                rows={2}
-                value={body}
-                onChange={(event) => setBody(event.target.value)}
-                placeholder={
-                  announcement
-                    ? "Write a comment…"
-                    : "Add context or share what happened to you. No names of individuals."
-                }
-                className="bg-background"
-              />
-              <Button
-                size="sm"
-                disabled={body.trim().length < 2 || commentMutation.isPending}
-                onClick={() => commentMutation.mutate()}
-              >
-                {commentMutation.isPending ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Send className="size-4" />
-                )}
-                Post comment
-              </Button>
+            <div
+              className="anon-field overflow-hidden rounded-[1.4rem] border border-border bg-background/80 shadow-sm transition-colors focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10"
+              data-anon={anonymous}
+              data-ready={body.trim().length >= 2}
+            >
+              <div className="flex items-start gap-2 px-3 pt-3">
+                <ProfileAvatar
+                  photoUrl={anonymous ? null : user.photoURL}
+                  initials={(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}
+                  className="mt-1 size-8 shrink-0 ring-2 ring-background"
+                />
+                <MentionTextarea
+                  textareaRef={commentInputRef}
+                  rows={2}
+                  value={body}
+                  onValueChange={setBody}
+                  placeholder={
+                    anonymous
+                      ? "Say it anonymously…"
+                      : announcement
+                        ? "Write a comment…"
+                        : "Add context or share what happened to you. No names of individuals."
+                  }
+                  className="min-h-12 resize-none border-0 bg-transparent px-1 pb-1 pt-2 text-sm shadow-none focus-visible:ring-0"
+                />
+              </div>
+              <div className="flex flex-wrap items-center justify-between gap-2 px-2 pb-2">
+                <div className="flex items-center">
+                  <QuickEmojiReactions
+                    open={emojiOpen}
+                    onOpenChange={setEmojiOpen}
+                    onSelect={(emoji) => setBody((value) => appendEmoji(value, emoji))}
+                    className="flex items-center"
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    aria-label="Mention someone"
+                    title="Mention someone"
+                    className="size-9 rounded-full text-muted-foreground hover:text-primary"
+                    onClick={() => {
+                      setBody((value) => appendEmoji(value, "@"));
+                      requestAnimationFrame(() => {
+                        const input = commentInputRef.current;
+                        if (!input) return;
+                        const end = input.value.length;
+                        input.focus();
+                        input.setSelectionRange(end, end);
+                      });
+                    }}
+                  >
+                    <AtSign className="size-[18px]" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <AnonymousPostingToggle
+                    anonymous={anonymous}
+                    onToggle={() => {
+                      setAnonymous((value) => !value);
+                      setAnonymousTouched(true);
+                    }}
+                    user={user}
+                  />
+                  <Button
+                    size="icon"
+                    className="size-10 rounded-full"
+                    disabled={body.trim().length < 2 || commentMutation.isPending}
+                    onClick={() => commentMutation.mutate()}
+                    aria-label="Post comment"
+                  >
+                    {commentMutation.isPending ? (
+                      <Loader2 className="size-4 animate-spin" />
+                    ) : (
+                      <Send className="size-4" />
+                    )}
+                  </Button>
+                </div>
+              </div>
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">

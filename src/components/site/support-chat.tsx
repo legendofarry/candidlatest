@@ -6,6 +6,8 @@ import { Link } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { getSupportConversation, sendSupportMessage } from "@/lib/support.functions";
+import { QuickEmojiReactions } from "@/components/site/quick-emoji-reactions";
+import { appendEmoji } from "@/lib/composer-utils";
 
 const quickPrompts = [
   "I need help with my account",
@@ -25,6 +27,7 @@ export function SupportChat({
   const [open, setOpen] = useState(false);
   const [launcherRevealed, setLauncherRevealed] = useState(false);
   const [body, setBody] = useState("");
+  const [emojiOpen, setEmojiOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const launcherSwipeStart = useRef<number | null>(null);
   const suppressLauncherClick = useRef(false);
@@ -42,6 +45,7 @@ export function SupportChat({
     mutationFn: () => send({ data: { body } }),
     onSuccess: () => {
       setBody("");
+      setEmojiOpen(false);
       void queryClient.invalidateQueries({ queryKey: ["support-conversation", user?.uid] });
     },
   });
@@ -280,20 +284,31 @@ export function SupportChat({
                 onSubmit={submit}
                 className="shrink-0 border-t border-border/70 bg-card/85 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-xl md:p-4 md:pb-4"
               >
-                <div className="flex items-center gap-2 rounded-[22px] border border-border/80 bg-background p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.08)] transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
+                <div className="flex flex-wrap items-center gap-1.5 rounded-[22px] border border-border/80 bg-background p-1.5 shadow-[0_8px_28px_rgba(0,0,0,0.08)] transition-all focus-within:border-primary/50 focus-within:ring-2 focus-within:ring-primary/10">
                   <input
                     value={body}
                     onChange={(event) => setBody(event.target.value)}
                     maxLength={4000}
                     placeholder="Write a message…"
-                    className="min-w-0 flex-1 bg-transparent px-3 py-2 text-base outline-none placeholder:text-muted-foreground/70 md:text-sm"
+                    className="order-1 min-w-0 flex-1 bg-transparent px-3 py-2 text-base outline-none placeholder:text-muted-foreground/70 md:text-sm"
                   />
+                  <div className="order-2 flex w-full items-center gap-1 border-t border-border/60 px-1 pt-1.5">
+                    <QuickEmojiReactions
+                      open={emojiOpen}
+                      onOpenChange={setEmojiOpen}
+                      onSelect={(emoji) => setBody((value) => appendEmoji(value, emoji))}
+                      className="flex items-center"
+                    />
+                    <span className="ml-auto mr-2 text-[11px] text-muted-foreground">
+                      Candid support
+                    </span>
+                  </div>
                   <Button
                     size="icon"
                     type="submit"
                     disabled={!body.trim() || sendMutation.isPending}
                     aria-label="Send message"
-                    className="size-10 shrink-0 rounded-[16px] shadow-lg shadow-primary/20 transition-transform active:scale-95"
+                    className="order-3 size-10 shrink-0 rounded-[16px] shadow-lg shadow-primary/20 transition-transform active:scale-95"
                   >
                     <Send className="size-4" />
                   </Button>

@@ -5,7 +5,7 @@ import { registerMyPushToken } from "@/lib/push.functions";
 import { firebaseApp, registerFirebaseServiceWorker } from "@/integrations/firebase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { notify } from "@/lib/notifications-store";
-import { hasPushOptIn } from "@/lib/push-preference";
+import { hasPushOptIn, setPushToken } from "@/lib/push-preference";
 
 /** Reassociates an already-authorized browser token with the signed-in account. */
 export function usePushRegistrationSync() {
@@ -17,14 +17,17 @@ export function usePushRegistrationSync() {
     let stopListening: (() => void) | undefined;
     void (async () => {
       if (
-        !user || requiresEmailVerification(user) ||
-        typeof window === "undefined" || typeof Notification === "undefined" ||
+        !user ||
+        requiresEmailVerification(user) ||
+        typeof window === "undefined" ||
+        typeof Notification === "undefined" ||
         !("serviceWorker" in navigator)
-      ) return;
+      )
+        return;
 
       try {
         const messagingSdk = await import("firebase/messaging");
-        if (!await messagingSdk.isSupported()) return;
+        if (!(await messagingSdk.isSupported())) return;
         const vapidKey = import.meta.env["VITE_FIREBASE_VAPID_KEY"];
         if (!vapidKey) return;
         const registration = await registerFirebaseServiceWorker();
@@ -32,9 +35,12 @@ export function usePushRegistrationSync() {
         const messaging = messagingSdk.getMessaging(firebaseApp);
         stopListening = messagingSdk.onMessage(messaging, (payload) => {
           if (
-            !active || document.visibilityState !== "visible" ||
-            Notification.permission !== "granted" || !hasPushOptIn(Notification.permission)
-          ) return;
+            !active ||
+            document.visibilityState !== "visible" ||
+            Notification.permission !== "granted" ||
+            !hasPushOptIn(Notification.permission)
+          )
+            return;
           const title = payload.notification?.title || payload.data?.["title"] || "Candid";
           const body =
             payload.notification?.body || payload.data?.["body"] || "You have a new notification.";
@@ -45,7 +51,10 @@ export function usePushRegistrationSync() {
           vapidKey,
           serviceWorkerRegistration: registration,
         });
-        if (active && token) await registerPush({ data: { token } });
+        if (active && token) {
+          await registerPush({ data: { token } });
+          setPushToken(token);
+        }
       } catch (error) {
         console.warn("[push] Could not sync this device to the signed-in account", error);
       }

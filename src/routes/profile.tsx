@@ -45,6 +45,7 @@ import {
   ProfilePhotoPicker,
 } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
+import { AccountSwitcher, AccountSwitcherMenuItem } from "@/components/site/account-switcher";
 import { getPublicProfile } from "@/lib/messaging.functions";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
@@ -78,6 +79,7 @@ function ProfilePage() {
   const isMobile = useIsMobile();
   const queryClient = useQueryClient();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
 
   const fetchOnboardingState = useServerFn(getOnboardingState);
   const onboarding = useQuery({
@@ -164,6 +166,14 @@ function ProfilePage() {
   return (
     <div className="min-h-screen bg-background">
       <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
+      {user ? (
+        <AccountSwitcher
+          open={accountSwitcherOpen}
+          onOpenChange={setAccountSwitcherOpen}
+          user={user}
+          username={onboarding.data?.username ?? null}
+        />
+      ) : null}
       <section className="min-h-screen px-3 pb-4 pt-2 sm:px-5 sm:pt-2 md:px-8 md:py-8">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -246,6 +256,14 @@ function ProfilePage() {
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="start">
                           <DropdownMenuLabel>{handle}</DropdownMenuLabel>
+                          {user ? (
+                            <>
+                              <AccountSwitcherMenuItem
+                                onOpen={() => setAccountSwitcherOpen(true)}
+                              />
+                              <DropdownMenuSeparator />
+                            </>
+                          ) : null}
                           <DropdownMenuItem asChild>
                             <Link to="/u/$username" params={{ username: onboarding.data.username }}>
                               <Link2 className="size-4" /> View public profile
@@ -270,9 +288,25 @@ function ProfilePage() {
                             </DropdownMenuItem>
                           )}
                           {nextUsernameChangeAt === null ? (
-                            <p className="px-2 py-1 text-xs text-muted-foreground">
-                            </p>
+                            <p className="px-2 py-1 text-xs text-muted-foreground"></p>
                           ) : null}
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    ) : user ? (
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="Account options"
+                            className="inline-flex min-w-0 items-center gap-1 rounded-sm text-inherit transition-colors hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            <span className="truncate">{handle}</span>
+                            <ChevronDown className="size-4 shrink-0" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuLabel>{handle}</DropdownMenuLabel>
+                          <AccountSwitcherMenuItem onOpen={() => setAccountSwitcherOpen(true)} />
                         </DropdownMenuContent>
                       </DropdownMenu>
                     ) : (

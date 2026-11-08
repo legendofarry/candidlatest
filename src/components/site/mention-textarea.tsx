@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState, type ChangeEvent, type ComponentProps } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ChangeEvent,
+  type ComponentProps,
+  type Ref,
+} from "react";
 import { Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { ProfileAvatar } from "@/components/site/profile-photo";
@@ -15,17 +22,25 @@ export function MentionTextarea({
   value,
   onValueChange,
   className,
+  textareaRef,
   ...props
 }: Omit<ComponentProps<typeof Textarea>, "value" | "onChange"> & {
   value: string;
   onValueChange: (value: string) => void;
+  textareaRef?: Ref<HTMLTextAreaElement>;
 }) {
   const { user } = useAuth();
   const search = useServerFn(getMentionSuggestions);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const inputElementRef = useRef<HTMLTextAreaElement>(null);
   const [activeMention, setActiveMention] = useState<ActiveMention | null>(null);
   const [users, setUsers] = useState<MentionUser[]>([]);
   const [loading, setLoading] = useState(false);
+
+  function setTextareaRef(element: HTMLTextAreaElement | null) {
+    inputElementRef.current = element;
+    if (typeof textareaRef === "function") textareaRef(element);
+    else if (textareaRef) textareaRef.current = element;
+  }
 
   useEffect(() => {
     if (!activeMention || !user || activeMention.query.length < 2) {
@@ -76,8 +91,8 @@ export function MentionTextarea({
     const caret = activeMention.start + replacement.length;
     onValueChange(next);
     requestAnimationFrame(() => {
-      inputRef.current?.setSelectionRange(caret, caret);
-      inputRef.current?.focus();
+      inputElementRef.current?.setSelectionRange(caret, caret);
+      inputElementRef.current?.focus();
     });
     setActiveMention(null);
   }
@@ -118,7 +133,7 @@ export function MentionTextarea({
       ) : null}
       <Textarea
         {...props}
-        ref={inputRef}
+        ref={setTextareaRef}
         value={value}
         onChange={handleChange}
         onKeyDown={(event) => {
@@ -132,7 +147,13 @@ export function MentionTextarea({
 }
 
 /** Render stored @handles as links while leaving all other text untouched. */
-export function MentionText({ text, linkMentions = true }: { text: string; linkMentions?: boolean }) {
+export function MentionText({
+  text,
+  linkMentions = true,
+}: {
+  text: string;
+  linkMentions?: boolean;
+}) {
   const parts = text.split(/(^|[\s(])(@[a-z0-9_]+(?:\.[a-z0-9_]+)*)/gi);
   return (
     <>

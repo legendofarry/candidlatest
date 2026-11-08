@@ -1,4 +1,5 @@
 const PUSH_OPT_IN_KEY = "candid.push-opt-in.v1";
+const PUSH_TOKEN_KEY = "candid.push-token.v1";
 
 /** Store the user's choice for this browser/app installation. */
 export function setPushOptIn(enabled: boolean) {
@@ -20,5 +21,22 @@ export function hasPushOptIn(permission: NotificationPermission) {
     return previouslyGranted;
   } catch {
     return permission === "granted";
+  }
+}
+
+export function getPushToken() {
+  try {
+    return localStorage.getItem(PUSH_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setPushToken(token: string | null) {
+  try {
+    if (token) localStorage.setItem(PUSH_TOKEN_KEY, token);
+    else localStorage.removeItem(PUSH_TOKEN_KEY);
+  } catch {
+    // Token sync still works for the current session when storage is unavailable.
   }
 }

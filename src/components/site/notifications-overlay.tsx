@@ -60,6 +60,7 @@ import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { requiresEmailVerification } from "@/lib/email-verification";
 import { Input } from "@/components/ui/input";
 import { ProfileAvatar } from "@/components/site/profile-photo";
+import { NotificationSettingsHub } from "@/components/site/notification-settings-hub";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Drawer,
@@ -733,6 +734,7 @@ export function NotificationsOverlay() {
                       </Button>
                     )
                   ) : null}
+                  {view.name === "list" && !selectionMode ? <NotificationSettingsHub /> : null}
                   {view.name !== "list" ? (
                     <Button
                       variant="outline"
