@@ -22,7 +22,8 @@ import {
   getMentionSuggestions,
   startConversationByUsername,
   updateConversationPreference,
-  getMessageTheme,
+  getChatPreferences,
+  saveChatPreferences,
 } from "@/lib/messaging.functions";
 import { readInboxScroll, saveInboxScroll } from "@/lib/message-panel-state";
 import { useAuth } from "@/hooks/useAuth";
@@ -31,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { MessageAppearanceSettings } from "@/components/site/message-appearance-settings";
+import { useChatPrefsSync } from "@/lib/message-appearance";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
 import { Input } from "@/components/ui/input";
 import { notify } from "@/lib/notifications-store";
@@ -114,21 +116,12 @@ export function MessagesInbox({
   const longPressTriggered = useRef(false);
   const embedded = Boolean(onSelectConversation);
   const updatePreference = useServerFn(updateConversationPreference);
-  const fetchMessageTheme = useServerFn(getMessageTheme);
-  const { data: messageThemeData } = useQuery({
-    queryKey: ["message-theme", user?.uid ?? null],
-    queryFn: () => fetchMessageTheme(),
-    enabled: Boolean(user),
-    staleTime: 60_000,
+  const loadChatPrefs = useServerFn(getChatPreferences);
+  const saveChatPrefs = useServerFn(saveChatPreferences);
+  useChatPrefsSync(user?.uid ?? null, {
+    load: () => loadChatPrefs(),
+    save: (payload) => saveChatPrefs({ data: payload }),
   });
-  const selectedTheme = (messageThemeData?.theme ?? "default") as "default" | "midnight" | "forest" | "ocean" | "sunset";
-  const themeClass = ({
-    default: "",
-    midnight: "!bg-[#050507]",
-    forest: "!bg-[#07150f]",
-    ocean: "!bg-[#071421]",
-    sunset: "!bg-[#1a0d19]",
-  } as const)[selectedTheme];
 
   const {
     data,
@@ -352,8 +345,7 @@ export function MessagesInbox({
   return (
     <div
       ref={listRef}
-      data-message-theme={selectedTheme}
-      className={cn("candid-message-theme", embedded ? "mx-auto max-w-2xl" : "-mx-4 max-w-none md:mx-auto md:max-w-5xl", themeClass)}
+      className={cn(embedded ? "mx-auto max-w-2xl" : "-mx-4 max-w-none md:mx-auto md:max-w-5xl")}
     >
       {!embedded ? (
         <header className="border-b border-border bg-background px-4 pb-5 pt-4 sm:px-6 md:py-6">

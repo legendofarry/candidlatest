@@ -7,7 +7,10 @@ import {
   ArrowLeft,
   BadgeCheck,
   Camera,
+  Check,
   CheckCheck,
+  Copy,
+  Forward,
   Download,
   ImagePlus,
   Loader2,
@@ -24,7 +27,8 @@ import {
   issueChatImageUpload,
   postMessage,
   reactToMessage,
-  getMessageTheme,
+  getChatPreferences,
+  saveChatPreferences,
 } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
@@ -35,7 +39,14 @@ import { cn } from "@/lib/utils";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { MessageAppearanceSettings } from "@/components/site/message-appearance-settings";
-import { getMessageAppearanceStyle, useMessageAppearance } from "@/lib/message-appearance";
+import {
+  getChatDataAttributes,
+  getMessageAppearanceStyle,
+  useChatLook,
+  useChatPrefsSync,
+} from "@/lib/message-appearance";
+import { ChatWallpaper } from "@/components/site/chat-wallpaper";
+import { ChatForwardDialog } from "@/components/site/chat-forward-dialog";
 import { onValue, ref } from "firebase/database";
 import { firebaseRealtimeDb } from "@/integrations/firebase/client";
 import {
@@ -118,16 +129,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const react = useServerFn(reactToMessage);
   const issueImageUpload = useServerFn(issueChatImageUpload);
   const discardImageUpload = useServerFn(discardChatImageUpload);
-  const fetchMessageTheme = useServerFn(getMessageTheme);
-  const { data: messageThemeData } = useQuery({
-    queryKey: ["message-theme", user?.uid ?? null],
-    queryFn: () => fetchMessageTheme(),
-    enabled: Boolean(user),
-    staleTime: 60_000,
+  const loadChatPrefs = useServerFn(getChatPreferences);
+  const saveChatPrefs = useServerFn(saveChatPreferences);
+  useChatPrefsSync(user?.uid ?? null, {
+    load: () => loadChatPrefs(),
+    save: (payload) => saveChatPrefs({ data: payload }),
   });
-  const appearance = useMessageAppearance(user?.uid ?? null, messageThemeData?.theme);
-  const theme = messageThemeData?.theme ?? "default";
-  const themedSurface = theme === "forest" ? "bg-[#07150f]" : theme === "ocean" ? "bg-[#071421]" : theme === "sunset" ? "bg-[#1a0d19]" : theme === "midnight" ? "bg-[#050507]" : "";
+  const { look: appearance, behavior } = useChatLook(user?.uid ?? null, id);
   const conversationQueryKey = ["conversation", id, user?.uid ?? null] as const;
 
   const [draft, setDraft] = useState("");
@@ -140,6 +148,19 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
   const [imageTicketId, setImageTicketId] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [clockNow, setClockNow] = useState(Date.now());
+  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [selectReactOpen, setSelectReactOpen] = useState(false);
+  const pressTimer = useRef<number | null>(null);
+  const selecting = selected.size > 0;
+  useEffect(() => {
+    if (!selecting) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setSelected(new Set());
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [selecting]);
   const [partnerPresence, setPartnerPresence] = useState<{ online: boolean; lastChanged: number | null }>({ online: false, lastChanged: null });
   const imageInputRef = useRef<HTMLInputElement>(null);
   const imageTicketRef = useRef<string | null>(null);
@@ -540,24 +561,125 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
     );
   }
 
+  const buzz = (ms = 10) => {
+    if (!behavior.haptics) return;
+    try {
+      navigator.vibrate?.(ms);
+    } catch {
+      /* haptics are optional */
+    }
+  };
+  const clearSelection = () => setSelected(new Set());
+  const toggleSelect = (message: (typeof messages)[number]) => {
+    if (message.is_deleted) return;
+    setSelected((previous) => {
+      const next = new Set(previous);
+      if (next.has(message.id)) next.delete(message.id);
+      else next.add(message.id);
+      return next;
+    });
+    buzz(8);
+  };
+  const cancelPress = () => {
+    if (pressTimer.current !== null) window.clearTimeout(pressTimer.current);
+    pressTimer.current = null;
+  };
+  const startPress = (message: (typeof messages)[number], event: React.PointerEvent) => {
+    if (selecting || message.is_deleted || (event.pointerType === "mouse" && event.button !== 0)) return;
+    if ((event.target as HTMLElement).closest("button, a")) return;
+    cancelPress();
+    pressTimer.current = window.setTimeout(() => {
+      pressTimer.current = null;
+      toggleSelect(message);
+      buzz(18);
+    }, 420);
+  };
+  const selectedMessages = messages.filter((message) => selected.has(message.id));
+  const selectedText = selectedMessages.filter((message) => message.body).map((message) => message.body).join("\n");
+  const canDeleteSelected =
+    selectedMessages.length > 0 &&
+    selectedMessages.every(
+      (message) => message.sender_id === user?.uid && !message.is_deleted && clockNow - new Date(message.created_at).getTime() <= 120_000,
+    );
+  const copySelected = async () => {
+    try {
+      await navigator.clipboard.writeText(selectedText);
+      toast.success(selectedMessages.length > 1 ? "Messages copied" : "Message copied");
+      clearSelection();
+    } catch {
+      toast.error("Could not copy", { description: "Your browser blocked clipboard access." });
+    }
+  };
+  const reactSelected = (emoji: string) => {
+    for (const message of selectedMessages) {
+      if (!(message.reactions?.[emoji] ?? []).includes(user?.uid ?? "")) toggleReaction.mutate({ message_id: message.id, emoji });
+    }
+    setSelectReactOpen(false);
+    clearSelection();
+  };
+  const deleteSelected = () => {
+    for (const message of selectedMessages) removeMessage.mutate(message.id);
+    clearSelection();
+  };
+  function jumpToMessage(messageId: string) {
+    const element = document.getElementById(`msg-${messageId}`);
+    if (!element) {
+      toast.error("That message isn't loaded", { description: "Load older messages, then try again." });
+      return;
+    }
+    skipNextAutoScroll.current = true;
+    element.scrollIntoView({ behavior: "smooth", block: "center" });
+    element.dataset["flash"] = "1";
+    window.setTimeout(() => delete element.dataset["flash"], 1600);
+  }
+
   return (
     <div
-      data-message-theme={theme}
-      data-appearance-preset={appearance.preset}
-      data-wallpaper={appearance.wallpaper}
-      data-doodle={appearance.doodle}
-      data-pattern-intensity={appearance.patternIntensity}
-      data-bubble-shape={appearance.bubbleShape}
+      {...getChatDataAttributes(appearance, behavior)}
       style={getMessageAppearanceStyle(appearance)}
       className={cn(
         "candid-message-theme flex h-full min-h-0 w-full flex-col overflow-hidden",
-        inSidebar ? cn("mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none", themedSurface) : cn("bg-black sm:bg-background", themedSurface),
+        inSidebar ? cn("mx-auto max-w-2xl bg-background md:mx-0 md:max-w-none") : cn("bg-black sm:bg-background"),
       )}
     >
       <header className={cn(
         "sticky top-0 z-30 flex shrink-0 items-center gap-2 transition-colors",
-        inSidebar ? cn("glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur", themedSurface) : cn("border-b border-zinc-800 bg-zinc-950 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white sm:border-border sm:bg-background/95 sm:px-5 sm:py-3.5 sm:text-foreground sm:backdrop-blur", themedSurface),
+        inSidebar ? cn("glass-card mb-4 rounded-2xl bg-background/95 p-3 backdrop-blur") : cn("border-b border-zinc-800 bg-zinc-950 px-3 pb-3 pt-[calc(0.75rem+env(safe-area-inset-top))] text-white sm:border-border sm:bg-background/95 sm:px-5 sm:py-3.5 sm:text-foreground sm:backdrop-blur"),
       )} data-chat-header>
+        {selecting ? (
+          <div className="flex w-full items-center gap-1">
+            <Button type="button" variant="ghost" size="icon" aria-label="Cancel selection" className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10" onClick={clearSelection}>
+              <X className="size-5" />
+            </Button>
+            <span className="flex-1 px-1 font-semibold" aria-live="polite">{selected.size} selected</span>
+            <Button type="button" variant="ghost" size="icon" aria-label="Copy selected messages" title="Copy" disabled={!selectedText} className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10" onClick={() => void copySelected()}>
+              <Copy className="size-5" />
+            </Button>
+            <Popover open={selectReactOpen} onOpenChange={setSelectReactOpen}>
+              <PopoverTrigger asChild>
+                <Button type="button" variant="ghost" size="icon" aria-label="React to selected messages" title="React" className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10">
+                  <Smile className="size-5" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="z-[120] w-auto rounded-full p-1.5" align="end">
+                <div className="flex gap-1">
+                  {EMOJI.map((emoji) => (
+                    <button key={emoji} type="button" onClick={() => reactSelected(emoji)} className="rounded-full px-1.5 py-1 text-base transition-transform hover:scale-125">
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button type="button" variant="ghost" size="icon" aria-label="Forward selected messages" title="Forward" disabled={!selectedText} className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10" onClick={() => setForwardOpen(true)}>
+              <Forward className="size-5" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" aria-label="Delete selected messages for everyone" title={canDeleteSelected ? "Delete for everyone" : "You can delete your own messages for 2 minutes after sending"} disabled={!canDeleteSelected} className="size-10 rounded-full text-current max-sm:text-white max-sm:hover:bg-white/10" onClick={deleteSelected}>
+              <Trash2 className="size-5" />
+            </Button>
+          </div>
+        ) : (
+          <>
         {!inSidebar ? <Button type="button" variant="ghost" size="icon" aria-label="Back to messages" className="size-9 shrink-0 rounded-full text-white hover:bg-white/10 hover:text-white sm:text-foreground sm:hover:bg-accent sm:hover:text-foreground" onClick={() => void navigate({ to: "/messages" })}><ArrowLeft className="size-5" /></Button> : null}
         <button type="button" onClick={() => { if (partner) void navigate({ to: "/u/$username", params: { username: partner.username } }); }} className="flex min-w-0 flex-1 items-center gap-3 text-left" disabled={!partner} aria-label={partner ? `View @${partner.username}'s profile` : undefined}>
           <ProfileAvatar photoUrl={partner?.photo_url} initials={partner?.username?.slice(0, 2) ?? "··"} className="size-10 shrink-0 font-display uppercase" />
@@ -571,19 +693,31 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           </span>
         </button>
         <MessageAppearanceSettings
+          chat={{
+            conversationId: id,
+            partner: partner ?? null,
+            messages,
+            onJumpToMessage: jumpToMessage,
+            onOpenImage: setOpenImageUrl,
+            onLeave: () => void navigate({ to: "/messages" }),
+          }}
           {...(partner?.username ? { contactName: `@${partner.username}` } : {})}
           className="size-10 text-current hover:bg-black/5 hover:text-current max-sm:text-white max-sm:hover:bg-white/10"
         />
+          </>
+        )}
       </header>
 
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <ChatWallpaper look={appearance} />
       <div
         data-chat-area
         className={cn(
-          "min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
-          inSidebar ? cn("space-y-3 pb-4", themedSurface) : cn("bg-black px-3 py-5 text-white sm:bg-background sm:px-6 sm:text-foreground", themedSurface),
+          "relative z-10 h-full min-h-0 overflow-y-auto overscroll-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          inSidebar ? cn("space-y-3 pb-4") : cn("px-3 py-5 text-white sm:px-6 sm:text-foreground"),
         )}
       >
-          <div className={cn("flex flex-col gap-3", !inSidebar && "mx-auto w-full max-w-2xl")}>
+          <div data-chat-list className={cn("flex flex-col gap-3", !inSidebar && "mx-auto w-full max-w-2xl")}>
           {conversation?.hasOlder ? (
             <div className="flex justify-center">
               <Button
@@ -618,14 +752,42 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
               return (
                 <motion.div
                   key={message.id}
+                  id={`msg-${message.id}`}
                   layout
                   initial={{ opacity: 0, y: 10, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
-                  className={cn("flex", mine ? "justify-end" : "justify-start")}
+                  data-selected={selected.has(message.id)}
+                  role={selecting && !message.is_deleted ? "checkbox" : undefined}
+                  aria-checked={selecting && !message.is_deleted ? selected.has(message.id) : undefined}
+                  onPointerDown={(event) => startPress(message, event)}
+                  onPointerUp={cancelPress}
+                  onPointerLeave={cancelPress}
+                  onPointerCancel={cancelPress}
+                  onPointerMove={(event) => {
+                    if (Math.abs(event.movementX) + Math.abs(event.movementY) > 6) cancelPress();
+                  }}
+                  onContextMenu={(event) => {
+                    if (message.is_deleted) return;
+                    event.preventDefault();
+                    if (!selecting) toggleSelect(message);
+                  }}
+                  onClick={() => {
+                    if (selecting) toggleSelect(message);
+                  }}
+                  className={cn(
+                    "relative flex [-webkit-touch-callout:none]",
+                    mine ? "justify-end" : "justify-start",
+                    selecting && "chat-select-row pl-8",
+                  )}
                 >
+                  {selecting && !message.is_deleted ? (
+                    <span className="chat-select-check absolute left-0 top-1/2 -translate-y-1/2" aria-hidden>
+                      <Check className="size-3.5" strokeWidth={3} />
+                    </span>
+                  ) : null}
                   {!mine && showPartnerAvatar ? <ProfileAvatar photoUrl={partner?.photo_url} initials={partner?.username?.slice(0, 2) ?? "··"} className="mb-5 mr-2 size-7 shrink-0 self-end sm:hidden" /> : null}
                   <div
-                    className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start")}
+                    className={cn("flex max-w-[82%] flex-col", mine ? "items-end" : "items-start", selecting && "pointer-events-none")}
                   >
                     {message.is_deleted ? (
                       <div className="rounded-3xl border border-zinc-800 bg-zinc-900 px-4 py-2.5 text-sm italic text-zinc-400 sm:border-border/70 sm:bg-transparent sm:text-muted-foreground">
@@ -651,13 +813,13 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                         {message.body ? (
                           <div
                             className={cn(
-                              "rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-relaxed shadow-sm sm:rounded-3xl sm:text-sm",
+                              "candid-message-bubble rounded-[1.35rem] px-4 py-2.5 text-[15px] leading-relaxed shadow-sm sm:rounded-3xl sm:text-sm",
                               mine
                                 ? "candid-message-sent rounded-br-md bg-gradient-to-br from-primary to-lime-400 text-zinc-950 sm:bg-primary sm:text-primary-foreground"
                                 : "candid-message-received rounded-bl-md bg-[#262626] text-white sm:border sm:border-border sm:bg-card sm:text-foreground",
                             )}
                           >
-                            <p className="whitespace-pre-wrap">{message.body}</p>
+                            <p className="candid-message-text whitespace-pre-wrap">{message.body}</p>
                           </div>
                         ) : null}
                       </>
@@ -751,6 +913,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           <div ref={bottomRef} />
         </div>
       </div>
+      </div>
 
       {conversation && !conversation.can_send ? (
         <div className={cn("shrink-0", !inSidebar && "border-t border-border bg-background p-4")}>
@@ -833,7 +996,7 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
                 value={draft}
                 onChange={(event) => setDraft(event.target.value)}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" && !event.shiftKey) {
+                  if (event.key === "Enter" && !event.shiftKey && behavior.sendOnEnter) {
                     event.preventDefault();
                     if (draft.trim() || imageReceipt) send.mutate();
                   }
@@ -861,6 +1024,8 @@ export function MessagesThread({ id, inSidebar = false }: { id: string; inSideba
           </div>
         </div>
       )}
+
+      <ChatForwardDialog open={forwardOpen} onOpenChange={setForwardOpen} text={selectedText} fromConversationId={id} onDone={clearSelection} />
 
       <Dialog open={Boolean(openImageUrl)} onOpenChange={(open) => !open && setOpenImageUrl(null)}>
         <DialogContent

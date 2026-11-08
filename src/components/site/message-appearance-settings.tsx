@@ -1,3 +1,5 @@
+// The old appearance-only dialog is now the full chat settings hub. This keeps existing imports working.
+export { ChatSettingsHub as MessageAppearanceSettings } from "./chat-settings/hub";
 import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
