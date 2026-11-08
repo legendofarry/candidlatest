@@ -4,11 +4,11 @@ import { getDatabase, type Database } from "firebase/database";
 
 export const firebaseConfig = {
   apiKey: import.meta.env["VITE_FIREBASE_API_KEY"],
-  authDomain: import.meta.env["VITE_FIREBASE_AUTH_DOMAIN"] ?? "candid-bbef5.firebaseapp.com",
-  projectId: import.meta.env["VITE_FIREBASE_PROJECT_ID"] ?? "candid-bbef5",
-  storageBucket: import.meta.env["VITE_FIREBASE_STORAGE_BUCKET"] ?? "candid-bbef5.firebasestorage.app",
-  messagingSenderId: import.meta.env["VITE_FIREBASE_MESSAGING_SENDER_ID"] ?? "524579606484",
-  appId: import.meta.env["VITE_FIREBASE_APP_ID"] ?? "1:524579606484:web:3c22f4436aab4d5ff0d041",
+  authDomain: import.meta.env["VITE_FIREBASE_AUTH_DOMAIN"],
+  projectId: import.meta.env["VITE_FIREBASE_PROJECT_ID"],
+  storageBucket: import.meta.env["VITE_FIREBASE_STORAGE_BUCKET"],
+  messagingSenderId: import.meta.env["VITE_FIREBASE_MESSAGING_SENDER_ID"],
+  appId: import.meta.env["VITE_FIREBASE_APP_ID"],
   databaseURL: import.meta.env["VITE_FIREBASE_DATABASE_URL"] ?? "",
 };
 

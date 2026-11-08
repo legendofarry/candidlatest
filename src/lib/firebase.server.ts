@@ -40,12 +40,12 @@ function parseServiceAccount(): ServiceAccountInput {
     }
   }
 
-  const projectId = process.env["FIREBASE_PROJECT_ID"] ?? "candid-bbef5";
+  const projectId = process.env["FIREBASE_PROJECT_ID"];
   const clientEmail = process.env["FIREBASE_CLIENT_EMAIL"];
   const privateKey = process.env["FIREBASE_PRIVATE_KEY"];
-  if (!clientEmail || !looksLikeKey(privateKey)) {
+  if (!projectId || !clientEmail || !looksLikeKey(privateKey)) {
     throw new Error(
-      "Missing Firebase admin credentials. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.",
+      "Missing Firebase admin credentials. Set FIREBASE_SERVICE_ACCOUNT_JSON or FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL and FIREBASE_PRIVATE_KEY.",
     );
   }
   return { projectId, clientEmail, privateKey: normalizePrivateKey(privateKey) };
@@ -148,7 +148,7 @@ let jwks: ReturnType<typeof createRemoteJWKSet> | undefined;
 export function getFirebaseAuth() {
   return {
     async verifyIdToken(token: string) {
-      const projectId = process.env["FIREBASE_PROJECT_ID"] ?? "candid-bbef5";
+      const { projectId } = parseServiceAccount();
       jwks ??= createRemoteJWKSet(
         new URL(
           "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com",

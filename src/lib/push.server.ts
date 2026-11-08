@@ -35,7 +35,8 @@ export async function dispatchWebPush(userId: string, input: PushMessage) {
     registered = subscriptions.size;
     if (!registered) return { sent: 0, registered };
     const { accessToken, projectId } = await getFirebaseMessagingCredentials();
-    const siteUrl = process.env["PUBLIC_APP_URL"] || "https://candid-beta.netlify.app";
+    const siteUrl =
+      process.env["PUBLIC_APP_URL"] ?? process.env["URL"] ?? "http://localhost:3000";
     const relativeLink = input.link || "/notifications";
     const link = new URL(relativeLink, siteUrl).toString();
     let sent = 0;

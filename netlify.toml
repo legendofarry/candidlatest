@@ -2,5 +2,9 @@
 command = "bun run build"
 publish = "dist"
 
+[build.environment]
+# These values are intentionally delivered to browsers as public client configuration.
+SECRETS_SCAN_OMIT_KEYS = "VITE_FIREBASE_API_KEY,VITE_FIREBASE_AUTH_DOMAIN,VITE_FIREBASE_PROJECT_ID,VITE_FIREBASE_STORAGE_BUCKET,VITE_FIREBASE_MESSAGING_SENDER_ID,VITE_FIREBASE_APP_ID,VITE_FIREBASE_DATABASE_URL,VITE_FIREBASE_VAPID_KEY,VITE_CLOUDINARY_CLOUD_NAME,VITE_CLOUDINARY_UPLOAD_PRESET"
+
 [functions]
 directory = "netlify/functions"

@@ -27,18 +27,9 @@ self.addEventListener("activate", (event) => {
 importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-app-compat.js");
 importScripts("https://www.gstatic.com/firebasejs/12.18.0/firebase-messaging-compat.js");
 
-const fallbackFirebaseConfig = {
-  authDomain: "candid-bbef5.firebaseapp.com",
-  projectId: "candid-bbef5",
-  storageBucket: "candid-bbef5.firebasestorage.app",
-  messagingSenderId: "524579606484",
-  appId: "1:524579606484:web:3c22f4436aab4d5ff0d041",
-};
-let firebaseConfig = fallbackFirebaseConfig;
-try {
-  const configParam = new URL(self.location.href).searchParams.get("firebaseConfig");
-  if (configParam) firebaseConfig = { ...fallbackFirebaseConfig, ...JSON.parse(configParam) };
-} catch { /* Retain the app's default Firebase project config. */ }
+const configParam = new URL(self.location.href).searchParams.get("firebaseConfig");
+if (!configParam) throw new Error("Missing Firebase configuration for the service worker.");
+const firebaseConfig = JSON.parse(configParam);
 firebase.initializeApp(firebaseConfig);
 
 const messaging = firebase.messaging();

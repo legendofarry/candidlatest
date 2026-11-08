@@ -23,7 +23,7 @@ function adminCredential() {
     }
   }
 
-  const projectId = process.env.FIREBASE_PROJECT_ID || "candid-bbef5";
+  const projectId = process.env.FIREBASE_PROJECT_ID;
   const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
   const privateKey = process.env.FIREBASE_PRIVATE_KEY;
   if (clientEmail && privateKey) return cert({ projectId, clientEmail, privateKey: normalizePrivateKey(privateKey) });
@@ -36,7 +36,7 @@ function adminCredential() {
 if (!getApps().length) {
   initializeApp({
     credential: adminCredential(),
-    databaseURL: process.env.FIREBASE_DATABASE_URL || "https://candid-bbef5-default-rtdb.firebaseio.com",
+    databaseURL: process.env.FIREBASE_DATABASE_URL,
   });
 }
 
