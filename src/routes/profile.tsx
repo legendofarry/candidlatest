@@ -46,15 +46,9 @@ import {
 } from "@/components/site/profile-photo";
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { AccountSwitcher } from "@/components/site/account-switcher";
+import { ProfileSettingsSheet } from "@/components/site/profile-settings-sheet";
 import { getPublicProfile } from "@/lib/messaging.functions";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -79,6 +73,7 @@ function ProfilePage() {
   const queryClient = useQueryClient();
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
+  const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
 
   const fetchOnboardingState = useServerFn(getOnboardingState);
   const onboarding = useQuery({
@@ -170,6 +165,38 @@ function ProfilePage() {
           profilePhotoUrl={onboarding.data?.photoUrl ?? null}
         />
       ) : null}
+      {user ? (
+        <ProfileSettingsSheet
+          open={profileSettingsOpen}
+          onOpenChange={setProfileSettingsOpen}
+          username={onboarding.data?.username ?? null}
+          photoUrl={onboarding.data?.photoUrl ?? null}
+          coverUrl={onboarding.data?.coverUrl ?? null}
+          onPhotoSaved={(photoUrl) => {
+            queryClient.setQueryData(
+              ["onboarding-state", user.uid],
+              (previous: unknown) =>
+                previous && typeof previous === "object" ? { ...previous, photoUrl } : previous,
+            );
+            void queryClient.invalidateQueries({ queryKey: ["public-profile"] });
+          }}
+          onCoverSaved={(coverUrl) => {
+            queryClient.setQueryData(
+              ["onboarding-state", user.uid],
+              (previous: unknown) =>
+                previous && typeof previous === "object" ? { ...previous, coverUrl } : previous,
+            );
+            void queryClient.invalidateQueries({ queryKey: ["public-profile"] });
+          }}
+          onEditUsername={() => {
+            setProfileSettingsOpen(false);
+            void navigate({
+              to: "/onboarding",
+              search: { editUsername: Boolean(onboarding.data?.username) },
+            });
+          }}
+        />
+      ) : null}
       <section className="min-h-screen px-3 pb-4 sm:px-5 md:px-8 md:py-8">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
@@ -259,39 +286,17 @@ function ProfilePage() {
                       official={onboarding.data?.accountType === "official"}
                     />
                     {user ? (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Profile and account settings"
-                            title="Profile and account settings"
-                            className="size-8 shrink-0 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
-                          >
-                            <Settings className="size-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-64 rounded-2xl p-1.5">
-                          <DropdownMenuLabel className="px-3 py-2">
-                            Profile & account
-                          </DropdownMenuLabel>
-                          <DropdownMenuItem
-                            asChild
-                            className="min-h-11 cursor-pointer rounded-xl px-3"
-                          >
-                            <Link to="/settings">
-                              <Settings className="size-4 text-primary" />
-                              <span className="flex flex-col">
-                                <span className="font-medium">Settings and updates</span>
-                                <span className="text-xs text-muted-foreground">
-                                  Profile, privacy and preferences
-                                </span>
-                              </span>
-                            </Link>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Profile settings"
+                        title="Profile settings"
+                        className="size-8 shrink-0 rounded-full text-muted-foreground hover:bg-primary/10 hover:text-primary"
+                        onClick={() => setProfileSettingsOpen(true)}
+                      >
+                        <Settings className="size-4" />
+                      </Button>
                     ) : null}
                   </h1>
                   <p className="truncate text-sm text-muted-foreground">
