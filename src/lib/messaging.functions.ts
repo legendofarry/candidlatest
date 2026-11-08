@@ -218,6 +218,31 @@ export const getMessageTheme = createServerFn({ method: "POST" })
     return { theme: await readMessageTheme(context.userId) };
   });
 
+export const getChatPreferences = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .handler(async ({ context }) => {
+    const { readChatPreferences } = await import("./messaging.server");
+    return readChatPreferences(context.userId);
+  });
+
+export const saveChatPreferences = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z.object({ data: z.string().min(2).max(30_000), updated_at: z.number().int().min(0) }).parse(input),
+  )
+  .handler(async ({ context, data }) => {
+    const { saveChatPreferences: save } = await import("./messaging.server");
+    return save(context.userId, data.data, data.updated_at);
+  });
+
+export const getConversationPreferences = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) => z.object({ conversation_id: z.string().min(1).max(200) }).parse(input))
+  .handler(async ({ context, data }) => {
+    const { readConversationPreferences } = await import("./messaging.server");
+    return readConversationPreferences(context.userId, data.conversation_id);
+  });
+
 export const updateMyProfileBio = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
   .inputValidator((input: unknown) => z.object({ bio: z.string().trim().max(500) }).parse(input))

@@ -560,6 +560,53 @@ export async function saveMessageTheme(userId: string, theme: (typeof MESSAGE_TH
   return { message_theme: theme };
 }
 
+const CHAT_PREFS_MAX_CHARS = 30_000;
+
+/** The member's saved chat look and behaviour, shared across their devices. */
+export async function readChatPreferences(userId: string) {
+  const snapshot = await getFirestoreDb().collection("chat_preferences").doc(userId).get();
+  const data = snapshot.data();
+  return {
+    data: typeof data?.data === "string" ? (data.data as string) : null,
+    updated_at: typeof data?.updated_at === "number" ? (data.updated_at as number) : 0,
+  };
+}
+
+export async function saveChatPreferences(userId: string, json: string, updatedAt: number) {
+  if (json.length > CHAT_PREFS_MAX_CHARS) throw new Error("Your chat settings are too large to save.");
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(json);
+  } catch {
+    throw new Error("Your chat settings could not be read.");
+  }
+  const { normalizePrefs, stripPremiumPresets } = await import("./chat-prefs-model.ts");
+  let prefs = normalizePrefs(parsed);
+  const access = await getUserMembershipEntitlements(userId);
+  if (access.tier === "basic") prefs = stripPremiumPresets(prefs);
+  const saved = JSON.stringify(prefs);
+  await getFirestoreDb().collection("chat_preferences").doc(userId).set({
+    user_id: userId,
+    data: saved,
+    updated_at: Math.max(0, Math.floor(updatedAt)),
+    saved_at: now(),
+  });
+  return { ok: true as const, data: saved };
+}
+
+/** Per-member mute / pin / archive state of one conversation. */
+export async function readConversationPreferences(userId: string, conversationId: string) {
+  const snapshot = await getFirestoreDb().collection("conversations").doc(conversationId).get();
+  const conversation = snapshot.data() as ConversationRecord | undefined;
+  if (!snapshot.exists || !conversation?.participant_ids.includes(userId)) throw new Error("Conversation not found.");
+  const preference = conversation.preferences?.[userId] ?? {};
+  return {
+    archived: preference.archived === true,
+    muted: preference.muted === true,
+    pinned: preference.pinned === true,
+  };
+}
+
 export async function saveProfileBio(userId: string, bio: string) {
   const db = getFirestoreDb();
   const normalizedBio = bio.trim();
