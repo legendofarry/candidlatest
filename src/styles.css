@@ -1228,6 +1228,45 @@
   position: absolute;
 }
 
+/* ── All-in-one comment capsule ── */
+.composer-capsule {
+  border-color: color-mix(in oklab, var(--border) 80%, transparent);
+  box-shadow: 0 8px 28px -20px color-mix(in oklab, var(--foreground) 40%, transparent);
+}
+.composer-capsule:focus-within {
+  border-color: color-mix(in oklab, var(--primary) 55%, transparent);
+  box-shadow:
+    0 0 0 4px color-mix(in oklab, var(--primary) 12%, transparent),
+    0 18px 40px -24px color-mix(in oklab, var(--primary) 70%, transparent);
+}
+.composer-send {
+  display: grid;
+  place-items: center;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 999px;
+  color: var(--muted-foreground);
+  background: var(--muted);
+  transform: scale(0.88) rotate(-20deg);
+  transition:
+    transform 0.45s cubic-bezier(0.34, 1.56, 0.64, 1),
+    background 0.3s ease,
+    color 0.3s ease,
+    box-shadow 0.4s ease;
+}
+.composer-capsule[data-ready="true"] .composer-send {
+  color: var(--primary-foreground);
+  background: var(--primary);
+  transform: none;
+  box-shadow: 0 8px 22px -8px color-mix(in oklab, var(--primary) 80%, transparent);
+}
+.composer-send:not(:disabled):active {
+  transform: scale(0.9) translateX(2px);
+}
+.composer-send:disabled {
+  cursor: not-allowed;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .anon-ring,
   .anon-field::after {

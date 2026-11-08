@@ -15,6 +15,8 @@ import {
   updateMessageAppearance,
   useMessageAppearance,
   type AppearancePreset,
+  type BubbleShape,
+  type PatternIntensity,
   type MessageAppearance as MessageAppearanceState,
 } from "@/lib/message-appearance";
 import { cn } from "@/lib/utils";
@@ -54,7 +56,7 @@ function isCustomized(appearance: MessageAppearanceState) {
   const preset = PRESETS[appearance.preset];
   return (
     appearance.wallpaper !== preset.wallpaper ||
-    (appearance.wallpaper === "solid" && appearance.wallpaperColor !== preset.surface) ||
+    ((appearance.wallpaper as string) === "solid" && appearance.wallpaperColor !== preset.surface) ||
     appearance.bubbleColor !== preset.outgoing ||
     appearance.patternIntensity !== "subtle" ||
     appearance.bubbleShape !== "standard" ||
@@ -68,7 +70,7 @@ function textColor(hex: string) {
     .match(/[\da-f]{2}/gi)
     ?.slice(0, 3)
     .map((part) => parseInt(part, 16)) ?? [0, 0, 0];
-  return (rgb[0] * 299 + rgb[1] * 587 + rgb[2] * 114) / 1000 > 150 ? "#202124" : "#ffffff";
+  return ((rgb[0] ?? 0) * 299 + (rgb[1] ?? 0) * 587 + (rgb[2] ?? 0) * 114) / 1000 > 150 ? "#202124" : "#ffffff";
 }
 
 function updateAppearance(

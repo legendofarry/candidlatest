@@ -409,7 +409,7 @@ function WorkplaceStoryComposer() {
         ) === index,
     )
     .slice(0, 8);
-  const areaSuggestions = county ? areasForCounty(county) : allKenyaAreas();
+  const areaSuggestions = (county ? areasForCounty(county) : allKenyaAreas()) ?? [];
   const countyOptions = Object.keys(KENYA_LOCATIONS).sort((a, b) => a.localeCompare(b));
   const popularCounties = ["Nairobi", "Mombasa", "Kisumu", "Nakuru", "Kiambu", "Uasin Gishu"];
   const visibleCounties = showAllCounties ? countyOptions : popularCounties;
