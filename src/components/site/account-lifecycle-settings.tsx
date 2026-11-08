@@ -1,22 +1,12 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { ChevronRight, Clock3, Ellipsis, RotateCcw, Trash2, UserRoundMinus, X } from "lucide-react";
-import { motion, useReducedMotion } from "motion/react";
+import { Clock3, Ellipsis, RotateCcw } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { changeMyAccountLifecycle, getMyAccountLifecycle } from "@/lib/account-lifecycle.functions";
 import { notify } from "@/lib/notifications-store";
 import { Button } from "@/components/ui/button";
-import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AccountControlsSheet } from "@/components/site/account-controls-sheet";
 
 export function AccountLifecycleSettings() {
   const { user } = useAuth();
@@ -25,8 +15,6 @@ export function AccountLifecycleSettings() {
   const changeLifecycle = useServerFn(changeMyAccountLifecycle);
   const [actionsOpen, setActionsOpen] = useState(false);
   const [busy, setBusy] = useState(false);
-  const isMobile = useIsMobile();
-  const reduceMotion = useReducedMotion();
   const { data } = useQuery({
     queryKey: ["account-lifecycle", user?.uid ?? null],
     queryFn: () => getLifecycle(),
@@ -106,6 +94,12 @@ export function AccountLifecycleSettings() {
         </Button>
       ) : null}
 
+      <AccountControlsSheet
+        open={actionsOpen}
+        onOpenChange={setActionsOpen}
+        busy={busy}
+        onSubmit={(action) => void submit(action)}
+      />
       <AlertDialog open={actionsOpen} onOpenChange={setActionsOpen}>
         <AlertDialogContent
           className={
