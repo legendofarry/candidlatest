@@ -1,8 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { motion } from "motion/react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
+import { useCallback, useEffect, useId, useRef, useState } from "react";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -27,14 +27,13 @@ import {
   getStoryForEdit,
   updateStory,
 } from "@/lib/actions.functions";
-import { generateStoryDrafts } from "@/lib/story-draft.functions";
+import { generateStoryField } from "@/lib/story-draft.functions";
 import { findCompanyMatches } from "@/lib/company-match";
 import { knownKenyanEmployers } from "@/lib/kenyan-employers";
 import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { MentionTextarea } from "@/components/site/mention-textarea";
 import { ConfirmDialog } from "@/components/site/confirm-dialog";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
@@ -45,7 +44,6 @@ import { allKenyaAreas, areasForCounty, KENYA_LOCATIONS } from "@/lib/kenya-loca
 import { CommunityPostComposer } from "@/components/site/community-post-composer";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { getPrivacySettings } from "@/lib/messaging.functions";
-import { Switch } from "@/components/ui/switch";
 
 const filtersQuery = queryOptions({ queryKey: ["filters"], queryFn: () => getFilterOptions() });
 
@@ -63,6 +61,22 @@ const REASONS = [
 
 const TENURES = ["Under 6 months", "6–12 months", "1–2 years", "3–5 years", "5+ years"];
 const LEVELS = ["Intern", "Entry level", "Mid level", "Senior", "Management"];
+const STEP_DETAILS = [
+  {
+    title: "Where did you work?",
+    detail: "Start with the employer and a little location context.",
+  },
+  { title: "What made you leave?", detail: "Choose every reason that reflects your experience." },
+  {
+    title: "What was your role?",
+    detail: "A few details help people understand your perspective.",
+  },
+  {
+    title: "Tell it in your own words",
+    detail: "Write it yourself, or draft either field with AI.",
+  },
+  { title: "Review before sharing", detail: "Check the details and keep yourself safe." },
+] as const;
 type StoryDraft = {
   version: 1;
   step: number;
@@ -92,7 +106,7 @@ export const Route = createFileRoute("/post")({
       {
         name: "description",
         content:
-          "Tell Kenyan job seekers why you really left. Four quick steps, screened before publishing.",
+          "Tell Kenyan job seekers why you really left. Five quick steps, screened before publishing.",
       },
       { property: "og:title", content: "Share your exit story" },
       {
@@ -132,10 +146,11 @@ function WorkplaceStoryComposer() {
   const findCompany = useServerFn(findOrCreateCompany);
   const create = useServerFn(createStory);
   const fetchStoryForEdit = useServerFn(getStoryForEdit);
-  const generateStoryDraftsFn = useServerFn(generateStoryDrafts);
+  const generateStoryFieldFn = useServerFn(generateStoryField);
   const update = useServerFn(updateStory);
 
   const [step, setStep] = useState(0);
+  const [stepDirection, setStepDirection] = useState(1);
   const [companyName, setCompanyName] = useState("");
   const [employerSuggestionsOpen, setEmployerSuggestionsOpen] = useState(false);
   const [industry, setIndustry] = useState("");
@@ -153,16 +168,7 @@ function WorkplaceStoryComposer() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [anonymous, setAnonymous] = useState(false);
-  const [aiAssistOpen, setAiAssistOpen] = useState(false);
-  const [aiContext, setAiContext] = useState("");
-  const [aiDrafts, setAiDrafts] = useState<{
-    variants: {
-      title: string;
-      body: string;
-      approach: "direct" | "conversational" | "reflective";
-    }[];
-  } | null>(null);
-  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiGeneratingField, setAiGeneratingField] = useState<"title" | "body" | null>(null);
   const [wouldReturn, setWouldReturn] = useState<boolean | null>(null);
   const [publishError, setPublishError] = useState("");
   const [editLoading, setEditLoading] = useState(Boolean(editStoryId));
@@ -172,6 +178,9 @@ function WorkplaceStoryComposer() {
   const [savedDraftKey, setSavedDraftKey] = useState<string | null>(null);
   const [draftReadyForUser, setDraftReadyForUser] = useState<string | null>(null);
   const storageFailureNotified = useRef(false);
+  const stepAnswersRef = useRef<HTMLDivElement>(null);
+  const reduceMotion = Boolean(useReducedMotion());
+  const aiDescriptionId = useId();
   const storyDraftUserId = user?.uid;
   const isEditing = Boolean(editStoryId);
 
@@ -219,11 +228,18 @@ function WorkplaceStoryComposer() {
     };
   }, [editStoryId, fetchStoryForEdit, user]);
 
-  async function generateAiStoryDrafts() {
-    setAiGenerating(true);
+  function goToStep(nextStep: number) {
+    setStepDirection(nextStep >= step ? 1 : -1);
+    setStep(nextStep);
+  }
+
+  async function generateAiStoryField(field: "title" | "body") {
+    if (aiGeneratingField) return;
+    setAiGeneratingField(field);
     try {
-      const result = await generateStoryDraftsFn({
+      const result = await generateStoryFieldFn({
         data: {
+          field,
           company: companyName,
           industry,
           county,
@@ -233,16 +249,15 @@ function WorkplaceStoryComposer() {
           tenure,
           roleLevel,
           wouldReturn,
-          storyNotes: aiContext,
-          currentTitle: title,
-          currentBody: body,
+          currentValue: field === "title" ? title : body,
         },
       });
-      setAiDrafts(result);
+      if (field === "title") setTitle(result.value);
+      else setBody(result.value);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not generate story drafts.");
+      toast.error(error instanceof Error ? error.message : "Could not draft this field.");
     } finally {
-      setAiGenerating(false);
+      setAiGeneratingField(null);
     }
   }
 
@@ -280,6 +295,13 @@ function WorkplaceStoryComposer() {
   };
   const storyDraftKey = JSON.stringify(storyDraft);
   const hasUnsavedDraftChanges = dirty && savedDraftKey !== storyDraftKey;
+
+  useEffect(() => {
+    stepAnswersRef.current?.scrollTo({
+      top: 0,
+      behavior: reduceMotion ? "auto" : "smooth",
+    });
+  }, [reduceMotion, step]);
 
   useEffect(() => {
     if (isEditing || !storyDraftUserId) {
@@ -583,7 +605,7 @@ function WorkplaceStoryComposer() {
 
           <div className="flex h-full min-h-0 flex-col overflow-hidden p-0 md:items-center md:p-8">
             <div className="flex min-h-0 w-full flex-1 flex-col">
-              <header className="z-20 shrink-0 border-b border-border bg-background px-4 pb-3 pt-3 md:border-0 md:px-0 md:pb-0 md:pt-0">
+              <header className="z-20 shrink-0 border-b border-border bg-background/95 px-4 pb-4 pt-3 backdrop-blur-xl md:border-0 md:bg-transparent md:px-0 md:pb-0 md:pt-0 md:backdrop-blur-none">
                 {account?.accountType === "official" &&
                 account.username === "candid" &&
                 !isEditing ? (
@@ -593,23 +615,49 @@ function WorkplaceStoryComposer() {
                     </Link>
                   </Button>
                 ) : null}
-                <h1 className="text-3xl font-semibold md:text-4xl">
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl md:text-4xl">
                   {isEditing ? "Edit your story" : "Share your exit story"}
                 </h1>
-                <div className="mt-4 flex gap-1.5">
-                  {steps.map((label, index) => (
-                    <div
-                      key={label}
-                      className={cn(
-                        "h-1.5 flex-1 rounded-full bg-secondary transition-colors",
-                        index <= step && "bg-primary",
-                      )}
-                    />
-                  ))}
+                <div
+                  className="mt-4 h-1.5 overflow-hidden rounded-full bg-secondary"
+                  role="progressbar"
+                  aria-label="Story completion"
+                  aria-valuemin={1}
+                  aria-valuemax={steps.length}
+                  aria-valuenow={step + 1}
+                  aria-valuetext={`Step ${step + 1} of ${steps.length}: ${steps[step]}`}
+                >
+                  <motion.div
+                    className="h-full rounded-full bg-primary"
+                    initial={false}
+                    animate={{ width: `${((step + 1) / steps.length) * 100}%` }}
+                    transition={
+                      reduceMotion
+                        ? { duration: 0 }
+                        : { type: "spring", stiffness: 180, damping: 26 }
+                    }
+                  />
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  Step {step + 1} of {steps.length} · {steps[step]}
-                </p>
+                <div className="mt-3 flex items-start justify-between gap-3">
+                  <AnimatePresence mode="wait" initial={false}>
+                    <motion.div
+                      key={step}
+                      initial={reduceMotion ? false : { opacity: 0, y: 6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={reduceMotion ? undefined : { opacity: 0, y: -4 }}
+                      transition={{ duration: reduceMotion ? 0 : 0.18 }}
+                      aria-live="polite"
+                    >
+                      <p className="text-sm font-semibold">{STEP_DETAILS[step]?.title}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {STEP_DETAILS[step]?.detail}
+                      </p>
+                    </motion.div>
+                  </AnimatePresence>
+                  <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-[11px] font-semibold tabular-nums text-muted-foreground">
+                    {String(step + 1).padStart(2, "0")} / {String(steps.length).padStart(2, "0")}
+                  </span>
+                </div>
               </header>
 
               <div className="grid min-h-0 flex-1 gap-6 px-4 md:px-0 xl:grid-cols-[minmax(0,1fr)_20rem]">
@@ -618,161 +666,180 @@ function WorkplaceStoryComposer() {
                     role="region"
                     tabIndex={0}
                     aria-label="Story answers"
+                    ref={stepAnswersRef}
                     className="min-h-0 flex-1 overflow-y-auto overscroll-contain py-4 md:py-5"
                   >
-                    <div className="space-y-5">
-                      {step === 0 ? (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="company">Who was your employer?</Label>
-                            <div className="relative z-30">
-                              <Input
-                                id="company"
-                                value={companyName}
-                                role="combobox"
-                                aria-autocomplete="list"
-                                aria-expanded={
-                                  employerSuggestionsOpen &&
-                                  (companySuggestions.length > 0 || Boolean(companyName.trim()))
-                                }
-                                aria-controls="employer-suggestions"
-                                onFocus={() => setEmployerSuggestionsOpen(true)}
-                                onBlur={(event) => {
-                                  const nextTarget = event.relatedTarget;
-                                  if (
-                                    !(nextTarget instanceof Node) ||
-                                    !event.currentTarget.parentElement?.contains(nextTarget)
-                                  ) {
-                                    setEmployerSuggestionsOpen(false);
+                    <AnimatePresence initial={false} mode="wait" custom={stepDirection}>
+                      <motion.div
+                        key={step}
+                        custom={stepDirection}
+                        initial={reduceMotion ? false : { opacity: 0, x: stepDirection * 20 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={reduceMotion ? undefined : { opacity: 0, x: stepDirection * -12 }}
+                        transition={
+                          reduceMotion
+                            ? { duration: 0 }
+                            : { type: "spring", stiffness: 280, damping: 28, mass: 0.7 }
+                        }
+                        className="space-y-5"
+                      >
+                        {step === 0 ? (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="company">Who was your employer?</Label>
+                              <div className="relative z-30">
+                                <Input
+                                  id="company"
+                                  value={companyName}
+                                  role="combobox"
+                                  aria-autocomplete="list"
+                                  aria-expanded={
+                                    employerSuggestionsOpen &&
+                                    (companySuggestions.length > 0 || Boolean(companyName.trim()))
                                   }
-                                }}
-                                onChange={(event) => {
-                                  setCompanyName(event.target.value);
-                                  setIndustry("");
-                                  setEmployerSuggestionsOpen(true);
-                                }}
-                                onKeyDown={(event) => {
-                                  if (event.key === "Escape") setEmployerSuggestionsOpen(false);
-                                }}
-                                placeholder="e.g. Sky Minimart, Naivas, a boda stage"
-                                autoComplete="off"
-                              />
-                              {employerSuggestionsOpen &&
-                              (companySuggestions.length > 0 || companyName.trim()) ? (
-                                <div
-                                  id="employer-suggestions"
-                                  role="listbox"
-                                  aria-label="Employer suggestions"
-                                  className="absolute inset-x-0 top-[calc(100%+0.35rem)] z-50 max-h-64 overflow-y-auto rounded-2xl border border-border bg-background p-1.5 shadow-xl"
-                                >
-                                  {companySuggestions.map((match) => (
-                                    <button
-                                      key={`${match.name}-${match.industry}`}
-                                      type="button"
-                                      role="option"
-                                      aria-selected={companyName === match.name}
-                                      onMouseDown={(event) => event.preventDefault()}
-                                      onClick={() => {
-                                        setCompanyName(match.name);
-                                        if (match.industry) setIndustry(match.industry);
-                                        setEmployerSuggestionsOpen(false);
-                                      }}
-                                      className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-secondary focus-visible:bg-secondary"
-                                    >
-                                      <Building2 className="size-4 shrink-0 text-primary" />
-                                      <span className="min-w-0 flex-1 truncate">{match.name}</span>
-                                      <span className="max-w-[45%] shrink-0 truncate text-[10px] text-muted-foreground">
-                                        {match.industry || "Known employer"}
-                                      </span>
-                                      {match.verified ? <CompanyVerifiedBadge /> : null}
-                                    </button>
-                                  ))}
-                                  {companyName.trim() ? (
-                                    <button
-                                      type="button"
-                                      role="option"
-                                      aria-selected={false}
-                                      onMouseDown={(event) => event.preventDefault()}
-                                      onClick={() => setEmployerSuggestionsOpen(false)}
-                                      className="mt-1 w-full border-t border-border px-3 py-2.5 text-left text-xs text-muted-foreground hover:bg-secondary"
-                                    >
-                                      {companySuggestions.length
-                                        ? `Continue with “${companyName.trim()}” as entered`
-                                        : `Use “${companyName.trim()}” as a new employer`}
-                                    </button>
-                                  ) : null}
-                                </div>
-                              ) : null}
-                            </div>
-                            <p className="rounded-xl border border-border bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
-                              The company name always appears on a published story. Your Candid
-                              username appears as the author; your account email and legal name are
-                              not shown. Avoid details that could identify you personally.
-                            </p>
-                          </div>
-                          <ChipField
-                            label="What kind of work do they do? (industry)"
-                            options={filters.industries}
-                            value={industry}
-                            onChange={setIndustry}
-                          />
-                          <div className="space-y-2">
-                            <Label>County</Label>
-                            <div className="flex flex-wrap gap-2">
-                              {visibleCounties.map((option) => (
-                                <button
-                                  key={option}
-                                  type="button"
-                                  onClick={() => {
-                                    setCounty(option);
-                                    setArea("");
-                                    setShowAllAreas(false);
+                                  aria-controls="employer-suggestions"
+                                  onFocus={() => setEmployerSuggestionsOpen(true)}
+                                  onBlur={(event) => {
+                                    const nextTarget = event.relatedTarget;
+                                    if (
+                                      !(nextTarget instanceof Node) ||
+                                      !event.currentTarget.parentElement?.contains(nextTarget)
+                                    ) {
+                                      setEmployerSuggestionsOpen(false);
+                                    }
                                   }}
-                                  className={cn(
-                                    "rounded-full border px-3 py-1.5 text-sm transition-colors",
-                                    county === option
-                                      ? "border-primary bg-primary/10 text-foreground"
-                                      : "border-border text-muted-foreground hover:text-foreground",
-                                  )}
-                                >
-                                  {option}
-                                </button>
-                              ))}
-                              {!showAllCounties ? (
-                                <button
-                                  type="button"
-                                  onClick={() => setShowAllCounties(true)}
-                                  className="rounded-full px-3 py-1.5 text-sm font-medium text-primary"
-                                >
-                                  +{Math.max(0, countyOptions.length - popularCounties.length)} more
-                                </button>
-                              ) : null}
+                                  onChange={(event) => {
+                                    setCompanyName(event.target.value);
+                                    setIndustry("");
+                                    setEmployerSuggestionsOpen(true);
+                                  }}
+                                  onKeyDown={(event) => {
+                                    if (event.key === "Escape") setEmployerSuggestionsOpen(false);
+                                  }}
+                                  placeholder="e.g. Sky Minimart, Naivas, a boda stage"
+                                  autoComplete="off"
+                                />
+                                {employerSuggestionsOpen &&
+                                (companySuggestions.length > 0 || companyName.trim()) ? (
+                                  <div
+                                    id="employer-suggestions"
+                                    role="listbox"
+                                    aria-label="Employer suggestions"
+                                    className="absolute inset-x-0 top-[calc(100%+0.35rem)] z-50 max-h-64 overflow-y-auto rounded-2xl border border-border bg-background p-1.5 shadow-xl"
+                                  >
+                                    {companySuggestions.map((match) => (
+                                      <button
+                                        key={`${match.name}-${match.industry}`}
+                                        type="button"
+                                        role="option"
+                                        aria-selected={companyName === match.name}
+                                        onMouseDown={(event) => event.preventDefault()}
+                                        onClick={() => {
+                                          setCompanyName(match.name);
+                                          if (match.industry) setIndustry(match.industry);
+                                          setEmployerSuggestionsOpen(false);
+                                        }}
+                                        className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm transition hover:bg-secondary focus-visible:bg-secondary"
+                                      >
+                                        <Building2 className="size-4 shrink-0 text-primary" />
+                                        <span className="min-w-0 flex-1 truncate">
+                                          {match.name}
+                                        </span>
+                                        <span className="max-w-[45%] shrink-0 truncate text-[10px] text-muted-foreground">
+                                          {match.industry || "Known employer"}
+                                        </span>
+                                        {match.verified ? <CompanyVerifiedBadge /> : null}
+                                      </button>
+                                    ))}
+                                    {companyName.trim() ? (
+                                      <button
+                                        type="button"
+                                        role="option"
+                                        aria-selected={false}
+                                        onMouseDown={(event) => event.preventDefault()}
+                                        onClick={() => setEmployerSuggestionsOpen(false)}
+                                        className="mt-1 w-full border-t border-border px-3 py-2.5 text-left text-xs text-muted-foreground hover:bg-secondary"
+                                      >
+                                        {companySuggestions.length
+                                          ? `Continue with “${companyName.trim()}” as entered`
+                                          : `Use “${companyName.trim()}” as a new employer`}
+                                      </button>
+                                    ) : null}
+                                  </div>
+                                ) : null}
+                              </div>
+                              <p className="rounded-xl border border-border bg-secondary/40 p-3 text-xs leading-relaxed text-muted-foreground">
+                                The company name always appears on a published story. Your Candid
+                                username appears as the author; your account email and legal name
+                                are not shown. Avoid details that could identify you personally.
+                              </p>
                             </div>
-                            <Input
-                              aria-label="Or enter a county"
-                              value={county}
-                              onChange={(event) => {
-                                setCounty(event.target.value);
-                                setArea("");
-                              }}
-                              placeholder="Or type a county"
-                              maxLength={80}
+                            <ChipField
+                              label="What kind of work do they do? (industry)"
+                              options={filters.industries}
+                              value={industry}
+                              onChange={setIndustry}
                             />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="work-area">
-                              Which area did you work in? (optional)
-                            </Label>
-                            {county && areaSuggestions.length ? (
+                            <div className="space-y-2">
+                              <Label>County</Label>
                               <div className="flex flex-wrap gap-2">
-                                {(showAllAreas ? areaSuggestions : areaSuggestions.slice(0, 6)).map(
-                                  (suggestion) => (
+                                {visibleCounties.map((option) => (
+                                  <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => {
+                                      setCounty(option);
+                                      setArea("");
+                                      setShowAllAreas(false);
+                                    }}
+                                    className={cn(
+                                      "rounded-full border px-3 py-1.5 text-sm transition-all duration-200 active:scale-[0.97]",
+                                      county === option
+                                        ? "border-primary bg-primary/10 text-foreground"
+                                        : "border-border text-muted-foreground hover:text-foreground",
+                                    )}
+                                  >
+                                    {option}
+                                  </button>
+                                ))}
+                                {!showAllCounties ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowAllCounties(true)}
+                                    className="rounded-full px-3 py-1.5 text-sm font-medium text-primary"
+                                  >
+                                    +{Math.max(0, countyOptions.length - popularCounties.length)}{" "}
+                                    more
+                                  </button>
+                                ) : null}
+                              </div>
+                              <Input
+                                aria-label="Or enter a county"
+                                value={county}
+                                onChange={(event) => {
+                                  setCounty(event.target.value);
+                                  setArea("");
+                                }}
+                                placeholder="Or type a county"
+                                maxLength={80}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="work-area">
+                                Which area did you work in? (optional)
+                              </Label>
+                              {county && areaSuggestions.length ? (
+                                <div className="flex flex-wrap gap-2">
+                                  {(showAllAreas
+                                    ? areaSuggestions
+                                    : areaSuggestions.slice(0, 6)
+                                  ).map((suggestion) => (
                                     <button
                                       key={suggestion}
                                       type="button"
                                       onClick={() => setArea(suggestion)}
                                       className={cn(
-                                        "rounded-full border px-3 py-1.5 text-sm transition-colors",
+                                        "rounded-full border px-3 py-1.5 text-sm transition-all duration-200 active:scale-[0.97]",
                                         area === suggestion
                                           ? "border-primary bg-primary/10 text-foreground"
                                           : "border-border text-muted-foreground hover:text-foreground",
@@ -780,432 +847,343 @@ function WorkplaceStoryComposer() {
                                     >
                                       {suggestion}
                                     </button>
-                                  ),
-                                )}
-                                {areaSuggestions.length > 6 && !showAllAreas ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setShowAllAreas(true)}
-                                    className="rounded-full px-3 py-1.5 text-sm font-medium text-primary"
-                                  >
-                                    See all areas
-                                  </button>
-                                ) : null}
-                              </div>
-                            ) : null}
-                            <Input
-                              id="work-area"
-                              value={area}
-                              onChange={(event) => setArea(event.target.value)}
-                              list="candid-work-areas"
-                              maxLength={100}
-                              placeholder="Choose a suggestion or type an area"
-                            />
-                            <datalist id="candid-work-areas">
-                              {(areaSuggestions ?? []).map((suggestion) => (
-                                <option key={suggestion} value={suggestion} />
-                              ))}
-                            </datalist>
-                            <p className="text-xs text-muted-foreground">
-                              Choose an area under the county, type another, or leave it blank.
-                            </p>
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="company-map">Public workplace map pin (optional)</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                id="company-map"
-                                value={companyMapUrl}
-                                onChange={(event) => setCompanyMapUrl(event.target.value)}
-                                maxLength={500}
-                                placeholder="Paste a Google Maps link"
-                              />
-                              <Button
-                                type="button"
-                                variant="outline"
-                                disabled={pinningLocation}
-                                onClick={pinCurrentLocation}
-                                className="shrink-0"
-                              >
-                                {pinningLocation ? (
-                                  <LoaderCircle className="size-4 animate-spin" />
-                                ) : (
-                                  <MapPin className="size-4" />
-                                )}
-                                <span className="hidden sm:inline">Use location</span>
-                              </Button>
-                            </div>
-                            <p className="text-xs text-muted-foreground">
-                              If you add a pin, its exact location is shown on the published story
-                              map. County and area are shown separately either way.
-                            </p>
-                          </div>
-                        </>
-                      ) : null}
-
-                      {step === 1 ? (
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <Label>Why did you leave? Pick all that apply</Label>
-                            <div className="flex flex-wrap gap-1.5">
-                              {REASONS.map((reason) => (
-                                <button
-                                  key={reason}
-                                  type="button"
-                                  onClick={() =>
-                                    setReasons((current) =>
-                                      current.includes(reason)
-                                        ? current.filter((item) => item !== reason)
-                                        : [...current, reason],
-                                    )
-                                  }
-                                  className={cn(
-                                    "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
-                                    reasons.includes(reason) &&
-                                      "border-primary/50 bg-primary/10 text-foreground",
-                                  )}
-                                >
-                                  {reason}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="space-y-2">
-                            <Label htmlFor="custom-reason">Or type your own</Label>
-                            <Input
-                              id="custom-reason"
-                              value={customReason}
-                              onChange={(event) => {
-                                const value = event.target.value;
-                                if (value.endsWith(",")) {
-                                  addCustomReason(value);
-                                } else {
-                                  setCustomReason(value);
-                                }
-                              }}
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter") {
-                                  event.preventDefault();
-                                  addCustomReason(customReason);
-                                }
-                              }}
-                              placeholder="Type a reason, then press Enter or comma"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Each comma or Enter saves it as its own reason.
-                            </p>
-                            {reasons.filter((r) => !(REASONS as readonly string[]).includes(r))
-                              .length > 0 ? (
-                              <div className="flex flex-wrap gap-1.5 pt-1">
-                                {reasons
-                                  .filter((r) => !(REASONS as readonly string[]).includes(r))
-                                  .map((reason) => (
-                                    <span
-                                      key={reason}
-                                      className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm"
-                                    >
-                                      {reason}
-                                      <button
-                                        type="button"
-                                        aria-label={`Remove ${reason}`}
-                                        onClick={() =>
-                                          setReasons((current) =>
-                                            current.filter((item) => item !== reason),
-                                          )
-                                        }
-                                      >
-                                        <X className="size-3.5" />
-                                      </button>
-                                    </span>
                                   ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        </div>
-                      ) : null}
-
-                      {step === 2 ? (
-                        <>
-                          <div className="space-y-2">
-                            <Label htmlFor="position">What was your job title there?</Label>
-                            <Input
-                              id="position"
-                              value={position}
-                              onChange={(event) => setPosition(event.target.value)}
-                              placeholder="e.g. Cashier, Graphic Designer, Accountant, Rider"
-                            />
-                            <p className="text-xs text-muted-foreground">
-                              Different positions are paid and treated differently — this keeps your
-                              story (and salary data) accurate.
-                            </p>
-                          </div>
-                          <ChipField
-                            label="How long did you work there?"
-                            options={TENURES}
-                            value={tenure}
-                            onChange={setTenure}
-                          />
-                          <ChipField
-                            label="How senior were you?"
-                            options={LEVELS}
-                            value={roleLevel}
-                            onChange={setRoleLevel}
-                          />
-                          <div className="space-y-2">
-                            <Label>Would you work here again?</Label>
-                            <div className="flex gap-2">
-                              {[
-                                { label: "Yes", value: true },
-                                { label: "No", value: false },
-                              ].map((option) => (
-                                <button
-                                  key={option.label}
-                                  type="button"
-                                  onClick={() => setWouldReturn(option.value)}
-                                  className={cn(
-                                    "rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground",
-                                    wouldReturn === option.value &&
-                                      "border-primary/50 bg-primary/10 text-foreground",
-                                  )}
-                                >
-                                  {option.label}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        </>
-                      ) : null}
-
-                      {step === 3 ? (
-                        <>
-                          {!isEditing ? (
-                            <section
-                              className={cn(
-                                "overflow-hidden rounded-2xl border transition-colors",
-                                aiAssistOpen
-                                  ? "border-primary/35 bg-primary/[0.035]"
-                                  : "border-border/80 bg-card/60",
-                              )}
-                            >
-                              <div className="flex items-center gap-3 p-3.5 sm:p-4">
-                                <span
-                                  className={cn(
-                                    "grid size-10 shrink-0 place-items-center rounded-xl transition-colors",
-                                    aiAssistOpen
-                                      ? "bg-primary text-primary-foreground"
-                                      : "bg-secondary text-muted-foreground",
-                                  )}
-                                >
-                                  <Sparkles className="size-5" />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                  <Label
-                                    htmlFor="ai-story-assist"
-                                    className="text-sm font-semibold"
-                                  >
-                                    AI writing assist
-                                  </Label>
-                                  <p className="mt-0.5 text-xs text-muted-foreground">
-                                    Optional · your story stays yours
-                                  </p>
-                                </div>
-                                <Switch
-                                  id="ai-story-assist"
-                                  checked={aiAssistOpen}
-                                  onCheckedChange={setAiAssistOpen}
-                                  disabled={aiGenerating}
-                                  aria-label="Use AI writing assist"
-                                />
-                              </div>
-                              {aiAssistOpen ? (
-                                <div className="space-y-3 border-t border-border/70 px-3.5 py-4 sm:px-4">
-                                  <div className="space-y-1">
-                                    <Label htmlFor="ai-story-notes" className="text-xs font-medium">
-                                      What actually happened?{" "}
-                                      <span className="font-normal text-muted-foreground">
-                                        (optional, but makes drafts more personal)
-                                      </span>
-                                    </Label>
-                                    <Textarea
-                                      id="ai-story-notes"
-                                      rows={3}
-                                      maxLength={1800}
-                                      value={aiContext}
-                                      onChange={(event) => {
-                                        setAiContext(event.target.value);
-                                        setAiDrafts(null);
-                                      }}
-                                      placeholder="Add the real details you want included. Avoid naming individual colleagues."
-                                      className="resize-y bg-background/80 text-sm"
-                                    />
-                                    <p className="text-right text-[11px] text-muted-foreground">
-                                      {aiContext.length}/1800
-                                    </p>
-                                  </div>
-                                  <div className="flex flex-col gap-3 rounded-xl bg-background/70 p-3 sm:flex-row sm:items-center sm:justify-between">
-                                    <p className="text-xs leading-relaxed text-muted-foreground">
-                                      Your answers and notes are sent to our AI provider to create
-                                      drafts. It may make mistakes—review every detail before use.
-                                      Up to 5 generations daily.
-                                    </p>
-                                    <Button
+                                  {areaSuggestions.length > 6 && !showAllAreas ? (
+                                    <button
                                       type="button"
-                                      variant="outline"
-                                      size="sm"
-                                      disabled={aiGenerating}
-                                      onClick={() => void generateAiStoryDrafts()}
-                                      className="shrink-0"
+                                      onClick={() => setShowAllAreas(true)}
+                                      className="rounded-full px-3 py-1.5 text-sm font-medium text-primary"
                                     >
-                                      {aiGenerating ? (
-                                        <LoaderCircle className="size-4 animate-spin" />
-                                      ) : aiDrafts ? (
-                                        <RefreshCw className="size-4" />
-                                      ) : (
-                                        <Sparkles className="size-4" />
-                                      )}
-                                      {aiGenerating
-                                        ? "Creating drafts…"
-                                        : aiDrafts
-                                          ? "Try three more"
-                                          : "Create 3 drafts"}
-                                    </Button>
-                                  </div>
-                                  {aiDrafts ? (
-                                    <div className="space-y-3" aria-live="polite">
-                                      {aiDrafts.variants.map((draft, index) => (
-                                        <article
-                                          key={`${draft.approach}-${index}`}
-                                          className="rounded-xl border border-border/80 bg-background/80 p-3.5"
-                                        >
-                                          <div className="mb-2 flex items-center justify-between gap-2">
-                                            <span className="inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-primary">
-                                              <Sparkles className="size-3.5" />
-                                              {draft.approach}
-                                            </span>
-                                            <Button
-                                              type="button"
-                                              size="sm"
-                                              onClick={() => {
-                                                setTitle(draft.title);
-                                                setBody(draft.body);
-                                              }}
-                                            >
-                                              Use this draft
-                                            </Button>
-                                          </div>
-                                          <h3 className="font-semibold">{draft.title}</h3>
-                                          <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-muted-foreground">
-                                            {draft.body}
-                                          </p>
-                                        </article>
-                                      ))}
-                                    </div>
+                                      See all areas
+                                    </button>
                                   ) : null}
                                 </div>
                               ) : null}
-                            </section>
-                          ) : null}
-                          <div className="space-y-2">
-                            <Label htmlFor="title">Headline</Label>
-                            <Input
-                              id="title"
-                              value={title}
-                              onChange={(event) => setTitle(event.target.value)}
-                              placeholder="Three months of salary paid late, every time"
-                            />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="body">Your story</Label>
-                            <div
-                              className={cn(
-                                "anon-field relative overflow-hidden rounded-2xl border bg-card/80",
-                                !anonymous && "border-border/80",
-                              )}
-                              data-anon={anonymous}
-                            >
-                              <MentionTextarea
-                                id="body"
-                                rows={10}
-                                value={body}
-                                onValueChange={setBody}
-                                placeholder="What happened, how it affected you, and what a job seeker should know. Describe roles, not names."
-                                className="min-h-[10rem] resize-y border-0 bg-transparent px-3 pb-12 pt-3 shadow-none focus-visible:ring-0"
+                              <Input
+                                id="work-area"
+                                value={area}
+                                onChange={(event) => setArea(event.target.value)}
+                                list="candid-work-areas"
+                                maxLength={100}
+                                placeholder="Choose a suggestion or type an area"
                               />
-                              <div className="pointer-events-none absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-background via-background/70 to-transparent" />
-                              {!isEditing ? (
-                                <AnonymousPostingToggle
-                                  anonymous={anonymous}
-                                  onToggle={() => setAnonymous((value) => !value)}
-                                  user={user}
-                                  className="absolute bottom-2 right-2 z-10"
+                              <datalist id="candid-work-areas">
+                                {(areaSuggestions ?? []).map((suggestion) => (
+                                  <option key={suggestion} value={suggestion} />
+                                ))}
+                              </datalist>
+                              <p className="text-xs text-muted-foreground">
+                                Choose an area under the county, type another, or leave it blank.
+                              </p>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="company-map">
+                                Public workplace map pin (optional)
+                              </Label>
+                              <div className="flex gap-2">
+                                <Input
+                                  id="company-map"
+                                  value={companyMapUrl}
+                                  onChange={(event) => setCompanyMapUrl(event.target.value)}
+                                  maxLength={500}
+                                  placeholder="Paste a Google Maps link"
                                 />
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  disabled={pinningLocation}
+                                  onClick={pinCurrentLocation}
+                                  className="shrink-0"
+                                >
+                                  {pinningLocation ? (
+                                    <LoaderCircle className="size-4 animate-spin" />
+                                  ) : (
+                                    <MapPin className="size-4" />
+                                  )}
+                                  <span className="hidden sm:inline">Use location</span>
+                                </Button>
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                If you add a pin, its exact location is shown on the published story
+                                map. County and area are shown separately either way.
+                              </p>
+                            </div>
+                          </>
+                        ) : null}
+
+                        {step === 1 ? (
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Why did you leave? Pick all that apply</Label>
+                              <div className="flex flex-wrap gap-1.5">
+                                {REASONS.map((reason) => (
+                                  <button
+                                    key={reason}
+                                    type="button"
+                                    onClick={() =>
+                                      setReasons((current) =>
+                                        current.includes(reason)
+                                          ? current.filter((item) => item !== reason)
+                                          : [...current, reason],
+                                      )
+                                    }
+                                    className={cn(
+                                      "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition-all duration-200 active:scale-[0.97]",
+                                      reasons.includes(reason) &&
+                                        "border-primary/50 bg-primary/10 text-foreground",
+                                    )}
+                                  >
+                                    {reason}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor="custom-reason">Or type your own</Label>
+                              <Input
+                                id="custom-reason"
+                                value={customReason}
+                                onChange={(event) => {
+                                  const value = event.target.value;
+                                  if (value.endsWith(",")) {
+                                    addCustomReason(value);
+                                  } else {
+                                    setCustomReason(value);
+                                  }
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter") {
+                                    event.preventDefault();
+                                    addCustomReason(customReason);
+                                  }
+                                }}
+                                placeholder="Type a reason, then press Enter or comma"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Each comma or Enter saves it as its own reason.
+                              </p>
+                              {reasons.filter((r) => !(REASONS as readonly string[]).includes(r))
+                                .length > 0 ? (
+                                <div className="flex flex-wrap gap-1.5 pt-1">
+                                  {reasons
+                                    .filter((r) => !(REASONS as readonly string[]).includes(r))
+                                    .map((reason) => (
+                                      <span
+                                        key={reason}
+                                        className="inline-flex items-center gap-1.5 rounded-full border border-primary/50 bg-primary/10 px-3 py-1.5 text-sm"
+                                      >
+                                        {reason}
+                                        <button
+                                          type="button"
+                                          aria-label={`Remove ${reason}`}
+                                          onClick={() =>
+                                            setReasons((current) =>
+                                              current.filter((item) => item !== reason),
+                                            )
+                                          }
+                                        >
+                                          <X className="size-3.5" />
+                                        </button>
+                                      </span>
+                                    ))}
+                                </div>
                               ) : null}
                             </div>
-                            <p className="text-xs text-muted-foreground">
-                              {body.trim().length} characters (min 60)
-                            </p>
                           </div>
-                        </>
-                      ) : null}
+                        ) : null}
 
-                      {step === 4 ? (
-                        <div className="space-y-4 text-sm">
-                          <h2 className="text-lg font-semibold">
-                            {isEditing ? "Review your changes" : "Before you publish"}
-                          </h2>
-                          {isEditing ? (
-                            <p className="rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
-                              Editing the employer is allowed. Any change will send the full story
-                              for moderator approval, and it will be hidden until approved. Existing
-                              private evidence, if any, will be retained.
-                            </p>
-                          ) : null}
-                          <ul className="space-y-2 text-muted-foreground">
-                            <li>
-                              · Your Candid handle appears with the story. Your email and legal name
-                              are never shown.
-                            </li>
-                            <li>· Do not name individual colleagues, managers or clients.</li>
-                            <li>· Stick to what you experienced or can describe factually.</li>
-                            <li>
-                              · Automated AI reads each full story. Clear, low-risk stories may go
-                              live right away; uncertain or sensitive cases wait for moderator
-                              review.
-                            </li>
-                          </ul>
+                        {step === 2 ? (
+                          <>
+                            <div className="space-y-2">
+                              <Label htmlFor="position">What was your job title there?</Label>
+                              <Input
+                                id="position"
+                                value={position}
+                                onChange={(event) => setPosition(event.target.value)}
+                                placeholder="e.g. Cashier, Graphic Designer, Accountant, Rider"
+                              />
+                              <p className="text-xs text-muted-foreground">
+                                Different positions are paid and treated differently — this keeps
+                                your story (and salary data) accurate.
+                              </p>
+                            </div>
+                            <ChipField
+                              label="How long did you work there?"
+                              options={TENURES}
+                              value={tenure}
+                              onChange={setTenure}
+                            />
+                            <ChipField
+                              label="How senior were you?"
+                              options={LEVELS}
+                              value={roleLevel}
+                              onChange={setRoleLevel}
+                            />
+                            <div className="space-y-2">
+                              <Label>Would you work here again?</Label>
+                              <div className="flex gap-2">
+                                {[
+                                  { label: "Yes", value: true },
+                                  { label: "No", value: false },
+                                ].map((option) => (
+                                  <button
+                                    key={option.label}
+                                    type="button"
+                                    onClick={() => setWouldReturn(option.value)}
+                                    className={cn(
+                                      "rounded-full border border-border px-4 py-1.5 text-sm text-muted-foreground transition-all duration-200 active:scale-[0.97]",
+                                      wouldReturn === option.value &&
+                                        "border-primary/50 bg-primary/10 text-foreground",
+                                    )}
+                                  >
+                                    {option.label}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        ) : null}
 
-                          <Button
-                            className="w-full glow-primary"
-                            disabled={submitting}
-                            onClick={submit}
-                          >
-                            {submitting ? (
-                              "Screening and publishing…"
-                            ) : isEditing ? (
-                              "Submit changes for approval"
-                            ) : (
-                              "Publish story"
-                            )}
-                          </Button>
-                          {publishError ? (
-                            <p
-                              role="alert"
-                              className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger"
+                        {step === 3 ? (
+                          <>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <Label htmlFor="title">Headline</Label>
+                                <span className="text-[11px] text-muted-foreground">
+                                  Optional AI assist
+                                </span>
+                              </div>
+                              <div className="relative">
+                                <Input
+                                  id="title"
+                                  value={title}
+                                  maxLength={160}
+                                  aria-describedby={aiDescriptionId}
+                                  onChange={(event) => setTitle(event.target.value)}
+                                  placeholder="Write a short, clear headline"
+                                  className="h-12 rounded-2xl border-border/80 bg-card/70 pr-32 text-base shadow-sm focus-visible:ring-primary/40"
+                                />
+                                <StoryFieldAIControls
+                                  field="headline"
+                                  value={title}
+                                  generating={aiGeneratingField === "title"}
+                                  disabled={Boolean(aiGeneratingField)}
+                                  onGenerate={() => void generateAiStoryField("title")}
+                                  onClear={() => setTitle("")}
+                                />
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div className="flex items-center justify-between gap-3">
+                                <Label htmlFor="body">Your story</Label>
+                                <span className="text-[11px] tabular-nums text-muted-foreground">
+                                  {body.trim().length} / 60 min
+                                </span>
+                              </div>
+                              <div
+                                className={cn(
+                                  "anon-field relative overflow-hidden rounded-2xl border bg-card/70 shadow-sm transition-colors focus-within:border-primary/45 focus-within:ring-2 focus-within:ring-primary/10",
+                                  anonymous ? "border-primary/35" : "border-border/80",
+                                )}
+                                data-anon={anonymous}
+                              >
+                                <MentionTextarea
+                                  id="body"
+                                  rows={10}
+                                  value={body}
+                                  maxLength={6000}
+                                  aria-describedby={aiDescriptionId}
+                                  onValueChange={setBody}
+                                  placeholder="Share what you experienced and what you want others to know. Keep people’s names and identifying details out."
+                                  className="min-h-[15rem] resize-y border-0 bg-transparent px-4 pb-14 pt-14 pr-32 text-base leading-7 shadow-none focus-visible:ring-0"
+                                />
+                                <StoryFieldAIControls
+                                  field="story"
+                                  value={body}
+                                  generating={aiGeneratingField === "body"}
+                                  disabled={Boolean(aiGeneratingField)}
+                                  onGenerate={() => void generateAiStoryField("body")}
+                                  onClear={() => setBody("")}
+                                  align="top"
+                                />
+                                <div className="pointer-events-none absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-background/70 to-transparent" />
+                                {!isEditing ? (
+                                  <AnonymousPostingToggle
+                                    anonymous={anonymous}
+                                    onToggle={() => setAnonymous((value) => !value)}
+                                    user={user}
+                                    className="absolute bottom-2 right-2 z-10"
+                                  />
+                                ) : null}
+                              </div>
+                              <p
+                                id={aiDescriptionId}
+                                className="text-xs leading-relaxed text-muted-foreground"
+                              >
+                                AI drafts use details you’ve entered above and may be inaccurate.
+                                Review and edit every suggestion. Up to 5 generations daily.
+                              </p>
+                            </div>
+                          </>
+                        ) : null}
+
+                        {step === 4 ? (
+                          <div className="space-y-4 text-sm">
+                            <h2 className="text-lg font-semibold">
+                              {isEditing ? "Review your changes" : "Before you publish"}
+                            </h2>
+                            {isEditing ? (
+                              <p className="rounded-xl border border-primary/25 bg-primary/5 p-3 text-sm text-muted-foreground">
+                                Editing the employer is allowed. Any change will send the full story
+                                for moderator approval, and it will be hidden until approved.
+                                Existing private evidence, if any, will be retained.
+                              </p>
+                            ) : null}
+                            <ul className="space-y-2 text-muted-foreground">
+                              <li>
+                                · Your Candid handle appears with the story. Your email and legal
+                                name are never shown.
+                              </li>
+                              <li>· Do not name individual colleagues, managers or clients.</li>
+                              <li>· Stick to what you experienced or can describe factually.</li>
+                              <li>
+                                · Automated AI reads each full story. Clear, low-risk stories may go
+                                live right away; uncertain or sensitive cases wait for moderator
+                                review.
+                              </li>
+                            </ul>
+
+                            <Button
+                              className="w-full glow-primary"
+                              disabled={submitting}
+                              onClick={submit}
                             >
-                              {publishError}
-                            </p>
-                          ) : null}
-                        </div>
-                      ) : null}
-                    </div>
+                              {submitting
+                                ? "Screening and publishing…"
+                                : isEditing
+                                  ? "Submit changes for approval"
+                                  : "Publish story"}
+                            </Button>
+                            {publishError ? (
+                              <p
+                                role="alert"
+                                className="mt-3 rounded-xl border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger"
+                              >
+                                {publishError}
+                              </p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </motion.div>
+                    </AnimatePresence>
                   </div>
 
                   <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-border bg-background/95 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur supports-[backdrop-filter]:bg-background/80">
                     <Button
                       variant="ghost"
                       disabled={step === 0}
-                      onClick={() => setStep((s) => s - 1)}
+                      onClick={() => goToStep(step - 1)}
                     >
                       <ArrowLeft className="size-4" /> Back
                     </Button>
@@ -1230,7 +1208,7 @@ function WorkplaceStoryComposer() {
                         </Button>
                       ) : null}
                       {step < 4 ? (
-                        <Button disabled={!canContinue} onClick={() => setStep((s) => s + 1)}>
+                        <Button disabled={!canContinue} onClick={() => goToStep(step + 1)}>
                           Continue <ArrowRight className="size-4" />
                         </Button>
                       ) : null}
@@ -1276,6 +1254,69 @@ function WorkplaceStoryComposer() {
   );
 }
 
+function StoryFieldAIControls({
+  field,
+  value,
+  generating,
+  disabled,
+  onGenerate,
+  onClear,
+  align = "center",
+}: {
+  field: "headline" | "story";
+  value: string;
+  generating: boolean;
+  disabled: boolean;
+  onGenerate: () => void;
+  onClear: () => void;
+  align?: "center" | "top";
+}) {
+  const hasValue = value.trim().length > 0;
+  return (
+    <div
+      className={cn(
+        "absolute right-2 z-10 flex items-center gap-1 rounded-full border border-border/70 bg-background/90 p-1 shadow-sm backdrop-blur-md",
+        align === "top" ? "top-2" : "top-1/2 -translate-y-1/2",
+      )}
+    >
+      <button
+        type="button"
+        aria-label={`Draft ${field} with AI`}
+        title={`Draft ${field} with AI`}
+        disabled={disabled}
+        onClick={onGenerate}
+        className="grid size-8 place-items-center rounded-full bg-primary/10 text-primary outline-none transition duration-200 hover:-translate-y-0.5 hover:bg-primary/20 active:scale-90 focus-visible:ring-2 focus-visible:ring-primary/50 disabled:cursor-wait disabled:opacity-60"
+      >
+        {generating ? (
+          <LoaderCircle className="size-4 animate-spin" />
+        ) : (
+          <Sparkles className="size-4" />
+        )}
+      </button>
+      <button
+        type="button"
+        aria-label={`Regenerate ${field} with AI`}
+        title={`Regenerate ${field}`}
+        disabled={disabled || !hasValue}
+        onClick={onGenerate}
+        className="grid size-8 place-items-center rounded-full text-muted-foreground outline-none transition duration-200 hover:-translate-y-0.5 hover:bg-secondary hover:text-foreground active:scale-90 focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-35"
+      >
+        <RefreshCw className={cn("size-3.5", generating && "animate-spin")} />
+      </button>
+      <button
+        type="button"
+        aria-label={`Clear ${field}`}
+        title={`Clear ${field}`}
+        disabled={disabled || !hasValue}
+        onClick={onClear}
+        className="grid size-8 place-items-center rounded-full text-muted-foreground outline-none transition duration-200 hover:-translate-y-0.5 hover:bg-destructive/10 hover:text-destructive active:scale-90 focus-visible:ring-2 focus-visible:ring-primary/50 disabled:opacity-35"
+      >
+        <X className="size-4" />
+      </button>
+    </div>
+  );
+}
+
 function ChipField({
   label,
   options,
@@ -1297,7 +1338,7 @@ function ChipField({
             type="button"
             onClick={() => onChange(value === option ? "" : option)}
             className={cn(
-              "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground",
+              "rounded-full border border-border px-3 py-1.5 text-sm text-muted-foreground transition-all duration-200 active:scale-[0.97]",
               value === option && "border-primary/50 bg-primary/10 text-foreground",
             )}
           >
