@@ -174,7 +174,7 @@ function ProfilePage() {
           username={onboarding.data?.username ?? null}
         />
       ) : null}
-      <section className="min-h-screen px-3 pb-4 pt-2 sm:px-5 sm:pt-2 md:px-8 md:py-8">
+      <section className="min-h-screen px-3 pb-4 sm:px-5 md:px-8 md:py-8">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}

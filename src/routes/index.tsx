@@ -4,8 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence } from "motion/react";
 import {
   Activity,
-  Bookmark,
-  Flame,
   Navigation,
   PenLine,
   Radar,
@@ -94,7 +92,7 @@ function FeedPage() {
   const [county, setCounty] = useState<string | null>(null);
   const [area, setArea] = useState<string | null>(null);
   const [q, setQ] = useState("");
-  const [lens, setLens] = useState<null | "radar" | "following" | "saved" | "near">(null);
+  const [lens, setLens] = useState<null | "radar" | "following" | "near">(null);
   const radarOnly = lens === "radar";
   const [nearSheetOpen, setNearSheetOpen] = useState(false);
   const nearMe = useNearMe();
@@ -126,7 +124,7 @@ function FeedPage() {
   }, [lens, nearSheetOpen, nearMe.location]);
 
   const nearActive = lens === "near" && Boolean(nearMe.location);
-  const lensActive = lens === "following" || lens === "saved";
+  const lensActive = lens === "following";
   const pagedFeed = !nearActive && !lensActive;
 
   const nearFeed = useQuery({
@@ -146,7 +144,7 @@ function FeedPage() {
   });
   const lensFeed = useQuery({
     queryKey: ["lens-stories", user?.uid ?? null, lens],
-    queryFn: () => fetchLens({ data: { lens: lens as "following" | "saved" } }),
+    queryFn: () => fetchLens(),
     enabled: lensActive && Boolean(user?.emailVerified),
     staleTime: 30_000,
   });
@@ -182,7 +180,7 @@ function FeedPage() {
   const sameText = (a: string | null | undefined, b: string | null) =>
     (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
   const stories = sourceStories.filter((story) => {
-    // Near me, Following and Saved load their own lists, so the filters apply here instead.
+    // Near me and followed accounts load their own lists, so filters apply here instead.
     if (!pagedFeed) {
       if (industry && !sameText(story.industry, industry)) return false;
       if (county && !sameText(story.county, county)) return false;
@@ -203,7 +201,7 @@ function FeedPage() {
       !radarOnly ||
       Boolean(
         (story.company_id && watchedCompanies.ids.has(story.company_id)) ||
-          (story.company_slug && watchedCompanies.slugs.has(story.company_slug)),
+        (story.company_slug && watchedCompanies.slugs.has(story.company_slug)),
       );
     return matchesSearch && matchesRadar;
   });
@@ -215,7 +213,12 @@ function FeedPage() {
   }
 
   const canReset =
-    Boolean(needle) || industry !== null || county !== null || area !== null || sort !== "new" || lens !== null;
+    Boolean(needle) ||
+    industry !== null ||
+    county !== null ||
+    area !== null ||
+    sort !== "new" ||
+    lens !== null;
 
   return (
     <div className="space-y-5 md:space-y-8">
@@ -328,13 +331,6 @@ function FeedPage() {
               setLens((current) => (current === next ? null : next));
               nearMe.setOn(false);
             }}
-            onTrending={() => {
-              if (lens === "following" || lens === "saved" || lens === "near") {
-                setLens(null);
-                nearMe.setOn(false);
-                setSort("trending");
-              } else setSort((current) => (current === "trending" ? "new" : "trending"));
-            }}
             onNear={() => {
               if (lens === "near") {
                 setLens(null);
@@ -419,15 +415,13 @@ function FeedPage() {
                 ? `No stories within ${nearMe.radius} km yet. Try searching wider from Change above.`
                 : lens === "following"
                   ? "No stories from people you follow yet. Follow members from their profiles to see their stories here."
-                  : lens === "saved"
-                    ? "You haven't saved any stories yet. Tap the bookmark on a story to keep it here."
-                    : radarOnly && watchedCompanies.data?.length === 0
-                ? "Your radar is empty. Track an employer from its company page to see their stories here."
-                : radarOnly && feedPages.hasNextPage
-                  ? "No tracked-company stories in this batch yet. Load more to continue scanning."
-                  : radarOnly
-                    ? "No stories from your tracked companies yet."
-                    : "No stories match these filters yet."}
+                  : radarOnly && watchedCompanies.data?.length === 0
+                    ? "You aren't watching any companies yet. Watch a company to see its stories here."
+                    : radarOnly && feedPages.hasNextPage
+                      ? "No stories from the companies you watch in this batch yet. Load more to continue scanning."
+                      : radarOnly
+                        ? "No stories from the companies you watch yet."
+                        : "No stories match these filters yet."}
             </p>
           ) : (
             stories
@@ -439,7 +433,7 @@ function FeedPage() {
                   index={index}
                   trackedCompany={Boolean(
                     (story.company_id && watchedCompanies.ids.has(story.company_id)) ||
-                      (story.company_slug && watchedCompanies.slugs.has(story.company_slug)),
+                    (story.company_slug && watchedCompanies.slugs.has(story.company_slug)),
                   )}
                   discussionOpen={activeDiscussion?.id === story.id}
                   onToggleDiscussion={() =>
@@ -521,17 +515,15 @@ function FeedChips({
   radarCount,
   nearLabel,
   onLens,
-  onTrending,
   onNear,
 }: {
   verified: boolean;
   signedIn: boolean;
-  lens: null | "radar" | "following" | "saved" | "near";
+  lens: null | "radar" | "following" | "near";
   sort: "new" | "top" | "trending";
   radarCount: number;
   nearLabel: string | null;
-  onLens: (lens: "radar" | "following" | "saved") => void;
-  onTrending: () => void;
+  onLens: (lens: "radar" | "following") => void;
   onNear: () => void;
 }) {
   const chip = (active: boolean) =>
@@ -542,7 +534,7 @@ function FeedChips({
     icon: Icon,
     count,
   }: {
-    id: "radar" | "following" | "saved";
+    id: "radar" | "following";
     label: string;
     icon: LucideIcon;
     count?: number;
@@ -567,9 +559,7 @@ function FeedChips({
       >
         <Icon className={`size-4 ${active && id === "radar" ? "animate-pulse" : ""}`} />
         {label}
-        {count !== undefined ? (
-          <span className="tabular-nums opacity-75">{count}</span>
-        ) : null}
+        {count !== undefined ? <span className="tabular-nums opacity-75">{count}</span> : null}
       </Button>
     );
   };
@@ -579,18 +569,8 @@ function FeedChips({
       aria-label="Feed shortcuts"
       className="-mx-3 mb-3 flex gap-2 overflow-x-auto px-3 pb-1 [scrollbar-width:none] sm:mx-0 sm:px-0 [&::-webkit-scrollbar]:hidden"
     >
-      {renderGated({ id: "radar", label: "My Radar", icon: Radar, count: radarCount })}
-      {renderGated({ id: "following", label: "Following", icon: UserCheck })}
-      {renderGated({ id: "saved", label: "Saved", icon: Bookmark })}
-      <Button
-        type="button"
-        variant={sort === "trending" && (lens === null || lens === "radar") ? "default" : "outline"}
-        aria-pressed={sort === "trending" && (lens === null || lens === "radar")}
-        onClick={onTrending}
-        className={chip(sort === "trending" && (lens === null || lens === "radar"))}
-      >
-        <Flame className="size-4" /> Trending
-      </Button>
+      {renderGated({ id: "radar", label: "Companies I watch", icon: Radar, count: radarCount })}
+      {renderGated({ id: "following", label: "People I follow", icon: UserCheck })}
       <Button
         type="button"
         variant={lens === "near" ? "default" : "outline"}

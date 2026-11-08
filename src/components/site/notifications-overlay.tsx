@@ -112,6 +112,25 @@ type PendingAction =
   | { type: "archive"; id: string }
   | { type: "unarchive"; id: string };
 
+function pendingActionTitle(pending: PendingAction) {
+  if (pending.type === "deleteMany") {
+    return `Delete ${pending.ids.length} selected notification${pending.ids.length === 1 ? "" : "s"}?`;
+  }
+  if (pending.type === "delete") return "Delete this notification?";
+  if (pending.type === "archive") return "Archive this notification?";
+  if (pending.type === "unarchive") return "Move back to inbox?";
+  if (pending.type === "unread") return "Mark as unread?";
+  return "Mark as read?";
+}
+
+function pendingActionDescription(pending: PendingAction) {
+  if (pending.type === "deleteMany") {
+    return "These notifications will be removed from this device. This cannot be undone.";
+  }
+  if (pending.type === "delete") return "It will be removed from this device. It cannot be undone.";
+  return "You can change this again at any time.";
+}
+
 type NotificationFilter =
   | "all"
   | "unread"
@@ -920,30 +939,14 @@ export function NotificationsOverlay() {
       </Drawer>
 
       <AlertDialog
-        open={pending !== null}
+        open={!isMobile && pending !== null}
         onOpenChange={(next) => (next ? null : setPending(null))}
       >
         <AlertDialogContent className="z-[95]">
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              {pending?.type === "deleteMany"
-                ? `Delete ${pending.ids.length} selected notification${pending.ids.length === 1 ? "" : "s"}?`
-                : pending?.type === "delete"
-                  ? "Delete this notification?"
-                  : pending?.type === "archive"
-                    ? "Archive this notification?"
-                    : pending?.type === "unarchive"
-                      ? "Move back to inbox?"
-                      : pending?.type === "unread"
-                        ? "Mark as unread?"
-                        : "Mark as read?"}
-            </AlertDialogTitle>
+            <AlertDialogTitle>{pending ? pendingActionTitle(pending) : null}</AlertDialogTitle>
             <AlertDialogDescription>
-              {pending?.type === "deleteMany"
-                ? "These notifications will be removed from this device. This cannot be undone."
-                : pending?.type === "delete"
-                  ? "It will be removed from this device. It cannot be undone."
-                  : "You can change this again at any time."}
+              {pending ? pendingActionDescription(pending) : null}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -954,6 +957,71 @@ export function NotificationsOverlay() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Drawer
+        open={isMobile && pending !== null}
+        onOpenChange={(next) => !next && setPending(null)}
+      >
+        <DrawerContent
+          overlayClassName="z-[95] bg-black/50 backdrop-blur-[2px]"
+          className="z-[96] min-h-72 rounded-t-[2rem] border-border bg-background px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl [&>div:first-child]:h-1.5 [&>div:first-child]:w-10 [&>div:first-child]:bg-muted-foreground/30"
+        >
+          {pending ? (
+            <>
+              <DrawerHeader className="items-center gap-3 px-1 pb-5 pt-4 text-center">
+                <span
+                  className={cn(
+                    "inline-flex size-12 items-center justify-center rounded-full",
+                    pending.type === "delete" || pending.type === "deleteMany"
+                      ? "bg-danger/10 text-danger"
+                      : "bg-primary/10 text-primary",
+                  )}
+                >
+                  {pending.type === "delete" || pending.type === "deleteMany" ? (
+                    <Trash2 className="size-5" />
+                  ) : pending.type === "archive" || pending.type === "unarchive" ? (
+                    <Archive className="size-5" />
+                  ) : (
+                    <CheckCheck className="size-5" />
+                  )}
+                </span>
+                <div className="grid gap-2">
+                  <DrawerTitle className="font-display text-xl">
+                    {pendingActionTitle(pending)}
+                  </DrawerTitle>
+                  <DrawerDescription className="text-sm leading-relaxed">
+                    {pendingActionDescription(pending)}
+                  </DrawerDescription>
+                </div>
+              </DrawerHeader>
+              <div className="mt-auto grid gap-2">
+                <Button
+                  type="button"
+                  variant={
+                    pending.type === "delete" || pending.type === "deleteMany"
+                      ? "destructive"
+                      : "default"
+                  }
+                  className="h-12 w-full rounded-2xl text-base font-semibold shadow-sm active:scale-[0.99]"
+                  onClick={runPending}
+                >
+                  {pending.type === "delete" || pending.type === "deleteMany"
+                    ? "Delete"
+                    : "Confirm"}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="h-12 w-full rounded-2xl border-border bg-background text-base"
+                  onClick={() => setPending(null)}
+                >
+                  Cancel
+                </Button>
+              </div>
+            </>
+          ) : null}
+        </DrawerContent>
+      </Drawer>
 
       <Drawer open={filterSheetOpen} onOpenChange={setFilterSheetOpen}>
         <DrawerContent overlayClassName="z-[105]" className="z-[110] max-h-[85dvh]">

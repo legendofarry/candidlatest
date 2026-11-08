@@ -109,9 +109,7 @@ async function geocodeCompany(
       });
       if (response.ok) {
         const rows = (await response.json()) as Array<{ lat: string; lon: string }>;
-        const candidate = rows[0]
-          ? { lat: Number(rows[0].lat), lng: Number(rows[0].lon) }
-          : null;
+        const candidate = rows[0] ? { lat: Number(rows[0].lat), lng: Number(rows[0].lon) } : null;
         if (candidate && isInKenya(candidate)) {
           const reach = hint?.precision === "area" ? 60 : hint ? 150 : Infinity;
           if (!hint || haversineKm(candidate, hint) <= reach) found = candidate;
@@ -150,7 +148,10 @@ function withCompanySlug<T extends { company_id: string | null; company_slug: st
   companies: Map<string, CompanyGeo>,
 ): T {
   const company = story.company_id ? companies.get(story.company_id) : undefined;
-  return { ...story, company_slug: company?.isPublic ? (company.slug ?? story.company_slug) : null };
+  return {
+    ...story,
+    company_slug: company?.isPublic ? (company.slug ?? story.company_slug) : null,
+  };
 }
 
 type StoryPoint = {
@@ -229,7 +230,11 @@ export async function readNearMeFeed(input: {
         story,
         rank: 0,
         km,
-        near: { match: "employer", distance_km: Math.round(km * 10) / 10, label: `${formatDistance(km)} away` },
+        near: {
+          match: "employer",
+          distance_km: Math.round(km * 10) / 10,
+          label: `${formatDistance(km)} away`,
+        },
       });
       if (company?.isPublic && company.slug) {
         const entry = employers.get(company.id);
@@ -283,27 +288,18 @@ export async function readNearMeFeed(input: {
   };
 }
 
-/** Stories from people the viewer follows, or stories they saved. */
-export async function readLensStories(viewerId: string, lens: "following" | "saved") {
+/** Stories from accounts the viewer follows. */
+export async function readLensStories(viewerId: string) {
   const db = getFirestoreDb();
   const ids = new Set<string>();
-  if (lens === "following") {
-    const snapshot = await db
-      .collection("follows")
-      .where("follower_id", "==", viewerId)
-      .limit(1000)
-      .get();
-    for (const doc of snapshot.docs) {
-      if (doc.get("status") === "pending") continue;
-      ids.add(String(doc.get("following_id")));
-    }
-  } else {
-    const snapshot = await db
-      .collection("story_saves")
-      .where("user_id", "==", viewerId)
-      .limit(1000)
-      .get();
-    for (const doc of snapshot.docs) ids.add(String(doc.get("story_id")));
+  const snapshot = await db
+    .collection("follows")
+    .where("follower_id", "==", viewerId)
+    .limit(1000)
+    .get();
+  for (const doc of snapshot.docs) {
+    if (doc.get("status") === "pending") continue;
+    ids.add(String(doc.get("following_id")));
   }
   if (!ids.size) return [];
   const [stories, companies] = await Promise.all([
@@ -311,11 +307,7 @@ export async function readLensStories(viewerId: string, lens: "following" | "sav
     loadCompanyGeo(),
   ]);
   return stories
-    .filter((story) =>
-      lens === "following"
-        ? Boolean(story.author_id && ids.has(story.author_id))
-        : Boolean(story.id && ids.has(story.id)),
-    )
+    .filter((story) => Boolean(story.author_id && ids.has(story.author_id)))
     .slice(0, 100)
     .map((story) => withCompanySlug(story, companies));
 }
@@ -389,10 +381,14 @@ export async function readNearbyPeople(
     db.collection("near_me_presence").where("active", "==", true).limit(1000).get(),
   ]);
   const followingIds = new Set(
-    following.docs.filter((doc) => doc.get("status") !== "pending").map((doc) => String(doc.get("following_id"))),
+    following.docs
+      .filter((doc) => doc.get("status") !== "pending")
+      .map((doc) => String(doc.get("following_id"))),
   );
   const followerIds = new Set(
-    followers.docs.filter((doc) => doc.get("status") !== "pending").map((doc) => String(doc.get("follower_id"))),
+    followers.docs
+      .filter((doc) => doc.get("status") !== "pending")
+      .map((doc) => String(doc.get("follower_id"))),
   );
 
   const candidates = presence.docs

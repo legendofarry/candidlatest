@@ -157,9 +157,6 @@ export function AccountSwitcher({ open, onOpenChange, user, username }: Props) {
       {mode === "list" ? (
         <div className="space-y-4">
           <section className="space-y-2">
-            <p className="px-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              Accounts on this device
-            </p>
             <div className="divide-y divide-border overflow-hidden rounded-2xl border border-border bg-card">
               {accounts.map((account) => {
                 const current = account.uid === user.uid;
@@ -228,9 +225,6 @@ export function AccountSwitcher({ open, onOpenChange, user, username }: Props) {
           >
             <Plus className="size-4" /> Add another account
           </Button>
-          <p className="text-xs leading-relaxed text-muted-foreground">
-            Account passwords are never saved. You’ll enter the password again when switching.
-          </p>
         </div>
       ) : (
         <form onSubmit={(event) => void submit(event)} className="space-y-4">
@@ -322,7 +316,7 @@ export function AccountSwitcher({ open, onOpenChange, user, username }: Props) {
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {mode === "list"
-              ? "Choose an account or add another."
+              ? ""
               : "Your credentials stay private."}
           </p>
         </div>
@@ -345,7 +339,7 @@ export function AccountSwitcher({ open, onOpenChange, user, username }: Props) {
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {mode === "list"
-              ? "Choose an account or add another."
+              ? ""
               : "Your credentials stay private."}
           </p>
         </div>

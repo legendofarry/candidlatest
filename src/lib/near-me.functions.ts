@@ -1,9 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import {
-  optionalFirebaseAuth,
-  requireFirebaseAuth,
-} from "@/integrations/firebase/auth-middleware";
+import { optionalFirebaseAuth, requireFirebaseAuth } from "@/integrations/firebase/auth-middleware";
 import {
   readLensStories,
   readMyNearMe,
@@ -22,18 +19,13 @@ const positionSchema = z.object({
 export const getNearMeFeed = createServerFn({ method: "POST" })
   .middleware([optionalFirebaseAuth])
   .inputValidator((input: unknown) => positionSchema.parse(input))
-  .handler(async ({ context, data }) =>
-    readNearMeFeed({ ...data, viewerId: context.userId }),
-  );
+  .handler(async ({ context, data }) => readNearMeFeed({ ...data, viewerId: context.userId }));
 
-/** "Following" and "Saved" chips on the feed. */
+/** Stories from accounts the viewer follows. */
 export const getLensStories = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])
-  .inputValidator((input: unknown) =>
-    z.object({ lens: z.enum(["following", "saved"]) }).parse(input),
-  )
-  .handler(async ({ context, data }) => ({
-    stories: await readLensStories(context.userId, data.lens),
+  .handler(async ({ context }) => ({
+    stories: await readLensStories(context.userId),
   }));
 
 export const getMyNearMe = createServerFn({ method: "POST" })

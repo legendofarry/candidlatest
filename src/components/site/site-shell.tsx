@@ -10,6 +10,7 @@ import {
   Home,
   LogOut,
   Loader2,
+  Menu,
   MessagesSquare,
   PenLine,
   Scale,
@@ -20,6 +21,8 @@ import {
   Trophy,
   UserRound,
   Wallet,
+  CreditCard,
+  ReceiptText,
   X,
 } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
@@ -73,6 +76,15 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { cn } from "@/lib/utils";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { dispatchBillingMenuAction } from "@/lib/billing-menu";
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Drawer,
@@ -287,6 +299,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   }
 
   const showDock = dockRoots.includes(pathname) && !standaloneDesktopRoute;
+  const onBillingPage = pathname === "/billing" && Boolean(user);
 
   if (user && accountProfile?.investigationHold) {
     return (
@@ -379,51 +392,90 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           )}
 
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <button
-              type="button"
-              onClick={toggleMessages}
-              aria-label="Toggle messages"
-              className={cn(
-                "relative inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                messagesVisible && "bg-secondary text-foreground",
-              )}
-            >
-              <MessagesSquare className="size-4" />
-              {(messageState?.unread ?? 0) > 0 ? <Count value={messageState!.unread} /> : null}
-            </button>
-            <Link
-              to="/search"
-              aria-label="Search Candid"
-              className={cn(
-                "inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
-                pathname === "/search" && "bg-secondary text-foreground",
-              )}
-            >
-              <Search className="size-4" />
-            </Link>
-            {user ? (
-              <Link
-                to="/billing"
-                aria-label="Membership"
-                title="Membership"
-                className={cn(
-                  "inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-primary",
-                  pathname.startsWith("/billing") && "bg-secondary text-primary",
-                )}
-              >
-                <Gem className="size-4" />
-              </Link>
-            ) : null}
-            <button
-              type="button"
-              onClick={toggleNotifications}
-              aria-label="Toggle notifications"
-              className="relative inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
-            >
-              <Bell className="size-4" />
-              {unread > 0 ? <Count value={unread} /> : null}
-            </button>
-            <ThemeToggle />
+            {onBillingPage ? (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    aria-label="Billing menu"
+                    title="Billing menu"
+                    className="size-10 rounded-full border-border bg-background shadow-sm"
+                  >
+                    <Menu className="size-5" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60 rounded-2xl p-1.5">
+                  <DropdownMenuLabel className="px-3 py-2 text-xs text-muted-foreground">
+                    Billing options
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    className="min-h-12 cursor-pointer rounded-xl px-3"
+                    onSelect={() => dispatchBillingMenuAction("payment-method")}
+                  >
+                    <CreditCard className="size-4 text-primary" />
+                    <span className="flex-1">Payment method</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    className="min-h-12 cursor-pointer rounded-xl px-3"
+                    onSelect={() => dispatchBillingMenuAction("payment-history")}
+                  >
+                    <ReceiptText className="size-4 text-primary" />
+                    <span className="flex-1">Payment history</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={toggleMessages}
+                  aria-label="Toggle messages"
+                  className={cn(
+                    "relative inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                    messagesVisible && "bg-secondary text-foreground",
+                  )}
+                >
+                  <MessagesSquare className="size-4" />
+                  {(messageState?.unread ?? 0) > 0 ? <Count value={messageState!.unread} /> : null}
+                </button>
+                <Link
+                  to="/search"
+                  aria-label="Search Candid"
+                  className={cn(
+                    "inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
+                    pathname === "/search" && "bg-secondary text-foreground",
+                  )}
+                >
+                  <Search className="size-4" />
+                </Link>
+                {user ? (
+                  <Link
+                    to="/billing"
+                    aria-label="Membership"
+                    title="Membership"
+                    className={cn(
+                      "inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-primary",
+                      pathname.startsWith("/billing") && "bg-secondary text-primary",
+                    )}
+                  >
+                    <Gem className="size-4" />
+                  </Link>
+                ) : null}
+                <button
+                  type="button"
+                  onClick={toggleNotifications}
+                  aria-label="Toggle notifications"
+                  className="relative inline-flex size-9 items-center justify-center rounded-full text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                >
+                  <Bell className="size-4" />
+                  {unread > 0 ? <Count value={unread} /> : null}
+                </button>
+                <ThemeToggle />
+              </>
+            )}
             <Button asChild size="sm" className="glow-primary hidden sm:inline-flex">
               <Link to="/post">
                 <PenLine className="size-4" /> Post a story
@@ -584,14 +636,14 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
                 ? "pt-0 md:pt-6"
                 : "pt-6",
             !fullscreenRoute &&
-            pathname !== "/support" &&
-            !messagesInboxRoute &&
-            !directConversationRoute &&
-            (showDock ? "pb-10" : "pb-10"),
+              pathname !== "/support" &&
+              !messagesInboxRoute &&
+              !directConversationRoute &&
+              (showDock ? "pb-10" : "pb-10"),
             directConversationRoute &&
-            "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
+              "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
             standaloneDesktopRoute &&
-            "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
+              "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
           )}
         >
           <BiometricGate>{children}</BiometricGate>
@@ -650,11 +702,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           <DrawerContent className="rounded-t-3xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))]">
             <DrawerHeader className="text-left">
               <DrawerTitle>{canLock ? "Leaving for now?" : "Sign out of Candid?"}</DrawerTitle>
-              <DrawerDescription>
-                {canLock
-                  ? ""
-                  : ""}
-              </DrawerDescription>
+              <DrawerDescription>{canLock ? "" : ""}</DrawerDescription>
             </DrawerHeader>
             {canLock ? (
               <label className="flex items-start gap-2 px-4 py-2 text-sm text-muted-foreground">

@@ -7,7 +7,6 @@ import {
   ChevronRight,
   CreditCard,
   Flame,
-  RefreshCw,
   RotateCw,
   Sparkles,
   WalletCards,
@@ -31,6 +30,7 @@ import {
 import { switchMyMembership } from "@/lib/membership.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
+import { subscribeBillingMenuAction } from "@/lib/billing-menu";
 
 export const Route = createFileRoute("/billing")({
   head: () => ({ meta: [{ title: "Billing & packages | Candid" }] }),
@@ -95,7 +95,9 @@ function BillingPage() {
       setBillingSheet(null);
     },
     onError: (error) =>
-      setPayerError(error instanceof Error ? error.message : "Could not save your payment details."),
+      setPayerError(
+        error instanceof Error ? error.message : "Could not save your payment details.",
+      ),
   });
   const cancelPaymentMutation = useMutation({
     mutationFn: (paymentId: string) => cancelPayment({ data: { paymentId } }),
@@ -128,6 +130,8 @@ function BillingPage() {
     setPayerPhone(saved.phone);
     setPayerName(saved.accountName);
   }, [data?.payerProfile]);
+
+  useEffect(() => subscribeBillingMenuAction((action) => setBillingSheet(action)), []);
 
   if (isCheckout) return <Outlet />;
 
@@ -344,9 +348,9 @@ function BillingPage() {
                     </p>
                   ) : null}
                   {!isOfficial &&
-                    membership?.source === "paid" &&
-                    membership.assignedTier === "premium" &&
-                    !membership.cancelAtPeriodEnd ? (
+                  membership?.source === "paid" &&
+                  membership.assignedTier === "premium" &&
+                  !membership.cancelAtPeriodEnd ? (
                     <Button
                       className="mt-3 rounded-xl"
                       variant="outline"
@@ -363,53 +367,6 @@ function BillingPage() {
                       Move to Free at expiry
                     </Button>
                   ) : null}
-                </article>
-                <article className="rounded-[1.7rem] border bg-card p-5 shadow-sm sm:p-6">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <button
-                      type="button"
-                      onClick={() => setBillingSheet("payment-method")}
-                      className="flex items-center justify-between rounded-2xl border border-border bg-secondary/50 p-4 text-left transition-colors hover:bg-secondary"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                          <CreditCard className="size-5" />
-                        </span>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                            Paying from
-                          </p>
-                          <h2 className="mt-1 font-display text-lg font-semibold">
-                            {data?.payerProfile
-                              ? `${data.payerProfile.provider === "mpesa" ? "M-Pesa" : "Airtel"} · ${data.payerProfile.phone}`
-                              : "Add your payment details"}
-                          </h2>
-                        </div>
-                      </div>
-                      <ChevronRight className="size-4 text-muted-foreground" />
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => setBillingSheet("payment-history")}
-                      className="flex items-center justify-between rounded-2xl border border-border bg-secondary/50 p-4 text-left transition-colors hover:bg-secondary"
-                    >
-                      <div className="flex items-center gap-3">
-                        <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                          <RefreshCw className="size-5" />
-                        </span>
-                        <div>
-                          <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
-                            Billing
-                          </p>
-                          <h2 className="mt-1 font-display text-lg font-semibold">
-                            Payment history
-                          </h2>
-                        </div>
-                      </div>
-                      <ChevronRight className="size-4 text-muted-foreground" />
-                    </button>
-                  </div>
                 </article>
               </section>
 
@@ -518,7 +475,7 @@ function BillingPage() {
                                         ? "Free scheduled"
                                         : "Move to Free at expiry"
                                       : renew ||
-                                        (tier === membership?.assignedTier && canRenewPremium)
+                                          (tier === membership?.assignedTier && canRenewPremium)
                                         ? "Renew Premium"
                                         : `Choose ${plan.name}`}
                             <ChevronRight className="ml-auto size-4" />
@@ -543,9 +500,10 @@ function BillingPage() {
               <DrawerHeader className="text-left">
                 <DrawerTitle>Your payment details</DrawerTitle>
                 <DrawerDescription>
-                  The mobile money account you will pay <span className="font-medium text-foreground">from</span>.
-                  When you pay, the Candid team sees these details next to your payment so we can
-                  match it and activate your plan faster.
+                  The mobile money account you will pay{" "}
+                  <span className="font-medium text-foreground">from</span>. When you pay, the
+                  Candid team sees these details next to your payment so we can match it and
+                  activate your plan faster.
                 </DrawerDescription>
               </DrawerHeader>
               <form
@@ -601,8 +559,8 @@ function BillingPage() {
                     placeholder="e.g. Jane Wanjiru Mwangi"
                   />
                   <span className="text-xs font-normal text-muted-foreground">
-                    Exactly as it shows on your {paymentMethod === "mpesa" ? "M-Pesa" : "Airtel Money"}{" "}
-                    confirmation message.
+                    Exactly as it shows on your{" "}
+                    {paymentMethod === "mpesa" ? "M-Pesa" : "Airtel Money"} confirmation message.
                   </span>
                 </label>
                 {payerError ? (
@@ -734,9 +692,9 @@ function formatDate(value?: string | null) {
   return Number.isNaN(date.getTime())
     ? "—"
     : date.toLocaleDateString("en-KE", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-      timeZone: "Africa/Nairobi",
-    });
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "Africa/Nairobi",
+      });
 }
