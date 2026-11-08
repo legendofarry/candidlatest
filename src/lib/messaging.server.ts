@@ -761,11 +761,11 @@ async function removePairInteractions(firstId: string, secondId: string) {
   }));
   for (const [storyId, metric] of storyMetricDeltas) {
     const delta: Record<string, ReturnType<typeof FieldValue.increment>> = {};
-    if (metric.likes) delta.likes = FieldValue.increment(metric.likes);
-    if (metric.followers) delta.follower_count = FieldValue.increment(metric.followers);
-    if (metric.comments) delta.comment_count = FieldValue.increment(metric.comments);
-    if (metric.upvotes) delta.upvotes = FieldValue.increment(metric.upvotes);
-    if (metric.metoo) delta.metoo = FieldValue.increment(metric.metoo);
+    if (metric.likes) delta["likes"] = FieldValue.increment(metric.likes);
+    if (metric.followers) delta["follower_count"] = FieldValue.increment(metric.followers);
+    if (metric.comments) delta["comment_count"] = FieldValue.increment(metric.comments);
+    if (metric.upvotes) delta["upvotes"] = FieldValue.increment(metric.upvotes);
+    if (metric.metoo) delta["metoo"] = FieldValue.increment(metric.metoo);
     operations.push((batch) => batch.update(db.collection("stories").doc(storyId), delta));
   }
   for (const [commentId, removedLikes] of commentLikeCounts) {

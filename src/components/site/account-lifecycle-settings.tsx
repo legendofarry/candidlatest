@@ -119,7 +119,7 @@ export function AccountLifecycleSettings() {
               aria-hidden="true"
               className="pointer-events-none absolute -right-10 -top-20 size-48 rounded-full border border-primary/15 bg-primary/10"
               animate={
-                reduceMotion ? undefined : { scale: [1, 1.24, 1], opacity: [0.35, 0.7, 0.35] }
+                reduceMotion ? {} : { scale: [1, 1.24, 1], opacity: [0.35, 0.7, 0.35] }
               }
               transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -127,7 +127,7 @@ export function AccountLifecycleSettings() {
               aria-hidden="true"
               className="pointer-events-none absolute -right-4 -top-14 size-36 rounded-full border border-sky-400/20"
               animate={
-                reduceMotion ? undefined : { scale: [1.18, 1, 1.18], opacity: [0.2, 0.55, 0.2] }
+                reduceMotion ? {} : { scale: [1.18, 1, 1.18], opacity: [0.2, 0.55, 0.2] }
               }
               transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
             />
@@ -163,7 +163,7 @@ export function AccountLifecycleSettings() {
                 <motion.span
                   aria-hidden="true"
                   className="text-muted-foreground"
-                  whileHover={reduceMotion ? undefined : { x: 3 }}
+                  whileHover={reduceMotion ? {} : { x: 3 }}
                   transition={{ duration: 0.18 }}
                 >
                   <ChevronRight className="size-4" />
@@ -190,7 +190,7 @@ export function AccountLifecycleSettings() {
                 <motion.span
                   aria-hidden="true"
                   className="text-destructive/70"
-                  whileHover={reduceMotion ? undefined : { x: 3 }}
+                  whileHover={reduceMotion ? {} : { x: 3 }}
                   transition={{ duration: 0.18 }}
                 >
                   <ChevronRight className="size-4" />
