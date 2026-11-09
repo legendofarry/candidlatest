@@ -409,12 +409,12 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
               <div className="absolute inset-x-6 top-1/2 h-px -translate-y-1/2 bg-border/80" />
               <motion.div
                 className="absolute left-1/2 top-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/15"
-                {...(!reduceMotion ? { animate: { scale: [0.8, 1.18, 0.8], opacity: [0.28, 0.7, 0.28] } } : {})}
+                {...(!reduceMotion ? { animate: { scale: [0.8, 1.18, 0.8], opacity: [0.28, 0.7, 0.28] } } : { initial: false })}
                 transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
               />
               <motion.div
                 className="absolute left-1/2 top-1/2 size-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/25"
-                {...(!reduceMotion ? { animate: { scale: [1.12, 0.82, 1.12], opacity: [0.6, 0.22, 0.6] } } : {})}
+                {...(!reduceMotion ? { animate: { scale: [1.12, 0.82, 1.12], opacity: [0.6, 0.22, 0.6] } } : { initial: false })}
                 transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
               />
               <div className="absolute left-1/2 top-1/2 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-primary/20 bg-background text-primary shadow-[0_0_24px_-8px_hsl(var(--primary)/0.55)]">
