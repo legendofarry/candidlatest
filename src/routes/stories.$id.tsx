@@ -223,7 +223,7 @@ function StoryPage() {
         )}
       </div>
 
-      <div className="py-5 sm:px-6">
+      <div className="px-4 py-5 sm:px-6">
         <div className="w-full space-y-6">
           {!isAnnouncement ? (
             <div className="flex flex-wrap gap-1.5">

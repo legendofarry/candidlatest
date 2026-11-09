@@ -444,10 +444,12 @@ function PublicProfilePage() {
                 <h1 className="flex flex-wrap items-center gap-1.5 text-xl font-bold tracking-tight sm:text-3xl">
                   @{profile.username}
                   {profile.verified ? <BadgeCheck className="size-5 text-sky-500" /> : null}
-                  <MembershipBadge
-                    tier={profile.membership_tier as "basic" | "premium" | "gold" | null}
-                    official={profile.official}
-                  />
+                  {!profile.verified ? (
+                    <MembershipBadge
+                      tier={profile.membership_tier as "basic" | "premium" | "gold" | null}
+                      official={profile.official}
+                    />
+                  ) : null}
                 </h1>
                 <p className="text-xs text-muted-foreground sm:text-sm">
                   {formatCount(profile.followers)} followers · {formatCount(profile.following)}{" "}
@@ -624,7 +626,11 @@ function PublicProfilePage() {
             </div>
           </section>
 
-          <ProfileCommunity username={profile.username} followerCount={profile.followers} />
+          <ProfileCommunity
+            username={profile.username}
+            followerCount={profile.followers}
+            followingCount={profile.following}
+          />
         </div>
       ) : null}
 

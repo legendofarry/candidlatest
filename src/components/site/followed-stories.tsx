@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -9,9 +9,11 @@ import {
   CalendarDays,
   CircleDot,
   Clock3,
+  FileText,
   Loader2,
   MessageCircle,
   Sparkles,
+  UsersRound,
   X as CloseIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,6 +36,15 @@ import { useAuth } from "@/hooks/useAuth";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { formatCount } from "@/lib/utils";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
+import { getPublicProfileConnections } from "@/lib/messaging.functions";
+import { ProfileAvatar } from "@/components/site/profile-photo";
+import {
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerDescription,
+  DrawerTitle,
+} from "@/components/ui/drawer";
 
 type StoryTimeline = {
   id: string;
@@ -56,7 +67,7 @@ type FollowedStoryRow = {
 };
 
 /** Followers/following counts plus followed stories with an AI catch-up. */
-export function FollowedStories() {
+export function FollowedStories({ username }: { username: string | null }) {
   const { user } = useAuth();
   const statsFn = useServerFn(getFollowStats);
   const listFn = useServerFn(getFollowedStories);
@@ -68,6 +79,7 @@ export function FollowedStories() {
   const [storyTimeline, setStoryTimeline] = useState<StoryTimeline | null>(null);
   const [loadingId, setLoadingId] = useState<string | null>(null);
   const [catchUpError, setCatchUpError] = useState<string | null>(null);
+  const [statsView, setStatsView] = useState<"followers" | "following" | "stories" | null>(null);
 
   const stats = useQuery({
     queryKey: ["follow-stats", user?.uid ?? null],
@@ -120,10 +132,29 @@ export function FollowedStories() {
       </div>
 
       <div className="mt-5 grid grid-cols-3 divide-x divide-border md:gap-2 md:divide-x-0">
-        <FollowMetric label="Followers" value={stats.data?.followers ?? 0} />
-        <FollowMetric label="Following" value={stats.data?.following ?? 0} />
-        <FollowMetric label="Stories" value={list.length} />
+        <FollowMetric
+          label="Followers"
+          value={stats.data?.followers ?? 0}
+          onClick={() => setStatsView("followers")}
+        />
+        <FollowMetric
+          label="Following"
+          value={stats.data?.following ?? 0}
+          onClick={() => setStatsView("following")}
+        />
+        <FollowMetric label="Stories" value={list.length} onClick={() => setStatsView("stories")} />
       </div>
+      <ProfileStatsDrawer
+        username={username}
+        open={statsView !== null}
+        initialView={statsView}
+        followerCount={stats.data?.followers ?? 0}
+        followingCount={stats.data?.following ?? 0}
+        followedStories={list}
+        onOpenChange={(open) => {
+          if (!open) setStatsView(null);
+        }}
+      />
 
       <ul className="mt-4 space-y-2.5">
         {stories.isPending ? (
@@ -411,13 +442,289 @@ function formatTimelineDate(value: string) {
     : date.toLocaleString("en-KE", { dateStyle: "medium", timeStyle: "short" });
 }
 
-function FollowMetric({ label, value }: { label: string; value: number }) {
+function FollowMetric({
+  label,
+  value,
+  onClick,
+}: {
+  label: string;
+  value: number;
+  onClick: () => void;
+}) {
   return (
-    <div className="px-2 py-2.5 text-center md:rounded-xl md:border md:border-border/70 md:bg-secondary/35 md:px-3">
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg px-2 py-2.5 text-center transition-colors hover:bg-secondary/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:rounded-xl md:border md:border-border/70 md:bg-secondary/35 md:px-3"
+    >
       <p className="text-xl font-semibold tabular-nums" aria-label={value.toLocaleString()}>
         {formatCount(value)}
       </p>
       <p className="mt-0.5 truncate text-[11px] text-muted-foreground">{label}</p>
-    </div>
+    </button>
+  );
+}
+
+type ProfileStatsView = "followers" | "following" | "stories";
+
+type ConnectionMember = {
+  id: string;
+  username: string;
+  photo_url: string | null;
+};
+
+function ProfileStatsDrawer({
+  username,
+  open,
+  initialView,
+  followerCount,
+  followingCount,
+  followedStories,
+  onOpenChange,
+}: {
+  username: string | null;
+  open: boolean;
+  initialView: ProfileStatsView | null;
+  followerCount: number;
+  followingCount: number;
+  followedStories: FollowedStoryRow[];
+  onOpenChange: (open: boolean) => void;
+}) {
+  const fetchConnections = useServerFn(getPublicProfileConnections);
+  const [view, setView] = useState<ProfileStatsView>("followers");
+  const [cursorHistory, setCursorHistory] = useState<(string | null)[]>([null]);
+  const [members, setMembers] = useState<ConnectionMember[]>([]);
+  const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [hasMore, setHasMore] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
+  const [retry, setRetry] = useState(0);
+  const cursor = cursorHistory.at(-1) ?? null;
+
+  useEffect(() => {
+    if (!open || (view !== "followers" && view !== "following") || !username) return;
+    let cancelled = false;
+    setLoading(true);
+    setLoadError(false);
+    void fetchConnections({ data: { username, kind: view, cursor } })
+      .then((page) => {
+        if (cancelled) return;
+        setMembers(page.members as ConnectionMember[]);
+        setHasMore(page.hasMore);
+        setNextCursor(page.nextCursor);
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(true);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [cursor, fetchConnections, open, retry, username, view]);
+
+  useEffect(() => {
+    if (!open || !initialView) return;
+    setView(initialView);
+    setCursorHistory([null]);
+    setMembers([]);
+    setNextCursor(null);
+    setHasMore(false);
+    setLoadError(false);
+  }, [initialView, open]);
+
+  function changeView(nextView: ProfileStatsView) {
+    setView(nextView);
+    setCursorHistory([null]);
+    setMembers([]);
+    setNextCursor(null);
+    setHasMore(false);
+    setLoadError(false);
+  }
+
+  const tabs: { id: ProfileStatsView; label: string; count: number }[] = [
+    { id: "followers", label: "Followers", count: followerCount },
+    { id: "following", label: "Following", count: followingCount },
+    { id: "stories", label: "Stories", count: followedStories.length },
+  ];
+
+  return (
+    <Drawer open={open} onOpenChange={onOpenChange}>
+      <DrawerContent
+        overlayClassName="!z-[100]"
+        className="!inset-0 !bottom-0 !z-[101] !mt-0 !h-[100dvh] !max-h-[100dvh] !rounded-none !border-0 !p-0 [&>div:first-child]:hidden"
+      >
+        <DrawerTitle className="sr-only">Your profile stats</DrawerTitle>
+        <DrawerDescription className="sr-only">
+          Browse your followers, following list, and followed stories.
+        </DrawerDescription>
+        <div className="flex h-full min-h-0 flex-col bg-background">
+          <header className="flex shrink-0 items-center gap-3 border-b border-border px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+              {view === "stories" ? (
+                <FileText className="size-5" />
+              ) : (
+                <UsersRound className="size-5" />
+              )}
+            </div>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-lg font-semibold">
+                {view === "stories"
+                  ? "Stories you follow"
+                  : view === "followers"
+                    ? "Followers"
+                    : "Following"}
+              </h2>
+              <p className="truncate text-xs text-muted-foreground">
+                {username ? `@${username}` : "Your Candid activity"}
+              </p>
+            </div>
+            <DrawerClose asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="size-10 rounded-full"
+                aria-label="Close"
+              >
+                <CloseIcon className="size-4" />
+              </Button>
+            </DrawerClose>
+          </header>
+
+          <nav className="grid shrink-0 grid-cols-3 border-b border-border px-3 sm:px-6">
+            {tabs.map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => changeView(tab.id)}
+                aria-pressed={view === tab.id}
+                className={`min-h-12 border-b-2 px-2 text-sm transition-colors ${
+                  view === tab.id
+                    ? "border-primary font-semibold text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {tab.label} <span className="text-xs">{formatCount(tab.count)}</span>
+              </button>
+            ))}
+          </nav>
+
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
+            {view === "stories" ? (
+              followedStories.length ? (
+                <ul className="divide-y divide-border px-4 sm:px-6">
+                  {followedStories.map((story) => (
+                    <li key={story.story_id}>
+                      <Link
+                        to="/stories/$id"
+                        params={{ id: story.story_id }}
+                        onClick={() => onOpenChange(false)}
+                        className="flex min-h-16 items-center gap-3 py-3"
+                      >
+                        <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                          <MessageCircle className="size-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium">
+                            {story.title ?? "Untitled story"}
+                          </span>
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            {story.company_name ?? "Unknown company"}
+                          </span>
+                        </span>
+                        <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <div className="grid min-h-56 place-items-center px-6 text-center">
+                  <p className="text-sm text-muted-foreground">
+                    You aren’t following any stories yet.
+                  </p>
+                </div>
+              )
+            ) : loading ? (
+              <div className="grid min-h-56 place-items-center text-sm text-muted-foreground">
+                <span className="inline-flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" /> Loading {view}…
+                </span>
+              </div>
+            ) : loadError ? (
+              <div className="grid min-h-56 place-items-center px-6 text-center">
+                <div>
+                  <p className="text-sm font-medium">This list couldn’t load.</p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => setRetry((count) => count + 1)}
+                  >
+                    Try again
+                  </Button>
+                </div>
+              </div>
+            ) : members.length ? (
+              <ul className="divide-y divide-border px-4 sm:px-6">
+                {members.map((member) => (
+                  <li key={member.id}>
+                    <Link
+                      to="/u/$username"
+                      params={{ username: member.username }}
+                      onClick={() => onOpenChange(false)}
+                      className="flex min-h-16 items-center gap-3 py-3"
+                    >
+                      <ProfileAvatar
+                        photoUrl={member.photo_url}
+                        initials={member.username.slice(0, 2)}
+                        className="size-10 shrink-0 border border-border"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                        @{member.username}
+                      </span>
+                      <ArrowRight className="size-4 shrink-0 text-muted-foreground" />
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <div className="grid min-h-56 place-items-center px-6 text-center text-sm text-muted-foreground">
+                No {view} yet.
+              </div>
+            )}
+          </div>
+
+          {view !== "stories" ? (
+            <footer className="flex shrink-0 items-center justify-between border-t border-border bg-background px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:px-6">
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading || cursorHistory.length <= 1}
+                onClick={() => {
+                  setMembers([]);
+                  setCursorHistory((history) => history.slice(0, -1));
+                }}
+              >
+                Previous
+              </Button>
+              <span className="text-xs text-muted-foreground">Page {cursorHistory.length}</span>
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={loading || !hasMore || !nextCursor}
+                onClick={() => {
+                  if (!nextCursor) return;
+                  setMembers([]);
+                  setCursorHistory((history) => [...history, nextCursor]);
+                }}
+              >
+                Next <ArrowRight className="size-4" />
+              </Button>
+            </footer>
+          ) : null}
+        </div>
+      </DrawerContent>
+    </Drawer>
   );
 }

@@ -277,11 +277,12 @@ function ProfilePage() {
                     )}
                     {verification.data?.badgeStatus === "claimed" ? (
                       <BadgeCheck className="size-5 shrink-0 text-verified" aria-label="Verified" />
-                    ) : null}
-                    <MembershipBadge
-                      tier={onboarding.data?.membership?.tier}
-                      official={onboarding.data?.accountType === "official"}
-                    />
+                    ) : (
+                      <MembershipBadge
+                        tier={onboarding.data?.membership?.tier}
+                        official={onboarding.data?.accountType === "official"}
+                      />
+                    )}
                     {user ? (
                       <Button
                         type="button"
@@ -370,7 +371,7 @@ function ProfilePage() {
             </section>
           ) : null}
 
-          <FollowedStories />
+          <FollowedStories username={onboarding.data?.username ?? null} />
           <SavedCommunityPosts />
 
           {user ? <ContributionsPanel /> : null}

@@ -15,6 +15,38 @@ export type NotificationActivityType =
   | "company_story"
   | "other";
 
+export const NOTIFICATION_ACTIVITY_OPTIONS: {
+  id: NotificationActivityType;
+  label: string;
+}[] = [
+  { id: "follow", label: "New followers" },
+  { id: "follow_request", label: "Follow requests" },
+  { id: "post_like", label: "Story likes" },
+  { id: "comment", label: "Comments" },
+  { id: "reply", label: "Replies" },
+  { id: "comment_like", label: "Comment likes" },
+  { id: "mention", label: "Mentions" },
+  { id: "message_reaction", label: "Message reactions" },
+  { id: "company_story", label: "Company updates" },
+  { id: "other", label: "Other activity" },
+];
+
+export type NotificationActivityPreferences = Record<NotificationActivityType, boolean>;
+
+const PREFERENCES_STORAGE_PREFIX = "candid.notification-preferences.v1";
+const DEFAULT_NOTIFICATION_PREFERENCES: NotificationActivityPreferences = {
+  follow: true,
+  follow_request: true,
+  post_like: true,
+  comment: true,
+  reply: true,
+  comment_like: true,
+  mention: true,
+  message_reaction: true,
+  company_story: true,
+  other: true,
+};
+
 /** Where a notification should take the user when it is actionable. */
 export type NotifyLink = { href: string; label?: string };
 
@@ -56,6 +88,7 @@ let notifications: AppNotification[] = [];
 let banners: BannerNotification[] = [];
 let activeUserId = "guest";
 let hydratedScope: string | null = null;
+let notificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES;
 let overlayOpen = false;
 let overlayView: OverlayView = { name: "list" };
 
@@ -79,6 +112,25 @@ function hydrate() {
     // The old unscoped inbox may contain rows from another account on this device.
     // Keep it out of every signed-in account's inbox.
     window.localStorage.removeItem(STORAGE_PREFIX);
+    const savedPreferences = window.localStorage.getItem(
+      `${PREFERENCES_STORAGE_PREFIX}:${activeUserId}`,
+    );
+    if (savedPreferences) {
+      try {
+        const parsed = JSON.parse(savedPreferences) as Partial<NotificationActivityPreferences>;
+        notificationPreferences = NOTIFICATION_ACTIVITY_OPTIONS.reduce(
+          (preferences, { id }) => {
+            preferences[id] = parsed[id] !== false;
+            return preferences;
+          },
+          { ...DEFAULT_NOTIFICATION_PREFERENCES },
+        );
+      } catch {
+        notificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES;
+      }
+    } else {
+      notificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES;
+    }
     const raw = window.localStorage.getItem(`${STORAGE_PREFIX}:${activeUserId}`);
     if (raw) {
       const parsed = JSON.parse(raw) as AppNotification[];
@@ -117,11 +169,45 @@ export function setNotificationUser(userId: string | null) {
   activeUserId = nextUserId;
   hydratedScope = null;
   notifications = [];
+  notificationPreferences = DEFAULT_NOTIFICATION_PREFERENCES;
   banners = [];
   overlayOpen = false;
   overlayView = { name: "list" };
   hydrate();
   emit();
+}
+
+export function useNotificationPreferences() {
+  return useSyncExternalStore(
+    subscribe,
+    () => notificationPreferences,
+    () => DEFAULT_NOTIFICATION_PREFERENCES,
+  );
+}
+
+export function setNotificationActivityEnabled(
+  activityType: NotificationActivityType,
+  enabled: boolean,
+) {
+  notificationPreferences = { ...notificationPreferences, [activityType]: enabled };
+  if (typeof window !== "undefined") {
+    try {
+      window.localStorage.setItem(
+        `${PREFERENCES_STORAGE_PREFIX}:${activeUserId}`,
+        JSON.stringify(notificationPreferences),
+      );
+    } catch {
+      /* storage unavailable */
+    }
+  }
+  emit();
+}
+
+export function isNotificationActivityEnabled(
+  activityType: NotificationActivityType | undefined,
+  preferences: NotificationActivityPreferences = notificationPreferences,
+) {
+  return preferences[activityType ?? "other"];
 }
 
 function newId() {
@@ -463,7 +549,12 @@ export function useBanners() {
 export function useUnreadCount() {
   return useSyncExternalStore(
     subscribe,
-    () => notifications.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0),
+    () =>
+      notifications.reduce(
+        (total, n) =>
+          total + (n.read || n.archived || !isNotificationActivityEnabled(n.activityType) ? 0 : 1),
+        0,
+      ),
     () => 0,
   );
 }

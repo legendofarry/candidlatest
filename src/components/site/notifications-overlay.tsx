@@ -46,7 +46,9 @@ import {
   removeNotification,
   removeNotifications,
   unarchiveNotification,
+  isNotificationActivityEnabled,
   useNotifications,
+  useNotificationPreferences,
   useNotificationsOverlay,
   type AppNotification,
   type NotificationActivityType,
@@ -190,6 +192,7 @@ function matchesNotificationFilter(notification: AppNotification, filter: Notifi
 export function NotificationsOverlay() {
   const { open, view } = useNotificationsOverlay();
   const all = useNotifications();
+  const notificationPreferences = useNotificationPreferences();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const fetchNotificationPage = useServerFn(syncMyNotifications);
@@ -221,7 +224,11 @@ export function NotificationsOverlay() {
     if (items.length) ingestServerNotifications(items);
   }, [serverPages.data]);
 
-  const notifications = all.filter((n) => (tab === "archive" ? n.archived : !n.archived));
+  const notifications = all.filter(
+    (n) =>
+      (tab === "archive" ? n.archived : !n.archived) &&
+      isNotificationActivityEnabled(n.activityType, notificationPreferences),
+  );
   const actionNotification = notifications.find((n) => n.id === notificationActionId) ?? null;
   const matchingNotifications = useMemo(() => {
     const query = search.trim().toLowerCase();
@@ -231,9 +238,25 @@ export function NotificationsOverlay() {
       return matchesSearch && matchesNotificationFilter(n, filter);
     });
   }, [notifications, search, filter]);
-  const archivedCount = all.reduce((total, n) => total + (n.archived ? 1 : 0), 0);
+  const archivedCount = all.reduce(
+    (total, n) =>
+      total +
+      (n.archived && isNotificationActivityEnabled(n.activityType, notificationPreferences)
+        ? 1
+        : 0),
+    0,
+  );
 
-  const unread = all.reduce((total, n) => total + (n.read || n.archived ? 0 : 1), 0);
+  const unread = all.reduce(
+    (total, n) =>
+      total +
+      (n.read ||
+      n.archived ||
+      !isNotificationActivityEnabled(n.activityType, notificationPreferences)
+        ? 0
+        : 1),
+    0,
+  );
   const companyWatchSyncError = serverPages.data?.pages.find(
     (page) => page.companyWatchSyncError,
   )?.companyWatchSyncError;

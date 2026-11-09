@@ -8,7 +8,7 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "preview": "vite preview",
-    "test": "node --experimental-strip-types --test src/lib/membership.test.ts src/lib/company-branding.test.ts src/lib/company-brand-discovery.test.ts src/lib/chat-wallpapers.test.ts src/lib/message-appearance.test.ts src/lib/account-switching.test.ts src/lib/profile-visibility.test.ts",
+    "test": "node --experimental-strip-types --test src/lib/membership.test.ts src/lib/company-branding.test.ts src/lib/company-brand-discovery.test.ts src/lib/chat-wallpapers.test.ts src/lib/message-appearance.test.ts src/lib/account-switching.test.ts src/lib/profile-visibility.test.ts src/lib/notifications-store.test.ts",
     "lint": "eslint .",
     "format": "prettier --write ."
   },

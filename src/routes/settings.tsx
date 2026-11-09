@@ -10,14 +10,12 @@ import {
   Fingerprint,
   Settings2,
   ShieldCheck,
-  DatabaseZap,
   EyeOff,
   Gem,
   RotateCcw,
   UserRound,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { PrivacySettings } from "@/components/site/privacy-settings";
 import { AccountDataExport } from "@/components/site/account-data-export";
@@ -25,8 +23,6 @@ import { AccountLifecycleSettings } from "@/components/site/account-lifecycle-se
 import { useAuth } from "@/hooks/useAuth";
 import { notify } from "@/lib/notifications-store";
 import { setPreference, usePreferences } from "@/lib/preferences";
-import { clearPersistedQueries } from "@/lib/query-persist";
-import { storageService } from "@/lib/storage";
 import {
   clearCredentials,
   getCredentials,
@@ -43,21 +39,9 @@ import {
   DrawerTitle,
 } from "@/components/ui/drawer";
 import { FloatingBackButton } from "@/components/site/floating-back-button";
-import { firebaseAuth } from "@/integrations/firebase/client";
 import { claimOfficialCandidAccount, getOnboardingState } from "@/lib/onboarding.functions";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
-import { clearDevelopmentFirestore, RESET_CONFIRMATION } from "@/lib/developer.functions";
 import { getMyFeedPreferences, updateFeedPreference } from "@/lib/social.functions";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/settings")({
   head: () => ({
@@ -77,17 +61,12 @@ function SettingsPage() {
   const queryClient = useQueryClient();
   const [bioAvailable, setBioAvailable] = useState(false);
   const [enrolled, setEnrolled] = useState(false);
-  const [developerResetOpen, setDeveloperResetOpen] = useState(false);
   const [notInterestedOpen, setNotInterestedOpen] = useState(false);
-  const [developerResetText, setDeveloperResetText] = useState("");
-  const [developerResetting, setDeveloperResetting] = useState(false);
   const [claimingCandid, setClaimingCandid] = useState(false);
   const fetchProfile = useServerFn(getOnboardingState);
   const claimCandidAccount = useServerFn(claimOfficialCandidAccount);
-  const resetFirestore = useServerFn(clearDevelopmentFirestore);
   const readFeedPreferences = useServerFn(getMyFeedPreferences);
   const changeFeedPreference = useServerFn(updateFeedPreference);
-  const developerMode = import.meta.env.DEV || import.meta.env["VITE_DEVELOPER_MODE"] === "true";
   const profile = useQuery({
     queryKey: ["onboarding-state", user?.uid ?? null],
     queryFn: () => fetchProfile(),
@@ -131,27 +110,6 @@ function SettingsPage() {
       setPreference("biometricUnlock", true);
     } catch (error) {
       notify.error(error instanceof Error ? error.message : "Could not enable biometric unlock");
-    }
-  }
-
-  async function clearDevelopmentDatabase() {
-    if (developerResetting || developerResetText !== RESET_CONFIRMATION) return;
-    setDeveloperResetting(true);
-    try {
-      await resetFirestore({ data: { confirmation: RESET_CONFIRMATION } });
-      clearPersistedQueries();
-      storageService.clearCache();
-      queryClient.clear();
-      setDeveloperResetOpen(false);
-      setDeveloperResetText("");
-      await firebaseAuth.signOut();
-      await navigate({ to: "/auth" });
-    } catch (error) {
-      notify.error(
-        error instanceof Error ? error.message : "Could not clear the development database.",
-      );
-    } finally {
-      setDeveloperResetting(false);
     }
   }
 
@@ -369,8 +327,7 @@ function SettingsPage() {
               </>
             ) : null}
 
-            {profile.data?.canClaimOfficialAccount &&
-              profile.data?.accountType !== "official" ? (
+            {profile.data?.canClaimOfficialAccount && profile.data?.accountType !== "official" ? (
               <SettingsGroup title="Official Candid account">
                 <div className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
                   <div>
@@ -502,21 +459,6 @@ function SettingsPage() {
                   </div>
                 </div>
 
-                {developerMode ? (
-                  <div id="developer-tools">
-                    <SettingsGroup title="Developer tools">
-                      <ActionRow
-                        icon={<DatabaseZap className="size-4" />}
-                        title="Clear Firestore development data"
-                        description="Deletes every Firestore document, including profiles, stories and messages. Firebase Authentication accounts and uploaded files are not deleted."
-                        actionLabel="Clear database"
-                        destructive
-                        onClick={() => setDeveloperResetOpen(true)}
-                      />
-                    </SettingsGroup>
-                  </div>
-                ) : null}
-
                 <Button asChild variant="outline" className="hidden w-full md:inline-flex">
                   <Link to="/profile">View profile</Link>
                 </Button>
@@ -525,44 +467,6 @@ function SettingsPage() {
           </motion.div>
         </section>
       </div>
-      <AlertDialog
-        open={developerResetOpen}
-        onOpenChange={(open) => {
-          setDeveloperResetOpen(open);
-          if (!open && !developerResetting) setDeveloperResetText("");
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Clear all Firestore development data?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This permanently removes every Firestore document. Firebase Authentication accounts
-              and Cloudinary uploads are not included. Type <strong>{RESET_CONFIRMATION}</strong> to
-              continue.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <Input
-            value={developerResetText}
-            onChange={(event) => setDeveloperResetText(event.target.value)}
-            placeholder={RESET_CONFIRMATION}
-            autoComplete="off"
-            disabled={developerResetting}
-          />
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={developerResetting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              disabled={developerResetText !== RESET_CONFIRMATION || developerResetting}
-              onClick={(event) => {
-                event.preventDefault();
-                void clearDevelopmentDatabase();
-              }}
-            >
-              {developerResetting ? "Clearing…" : "Clear Firestore"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
