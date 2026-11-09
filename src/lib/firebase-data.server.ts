@@ -12,6 +12,7 @@ import { cacheServerRead } from "./server-cache";
 import { isValidMapCoordinates } from "./map-location";
 import { getKnownKenyanEmployerDirectoryEntries } from "./kenyan-employers";
 import { companiesLikelySame } from "./company-match";
+import { canViewerSeeProfileContributions } from "./profile-visibility";
 
 export type CompanyRecord = {
   id: string;
@@ -1059,16 +1060,10 @@ async function calculatePublicStories(input: {
         profile.account_status === "deletion_in_progress"
       )
         return;
-      if (profile.profile_visibility !== "private" || input.viewerId === authorId) {
+      if (canViewerSeeProfileContributions(profile.profile_visibility, authorId, input.viewerId)) {
         allowedAuthorIds.add(authorId);
         return;
       }
-      if (!input.viewerId) return;
-      const follow = await db
-        .collection("follows")
-        .doc(input.viewerId + ":" + authorId)
-        .get();
-      if (follow.exists && follow.get("status") !== "pending") allowedAuthorIds.add(authorId);
     }),
   );
   const visibleSelected = selected.filter(
@@ -1206,13 +1201,7 @@ export async function getPublicStoryPage(input: {
         author.account_status === "deletion_in_progress"
       )
         return false;
-      if (author.profile_visibility !== "private" || input.viewerId === author.id) return true;
-      if (!input.viewerId) return false;
-      const follow = await db
-        .collection("follows")
-        .doc(input.viewerId + ":" + author.id)
-        .get();
-      return follow.exists && follow.get("status") !== "pending";
+      return canViewerSeeProfileContributions(author.profile_visibility, author.id, input.viewerId);
     }),
   );
   const visibleStoryRows = storyRows.filter((_, index) => visibleStories[index]);
@@ -1364,13 +1353,7 @@ async function canViewAuthorContributions(
   )
     return false;
   if (viewerId && viewerId !== authorId && await accountsBlockEachOther(viewerId, authorId)) return false;
-  if (profile.profile_visibility !== "private" || viewerId === authorId) return true;
-  if (!viewerId) return false;
-  const follow = await getFirestoreDb()
-    .collection("follows")
-    .doc(viewerId + ":" + authorId)
-    .get();
-  return follow.exists && follow.get("status") !== "pending";
+  return canViewerSeeProfileContributions(profile.profile_visibility, authorId, viewerId);
 }
 
 async function calculateStoryView(id: string, viewerId: string | null = null) {

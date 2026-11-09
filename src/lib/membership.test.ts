@@ -51,7 +51,7 @@ test("only the existing legacy Gold account or explicitly unlocked accounts can 
   assert.equal(canSelfSwitchMembership({ subscription_tier: "basic" }), false);
 });
 
-test("Free and Premium package limits keep safety, core actions, and verified badges independent", () => {
+test("Free and Premium package limits keep safety and core actions independent", () => {
   assert.deepEqual(getMembershipEntitlements("basic"), {
     membershipBadge: false,
     maxPinnedStories: 0,
@@ -62,7 +62,7 @@ test("Free and Premium package limits keep safety, core actions, and verified ba
     monthlySalaryReports: 3,
   });
   assert.deepEqual(getMembershipEntitlements("premium"), {
-    membershipBadge: false,
+    membershipBadge: true,
     maxPinnedStories: 3,
     maxComparedCompanies: 5,
     leaderboardRows: 10,
@@ -71,7 +71,7 @@ test("Free and Premium package limits keep safety, core actions, and verified ba
     monthlySalaryReports: 20,
   });
   assert.deepEqual(getMembershipEntitlements("gold"), {
-    membershipBadge: false,
+    membershipBadge: true,
     maxPinnedStories: 3,
     maxComparedCompanies: 5,
     leaderboardRows: 10,

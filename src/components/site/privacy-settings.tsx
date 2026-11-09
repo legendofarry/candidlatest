@@ -43,7 +43,7 @@ const VISIBILITY = [
   {
     value: "private",
     label: "Private",
-    detail: "Approve followers before they see your contributions.",
+    detail: "Only you can see your stories and contributions.",
     Icon: LockKeyhole,
   },
 ] as const;

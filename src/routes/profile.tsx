@@ -163,6 +163,7 @@ function ProfilePage() {
           user={user}
           username={onboarding.data?.username ?? null}
           profilePhotoUrl={onboarding.data?.photoUrl ?? null}
+          premiumAccess={onboarding.data ? onboarding.data.membership.tier !== "basic" : undefined}
         />
       ) : null}
       {user ? (
@@ -173,18 +174,14 @@ function ProfilePage() {
           photoUrl={onboarding.data?.photoUrl ?? null}
           coverUrl={onboarding.data?.coverUrl ?? null}
           onPhotoSaved={(photoUrl) => {
-            queryClient.setQueryData(
-              ["onboarding-state", user.uid],
-              (previous: unknown) =>
-                previous && typeof previous === "object" ? { ...previous, photoUrl } : previous,
+            queryClient.setQueryData(["onboarding-state", user.uid], (previous: unknown) =>
+              previous && typeof previous === "object" ? { ...previous, photoUrl } : previous,
             );
             void queryClient.invalidateQueries({ queryKey: ["public-profile"] });
           }}
           onCoverSaved={(coverUrl) => {
-            queryClient.setQueryData(
-              ["onboarding-state", user.uid],
-              (previous: unknown) =>
-                previous && typeof previous === "object" ? { ...previous, coverUrl } : previous,
+            queryClient.setQueryData(["onboarding-state", user.uid], (previous: unknown) =>
+              previous && typeof previous === "object" ? { ...previous, coverUrl } : previous,
             );
             void queryClient.invalidateQueries({ queryKey: ["public-profile"] });
           }}

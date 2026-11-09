@@ -58,6 +58,22 @@ export function getFirestoreDb() {
   return db;
 }
 
+export async function createFirebaseCustomToken(uid: string) {
+  const credentials = parseServiceAccount();
+  const key = await importPKCS8(credentials.privateKey, "RS256");
+  const issuedAt = Math.floor(Date.now() / 1000);
+  return new SignJWT({ uid })
+    .setProtectedHeader({ alg: "RS256", typ: "JWT" })
+    .setIssuer(credentials.clientEmail)
+    .setSubject(credentials.clientEmail)
+    .setAudience(
+      "https://identitytoolkit.googleapis.com/google.identity.identitytoolkit.v1.IdentityToolkit",
+    )
+    .setIssuedAt(issuedAt)
+    .setExpirationTime(issuedAt + 5 * 60)
+    .sign(key);
+}
+
 let messagingToken: { value: string; expiresAt: number; projectId: string } | undefined;
 let realtimeDatabaseToken: { value: string; expiresAt: number; projectId: string } | undefined;
 
@@ -74,7 +90,8 @@ export async function getFirebaseRealtimeDatabaseCredentials() {
   const key = await importPKCS8(credentials.privateKey, "RS256");
   const issuedAt = Math.floor(Date.now() / 1000);
   const assertion = await new SignJWT({
-    scope: "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/cloud-platform",
+    scope:
+      "https://www.googleapis.com/auth/firebase.database https://www.googleapis.com/auth/cloud-platform",
   })
     .setProtectedHeader({ alg: "RS256", typ: "JWT" })
     .setIssuer(credentials.clientEmail)

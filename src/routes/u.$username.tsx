@@ -634,11 +634,10 @@ function PublicProfilePage() {
             <LockKeyhole className="mx-auto size-7 text-primary" />
             <h2 className="mt-3 font-semibold">This profile is private</h2>
             <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-              Follow @{profile.username} and wait for approval to see their stories and
-              contributions.
+              Only @{profile.username} can see this account’s stories and contributions.
             </p>
           </section>
-        ) : pinnedStories.length ? (
+        ) : profile.isSelf && pinnedStories.length ? (
           <section className="mx-4 mb-3 overflow-hidden rounded-2xl border border-primary/40 bg-primary/10 shadow-[0_8px_28px_-18px_hsl(var(--primary)/0.55)] sm:mx-5">
             <div className="flex items-center justify-between gap-3 border-b border-primary/20 bg-primary/10 px-4 py-3 sm:px-5">
               <div className="flex items-center gap-2">
@@ -710,7 +709,7 @@ function PublicProfilePage() {
                   </Link>
                 )
               ) : null}
-              {visibleProfileStories.length ? (
+              {profile.isSelf && visibleProfileStories.length ? (
                 <div className="divide-y divide-border">
                   {visibleProfileStories.map((story) => (
                     <article key={story.id} className="px-4 py-4 sm:px-5">
@@ -794,12 +793,12 @@ function PublicProfilePage() {
                     </article>
                   ))}
                 </div>
-              ) : pinnedStories.length === 0 ? (
+              ) : profile.isSelf && pinnedStories.length === 0 ? (
                 <p className="px-4 py-8 text-center text-sm text-muted-foreground">
                   No published stories yet.
                 </p>
               ) : null}
-              {hasMoreProfileStories ? (
+              {profile.isSelf && hasMoreProfileStories ? (
                 <div className="flex justify-center border-t border-border p-4">
                   <Button
                     variant="outline"

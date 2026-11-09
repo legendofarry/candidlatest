@@ -5,7 +5,11 @@ export type RememberedAccount = {
   displayName: string | null;
   photoURL: string | null;
   lastUsedAt: number;
+  premium?: boolean;
+  trusted?: boolean;
 };
+
+export const MAX_REMEMBERED_ACCOUNTS = 3;
 
 const STORAGE_KEY = "candid.remembered-accounts.v1";
 
@@ -18,7 +22,9 @@ function isRememberedAccount(value: unknown): value is RememberedAccount {
     (typeof account.username === "string" || account.username === null) &&
     (typeof account.displayName === "string" || account.displayName === null) &&
     (typeof account.photoURL === "string" || account.photoURL === null) &&
-    typeof account.lastUsedAt === "number"
+    typeof account.lastUsedAt === "number" &&
+    (account.premium === undefined || typeof account.premium === "boolean") &&
+    (account.trusted === undefined || typeof account.trusted === "boolean")
   );
 }
 
@@ -47,18 +53,58 @@ function saveAccounts(accounts: RememberedAccount[]) {
 export function rememberAccount(account: RememberedAccount) {
   const accounts = getRememberedAccounts();
   const existing = accounts.find((saved) => saved.uid === account.uid);
+  const { premium, trusted, ...accountDetails } = account;
   const updatedAccount = {
     ...existing,
-    ...account,
+    ...accountDetails,
     username: account.username ?? existing?.username ?? null,
     displayName: account.displayName ?? existing?.displayName ?? null,
     photoURL: account.photoURL ?? existing?.photoURL ?? null,
+    ...(typeof premium === "boolean"
+      ? { premium }
+      : existing?.premium !== undefined
+        ? { premium: existing.premium }
+        : {}),
+    ...(typeof trusted === "boolean"
+      ? { trusted }
+      : existing?.trusted !== undefined
+        ? { trusted: existing.trusted }
+        : {}),
   };
   const updated = [updatedAccount, ...accounts.filter((saved) => saved.uid !== account.uid)].sort(
     (a, b) => b.lastUsedAt - a.lastUsedAt,
   );
   saveAccounts(updated);
   return updated;
+}
+
+export function setRememberedAccountTrusted(uid: string, trusted: boolean) {
+  const accounts = getRememberedAccounts();
+  const updated = accounts.map((account) =>
+    account.uid === uid ? { ...account, trusted } : account,
+  );
+  saveAccounts(updated);
+  return updated;
+}
+
+export function clearRememberedAccountTrust() {
+  const accounts = getRememberedAccounts();
+  const updated = accounts.map((account) => ({ ...account, trusted: false }));
+  saveAccounts(updated);
+  return updated;
+}
+
+export function canAddRememberedAccount(
+  accounts: RememberedAccount[],
+  activeUid: string,
+  activePremiumAccess?: boolean,
+) {
+  if (accounts.length >= MAX_REMEMBERED_ACCOUNTS) return false;
+  return accounts.some((account) =>
+    account.uid === activeUid && activePremiumAccess !== undefined
+      ? activePremiumAccess
+      : account.premium === true,
+  );
 }
 
 export function updateRememberedAccountPhotos(photosByUsername: Record<string, string>) {

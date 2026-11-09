@@ -41,7 +41,7 @@ export const MEMBERSHIP_ENTITLEMENTS = {
     monthlySalaryReports: 3,
   },
   premium: {
-    membershipBadge: false,
+    membershipBadge: true,
     maxPinnedStories: 3,
     maxComparedCompanies: 5,
     leaderboardRows: 10,
@@ -51,7 +51,7 @@ export const MEMBERSHIP_ENTITLEMENTS = {
   },
   // Historical Gold memberships keep Premium access, but Gold is never offered.
   gold: {
-    membershipBadge: false,
+    membershipBadge: true,
     maxPinnedStories: 3,
     maxComparedCompanies: 5,
     leaderboardRows: 10,

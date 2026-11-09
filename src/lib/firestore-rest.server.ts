@@ -235,8 +235,13 @@ export class DocumentReference {
       currentDocument: { exists: false },
     };
   }
-  deleteWrite(): Write {
-    return { delete: this.name };
+  deleteWrite(precondition?: { updateTime?: string }): Write {
+    return {
+      delete: this.name,
+      ...(precondition?.updateTime
+        ? { currentDocument: { updateTime: precondition.updateTime } }
+        : {}),
+    };
   }
   set(data: DocumentData, options?: SetOptions) {
     return this.db.commit([this.setWrite(data, options)]);
@@ -247,8 +252,8 @@ export class DocumentReference {
   create(data: DocumentData) {
     return this.db.commit([this.createWrite(data)]);
   }
-  delete() {
-    return this.db.commit([this.deleteWrite()]);
+  delete(precondition?: { updateTime?: string }) {
+    return this.db.commit([this.deleteWrite(precondition)]);
   }
 }
 
@@ -411,8 +416,8 @@ export class WriteBatch {
     this.writes.push(ref.createWrite(data));
     return this;
   }
-  delete(ref: DocumentReference) {
-    this.writes.push(ref.deleteWrite());
+  delete(ref: DocumentReference, precondition?: { updateTime?: string }) {
+    this.writes.push(ref.deleteWrite(precondition));
     return this;
   }
   async commit() {

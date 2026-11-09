@@ -10,6 +10,7 @@ import {
   type StoryRecord,
 } from "./firebase-data.server";
 import { getEffectiveMembershipTier, getMembershipEntitlements } from "./membership";
+import { canViewerSeeProfileContributions } from "./profile-visibility";
 import {
   createAuthenticatedImageUrl,
   getCloudinaryEvidenceConfig,
@@ -1671,7 +1672,11 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       : "accepted";
   const isSelf = viewerId === userId;
   const isPrivate = profile.profile_visibility === "private";
-  const canViewContributions = !isPrivate || isSelf || viewerFollowStatus === "accepted";
+  const canViewContributions = canViewerSeeProfileContributions(
+    profile.profile_visibility,
+    userId,
+    viewerId,
+  );
   const [storyCount, commentCount, anonymousStoryCount, anonymousCommentCount, stories] =
     canViewContributions
       ? await Promise.all([
@@ -1697,14 +1702,16 @@ export async function readPublicProfile(username: string, viewerId: string | nul
             .where("status", "==", "published")
             .where("is_anonymous", "==", true)
             .count(),
-          db
-            .collection("stories")
-            .where("author_id", "==", userId)
-            .where("status", "==", "published")
-            .orderBy("created_at", "desc")
-            .orderBy("__name__", "desc")
-            .limit(31)
-            .get(),
+          isSelf
+            ? db
+                .collection("stories")
+                .where("author_id", "==", userId)
+                .where("status", "==", "published")
+                .orderBy("created_at", "desc")
+                .orderBy("__name__", "desc")
+                .limit(31)
+                .get()
+            : Promise.resolve(null),
         ])
       : [0, 0, 0, 0, null];
   const storyDocs = stories?.docs ?? [];
@@ -1717,7 +1724,7 @@ export async function readPublicProfile(username: string, viewerId: string | nul
       .map((doc) => publicProfileStory(doc.id, doc.data() as StoryRecord, doc.updateTime)),
   );
   const profileStoriesById = new Map(profileStories.map((story) => [story.id, story] as const));
-  const pinnedStoryDocs = canViewContributions
+  const pinnedStoryDocs = isSelf
     ? await Promise.all(
         requestedPinIds.map(
           async (storyId) =>
@@ -1831,14 +1838,7 @@ export async function readPublicProfileStories(
   if (viewerId && viewerId !== userId && (await accountsBlockEachOther(viewerId, userId))) {
     return { stories: [], hasMore: false, nextCursor: null };
   }
-  if (profile?.profile_visibility === "private" && viewerId !== userId) {
-    const follow = viewerId
-      ? await db.collection("follows").doc(`${viewerId}:${userId}`).get()
-      : null;
-    if (!follow?.exists || follow.get("status") === "pending") {
-      return { stories: [], hasMore: false, nextCursor: null };
-    }
-  }
+  if (viewerId !== userId) return { stories: [], hasMore: false, nextCursor: null };
 
   let query = db
     .collection("stories")

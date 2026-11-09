@@ -1,9 +1,13 @@
 import assert from "node:assert/strict";
 import { beforeEach, test } from "node:test";
 import {
+  canAddRememberedAccount,
+  clearRememberedAccountTrust,
   forgetRememberedAccount,
   getRememberedAccounts,
+  MAX_REMEMBERED_ACCOUNTS,
   rememberAccount,
+  setRememberedAccountTrusted,
   updateRememberedAccountPhotos,
   type RememberedAccount,
 } from "./account-switching.ts";
@@ -76,5 +80,64 @@ test("forgetting an account removes only that account", () => {
   assert.deepEqual(
     forgetRememberedAccount("one").map(({ uid }) => uid),
     ["two"],
+  );
+});
+
+test("a saved Premium account unlocks adding even when the active account is free", () => {
+  const accounts = [
+    { ...account("free-active", 2), premium: false },
+    { ...account("premium", 1), premium: true },
+  ];
+
+  assert.equal(canAddRememberedAccount(accounts, "free-active", false), true);
+});
+
+test("active membership overrides stale saved Premium status", () => {
+  const accounts = [{ ...account("expired-premium", 1), premium: true }];
+
+  assert.equal(canAddRememberedAccount(accounts, "expired-premium", false), false);
+  assert.equal(canAddRememberedAccount(accounts, "expired-premium", true), true);
+});
+
+test("the Premium account limit counts all saved accounts", () => {
+  const accounts = Array.from({ length: MAX_REMEMBERED_ACCOUNTS }, (_, index) =>
+    index === 1
+      ? { ...account(`saved-${index}`, index), premium: true }
+      : { ...account(`saved-${index}`, index), premium: false },
+  );
+
+  assert.equal(canAddRememberedAccount(accounts, "saved-1", true), false);
+});
+
+test("legacy remembered accounts remain valid and retain Premium metadata when refreshed", () => {
+  rememberAccount(account("legacy", 1));
+  assert.equal(getRememberedAccounts()[0]?.premium, undefined);
+
+  rememberAccount({ ...account("legacy", 2), premium: true });
+  rememberAccount(account("legacy", 3));
+
+  assert.equal(getRememberedAccounts()[0]?.premium, true);
+});
+
+test("trust status is stored per saved account and cleared when device keys are replaced", () => {
+  rememberAccount({ ...account("trusted", 2), trusted: true });
+  rememberAccount({ ...account("untrusted", 1), trusted: false });
+
+  setRememberedAccountTrusted("untrusted", true);
+  assert.deepEqual(
+    getRememberedAccounts().map(({ uid, trusted }) => ({ uid, trusted })),
+    [
+      { uid: "trusted", trusted: true },
+      { uid: "untrusted", trusted: true },
+    ],
+  );
+
+  clearRememberedAccountTrust();
+  assert.deepEqual(
+    getRememberedAccounts().map(({ uid, trusted }) => ({ uid, trusted })),
+    [
+      { uid: "trusted", trusted: false },
+      { uid: "untrusted", trusted: false },
+    ],
   );
 });

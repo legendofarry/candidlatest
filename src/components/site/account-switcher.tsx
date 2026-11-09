@@ -1,17 +1,27 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
-import { signInWithEmailAndPassword } from "firebase/auth";
+import { signInWithCustomToken, signInWithEmailAndPassword } from "firebase/auth";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import {
+  canAddRememberedAccount,
+  clearRememberedAccountTrust,
   forgetRememberedAccount,
   getRememberedAccounts,
+  MAX_REMEMBERED_ACCOUNTS,
   rememberAccount,
+  setRememberedAccountTrusted,
   type RememberedAccount,
   updateRememberedAccountPhotos,
 } from "@/lib/account-switching";
+import {
+  completeTrustedAccountSwitch,
+  createTrustedAccountSwitchChallenge,
+  registerTrustedAccountDevice,
+} from "@/lib/trusted-account.functions";
+import { getTrustedDevice, signTrustedSwitch } from "@/lib/trusted-account-device";
 import { notify } from "@/lib/notifications-store";
 import { getAccountProfileAvatars } from "@/lib/messaging.functions";
 import { Button } from "@/components/ui/button";
@@ -19,14 +29,29 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Drawer, DrawerContent, DrawerDescription, DrawerTitle } from "@/components/ui/drawer";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ProfileAvatar } from "@/components/site/profile-photo";
 import {
   ArrowLeft,
+  ArrowLeftRight,
+  BadgeCheck,
   Check,
   ChevronRight,
+  Crown,
+  LockKeyhole,
   Loader2,
   LogIn,
   Plus,
+  Sparkles,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -43,6 +68,7 @@ type Props = {
   };
   username: string | null;
   profilePhotoUrl: string | null;
+  premiumAccess?: boolean;
 };
 
 function authErrorMessage(error: unknown) {
@@ -73,14 +99,25 @@ function accountTitle(account: RememberedAccount) {
   return account.displayName || account.email;
 }
 
-export function AccountSwitcher({ open, onOpenChange, user, username, profilePhotoUrl }: Props) {
+export function AccountSwitcher({
+  open,
+  onOpenChange,
+  user,
+  username,
+  profilePhotoUrl,
+  premiumAccess,
+}: Props) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const reduceMotion = Boolean(useReducedMotion());
   const fetchAccountAvatars = useServerFn(getAccountProfileAvatars);
+  const registerTrustedDevice = useServerFn(registerTrustedAccountDevice);
+  const createSwitchChallenge = useServerFn(createTrustedAccountSwitchChallenge);
+  const completeSwitch = useServerFn(completeTrustedAccountSwitch);
   const [accounts, setAccounts] = useState<RememberedAccount[]>([]);
   const [selectedAccount, setSelectedAccount] = useState<RememberedAccount | null>(null);
-  const [mode, setMode] = useState<"list" | "switch" | "add">("list");
+  const [accountToForget, setAccountToForget] = useState<RememberedAccount | null>(null);
+  const [mode, setMode] = useState<"list" | "switch" | "add" | "upgrade" | "switching">("list");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -113,10 +150,29 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
           }
         });
     }
+    void (async () => {
+      try {
+        const { device, created } = await getTrustedDevice();
+        if (!active) return;
+        if (created) setAccounts(clearRememberedAccountTrust());
+        await registerTrustedDevice({
+          data: { deviceId: device.deviceId, publicKey: device.publicKey },
+        });
+        if (active) setAccounts(setRememberedAccountTrusted(user.uid, true));
+      } catch (deviceError) {
+        if (active) {
+          notify.error(
+            deviceError instanceof Error
+              ? deviceError.message
+              : "Could not prepare secure account switching on this device.",
+          );
+        }
+      }
+    })();
     return () => {
       active = false;
     };
-  }, [open, fetchAccountAvatars]);
+  }, [open, fetchAccountAvatars, registerTrustedDevice, user.uid]);
 
   useEffect(() => {
     if (!user.email) return;
@@ -128,6 +184,7 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
         displayName: user.displayName,
         photoURL: profilePhotoUrl ?? user.photoURL,
         lastUsedAt: Date.now(),
+        ...(premiumAccess === undefined ? {} : { premium: premiumAccess }),
       });
       setAccounts(currentAccounts);
     } catch (saveError) {
@@ -136,7 +193,60 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
         saveError instanceof Error ? saveError.message : "Could not remember this account.",
       );
     }
-  }, [user.uid, user.email, user.displayName, user.photoURL, username, profilePhotoUrl]);
+  }, [
+    user.uid,
+    user.email,
+    user.displayName,
+    user.photoURL,
+    username,
+    profilePhotoUrl,
+    premiumAccess,
+  ]);
+
+  async function switchWithTrustedDevice(account: RememberedAccount) {
+    setSelectedAccount(account);
+    setMode("switching");
+    setError(null);
+    try {
+      const { device } = await getTrustedDevice();
+      const challenge = await createSwitchChallenge({
+        data: { targetUid: account.uid, deviceId: device.deviceId },
+      });
+      const proof = await signTrustedSwitch(
+        device,
+        account.uid,
+        challenge.challengeId,
+        challenge.nonce,
+      );
+      const result = await completeSwitch({
+        data: {
+          targetUid: account.uid,
+          deviceId: device.deviceId,
+          challengeId: challenge.challengeId,
+          proof,
+        },
+      });
+      const credential = await signInWithCustomToken(firebaseAuth, result.customToken);
+      if (credential.user.email) {
+        const nextAccounts = rememberAccount({
+          uid: credential.user.uid,
+          email: credential.user.email,
+          username: account.username,
+          displayName: credential.user.displayName ?? account.displayName,
+          photoURL: credential.user.photoURL ?? account.photoURL,
+          lastUsedAt: Date.now(),
+          trusted: true,
+        });
+        setAccounts(nextAccounts);
+      }
+      setPassword("");
+      setMode("list");
+      onOpenChange(false);
+    } catch (switchError) {
+      setError(authErrorMessage(switchError));
+      setMode("switch");
+    }
+  }
 
   function chooseAccount(account: RememberedAccount) {
     if (account.uid === user.uid) return;
@@ -144,7 +254,11 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
     setEmail(account.email);
     setPassword("");
     setError(null);
-    setMode("switch");
+    if (account.trusted) {
+      void switchWithTrustedDevice(account);
+    } else {
+      setMode("switch");
+    }
   }
 
   function forgetAccount(account: RememberedAccount) {
@@ -169,7 +283,22 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
     setError(null);
     try {
       const credential = await signInWithEmailAndPassword(firebaseAuth, email.trim(), password);
+      setMode("switching");
       if (credential.user.email) {
+        let trusted = false;
+        try {
+          const { device } = await getTrustedDevice();
+          await registerTrustedDevice({
+            data: { deviceId: device.deviceId, publicKey: device.publicKey },
+          });
+          trusted = true;
+        } catch (deviceError) {
+          notify.error(
+            deviceError instanceof Error
+              ? deviceError.message
+              : "Signed in, but this device could not be trusted for quick switching.",
+          );
+        }
         const nextAccounts = rememberAccount({
           uid: credential.user.uid,
           email: credential.user.email,
@@ -177,18 +306,24 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
           displayName: credential.user.displayName,
           photoURL: credential.user.photoURL,
           lastUsedAt: Date.now(),
+          trusted,
         });
         setAccounts(nextAccounts);
       }
       setPassword("");
+      setMode("list");
       onOpenChange(false);
-      await navigate({ to: "/auth" });
     } catch (signInError) {
       setError(authErrorMessage(signInError));
+      setMode(selectedAccount ? "switch" : "add");
     } finally {
       setBusy(false);
     }
   }
+
+  const canAddAccount = canAddRememberedAccount(accounts, user.uid, premiumAccess);
+  const accountLimitReached = accounts.length >= MAX_REMEMBERED_ACCOUNTS;
+  const savedAccountCount = accounts.length;
 
   const body = (
     <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 sm:px-5">
@@ -208,6 +343,10 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
                   <AnimatePresence initial={false}>
                     {accounts.map((account, index) => {
                       const current = account.uid === user.uid;
+                      const premium =
+                        current && premiumAccess !== undefined
+                          ? premiumAccess
+                          : account.premium === true;
                       return (
                         <motion.div
                           key={account.uid}
@@ -254,6 +393,12 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
                                   Active
                                 </span>
                               ) : null}
+                              {premium ? (
+                                <BadgeCheck
+                                  className="size-4 shrink-0 text-verified"
+                                  aria-label="Premium account"
+                                />
+                              ) : null}
                             </span>
                             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
                               {account.email}
@@ -274,7 +419,7 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
                                 aria-label={`Forget ${accountTitle(account)}`}
                                 title="Remove from this device"
                                 className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                                onClick={() => forgetAccount(account)}
+                                onClick={() => setAccountToForget(account)}
                               >
                                 <Trash2 className="size-4" />
                               </Button>
@@ -289,9 +434,22 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
               <motion.div {...(!reduceMotion ? { whileTap: { scale: 0.985 } } : {})}>
                 <Button
                   type="button"
-                  variant="outline"
-                  className="h-12 w-full justify-start rounded-2xl border-dashed bg-background/60 text-sm"
+                  variant={canAddAccount ? "outline" : "default"}
+                  disabled={accountLimitReached}
+                  className={cn(
+                    "h-12 w-full justify-start rounded-2xl text-sm",
+                    canAddAccount
+                      ? "border-dashed bg-background/60"
+                      : accountLimitReached
+                        ? "cursor-not-allowed bg-muted text-muted-foreground"
+                        : "border border-primary/25 bg-gradient-to-r from-primary/15 via-primary/10 to-amber-400/15 text-foreground shadow-sm shadow-primary/10 hover:from-primary/20 hover:via-primary/15 hover:to-amber-400/20",
+                  )}
                   onClick={() => {
+                    if (accountLimitReached) return;
+                    if (!canAddAccount) {
+                      setMode("upgrade");
+                      return;
+                    }
                     setMode("add");
                     setSelectedAccount(null);
                     setEmail("");
@@ -299,13 +457,261 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
                     setError(null);
                   }}
                 >
-                  <span className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                    <Plus className="size-4" />
+                  <span
+                    className={cn(
+                      "flex size-8 items-center justify-center rounded-xl",
+                      canAddAccount || accountLimitReached
+                        ? "bg-primary/10 text-primary"
+                        : "bg-gradient-to-br from-primary to-emerald-500 text-primary-foreground shadow-sm",
+                    )}
+                  >
+                    {accountLimitReached ? (
+                      <LockKeyhole className="size-4" />
+                    ) : canAddAccount ? (
+                      <Plus className="size-4" />
+                    ) : (
+                      <Crown className="size-4" />
+                    )}
                   </span>
-                  Add another account
+                  <span className="flex-1 text-left">
+                    {accountLimitReached ? "Account limit reached" : "Add another account"}
+                  </span>
+                  {accountLimitReached ? (
+                    <span className="text-xs font-semibold">{savedAccountCount}/3</span>
+                  ) : !canAddAccount ? (
+                    <span className="rounded-full bg-primary/10 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-primary">
+                      Premium
+                    </span>
+                  ) : null}
                 </Button>
               </motion.div>
             </motion.div>
+          ) : mode === "switching" ? (
+            <motion.section
+              key="switching-account"
+              initial={reduceMotion ? false : { opacity: 0, scale: 0.96, y: 12 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.3, ease: "easeOut" }}
+              className="flex min-h-[22rem] flex-col items-center justify-center overflow-hidden rounded-3xl bg-gradient-to-br from-primary/[0.08] via-background to-sky-400/[0.12] px-5 py-8 text-center"
+            >
+              <div className="relative flex size-36 items-center justify-center">
+                {!reduceMotion ? (
+                  <>
+                    <motion.span
+                      className="absolute inset-2 rounded-full border border-primary/20"
+                      animate={{ rotate: 360, scale: [1, 1.06, 1] }}
+                      transition={{
+                        rotate: { duration: 7, repeat: Infinity, ease: "linear" },
+                        scale: { duration: 2, repeat: Infinity, ease: "easeInOut" },
+                      }}
+                    />
+                    <motion.span
+                      className="absolute inset-0 rounded-full border border-dashed border-sky-400/40"
+                      animate={{ rotate: -360 }}
+                      transition={{ duration: 12, repeat: Infinity, ease: "linear" }}
+                    />
+                    <motion.span
+                      className="absolute -inset-2 rounded-full bg-primary/10 blur-2xl"
+                      animate={{ opacity: [0.35, 0.8, 0.35], scale: [0.85, 1.1, 0.85] }}
+                      transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                    />
+                  </>
+                ) : null}
+                <ProfileAvatar
+                  photoUrl={selectedAccount?.photoURL}
+                  initials={(
+                    selectedAccount?.username?.[0] ||
+                    selectedAccount?.displayName?.[0] ||
+                    selectedAccount?.email[0] ||
+                    "U"
+                  ).toUpperCase()}
+                  className="relative z-10 size-24 border-4 border-background shadow-[0_14px_40px_-12px_rgba(0,0,0,0.35)] ring-2 ring-primary/20"
+                />
+                <motion.span
+                  className="absolute bottom-1 right-0 z-20 flex size-10 items-center justify-center rounded-full border-2 border-background bg-primary text-primary-foreground shadow-lg"
+                  {...(!reduceMotion
+                    ? {
+                      animate: { scale: [1, 1.1, 1] },
+                      transition: {
+                        duration: 1.4,
+                        repeat: Infinity,
+                        ease: "easeInOut" as const,
+                      },
+                    }
+                    : {})}
+                >
+                  <ArrowLeftRight className="size-4" />
+                </motion.span>
+              </div>
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: reduceMotion ? 0 : 0.12 }}
+                className="mt-5"
+              >
+                <h3 className="font-display text-xl font-bold tracking-tight">
+                  Switching accounts
+                </h3>
+                <p className="mt-1 max-w-xs text-sm text-muted-foreground">
+                  Securely connecting to{" "}
+                  <span className="font-semibold text-foreground">
+                    {selectedAccount ? accountTitle(selectedAccount) : "your account"}
+                  </span>
+                  …
+                </p>
+              </motion.div>
+              {!reduceMotion ? (
+                <div className="mt-6 flex items-center gap-1.5" aria-hidden="true">
+                  {[0, 1, 2].map((dot) => (
+                    <motion.span
+                      key={dot}
+                      className="size-1.5 rounded-full bg-primary"
+                      animate={{ opacity: [0.25, 1, 0.25], scale: [0.8, 1.15, 0.8] }}
+                      transition={{
+                        duration: 1.1,
+                        delay: dot * 0.16,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                      }}
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </motion.section>
+          ) : mode === "upgrade" ? (
+            <motion.section
+              key="premium-upgrade"
+              initial={reduceMotion ? false : { opacity: 0, x: 16 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: reduceMotion ? 0 : 0.22, ease: "easeOut" }}
+              className="space-y-5"
+            >
+              <button
+                type="button"
+                onClick={() => setMode("list")}
+                className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <ArrowLeft className="size-4" /> Back to accounts
+              </button>
+              <div className="text-center">
+                <motion.span
+                  initial={reduceMotion ? false : { scale: 0.7, rotate: -12, opacity: 0 }}
+                  animate={{ scale: 1, rotate: 0, opacity: 1 }}
+                  transition={{ type: "spring", stiffness: 360, damping: 24 }}
+                  className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-amber-400/20 text-primary shadow-inner"
+                >
+                  <Crown className="size-7" />
+                </motion.span>
+                <h3 className="mt-3 font-display text-xl font-bold tracking-tight">
+                  Your accounts, together
+                </h3>
+                <p className="mx-auto mt-1 max-w-xs text-sm leading-relaxed text-muted-foreground">
+                  Premium lets you save and switch between up to three accounts on this device.
+                </p>
+              </div>
+              <div className="relative overflow-hidden rounded-3xl border border-primary/15 bg-gradient-to-br from-primary/[0.08] via-background to-amber-400/[0.08] px-4 py-6">
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute left-1/2 top-1/2 h-px w-[75%] -translate-x-1/2 -translate-y-1/2 bg-gradient-to-r from-transparent via-primary/40 to-transparent"
+                />
+                <div className="relative flex items-center justify-center gap-3 sm:gap-5">
+                  {Array.from({ length: Math.max(MAX_REMEMBERED_ACCOUNTS, savedAccountCount) }).map(
+                    (_, index) => {
+                      const account = accounts[index];
+                      return (
+                        <motion.div
+                          key={account?.uid ?? `empty-${index}`}
+                          initial={reduceMotion ? false : { opacity: 0, y: 18, scale: 0.65 }}
+                          animate={
+                            reduceMotion
+                              ? { opacity: 1, y: 0, scale: 1 }
+                              : {
+                                opacity: 1,
+                                y: [0, -5, 0],
+                                scale: 1,
+                              }
+                          }
+                          transition={
+                            reduceMotion
+                              ? { duration: 0 }
+                              : {
+                                opacity: { delay: index * 0.3, duration: 0.35 },
+                                scale: { delay: index * 0.3, type: "spring", stiffness: 300 },
+                                y: {
+                                  delay: 0.6 + index * 0.3,
+                                  duration: 2,
+                                  repeat: Infinity,
+                                  ease: "easeInOut",
+                                },
+                              }
+                          }
+                          className="relative z-10 flex size-[4.25rem] shrink-0 items-center justify-center rounded-full border-2 border-background bg-background shadow-[0_8px_24px_-10px_rgba(0,0,0,0.35)] ring-1 ring-primary/15"
+                          aria-label={
+                            account
+                              ? `Saved account ${accountTitle(account)}`
+                              : `Premium account slot ${index + 1}`
+                          }
+                        >
+                          {account ? (
+                            <ProfileAvatar
+                              photoUrl={account.photoURL}
+                              initials={(
+                                account.username?.[0] ||
+                                account.displayName?.[0] ||
+                                account.email[0] ||
+                                "U"
+                              ).toUpperCase()}
+                              className="size-full"
+                            />
+                          ) : (
+                            <span className="flex size-full items-center justify-center rounded-full border border-dashed border-primary/30 bg-primary/[0.04] text-primary/70">
+                              <Plus className="size-5" />
+                            </span>
+                          )}
+                        </motion.div>
+                      );
+                    },
+                  )}
+                  <motion.span
+                    initial={reduceMotion ? false : { opacity: 0, scale: 0.5 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    transition={{ delay: reduceMotion ? 0 : 1.15, type: "spring" }}
+                    className="absolute left-1/2 top-1/2 z-20 flex size-9 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-primary/20 bg-background text-primary shadow-md"
+                    aria-hidden="true"
+                  >
+                    <Sparkles className="size-4" />
+                  </motion.span>
+                </div>
+                <p className="relative mt-5 text-center text-xs font-medium text-muted-foreground">
+                  {savedAccountCount} {savedAccountCount === 1 ? "account saved" : "accounts saved"}
+                  {" · "}up to {MAX_REMEMBERED_ACCOUNTS} with Premium
+                </p>
+              </div>
+              <motion.div
+                initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{
+                  duration: reduceMotion ? 0 : 0.35,
+                  delay: reduceMotion ? 0 : 1.65,
+                }}
+              >
+                <Button
+                  type="button"
+                  className="h-12 w-full rounded-2xl bg-gradient-to-r from-primary via-primary to-emerald-500 text-primary-foreground shadow-lg shadow-primary/20 hover:brightness-105"
+                  onClick={() => {
+                    onOpenChange(false);
+                    void navigate({ to: "/billing" });
+                  }}
+                >
+                  <Sparkles className="size-4" />
+                  Upgrade to Premium
+                  <ChevronRight className="ml-auto size-4" />
+                </Button>
+              </motion.div>
+              <p className="text-center text-xs text-muted-foreground">
+                Already have Premium on another saved account? Switch to it to add more.
+              </p>
+            </motion.section>
           ) : (
             <motion.form
               key={mode}
@@ -334,7 +740,8 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
                     : `Switch to ${selectedAccount ? accountTitle(selectedAccount) : "account"}`}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Sign in with the account’s email and password. Your password won’t be saved.
+                  Sign in once to trust this device. Next time, switching to this account won’t ask
+                  for your password.
                 </p>
               </div>
               <div className="space-y-2">
@@ -400,59 +807,17 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.35, delay: reduceMotion ? 0 : 0.15 }}
-            className="mt-auto flex min-h-44 flex-col items-center justify-center pt-3 text-center"
+            className="mt-auto flex min-h-40 flex-col items-center justify-center pt-2 text-center"
           >
-            <div
-              aria-hidden="true"
-              className="relative h-32 w-full max-w-[19rem] overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_18%,black_82%,transparent)]"
-            >
-              <div className="absolute inset-x-6 top-1/2 h-px -translate-y-1/2 bg-border/80" />
-              <motion.div
-                className="absolute left-1/2 top-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/15"
-                {...(!reduceMotion ? { animate: { scale: [0.8, 1.18, 0.8], opacity: [0.28, 0.7, 0.28] } } : { initial: false })}
-                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
+            <div aria-hidden="true" className="pointer-events-none h-36 w-60 max-w-full">
+              <Lottie
+                src={accountSwitchAnimation}
+                autoplay={!reduceMotion}
+                loop={!reduceMotion}
+                className="h-full w-full"
               />
-              <motion.div
-                className="absolute left-1/2 top-1/2 size-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/25"
-                {...(!reduceMotion ? { animate: { scale: [1.12, 0.82, 1.12], opacity: [0.6, 0.22, 0.6] } } : { initial: false })}
-                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
-              />
-              <div className="absolute left-1/2 top-1/2 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-primary/20 bg-background text-primary shadow-[0_0_24px_-8px_hsl(var(--primary)/0.55)]">
-                <ArrowLeft className="size-4 rotate-180" />
-              </div>
-              {[0, 1].map((index) => (
-                <motion.div
-                  key={index}
-                  className="absolute left-0 top-0 flex size-12 items-center justify-center rounded-full border-2 border-background bg-primary/10 text-primary shadow-lg ring-1 ring-primary/20"
-                  initial={{ x: -72, y: 48, opacity: 0, scale: 0.72 }}
-                  animate={reduceMotion ? { x: index === 0 ? 49 : 167, y: 40, opacity: 1, scale: 1 } : {
-                    x: [-72, 12, 86, 158, 238],
-                    y: index === 0 ? [45, 20, 43, 67, 42] : [42, 68, 41, 18, 45],
-                    opacity: [0, 1, 1, 1, 0],
-                    scale: [0.72, 1, 1.08, 1, 0.72],
-                    rotate: index === 0 ? [0, -8, 4, -5, 0] : [0, 7, -4, 6, 0],
-                  }}
-                  transition={reduceMotion ? { duration: 0 } : {
-                    duration: 5.2,
-                    delay: index * 2.6,
-                    repeat: Infinity,
-                    ease: "easeInOut",
-                    times: [0, 0.18, 0.48, 0.82, 1],
-                  }}
-                >
-                  {index === 0 ? <UserRound className="size-5" /> : <span className="font-display text-sm font-bold">C</span>}
-                </motion.div>
-              ))}
-              {!reduceMotion ? (
-                <motion.div
-                  className="absolute left-1/2 top-1/2 h-16 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-xl"
-                  {...(!reduceMotion ? { animate: { opacity: [0.16, 0.42, 0.16], scaleX: [0.72, 1.25, 0.72] } } : {})}
-                  transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
-                />
-              ) : null}
             </div>
-            <p className="mt-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              <span className="size-1.5 rounded-full bg-primary" />
+            <p className="-mt-2 text-xs font-medium text-muted-foreground">
               Your accounts, one easy switch
             </p>
           </motion.div>
@@ -482,40 +847,85 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
               ? "Your accounts"
               : mode === "add"
                 ? "Add an account"
-                : "Switch account"}
+                : mode === "upgrade"
+                  ? "Premium account switching"
+                  : mode === "switching"
+                    ? "Connecting securely"
+                    : "Switch account"}
           </h2>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            {mode === "list" ? "" : "Your password stays private and is never saved."}
+            {mode === "list" || mode === "upgrade" || mode === "switching"
+              ? ""
+              : "Your password is used once to trust this device and is never saved."}
           </p>
         </div>
       </div>
     </div>
   );
 
-  return isMobile ? (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="!z-[110] flex h-[min(82dvh,42rem)] max-h-[90dvh] flex-col overflow-hidden rounded-t-[2rem] border-border bg-background shadow-[0_-20px_70px_-20px_rgba(0,0,0,0.35)] [&>div:first-child]:h-1.5 [&>div:first-child]:w-10 [&>div:first-child]:bg-muted-foreground/30">
-        <DrawerTitle className="sr-only">Switch accounts</DrawerTitle>
-        <DrawerDescription className="sr-only">
-          Switch between accounts remembered on this device or sign in to add another.
-        </DrawerDescription>
-        {modalHeader}
-        {body}
-      </DrawerContent>
-    </Drawer>
-  ) : (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent
-        hideCloseButton
-        className="flex max-h-[min(80dvh,42rem)] w-[min(28rem,94vw)] flex-col gap-0 overflow-hidden rounded-2xl bg-background p-0"
+  return (
+    <>
+      {isMobile ? (
+        <Drawer open={open} onOpenChange={onOpenChange}>
+          <DrawerContent className="!z-[110] flex h-[min(82dvh,42rem)] max-h-[90dvh] flex-col overflow-hidden rounded-t-[2rem] border-border bg-background shadow-[0_-20px_70px_-20px_rgba(0,0,0,0.35)] [&>div:first-child]:h-1.5 [&>div:first-child]:w-10 [&>div:first-child]:bg-muted-foreground/30">
+            <DrawerTitle className="sr-only">Switch accounts</DrawerTitle>
+            <DrawerDescription className="sr-only">
+              Switch between accounts remembered on this device or sign in to add another.
+            </DrawerDescription>
+            {modalHeader}
+            {body}
+          </DrawerContent>
+        </Drawer>
+      ) : (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+          <DialogContent
+            hideCloseButton
+            className="flex max-h-[min(80dvh,42rem)] w-[min(28rem,94vw)] flex-col gap-0 overflow-hidden rounded-2xl bg-background p-0"
+          >
+            <DialogTitle className="sr-only">Switch accounts</DialogTitle>
+            <DialogDescription className="sr-only">
+              Switch between accounts remembered on this device or sign in to add another.
+            </DialogDescription>
+            {modalHeader}
+            {body}
+          </DialogContent>
+        </Dialog>
+      )}
+      <AlertDialog
+        open={Boolean(accountToForget)}
+        onOpenChange={(nextOpen) => {
+          if (!nextOpen) setAccountToForget(null);
+        }}
       >
-        <DialogTitle className="sr-only">Switch accounts</DialogTitle>
-        <DialogDescription className="sr-only">
-          Switch between accounts remembered on this device or sign in to add another.
-        </DialogDescription>
-        {modalHeader}
-        {body}
-      </DialogContent>
-    </Dialog>
+        <AlertDialogContent
+          className={cn(
+            "z-[130] rounded-2xl sm:max-w-sm",
+            isMobile &&
+            "!fixed !inset-x-0 !bottom-0 !left-0 !top-auto !z-[130] !grid !max-h-[85dvh] !w-full !max-w-none !translate-x-0 !translate-y-0 !gap-4 !rounded-b-none !rounded-t-3xl !border-border !bg-background !p-5 !pb-[calc(1.25rem+env(safe-area-inset-bottom))] !shadow-[0_-20px_70px_-12px_rgba(0,0,0,0.3)] data-[state=closed]:slide-out-to-bottom data-[state=open]:slide-in-from-bottom sm:!inset-x-auto sm:!bottom-auto sm:!left-1/2 sm:!top-1/2 sm:!w-full sm:!max-w-sm sm:!-translate-x-1/2 sm:!-translate-y-1/2 sm:!rounded-2xl sm:!p-6 sm:data-[state=closed]:slide-out-to-bottom-0 sm:data-[state=open]:slide-in-from-bottom-0",
+          )}
+        >
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove saved account?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {accountToForget
+                ? `Remove ${accountTitle(accountToForget)} from this device? This won’t delete the account.`
+                : "This removes the account from this device only."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (accountToForget) forgetAccount(accountToForget);
+                setAccountToForget(null);
+              }}
+            >
+              Remove account
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
