@@ -285,7 +285,7 @@ function PublicProfilePage() {
         .map(([key, value]) => [key, profileLink(key, value)] as const)
         .filter((entry): entry is readonly [string, string] => Boolean(entry[1]))
     : [];
-  const tabs = ["All", "Stories", "About"] as const;
+  const tabs = ["Stories", "About"] as const;
   const bioEditorForm = (
     <form
       onSubmit={(event) => {

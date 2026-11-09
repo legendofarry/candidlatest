@@ -355,6 +355,22 @@ export const getPublicProfileFollowers = createServerFn({ method: "POST" })
     return readPublicProfileFollowers(data.username, data.cursor, context.userId);
   });
 
+export const getPublicProfileConnections = createServerFn({ method: "POST" })
+  .middleware([requireFirebaseAuth])
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        username: z.string().trim().min(1).max(32),
+        kind: z.enum(["followers", "following"]).default("followers"),
+        cursor: z.string().min(1).max(200).nullable().default(null),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data, context }) => {
+    const { readPublicProfileConnections } = await import("./messaging.server");
+    return readPublicProfileConnections(data.username, data.kind, data.cursor, context.userId);
+  });
+
 /** Small, authenticated lookup used by the @mention picker. */
 export const getMentionSuggestions = createServerFn({ method: "POST" })
   .middleware([requireFirebaseAuth])

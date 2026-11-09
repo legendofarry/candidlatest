@@ -809,13 +809,64 @@ export function AccountSwitcher({
             transition={{ duration: reduceMotion ? 0 : 0.35, delay: reduceMotion ? 0 : 0.15 }}
             className="mt-auto flex min-h-40 flex-col items-center justify-center pt-2 text-center"
           >
-            <div aria-hidden="true" className="pointer-events-none h-36 w-60 max-w-full">
-              <Lottie
-                src={accountSwitchAnimation}
-                autoplay={!reduceMotion}
-                loop={!reduceMotion}
-                className="h-full w-full"
+            <div aria-hidden="true" className="pointer-events-none relative h-36 w-60 max-w-full">
+              <motion.div
+                className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/15 blur-2xl"
+                animate={reduceMotion ? undefined : { scale: [1, 1.18, 1], opacity: [0.7, 1, 0.7] }}
+                transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
               />
+              {accounts.slice(0, 3).map((account, index) => {
+                const total = Math.max(accounts.length, 3);
+                const angle = (Math.PI * 2 * index) / total - Math.PI / 2;
+                const radius = 52;
+                return (
+                  <motion.div
+                    key={`${account.uid}-preview`}
+                    className="absolute left-1/2 top-1/2"
+                    animate={
+                      reduceMotion
+                        ? { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius * 0.7 }
+                        : {
+                            x: [Math.cos(angle) * radius, Math.cos(angle + 0.4) * (radius + 10), Math.cos(angle) * radius],
+                            y: [Math.sin(angle) * radius * 0.7, Math.sin(angle + 0.4) * (radius * 0.7 + 10), Math.sin(angle) * radius * 0.7],
+                            rotate: [0, 8, 0],
+                          }
+                    }
+                    transition={
+                      reduceMotion
+                        ? undefined
+                        : {
+                            duration: 2.8,
+                            delay: index * 0.15,
+                            repeat: Infinity,
+                            ease: "easeInOut",
+                          }
+                    }
+                    style={{ x: 0, y: 0 }}
+                  >
+                    <ProfileAvatar
+                      photoUrl={account.photoURL}
+                      initials={(
+                        account.username?.[0] ||
+                        account.displayName?.[0] ||
+                        account.email[0] ||
+                        "U"
+                      ).toUpperCase()}
+                      className="size-11 border-2 border-background shadow-[0_12px_28px_-12px_rgba(0,0,0,0.35)]"
+                    />
+                  </motion.div>
+                );
+              })}
+              <motion.div
+                className="absolute left-1/2 top-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-primary/20 bg-background shadow-[0_18px_42px_-18px_rgba(0,0,0,0.35)]"
+                animate={reduceMotion ? undefined : { scale: [1, 1.08, 1], rotate: [0, 8, 0] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+                style={{ width: 62, height: 62 }}
+              >
+                <div className="flex size-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-emerald-500 text-primary-foreground shadow-inner">
+                  <ArrowLeftRight className="size-4" />
+                </div>
+              </motion.div>
             </div>
             <p className="-mt-2 text-xs font-medium text-muted-foreground">
               Your accounts, one easy switch

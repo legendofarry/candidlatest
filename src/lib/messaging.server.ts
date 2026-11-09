@@ -1866,16 +1866,17 @@ export async function readPublicProfileStories(
   };
 }
 
-/** Cursor-paged public follower directory. Each request reads one bounded page. */
-export async function readPublicProfileFollowers(
+/** Cursor-paged public follower/following directory. Each request reads one bounded page. */
+export async function readPublicProfileConnections(
   username: string,
+  kind: "followers" | "following",
   cursor: string | null,
   viewerId: string,
 ) {
   const db = getFirestoreDb();
   const usernameSnap = await db.collection("usernames").doc(username.trim().toLowerCase()).get();
   const userId = (usernameSnap.data() as { user_id?: string } | undefined)?.user_id;
-  if (!userId) return { followers: [], hasMore: false, nextCursor: null };
+  if (!userId) return { members: [], hasMore: false, nextCursor: null };
 
   const profileSnap = await db.collection("profiles").doc(userId).get();
   const profile = profileSnap.data() as ProfileRecord | undefined;
@@ -1885,14 +1886,14 @@ export async function readPublicProfileFollowers(
     profile?.account_status === "deactivated" ||
     profile?.account_status === "deletion_pending"
   )
-    return { followers: [], hasMore: false, nextCursor: null };
+    return { members: [], hasMore: false, nextCursor: null };
   if (viewerId !== userId && (await accountsBlockEachOther(viewerId, userId))) {
-    return { followers: [], hasMore: false, nextCursor: null };
+    return { members: [], hasMore: false, nextCursor: null };
   }
 
   let query = db
     .collection("follows")
-    .where("following_id", "==", userId)
+    .where(kind === "followers" ? "following_id" : "follower_id", "==", userId)
     .orderBy("__name__", "asc");
   if (cursor) query = query.startAfter(db.collection("follows").doc(cursor));
 
@@ -1901,25 +1902,34 @@ export async function readPublicProfileFollowers(
   const pageDocs = snapshot.docs.slice(0, pageSize);
   const profiles = await Promise.all(
     pageDocs.map(async (followDoc) => {
-      const followerId = (followDoc.data() as { follower_id?: string }).follower_id;
-      if (!followerId) return null;
-      const followerSnap = await db.collection("profiles").doc(followerId).get();
-      const follower = followerSnap.data() as ProfileRecord | undefined;
-      if (!followerSnap.exists || follower?.banned || !follower?.username) return null;
+      const relatedId =
+        kind === "followers"
+          ? ((followDoc.data() as { follower_id?: string }).follower_id ?? null)
+          : ((followDoc.data() as { following_id?: string }).following_id ?? null);
+      if (!relatedId) return null;
+      const relatedSnap = await db.collection("profiles").doc(relatedId).get();
+      const related = relatedSnap.data() as ProfileRecord | undefined;
+      if (!relatedSnap.exists || related?.banned || !related?.username) return null;
       return {
-        id: followerId,
-        username: follower.username,
-        photo_url: follower.photo_url ?? null,
+        id: relatedId,
+        username: related.username,
+        photo_url: related.photo_url ?? null,
       };
     }),
   );
   const last = pageDocs.at(-1);
   const hasMore = snapshot.size > pageSize;
   return {
-    followers: profiles.filter((follower): follower is NonNullable<typeof follower> =>
-      Boolean(follower),
-    ),
+    members: profiles.filter((member): member is NonNullable<typeof member> => Boolean(member)),
     hasMore,
     nextCursor: hasMore && last ? last.id : null,
   };
+}
+
+export async function readPublicProfileFollowers(
+  username: string,
+  cursor: string | null,
+  viewerId: string,
+) {
+  return readPublicProfileConnections(username, "followers", cursor, viewerId);
 }
