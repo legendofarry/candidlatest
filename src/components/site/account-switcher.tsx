@@ -3,10 +3,8 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { AnimatePresence, motion, useReducedMotion } from "motion/react";
-import { Lottie } from "lottie-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { firebaseAuth } from "@/integrations/firebase/client";
-import accountSwitchAnimation from "@/assets/account-switch.json";
 import {
   forgetRememberedAccount,
   getRememberedAccounts,
@@ -402,17 +400,59 @@ export function AccountSwitcher({ open, onOpenChange, user, username, profilePho
             initial={reduceMotion ? false : { opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: reduceMotion ? 0 : 0.35, delay: reduceMotion ? 0 : 0.15 }}
-            className="mt-auto flex min-h-40 flex-col items-center justify-center pt-2 text-center"
+            className="mt-auto flex min-h-44 flex-col items-center justify-center pt-3 text-center"
           >
-            <div aria-hidden="true" className="pointer-events-none h-36 w-60 max-w-full">
-              <Lottie
-                src={accountSwitchAnimation}
-                autoplay={!reduceMotion}
-                loop={!reduceMotion}
-                className="h-full w-full"
+            <div
+              aria-hidden="true"
+              className="relative h-32 w-full max-w-[19rem] overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_18%,black_82%,transparent)]"
+            >
+              <div className="absolute inset-x-6 top-1/2 h-px -translate-y-1/2 bg-border/80" />
+              <motion.div
+                className="absolute left-1/2 top-1/2 size-16 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/15"
+                {...(!reduceMotion ? { animate: { scale: [0.8, 1.18, 0.8], opacity: [0.28, 0.7, 0.28] } } : { initial: false })}
+                transition={{ duration: 3.6, repeat: Infinity, ease: "easeInOut" }}
               />
+              <motion.div
+                className="absolute left-1/2 top-1/2 size-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-primary/25"
+                {...(!reduceMotion ? { animate: { scale: [1.12, 0.82, 1.12], opacity: [0.6, 0.22, 0.6] } } : { initial: false })}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeInOut" }}
+              />
+              <div className="absolute left-1/2 top-1/2 flex size-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-primary/20 bg-background text-primary shadow-[0_0_24px_-8px_hsl(var(--primary)/0.55)]">
+                <ArrowLeft className="size-4 rotate-180" />
+              </div>
+              {[0, 1].map((index) => (
+                <motion.div
+                  key={index}
+                  className="absolute left-0 top-0 flex size-12 items-center justify-center rounded-full border-2 border-background bg-primary/10 text-primary shadow-lg ring-1 ring-primary/20"
+                  initial={{ x: -72, y: 48, opacity: 0, scale: 0.72 }}
+                  animate={reduceMotion ? { x: index === 0 ? 49 : 167, y: 40, opacity: 1, scale: 1 } : {
+                    x: [-72, 12, 86, 158, 238],
+                    y: index === 0 ? [45, 20, 43, 67, 42] : [42, 68, 41, 18, 45],
+                    opacity: [0, 1, 1, 1, 0],
+                    scale: [0.72, 1, 1.08, 1, 0.72],
+                    rotate: index === 0 ? [0, -8, 4, -5, 0] : [0, 7, -4, 6, 0],
+                  }}
+                  transition={reduceMotion ? { duration: 0 } : {
+                    duration: 5.2,
+                    delay: index * 2.6,
+                    repeat: Infinity,
+                    ease: "easeInOut",
+                    times: [0, 0.18, 0.48, 0.82, 1],
+                  }}
+                >
+                  {index === 0 ? <UserRound className="size-5" /> : <span className="font-display text-sm font-bold">C</span>}
+                </motion.div>
+              ))}
+              {!reduceMotion ? (
+                <motion.div
+                  className="absolute left-1/2 top-1/2 h-16 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-primary/10 blur-xl"
+                  {...(!reduceMotion ? { animate: { opacity: [0.16, 0.42, 0.16], scaleX: [0.72, 1.25, 0.72] } } : {})}
+                  transition={{ duration: 2.4, repeat: Infinity, ease: "easeInOut" }}
+                />
+              ) : null}
             </div>
-            <p className="-mt-2 text-xs font-medium text-muted-foreground">
+            <p className="mt-1 inline-flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+              <span className="size-1.5 rounded-full bg-primary" />
               Your accounts, one easy switch
             </p>
           </motion.div>
