@@ -55,7 +55,7 @@ export function CompanyHero({ company, score, descriptor, stories }: Props) {
   }).data;
   const brand = getCompanyBrand(company.name);
   const accent = discovered?.color ?? getCompanyAccent(company.name);
-  const logoUrl = discovered?.logoUrl ?? (brand ? getCompanyBrandLogoUrl(brand.domain) : null);
+  const logoUrl = discovered?.logoUrl ?? (brand ? getCompanyBrandLogoUrl(brand.domain, brand.logoPath) : null);
   const fallbackLogoUrl = discovered?.domain ? getCompanyBrandLogoUrl(discovered.domain) : null;
   const overall = num(score?.overall);
   const signal = getCompanySignal(score);
@@ -159,7 +159,7 @@ function BrandMark({ name, logoUrl, fallbackLogoUrl, accent, status }: { name: s
         }
       >
         {src ? (
-          <img src={src} alt="" className="size-[70%] object-contain" onError={() => setFailed((list) => [...list, src])} />
+          <img src={src} alt="" className="size-[88%] object-contain" onError={() => setFailed((list) => [...list, src])} />
         ) : (
           <span className="font-display text-2xl font-bold tracking-tight" style={{ color: "oklch(0.99 0 0)" }}>
             {getCompanyMonogram(name)}

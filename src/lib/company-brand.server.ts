@@ -101,7 +101,11 @@ export async function resolveCompanyBrand(companyId: string): Promise<CompanyBra
 
   const curated = getCompanyBrand(name);
   if (curated) {
-    return { domain: curated.domain, color: curated.color, logoUrl: getCompanyBrandLogoUrl(curated.domain) };
+    return {
+      domain: curated.domain,
+      color: curated.color,
+      logoUrl: getCompanyBrandLogoUrl(curated.domain, curated.logoPath),
+    };
   }
 
   const ref = db.collection("company_brands").doc(companyId);

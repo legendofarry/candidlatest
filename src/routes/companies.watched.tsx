@@ -4,11 +4,12 @@ import { useMemo, useState, type CSSProperties } from "react";
 import { ArrowUpRight, Crosshair, Loader2, Radar, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { CompanyWatchButton } from "@/components/site/company-watch-button";
+import { CompanyLogo } from "@/components/site/company-logo";
 import { getCompanySignal } from "@/components/site/company-hero";
 import { useAuth } from "@/hooks/useAuth";
 import { useWatchedCompanies } from "@/hooks/use-watched-companies";
 import { listCompanyScores } from "@/lib/public.functions";
-import { getCompanyAccent, getCompanyMonogram } from "@/lib/company-branding";
+import { getCompanyAccent } from "@/lib/company-branding";
 import { formatCount } from "@/lib/utils";
 
 export const Route = createFileRoute("/companies/watched")({
@@ -123,15 +124,7 @@ function WatchedCompaniesPage() {
                   className="flex min-w-0 flex-1 items-center gap-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span className="relative shrink-0">
-                    <span
-                      className="grid size-12 place-items-center rounded-2xl font-display text-sm font-bold"
-                      style={{
-                        background: `linear-gradient(140deg, ${accent}, color-mix(in oklab, ${accent} 45%, black))`,
-                        color: "oklch(0.99 0 0)",
-                        boxShadow: `0 8px 24px -10px ${accent}`,
-                      }}
-                    >
-                    </span>
+                    <CompanyLogo name={watch.company_name} sizeClassName="size-12 rounded-2xl" />
                     <span className="absolute -bottom-0.5 -right-0.5 grid size-4 place-items-center rounded-full bg-background">
                       <span className="relative inline-flex size-2">
                         {fresh ? <span className="sonar-ping absolute inset-0 rounded-full bg-primary" /> : null}

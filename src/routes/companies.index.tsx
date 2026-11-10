@@ -17,8 +17,10 @@ import { listCompanyScores } from "@/lib/public.functions";
 import { FilterBar } from "@/components/site/filter-bar";
 import { cn, formatCount } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { CompanyLogo } from "@/components/site/company-logo";
 import { CompanyVerifiedBadge } from "@/components/site/company-verified-badge";
 import { useAutoCollapsingCount } from "@/hooks/use-auto-collapsing-count";
+import { getCompanyBrand } from "@/lib/company-branding";
 import {
   Drawer,
   DrawerContent,
@@ -381,6 +383,7 @@ function CompaniesPage() {
           <div className="space-y-3 md:hidden">
             {visibleRows.map((company) => {
               const score = company.overall === null ? null : Number(company.overall);
+              const brand = getCompanyBrand(company.name);
               const accent =
                 score === null
                   ? "bg-[#f0f0ee] text-slate-700"
@@ -389,26 +392,14 @@ function CompaniesPage() {
                     : score >= 3.5
                       ? "bg-lime-200 text-slate-900"
                       : "bg-[#f1f1ee] text-slate-700";
-              const initials = (company.name ?? "").trim().slice(0, 1).toUpperCase() || "?";
-              const avatarTone = /[aeiou]/i.test(initials)
-                ? "bg-[#b6f4e5]"
-                : /[t]/i.test(initials)
-                  ? "bg-[#b7e2ff]"
-                  : "bg-[#d0eb6b]";
               return (
                 <article
                   key={company.company_id}
                   className="rounded-[1.6rem] border border-border bg-card px-4 py-4 shadow-[0_6px_18px_rgba(0,0,0,.04)]"
+                  style={brand ? { borderLeftWidth: 3, borderLeftColor: brand.color } : undefined}
                 >
                   <div className="flex items-start gap-3">
-                    <span
-                      className={cn(
-                        "flex size-11 shrink-0 items-center justify-center rounded-full text-lg font-semibold text-slate-900",
-                        avatarTone,
-                      )}
-                    >
-                      {initials}
-                    </span>
+                    <CompanyLogo name={company.name} />
                     <div className="min-w-0 flex-1">
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
@@ -465,38 +456,47 @@ function CompaniesPage() {
           </div>
 
           <div className="hidden md:grid md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
-            {visibleRows.map((company, index) => (
-              <Link
-                key={company.company_id}
-                to="/companies/$slug"
-                params={{ slug: company.slug ?? "" }}
-                className="animate-rise rounded-2xl border border-border bg-card p-5 transition-transform hover:-translate-y-0.5"
-                style={{ animationDelay: `${Math.min(index, 8) * 50}ms` }}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <h2 className="flex items-center gap-1.5 font-semibold">
-                      {company.name}
-                      {company.verified ? <CompanyVerifiedBadge /> : null}
-                    </h2>
-                    <p className="text-xs text-muted-foreground">
-                      {company.industry} · {company.county}
-                    </p>
+            {visibleRows.map((company, index) => {
+              const brand = getCompanyBrand(company.name);
+              return (
+                <Link
+                  key={company.company_id}
+                  to="/companies/$slug"
+                  params={{ slug: company.slug ?? "" }}
+                  className="animate-rise rounded-2xl border border-border border-t-2 border-t-transparent bg-card p-5 transition-transform hover:-translate-y-0.5"
+                  style={{
+                    animationDelay: `${Math.min(index, 8) * 50}ms`,
+                    ...(brand ? { borderTopColor: brand.color } : {}),
+                  }}
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <CompanyLogo name={company.name} sizeClassName="size-12" />
+                      <div className="min-w-0">
+                        <h2 className="flex items-center gap-1.5 font-semibold">
+                          {company.name}
+                          {company.verified ? <CompanyVerifiedBadge /> : null}
+                        </h2>
+                        <p className="text-xs text-muted-foreground">
+                          {company.industry} · {company.county}
+                        </p>
+                      </div>
+                    </div>
+                    <ScoreBadge value={company.overall} />
                   </div>
-                  <ScoreBadge value={company.overall} />
-                </div>
-                {company.descriptor ? (
-                  <p className="mt-3 text-sm text-muted-foreground">{company.descriptor}</p>
-                ) : null}
-                <p className="mt-3 text-xs text-muted-foreground">
-                  {formatCount(company.story_count)} stories · {formatCount(company.rating_count)}{" "}
-                  ratings
-                  {company.would_work_again_pct !== null
-                    ? ` · ${Math.round(Number(company.would_work_again_pct))}% would work here again`
-                    : ""}
-                </p>
-              </Link>
-            ))}
+                  {company.descriptor ? (
+                    <p className="mt-3 text-sm text-muted-foreground">{company.descriptor}</p>
+                  ) : null}
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {formatCount(company.story_count)} stories · {formatCount(company.rating_count)}{" "}
+                    ratings
+                    {company.would_work_again_pct !== null
+                      ? ` · ${Math.round(Number(company.would_work_again_pct))}% would work here again`
+                      : ""}
+                  </p>
+                </Link>
+              );
+            })}
           </div>
         </>
       )}
