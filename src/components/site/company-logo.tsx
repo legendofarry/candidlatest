@@ -22,10 +22,9 @@ export function CompanyLogo({
     return (
       <span
         className={cn(
-          "flex shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-white",
+          "flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white",
           sizeClassName,
         )}
-        style={{ borderColor: brand?.color }}
       >
         <img
           src={logoUrl}

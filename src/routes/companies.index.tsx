@@ -417,7 +417,7 @@ function CompaniesPage() {
                             accent,
                           )}
                         >
-                          {score === null ? "No score" : `★ ${score.toFixed(1)}/5`}
+                          {score === null ? "" : `★ ${score.toFixed(1)}/5`}
                         </span>
                       </div>
                       <p className="mt-2 text-sm text-muted-foreground">
