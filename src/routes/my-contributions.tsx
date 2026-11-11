@@ -167,13 +167,13 @@ function MyContributionsPage() {
         queryClient.invalidateQueries({ queryKey: ["my-contributions", user?.uid] }),
         deleting.type === "story"
           ? Promise.all([
-              queryClient.invalidateQueries({ queryKey: ["stories"] }),
-              queryClient.invalidateQueries({ queryKey: ["story-pages"] }),
-              queryClient.invalidateQueries({ queryKey: ["story", deleting.id] }),
-              queryClient.invalidateQueries({ queryKey: ["company-scores"] }),
-              queryClient.invalidateQueries({ queryKey: ["onboarding-state", user?.uid] }),
-              queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
-            ])
+            queryClient.invalidateQueries({ queryKey: ["stories"] }),
+            queryClient.invalidateQueries({ queryKey: ["story-pages"] }),
+            queryClient.invalidateQueries({ queryKey: ["story", deleting.id] }),
+            queryClient.invalidateQueries({ queryKey: ["company-scores"] }),
+            queryClient.invalidateQueries({ queryKey: ["onboarding-state", user?.uid] }),
+            queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
+          ])
           : queryClient.invalidateQueries({ queryKey: ["story", deleting.storyId] }),
       ]);
     } catch (error) {
@@ -234,7 +234,11 @@ function MyContributionsPage() {
               to="/profile"
               className="mb-3 inline-flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
             >
-              <ProfileAvatar initials="Y" className="size-6" />
+              <ProfileAvatar
+                photoUrl={user.photoURL}
+                initials={(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}
+                className="size-6"
+              />
               Your profile
               <ArrowUpRight className="size-3.5" />
             </Link>
@@ -290,9 +294,7 @@ function MyContributionsPage() {
                 </div>
               </div>
               <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full">
-                <Link to="/billing">
-                  {maxPinnedStories === 0 ? "View plans" : "Manage"}
-                </Link>
+                <Link to="/billing">{maxPinnedStories === 0 ? "View plans" : "Manage"}</Link>
               </Button>
             </div>
           </>
@@ -551,153 +553,156 @@ function ContributionRow({
         : item.status === "published"
           ? "Published"
           : "Hidden";
-  const statusTone =
-    item.isDeleted || item.status === "hidden"
-      ? "bg-muted text-muted-foreground"
-      : item.status === "pending"
-        ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-        : "bg-primary/10 text-primary";
+  const statusTone = isRemoved
+    ? "bg-muted text-muted-foreground"
+    : item.status === "pending"
+      ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
+      : "bg-primary/10 text-primary";
   const href = isStory ? ("/stories/$id" as const) : ("/stories/$id" as const);
   const canView = isStory ? item.status === "published" : item.storyStatus === "published";
   const canEdit = isStory ? !item.authorDeleted : !item.isDeleted && item.status === "published";
   const pinLimitReached = !isPinned && pinnedCount >= maxPinnedStories;
   const dateLabel = item.createdAt
     ? new Date(item.createdAt).toLocaleDateString("en-KE", {
-        day: "numeric",
-        month: "short",
-        year: "numeric",
-      })
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    })
     : "Date unavailable";
   return (
-      <article className="group flex w-full flex-col px-4 py-5 transition-colors hover:bg-secondary/20 sm:px-6 md:flex-row md:items-start md:gap-6 md:px-8">
-        <div className="flex min-w-0 flex-1 items-start gap-3">
-          <span
-            className={cn(
-              "flex size-10 shrink-0 items-center justify-center rounded-full",
-              isStory
-                ? "bg-primary/15 text-primary"
-                : "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-            )}
-          >
-            {isStory ? <PenLine className="size-5" /> : <MessageSquareText className="size-5" />}
-          </span>
-          <div className="min-w-0 flex-1">
-            <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
-              <span className="font-semibold">{isStory ? "Story" : "Comment"}</span>
-              <span className="text-muted-foreground">·</span>
-              <span className="min-w-0 truncate text-muted-foreground">
-                {isStory ? item.companyName || "Workplace story" : item.storyTitle}
-              </span>
-              <span className={cn("ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium", statusTone)}>
-                {item.status === "published" ? <CircleCheck className="size-3" /> : null}
-                {item.status === "pending" ? <Clock3 className="size-3" /> : null}
-                {item.status === "hidden" ? <EyeOff className="size-3" /> : null}
-                {statusLabel}
-              </span>
-            </p>
-            <h2 className="mt-2 line-clamp-2 text-base font-semibold leading-snug sm:text-lg">
-              {item.isDeleted ? "Comment removed" : item.title}
-            </h2>
-            {item.body ? (
-              <p className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-                {item.body}
-              </p>
-            ) : null}
-            <p className="mt-2 text-xs text-muted-foreground">
-              {dateLabel}
-              {isStory && item.status === "pending"
-                ? " · Only you can see this while it is reviewed"
-                : isStory && item.status === "published"
-                  ? " · Edits go through review again"
-                  : ""}
-            </p>
-          </div>
-          {isPinned ? (
-            <span className="flex size-7 shrink-0 items-center justify-center text-lime-700" aria-label="Pinned on profile">
-              <Pin className="size-3.5 fill-current" />
+    <article className="group flex w-full flex-col px-4 py-5 transition-colors hover:bg-secondary/20 sm:px-6 md:flex-row md:items-start md:gap-6 md:px-8">
+      <div className="flex min-w-0 flex-1 items-start gap-3">
+        <span
+          className={cn(
+            "flex size-10 shrink-0 items-center justify-center rounded-full",
+            isStory ? "bg-primary/15 text-primary" : "bg-sky-500/15 text-sky-700 dark:text-sky-300",
+          )}
+        >
+          {isStory ? <PenLine className="size-5" /> : <MessageSquareText className="size-5" />}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+            <span className="font-semibold">{isStory ? "Story" : "Comment"}</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="min-w-0 truncate text-muted-foreground">
+              {isStory ? item.companyName || "Workplace story" : item.storyTitle}
             </span>
+            <span
+              className={cn(
+                "ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                statusTone,
+              )}
+            >
+              {statusLabel === "Published" ? <CircleCheck className="size-3" /> : null}
+              {item.status === "pending" ? <Clock3 className="size-3" /> : null}
+              {item.status === "hidden" ? <EyeOff className="size-3" /> : null}
+              {statusLabel}
+            </span>
+          </p>
+          {item.body && !(item.type === "comment" && item.isDeleted) ? (
+            <p className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
+              {item.body}
+            </p>
           ) : null}
+          <p className="mt-2 text-xs text-muted-foreground">
+            {dateLabel}
+            {isStory && item.status === "pending"
+              ? " · Only you can see this while it is reviewed"
+              : isStory && item.status === "published"
+                ? " · Edits go through review again"
+                : ""}
+          </p>
         </div>
+        {isPinned ? (
+          <span
+            className="flex size-7 shrink-0 items-center justify-center text-lime-700"
+            aria-label="Pinned on profile"
+          >
+            <Pin className="size-3.5 fill-current" />
+          </span>
+        ) : null}
+      </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-2 pl-[3.25rem] md:mt-1 md:max-w-[45%] md:justify-end md:pl-0">
-            {canView ? (
-              <Button
-                asChild
-                size="sm"
-                variant="secondary"
-                className="min-h-9 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              >
-                <Link
-                  to={href}
-                  params={{ id: item.storyId }}
-                  {...(isStory ? {} : { search: { comment: item.id } })}
-                >
-                  <Eye className="size-4" /> View
-                </Link>
-              </Button>
-            ) : (
-              <span className="flex min-h-9 items-center gap-1.5 rounded-full bg-secondary/50 px-3 text-xs text-muted-foreground">
-                <EyeOff className="size-4" /> {item.authorDeleted ? "Removed" : "Not public"}
-              </span>
-            )}
-            {isStory && canEdit ? (
-              <Button asChild size="sm" className="min-h-9 rounded-full">
-                <Link to="/post" search={{ edit: item.id }}>
-                  <PenLine className="size-4" /> Edit
-                </Link>
-              </Button>
-            ) : null}
-            {!isStory && canEdit ? (
-              <Button size="sm" className="min-h-9 rounded-full" onClick={onEdit}>
-                <PenLine className="size-4" /> Edit
-              </Button>
-            ) : null}
-            {isStory && canView ? (
-              maxPinnedStories === 0 ? (
-                <Button
-                  asChild
-                  size="icon"
-                  variant="secondary"
-                  className="size-9 shrink-0 rounded-full bg-secondary"
-                >
-                  <Link to="/billing" aria-label="Upgrade to pin a story">
-                    <LockKeyhole className="size-4" />
-                  </Link>
-                </Button>
+      <div className="mt-4 flex flex-wrap items-center gap-2 pl-[3.25rem] md:mt-1 md:max-w-[45%] md:justify-end md:pl-0">
+        {canView ? (
+          <Button
+            asChild
+            size="sm"
+            variant="secondary"
+            className="min-h-9 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
+          >
+            <Link
+              to={href}
+              params={{ id: item.storyId }}
+              {...(isStory ? {} : { search: { comment: item.id } })}
+            >
+              <Eye className="size-4" /> View
+            </Link>
+          </Button>
+        ) : (
+          <span className="flex min-h-9 items-center gap-1.5 rounded-full bg-secondary/50 px-3 text-xs text-muted-foreground">
+            <EyeOff className="size-4" /> {item.authorDeleted ? "Removed" : "Not public"}
+          </span>
+        )}
+        {isStory && canEdit ? (
+          <Button asChild size="sm" className="min-h-9 rounded-full">
+            <Link to="/post" search={{ edit: item.id }}>
+              <PenLine className="size-4" /> Edit
+            </Link>
+          </Button>
+        ) : null}
+        {!isStory && canEdit ? (
+          <Button size="sm" className="min-h-9 rounded-full" onClick={onEdit}>
+            <PenLine className="size-4" /> Edit
+          </Button>
+        ) : null}
+        {isStory && canView ? (
+          maxPinnedStories === 0 ? (
+            <Button
+              asChild
+              size="icon"
+              variant="secondary"
+              className="size-9 shrink-0 rounded-full bg-secondary"
+            >
+              <Link to="/billing" aria-label="Upgrade to pin a story">
+                <LockKeyhole className="size-4" />
+              </Link>
+            </Button>
+          ) : (
+            <Button
+              size="icon"
+              variant="secondary"
+              className={cn(
+                "size-9 shrink-0 rounded-full",
+                isPinned ? "bg-primary/15 text-primary" : "bg-secondary",
+              )}
+              disabled={pinning || pinLimitReached}
+              onClick={onTogglePin}
+              aria-label={isPinned ? "Unpin story" : "Pin story"}
+              title={pinLimitReached ? "Premium includes up to 3 pinned stories" : undefined}
+            >
+              {pinning ? (
+                <LoaderCircle className="size-4 animate-spin" />
+              ) : isPinned ? (
+                <PinOff className="size-4" />
               ) : (
-                <Button
-                  size="icon"
-                  variant="secondary"
-                  className={cn("size-9 shrink-0 rounded-full", isPinned ? "bg-primary/15 text-primary" : "bg-secondary")}
-                  disabled={pinning || pinLimitReached}
-                  onClick={onTogglePin}
-                  aria-label={isPinned ? "Unpin story" : "Pin story"}
-                  title={pinLimitReached ? "Premium includes up to 3 pinned stories" : undefined}
-                >
-                  {pinning ? (
-                    <LoaderCircle className="size-4 animate-spin" />
-                  ) : isPinned ? (
-                    <PinOff className="size-4" />
-                  ) : (
-                    <Pin className="size-4" />
-                  )}
-                </Button>
-              )
-            ) : null}
-            {!isRemoved ? (
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={`Remove ${isStory ? "story" : "comment"}`}
-                className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-                onClick={onDelete}
-              >
-                <Trash2 className="size-4" />
-              </Button>
-            ) : null}
-          {isStory && item.status === "published" ? (
-            <span className="ml-1 text-xs text-muted-foreground">Edits go through review again</span>
-          ) : null}
-      </article>
+                <Pin className="size-4" />
+              )}
+            </Button>
+          )
+        ) : null}
+        {!isRemoved ? (
+          <Button
+            size="icon"
+            variant="ghost"
+            aria-label={`Remove ${isStory ? "story" : "comment"}`}
+            className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+            onClick={onDelete}
+          >
+            <Trash2 className="size-4" />
+          </Button>
+        ) : null}
+      </div>
+    </article>
   );
 }
