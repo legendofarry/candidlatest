@@ -76,3 +76,5 @@ This checklist tracks the requested product work. Items marked **Needs decision*
 - [ ] Set the RTDB URL in production browser-build and server environments, then rebuild/redeploy the app.
 - [ ] Configure a production TURN service with short-lived credentials before relying on calls across mobile networks.
 - [ ] Review OpenStreetMap Nominatim usage (employer lookups run at most two per Near me request, cached for 30 days); move to a paid geocoder if volume grows.
+
+- [x] My contributions redesigned: tabs with counts, status chips, card layout, action menu, mobile floating Share button. Profile pinning removed from this screen (the server function remains; remove it separately if pinning is retired).

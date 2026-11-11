@@ -1,34 +1,24 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useInfiniteQuery, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
-  Archive,
-  ArrowUpRight,
-  Check,
-  CircleCheck,
-  Clock3,
+  ArrowLeft,
   Eye,
-  EyeOff,
   LoaderCircle,
-  LockKeyhole,
   MessageSquareText,
-  Pin,
-  PinOff,
+  MoreHorizontal,
   PenLine,
+  Plus,
   Search,
   Trash2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { FloatingBackButton } from "@/components/site/floating-back-button";
-import { ProfileAvatar } from "@/components/site/profile-photo";
 import { useAuth } from "@/hooks/useAuth";
 import { deleteStory, editComment, deleteComment } from "@/lib/actions.functions";
-import { getMyContributions, toggleMyProfileStoryPin } from "@/lib/social.functions";
-import { getOnboardingState } from "@/lib/onboarding.functions";
-import { getMembershipEntitlements, type MembershipTier } from "@/lib/membership";
+import { getMyContributions } from "@/lib/social.functions";
 import { notify as toast } from "@/lib/notifications-store";
 import { cn, formatCount } from "@/lib/utils";
 import {
@@ -49,6 +39,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 export const Route = createFileRoute("/my-contributions")({
   head: () => ({
@@ -78,7 +75,6 @@ type Contribution = {
   companyName: string | null;
   isDeleted: boolean;
   authorDeleted: boolean;
-  isPinned: boolean;
 };
 type ContributionCursor = {
   stories: { createdAt: string; id: string } | null;
@@ -87,11 +83,8 @@ type ContributionCursor = {
 
 function MyContributionsPage() {
   const { user, loading } = useAuth();
-  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const fetchContributions = useServerFn(getMyContributions);
-  const fetchAccount = useServerFn(getOnboardingState);
-  const toggleStoryPin = useServerFn(toggleMyProfileStoryPin);
   const removeStory = useServerFn(deleteStory);
   const removeComment = useServerFn(deleteComment);
   const updateComment = useServerFn(editComment);
@@ -103,36 +96,6 @@ function MyContributionsPage() {
   const [savingEdit, setSavingEdit] = useState(false);
   const [deleting, setDeleting] = useState<Contribution | null>(null);
   const [savingDelete, setSavingDelete] = useState(false);
-  const [pinningStoryId, setPinningStoryId] = useState<string | null>(null);
-
-  const account = useQuery({
-    queryKey: ["onboarding-state", user?.uid ?? null],
-    queryFn: () => fetchAccount(),
-    enabled: Boolean(user),
-  });
-  const pinnedStoryIds = useMemo(
-    () => new Set(account.data?.pinnedStoryIds ?? []),
-    [account.data?.pinnedStoryIds],
-  );
-  const membershipTier = (account.data?.membership.tier ?? "basic") as MembershipTier;
-  const maxPinnedStories = getMembershipEntitlements(membershipTier).maxPinnedStories;
-
-  async function togglePinnedStory(storyId: string) {
-    if (!user || pinningStoryId) return;
-    setPinningStoryId(storyId);
-    try {
-      await toggleStoryPin({ data: { story_id: storyId } });
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ["onboarding-state", user.uid] }),
-        queryClient.invalidateQueries({ queryKey: ["my-contributions", user.uid] }),
-        queryClient.invalidateQueries({ queryKey: ["public-profile"] }),
-      ]);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not update your profile pins.");
-    } finally {
-      setPinningStoryId(null);
-    }
-  }
 
   const contributions = useInfiniteQuery({
     queryKey: ["my-contributions", user?.uid ?? null, category, status],
@@ -221,155 +184,108 @@ function MyContributionsPage() {
     );
   }
 
+  const total = (counts?.stories ?? 0) + (counts?.comments ?? 0);
+  const tabs = [
+    ["all", "All", total],
+    ["stories", "Stories", counts?.stories ?? 0],
+    ["comments", "Comments", counts?.comments ?? 0],
+  ] as const;
+  const statuses = [
+    ["all", "Everything"],
+    ["published", "Published"],
+    ["pending", "In review"],
+    ["hidden", "Not public"],
+  ] as const;
+
   return (
-    <main className="min-h-dvh bg-background pb-28 md:pb-12">
-      <FloatingBackButton
-        onClick={() => void navigate({ to: "/profile" })}
-        className="hidden md:inline-flex"
-      />
-      <div className="w-full px-0 pt-0 md:pt-8">
-        <header className="flex flex-col gap-5 px-4 pb-5 pt-4 sm:px-6 md:flex-row md:items-end md:justify-between md:px-8 md:pt-0">
-          <div className="min-w-0">
-            <Link
-              to="/profile"
-              className="mb-3 inline-flex items-center gap-2 text-xs text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <ProfileAvatar
-                photoUrl={user.photoURL}
-                initials={(user.displayName || user.email || "U").slice(0, 1).toUpperCase()}
-                className="size-6"
-              />
-              Your profile
-              <ArrowUpRight className="size-3.5" />
-            </Link>
-            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-              Your activity
-            </p>
-            <h1 className="mt-1 font-display text-3xl font-bold tracking-tight sm:text-4xl">
+    <main className="min-h-dvh bg-background pb-32 md:pb-16">
+      <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6 md:pt-10">
+        <header className="flex flex-col gap-5">
+          <Link
+            to="/profile"
+            className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+          >
+            <ArrowLeft className="size-4" /> Profile
+          </Link>
+          <div className="flex items-end justify-between gap-4">
+            <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
               My contributions
             </h1>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Your stories and comments, all in one place.
-            </p>
-          </div>
-          <div className="flex items-center gap-7 sm:gap-9">
-            {[
-              ["Total", (counts?.stories ?? 0) + (counts?.comments ?? 0)],
-              ["Stories", counts?.stories ?? 0],
-              ["Comments", counts?.comments ?? 0],
-            ].map(([label, count]) => (
-              <div key={label}>
-                <p className="text-xl font-semibold leading-none tabular-nums">
-                  {formatCount(Number(count))}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">{label}</p>
-              </div>
-            ))}
+            <Button asChild className="hidden h-11 rounded-full px-5 md:inline-flex">
+              <Link to="/post">
+                <Plus className="mr-1.5 size-4" /> Share a story
+              </Link>
+            </Button>
           </div>
         </header>
 
-        {category !== "comments" ? (
-          <>
-            <div className="mb-4 flex w-full items-center gap-3 px-4 py-3 sm:px-6 md:px-8">
-              <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-lime-100 text-[#182515]">
-                <Pin className="size-5" />
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-semibold">Profile pins</p>
-                <p className="text-xs text-muted-foreground">
-                  {maxPinnedStories === 0
-                    ? "Premium members can pin up to 3 published stories."
-                    : `${pinnedStoryIds.size} of ${maxPinnedStories} used`}
-                </p>
-                <div className="mt-1.5 flex max-w-48 gap-1">
-                  {Array.from({ length: Math.min(3, maxPinnedStories || 3) }).map((_, index) => (
-                    <span
-                      key={index}
-                      className={cn(
-                        "h-1.5 flex-1 rounded-full",
-                        index < pinnedStoryIds.size ? "bg-lime-500" : "bg-secondary",
-                      )}
-                    />
-                  ))}
-                </div>
-              </div>
-              <Button asChild variant="ghost" size="sm" className="shrink-0 rounded-full">
-                <Link to="/billing">{maxPinnedStories === 0 ? "View plans" : "Manage"}</Link>
-              </Button>
-            </div>
-          </>
-        ) : null}
-
-        <section className="w-full min-w-0">
-          <div className="sticky top-16 z-30 space-y-3 bg-background/95 px-4 py-3 backdrop-blur-md sm:px-6 md:px-8">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-              <div className="grid w-full grid-cols-3 rounded-full bg-secondary/70 p-1 sm:w-auto sm:shrink-0">
-                {(["all", "stories", "comments"] as const).map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    onClick={() => setCategory(item)}
-                    aria-pressed={category === item}
-                    className={cn(
-                      "min-h-9 rounded-full px-4 text-sm font-medium capitalize transition-colors",
-                      category === item
-                        ? "bg-background text-foreground shadow-sm"
-                        : "text-muted-foreground hover:text-foreground",
-                    )}
-                  >
-                    {item === "all" ? "All" : item}
-                  </button>
-                ))}
-              </div>
-              <label className="relative min-w-0 flex-1">
-                <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search stories and comments"
-                  className="h-11 rounded-full border-0 bg-secondary/50 pl-10 shadow-none focus-visible:ring-1"
-                />
-              </label>
-            </div>
-            <div className="flex w-full gap-2 overflow-x-auto pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-              {(
-                [
-                  ["all", "All statuses", Archive],
-                  ["published", "Published", Check],
-                  ["pending", "In review", Clock3],
-                  ["hidden", "Not public", EyeOff],
-                ] as const
-              ).map(([value, label, Icon]) => (
+        <div className="sticky top-16 z-30 -mx-4 mt-6 space-y-3 bg-background/95 px-4 pb-3 pt-1 backdrop-blur-md sm:-mx-6 sm:px-6">
+          <div className="flex items-center gap-3">
+            <div
+              role="tablist"
+              className="grid flex-1 grid-cols-3 rounded-full bg-secondary/70 p-1 md:flex md:flex-none md:gap-1"
+            >
+              {tabs.map(([value, label, count]) => (
                 <button
                   key={value}
                   type="button"
-                  onClick={() => setStatus(value)}
-                  aria-pressed={status === value}
+                  role="tab"
+                  aria-selected={category === value}
+                  onClick={() => setCategory(value)}
                   className={cn(
-                    "inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
-                    status === value
-                      ? "bg-primary text-primary-foreground md:bg-primary/10 md:text-foreground"
-                      : "bg-card text-muted-foreground md:bg-transparent hover:bg-secondary",
+                    "min-h-10 rounded-full px-4 text-sm transition-colors",
+                    category === value
+                      ? "bg-background font-semibold text-foreground shadow-sm"
+                      : "font-medium text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  <Icon
-                    className={cn(
-                      "size-3.5",
-                      value === "pending"
-                        ? "text-amber-500"
-                        : value === "published"
-                          ? status === value
-                            ? "text-lime-300 md:text-primary"
-                            : "text-primary"
-                          : "",
-                    )}
-                  />
                   {label}
+                  <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">
+                    {formatCount(count)}
+                  </span>
                 </button>
               ))}
             </div>
+            <label className="relative hidden min-w-0 flex-1 md:block">
+              <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder="Search"
+                className="h-11 rounded-full border-0 bg-secondary/50 pl-10 shadow-none focus-visible:ring-1"
+              />
+            </label>
           </div>
+          <label className="relative block md:hidden">
+            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search your contributions"
+              className="h-11 rounded-full border-0 bg-secondary/50 pl-10 shadow-none focus-visible:ring-1"
+            />
+          </label>
+          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+            {statuses.map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setStatus(value)}
+                aria-pressed={status === value}
+                className={cn(
+                  "min-h-9 shrink-0 rounded-full border px-4 text-sm transition-colors",
+                  status === value
+                    ? "border-foreground bg-foreground font-semibold text-background"
+                    : "border-border bg-card font-medium text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
 
+        <section className="mt-2">
           {contributions.isPending ? (
             <div className="flex min-h-64 items-center justify-center gap-3 text-sm text-muted-foreground">
               <LoaderCircle className="size-5 animate-spin" /> Loading your contributions…
@@ -386,39 +302,43 @@ function MyContributionsPage() {
               </Button>
             </div>
           ) : items.length === 0 ? (
-            <div className="flex min-h-[45dvh] w-full flex-col items-center justify-center px-6 py-12 text-center">
-              <span className="flex size-14 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-                <MessageSquareText className="size-7" />
+            <div className="flex min-h-[50dvh] flex-col items-center justify-center px-6 py-12 text-center">
+              <span className="flex size-20 items-center justify-center rounded-[28px] bg-primary/10 text-primary">
+                <MessageSquareText className="size-9" />
               </span>
-              <h2 className="mt-5 text-xl font-semibold">
+              <h2 className="mt-6 font-display text-2xl font-semibold">
                 {search
-                  ? "No matches in loaded contributions"
-                  : category === "all"
-                    ? "Your contributions start here"
-                    : `No ${category} yet`}
+                  ? "No matches"
+                  : category === "all" && status === "all"
+                    ? "Nothing shared yet"
+                    : "Nothing here"}
               </h2>
-              <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              <p className="mt-2 max-w-xs text-[15px] leading-relaxed text-muted-foreground">
                 {search
-                  ? "Try another search to find a story or comment."
-                  : "Share a workplace story to help others understand what it’s like to work there."}
+                  ? "Try another search."
+                  : status !== "all"
+                    ? "No contributions with this status."
+                    : "Your stories and comments will show up here."}
               </p>
-              {!search ? (
-                <Button asChild className="mt-6 rounded-full px-5">
-                  <Link to="/post">Share a story</Link>
-                </Button>
+              {!search && status === "all" ? (
+                <div className="mt-6 flex w-full max-w-xs flex-col gap-2">
+                  <Button asChild className="h-12 rounded-full">
+                    <Link to="/post">
+                      <Plus className="mr-1.5 size-4" /> Share your first story
+                    </Link>
+                  </Button>
+                  <Button asChild variant="ghost" className="h-12 rounded-full">
+                    <Link to="/">Read stories and comment</Link>
+                  </Button>
+                </div>
               ) : null}
             </div>
           ) : (
-            <div className="space-y-1 px-0">
+            <div className="space-y-3">
               {items.map((item) => (
-                <ContributionRow
+                <ContributionCard
                   key={`${item.type}-${item.id}`}
                   item={item}
-                  isPinned={pinnedStoryIds.has(item.id)}
-                  pinnedCount={pinnedStoryIds.size}
-                  maxPinnedStories={maxPinnedStories}
-                  pinning={pinningStoryId === item.id}
-                  onTogglePin={() => void togglePinnedStory(item.id)}
                   onEdit={() => {
                     setEditing(item);
                     setEditBody(item.body);
@@ -430,22 +350,29 @@ function MyContributionsPage() {
           )}
 
           {contributions.hasNextPage ? (
-            <div className="flex justify-center px-4 py-6 sm:px-6">
+            <div className="flex justify-center py-8">
               <Button
                 variant="outline"
-                className="min-w-48 rounded-full"
+                className="h-12 min-w-44 rounded-full"
                 disabled={contributions.isFetchingNextPage}
                 onClick={() => void contributions.fetchNextPage()}
               >
                 {contributions.isFetchingNextPage ? (
                   <LoaderCircle className="mr-2 size-4 animate-spin" />
                 ) : null}
-                {contributions.isFetchingNextPage ? "Loading…" : "Load more contributions"}
+                {contributions.isFetchingNextPage ? "Loading…" : "Show more"}
               </Button>
             </div>
           ) : null}
         </section>
       </div>
+
+      <Link
+        to="/post"
+        className="fixed bottom-24 right-4 z-40 inline-flex h-14 items-center gap-2 rounded-full bg-foreground px-5 text-[15px] font-semibold text-background shadow-xl md:hidden"
+      >
+        <Plus className="size-5" /> Share a story
+      </Link>
 
       <Dialog
         open={Boolean(editing)}
@@ -524,185 +451,205 @@ function MyContributionsPage() {
   );
 }
 
-function ContributionRow({
+function ContributionCard({
   item,
-  isPinned,
-  pinnedCount,
-  maxPinnedStories,
-  pinning,
-  onTogglePin,
   onEdit,
   onDelete,
 }: {
   item: Contribution;
-  isPinned: boolean;
-  pinnedCount: number;
-  maxPinnedStories: number;
-  pinning: boolean;
-  onTogglePin: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const isStory = item.type === "story";
-  const isRemoved = item.isDeleted || item.authorDeleted || item.status === "hidden";
-  const statusLabel =
-    item.isDeleted || item.authorDeleted
-      ? "Removed by you"
-      : item.status === "pending"
-        ? "In review"
-        : item.status === "published"
-          ? "Published"
-          : "Hidden";
-  const statusTone = isRemoved
-    ? "bg-muted text-muted-foreground"
+  const removed = item.isDeleted || item.authorDeleted;
+  const state: "published" | "review" | "hidden" | "removed" = removed
+    ? "removed"
     : item.status === "pending"
-      ? "bg-amber-500/10 text-amber-700 dark:text-amber-300"
-      : "bg-primary/10 text-primary";
-  const href = isStory ? ("/stories/$id" as const) : ("/stories/$id" as const);
+      ? "review"
+      : item.status === "published"
+        ? "published"
+        : "hidden";
+  const label = {
+    published: "Published",
+    review: "In review",
+    hidden: "Not public",
+    removed: "Removed",
+  }[state];
+  const dot = {
+    published: "bg-primary",
+    review: "bg-amber-500",
+    hidden: "bg-muted-foreground/60",
+    removed: "bg-muted-foreground/40",
+  }[state];
+  const tone = {
+    published: "text-primary",
+    review: "text-amber-700 dark:text-amber-300",
+    hidden: "text-foreground",
+    removed: "text-muted-foreground",
+  }[state];
   const canView = isStory ? item.status === "published" : item.storyStatus === "published";
   const canEdit = isStory ? !item.authorDeleted : !item.isDeleted && item.status === "published";
-  const pinLimitReached = !isPinned && pinnedCount >= maxPinnedStories;
-  const dateLabel = item.createdAt
+  const date = item.createdAt
     ? new Date(item.createdAt).toLocaleDateString("en-KE", {
-      day: "numeric",
-      month: "short",
-      year: "numeric",
-    })
-    : "Date unavailable";
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+      })
+    : "";
+  const heading = isStory ? item.title || item.companyName || "Workplace story" : null;
+  const note =
+    state === "review"
+      ? "We are checking this before it goes live. Only you can see it until then."
+      : state === "hidden"
+        ? "Not public right now. Edit it and send it for review again."
+        : null;
+  const viewLink = (children: ReactNode) => (
+    <Link
+      to="/stories/$id"
+      params={{ id: item.storyId }}
+      {...(isStory ? {} : { search: { comment: item.id } })}
+    >
+      {children}
+    </Link>
+  );
+
   return (
-    <article className="group flex w-full flex-col px-4 py-5 transition-colors hover:bg-secondary/20 sm:px-6 md:flex-row md:items-start md:gap-6 md:px-8">
-      <div className="flex min-w-0 flex-1 items-start gap-3">
-        <span
-          className={cn(
-            "flex size-10 shrink-0 items-center justify-center rounded-full",
-            isStory ? "bg-primary/15 text-primary" : "bg-sky-500/15 text-sky-700 dark:text-sky-300",
-          )}
-        >
-          {isStory ? <PenLine className="size-5" /> : <MessageSquareText className="size-5" />}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
-            <span className="font-semibold">{isStory ? "Story" : "Comment"}</span>
-            <span className="text-muted-foreground">·</span>
-            <span className="min-w-0 truncate text-muted-foreground">
-              {isStory ? item.companyName || "Workplace story" : item.storyTitle}
+    <article
+      className={cn(
+        "overflow-hidden rounded-3xl border border-border bg-card",
+        state === "removed" && "opacity-70",
+      )}
+    >
+      <div className="px-5 pb-4 pt-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="flex min-w-0 flex-wrap items-center gap-x-2 text-[13px] text-muted-foreground">
+            <span className={cn("inline-flex items-center gap-1.5 font-semibold", tone)}>
+              <span className={cn("size-1.5 rounded-full", dot)} />
+              {label}
             </span>
-            <span
-              className={cn(
-                "ml-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                statusTone,
-              )}
-            >
-              {statusLabel === "Published" ? <CircleCheck className="size-3" /> : null}
-              {item.status === "pending" ? <Clock3 className="size-3" /> : null}
-              {item.status === "hidden" ? <EyeOff className="size-3" /> : null}
-              {statusLabel}
-            </span>
+            <span aria-hidden="true">·</span>
+            <span>{isStory ? "Story" : "Comment"}</span>
+            {date ? (
+              <>
+                <span aria-hidden="true">·</span>
+                <span>{date}</span>
+              </>
+            ) : null}
           </p>
-          {item.body && !(item.type === "comment" && item.isDeleted) ? (
-            <p className="mt-1.5 line-clamp-3 text-sm leading-relaxed text-muted-foreground">
-              {item.body}
-            </p>
+          {!removed ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="More actions"
+                  className="-mr-2 size-11 shrink-0 rounded-full text-muted-foreground"
+                >
+                  <MoreHorizontal className="size-5" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-2xl p-1.5">
+                {canView ? (
+                  <DropdownMenuItem asChild className="h-11 rounded-xl">
+                    {viewLink(
+                      <>
+                        <Eye className="mr-2 size-4" /> View
+                      </>,
+                    )}
+                  </DropdownMenuItem>
+                ) : null}
+                {canEdit ? (
+                  isStory ? (
+                    <DropdownMenuItem asChild className="h-11 rounded-xl">
+                      <Link to="/post" search={{ edit: item.id }}>
+                        <PenLine className="mr-2 size-4" /> Edit
+                      </Link>
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem className="h-11 rounded-xl" onSelect={onEdit}>
+                      <PenLine className="mr-2 size-4" /> Edit
+                    </DropdownMenuItem>
+                  )
+                ) : null}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="h-11 rounded-xl text-destructive focus:text-destructive"
+                  onSelect={onDelete}
+                >
+                  <Trash2 className="mr-2 size-4" /> Remove
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : null}
-          <p className="mt-2 text-xs text-muted-foreground">
-            {dateLabel}
-            {isStory && item.status === "pending"
-              ? " · Only you can see this while it is reviewed"
-              : isStory && item.status === "published"
-                ? " · Edits go through review again"
-                : ""}
-          </p>
         </div>
-        {isPinned ? (
-          <span
-            className="flex size-7 shrink-0 items-center justify-center text-lime-700"
-            aria-label="Pinned on profile"
-          >
-            <Pin className="size-3.5 fill-current" />
-          </span>
+
+        {!isStory ? (
+          <p className="mt-2 truncate text-[13px] text-muted-foreground">
+            Replying to <span className="font-medium text-foreground">{item.storyTitle}</span>
+          </p>
+        ) : null}
+        {heading ? (
+          <h2 className="mt-2 font-display text-xl font-semibold leading-snug tracking-tight">
+            {heading}
+          </h2>
+        ) : null}
+        {item.body && !(item.type === "comment" && item.isDeleted) ? (
+          <p className="mt-1.5 line-clamp-3 text-[15px] leading-relaxed text-muted-foreground">
+            {item.body}
+          </p>
+        ) : null}
+
+        {state === "published" || (!isStory && canView) ? (
+          <div className="-mb-1 mt-3 flex items-center justify-end gap-1">
+            {canView ? (
+              <Button asChild variant="ghost" className="h-11 rounded-full px-4 font-semibold">
+                {viewLink(
+                  <>
+                    <Eye className="mr-1.5 size-4" /> View
+                  </>,
+                )}
+              </Button>
+            ) : null}
+            {canEdit ? (
+              isStory ? (
+                <Button asChild variant="ghost" className="h-11 rounded-full px-4 font-semibold">
+                  <Link to="/post" search={{ edit: item.id }}>
+                    <PenLine className="mr-1.5 size-4" /> Edit
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="ghost"
+                  className="h-11 rounded-full px-4 font-semibold"
+                  onClick={onEdit}
+                >
+                  <PenLine className="mr-1.5 size-4" /> Edit
+                </Button>
+              )
+            ) : null}
+          </div>
         ) : null}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2 pl-[3.25rem] md:mt-1 md:max-w-[45%] md:justify-end md:pl-0">
-        {canView ? (
-          <Button
-            asChild
-            size="sm"
-            variant="secondary"
-            className="min-h-9 rounded-full bg-secondary text-secondary-foreground hover:bg-secondary/80"
-          >
-            <Link
-              to={href}
-              params={{ id: item.storyId }}
-              {...(isStory ? {} : { search: { comment: item.id } })}
-            >
-              <Eye className="size-4" /> View
-            </Link>
-          </Button>
-        ) : (
-          <span className="flex min-h-9 items-center gap-1.5 rounded-full bg-secondary/50 px-3 text-xs text-muted-foreground">
-            <EyeOff className="size-4" /> {item.authorDeleted ? "Removed" : "Not public"}
-          </span>
-        )}
-        {isStory && canEdit ? (
-          <Button asChild size="sm" className="min-h-9 rounded-full">
-            <Link to="/post" search={{ edit: item.id }}>
-              <PenLine className="size-4" /> Edit
-            </Link>
-          </Button>
-        ) : null}
-        {!isStory && canEdit ? (
-          <Button size="sm" className="min-h-9 rounded-full" onClick={onEdit}>
-            <PenLine className="size-4" /> Edit
-          </Button>
-        ) : null}
-        {isStory && canView ? (
-          maxPinnedStories === 0 ? (
-            <Button
-              asChild
-              size="icon"
-              variant="secondary"
-              className="size-9 shrink-0 rounded-full bg-secondary"
-            >
-              <Link to="/billing" aria-label="Upgrade to pin a story">
-                <LockKeyhole className="size-4" />
+      {note ? (
+        <div
+          className={cn(
+            "flex flex-wrap items-center justify-between gap-3 border-t px-5 py-3.5",
+            state === "review"
+              ? "border-amber-500/20 bg-amber-500/10"
+              : "border-border bg-secondary/50",
+          )}
+        >
+          <p className="min-w-0 flex-1 basis-60 text-sm leading-relaxed">{note}</p>
+          {state === "hidden" && isStory && canEdit ? (
+            <Button asChild className="h-11 rounded-full px-5">
+              <Link to="/post" search={{ edit: item.id }}>
+                Edit and resubmit
               </Link>
             </Button>
-          ) : (
-            <Button
-              size="icon"
-              variant="secondary"
-              className={cn(
-                "size-9 shrink-0 rounded-full",
-                isPinned ? "bg-primary/15 text-primary" : "bg-secondary",
-              )}
-              disabled={pinning || pinLimitReached}
-              onClick={onTogglePin}
-              aria-label={isPinned ? "Unpin story" : "Pin story"}
-              title={pinLimitReached ? "Premium includes up to 3 pinned stories" : undefined}
-            >
-              {pinning ? (
-                <LoaderCircle className="size-4 animate-spin" />
-              ) : isPinned ? (
-                <PinOff className="size-4" />
-              ) : (
-                <Pin className="size-4" />
-              )}
-            </Button>
-          )
-        ) : null}
-        {!isRemoved ? (
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label={`Remove ${isStory ? "story" : "comment"}`}
-            className="size-9 shrink-0 rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-            onClick={onDelete}
-          >
-            <Trash2 className="size-4" />
-          </Button>
-        ) : null}
-      </div>
+          ) : null}
+        </div>
+      ) : null}
     </article>
   );
 }
