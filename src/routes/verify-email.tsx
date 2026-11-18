@@ -240,7 +240,123 @@ function VerifyEmailPage() {
           <div aria-hidden="true" className="absolute -bottom-40 -left-24 size-80 rounded-full border border-[#c7ff00]/10" />
         </aside>
 
-        <section className="flex min-h-dvh flex-col px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:px-8 sm:py-8 lg:px-12 xl:px-20">
+        {/* Mobile layout */}
+        <section className="flex min-h-dvh flex-col px-6 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-[max(1.25rem,env(safe-area-inset-top))] sm:hidden">
+          <header className="flex items-center justify-between">
+            <Link
+              to="/"
+              className="inline-flex items-center gap-2 font-display text-lg font-bold tracking-tight"
+            >
+              <Flame className="size-6 stroke-[2.2] text-[#c7ff00]" />
+              <span>Candid<span className="text-[#c7ff00]">.</span></span>
+            </Link>
+            <button
+              type="button"
+              onClick={() => void useAnotherAccount()}
+              className="min-h-11 px-2 text-sm text-white/45 active:text-white"
+            >
+              Sign out
+            </button>
+          </header>
+
+          <div className="flex flex-1 flex-col items-center justify-center text-center">
+            <div className="relative flex size-56 items-center justify-center">
+              {[0, 1].map((i) => (
+                <motion.span
+                  key={i}
+                  aria-hidden="true"
+                  initial={{ scale: 0.55, opacity: 0.5 }}
+                  animate={{ scale: 1.25, opacity: 0 }}
+                  transition={{ duration: 3.2, repeat: Infinity, delay: i * 1.6, ease: "easeOut" }}
+                  className="absolute size-44 rounded-full border border-[#c7ff00]/40"
+                />
+              ))}
+              <div className="absolute size-44 rounded-full bg-[radial-gradient(circle,_rgba(199,255,0,.16),_transparent_68%)]" />
+              <motion.div
+                animate={{ y: [0, -6, 0], rotate: [-2, 2, -2] }}
+                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
+                className="relative flex size-24 items-center justify-center rounded-[1.75rem] border border-[#c7ff00]/30 bg-[#11150b] shadow-[0_0_80px_-20px_rgba(199,255,0,.6)]"
+              >
+                <Mail className="size-10 stroke-[1.35] text-[#c7ff00]" />
+                <span className="absolute -bottom-2.5 -right-2.5 flex size-9 items-center justify-center rounded-xl border border-[#c7ff00]/30 bg-[#c7ff00] text-black">
+                  {checking ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4 stroke-[3]" />}
+                </span>
+              </motion.div>
+            </div>
+
+            <h1 className="mt-2 font-display text-[2.6rem] font-semibold leading-[1] tracking-[-0.055em]">
+              {hasSendError ? "Let’s get that link through." : "Check your inbox."}
+            </h1>
+            <p className="mt-3 max-w-[19rem] text-[15px] leading-6 text-white/50">
+              {hasSendError
+                ? "Your account is ready, but the verification email didn’t go through."
+                : "Tap the link in the email we sent. We’ll take you straight in."}
+            </p>
+
+            <div className="mt-6 flex max-w-full items-center gap-2.5 rounded-full border border-white/10 bg-white/[0.04] py-2 pl-3 pr-4">
+              <Mail className="size-4 shrink-0 text-[#c7ff00]" />
+              <span className="truncate text-sm font-medium text-white/90">
+                {user.email || "No email address linked"}
+              </span>
+            </div>
+
+            <div
+              aria-live="polite"
+              role={noticeTone === "error" ? "alert" : "status"}
+              className={`mt-5 flex min-h-6 max-w-[20rem] items-start justify-center gap-2 text-[13px] leading-5 ${
+                noticeTone === "error"
+                  ? "text-rose-300"
+                  : noticeTone === "success"
+                    ? "text-[#c7ff00]"
+                    : "text-white/45"
+              }`}
+            >
+              {!notice ? (
+                <span className="relative mt-1.5 flex size-2 shrink-0">
+                  <span className="absolute inline-flex size-full animate-ping rounded-full bg-[#c7ff00]/60" />
+                  <span className="relative inline-flex size-2 rounded-full bg-[#c7ff00]" />
+                </span>
+              ) : null}
+              <span>{notice || "Waiting for you to confirm. We check automatically."}</span>
+            </div>
+          </div>
+
+          <div className="space-y-2.5">
+            <Button
+              asChild
+              className="h-14 w-full rounded-2xl bg-[#c7ff00] text-base font-semibold text-black hover:bg-[#d7ff49]"
+            >
+              <a href="mailto:">
+                <Mail className="size-5" /> Open mail app
+              </a>
+            </Button>
+            <div className="grid grid-cols-2 gap-2.5">
+              <Button
+                onClick={() => void checkVerification(true)}
+                disabled={checking}
+                variant="outline"
+                className="h-12 rounded-2xl border-white/15 bg-white/[0.04] text-[15px] text-white hover:bg-white/[0.08] hover:text-white"
+              >
+                {checking ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                I’ve verified
+              </Button>
+              <Button
+                onClick={() => void resendEmail()}
+                disabled={sending || cooldown > 0 || !user.email}
+                variant="outline"
+                className="h-12 rounded-2xl border-white/15 bg-white/[0.04] text-[15px] text-white hover:bg-white/[0.08] hover:text-white"
+              >
+                {sending ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                {cooldown > 0 ? `Resend ${cooldown}s` : "Resend"}
+              </Button>
+            </div>
+            <p className="px-2 pt-1.5 text-center text-xs leading-5 text-white/35">
+              Can’t find it? Check Spam or Junk and mark it <span className="text-white/60">Not spam</span>.
+            </p>
+          </div>
+        </section>
+
+        <section className="hidden min-h-dvh flex-col px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] sm:flex sm:px-8 sm:py-8 lg:px-12 xl:px-20">
           <header className="flex items-center justify-between lg:justify-end">
             <Link
               to="/"
