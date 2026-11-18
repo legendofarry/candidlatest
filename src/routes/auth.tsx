@@ -261,7 +261,7 @@ function AuthPage() {
 
           <main className="flex h-dvh flex-col overflow-hidden px-6 py-5 sm:px-10 sm:py-8 lg:justify-center lg:px-14 lg:py-12 xl:px-20">
             <div className="mx-auto w-full max-w-[620px] animate-rise">
-              <div className="mb-8 flex items-center justify-between sm:mb-12 lg:hidden">
+              <div className="mb-7 flex items-center sm:mb-10 lg:hidden">
                 <Link
                   to="/"
                   className="inline-flex items-center gap-3 font-display text-[1.65rem] font-bold tracking-tight text-[#f5f5f0]"
@@ -269,34 +269,16 @@ function AuthPage() {
                   <Flame className="size-9 stroke-[2.2] text-[#c7ff00]" />
                   <span>Candid<span className="text-[#c7ff00]">.</span></span>
                 </Link>
-                <span className="text-xs font-medium uppercase tracking-[0.16em] text-white/45">Make it yours.</span>
-              </div>
-              <div className="mb-14 hidden items-center justify-end lg:flex">
-                <span className="text-xs font-medium uppercase tracking-[0.16em] text-white/45">Make it yours.</span>
-              </div>
-              <div className="mb-10 flex items-center justify-between sm:mb-14">
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-[0.28em] text-white/45">Your next chapter</p>
-                </div>
               </div>
               <div className="max-w-[700px]">
-                <div className="mb-7 mt-4 sm:mb-10 sm:mt-6">
-                  <h1 className="max-w-[650px] font-display text-[2.7rem] font-semibold leading-[0.98] tracking-[-0.055em] text-[#f5f5f0] sm:text-6xl lg:text-[4.35rem]">
-                    {mode === "signin" ? (
-                      <>Good to have<br /><span className="text-[#c7ff00]">you back.</span></>
-                    ) : "Make it yours."}
-                  </h1>
-                  <p className="mt-5 text-base text-white/50 sm:mt-7 sm:text-xl">
-                    {mode === "signin"
-                      ? "Pick up where you left off."
-                      : "A little spark. A new beginning."}
-                  </p>
-                </div>
+                <h1 className="mb-6 font-display text-3xl font-semibold leading-tight tracking-[-0.04em] text-[#f5f5f0] lg:hidden">
+                  {mode === "signin" ? "Good to have you back" : "Create your account"}
+                </h1>
 
                 <div
                   role="tablist"
                   aria-label="Choose sign in or account creation"
-                  className="mb-7 grid max-w-[680px] grid-cols-2 border-b border-white/15 sm:mb-10"
+                  className="mb-6 grid max-w-[680px] grid-cols-2 border-b border-white/15 sm:mb-8"
                 >
                   {([
                     ["signin", "Sign in"],
