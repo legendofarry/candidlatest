@@ -10,6 +10,7 @@ import {
 import { notify as toast } from "@/lib/notifications-store";
 import { Eye, EyeOff, Flame, Loader2 } from "lucide-react";
 import { firebaseAuth } from "@/integrations/firebase/client";
+import { AUTH_EMAIL_SESSION_KEY } from "@/lib/auth-email";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -111,6 +112,14 @@ function AuthPage() {
   const fetchOnboardingState = useServerFn(getOnboardingState);
   const fetchLifecycle = useServerFn(getMyAccountLifecycle);
   const changeLifecycle = useServerFn(changeMyAccountLifecycle);
+
+  useEffect(() => {
+    try {
+      setEmail(window.sessionStorage.getItem(AUTH_EMAIL_SESSION_KEY) ?? "");
+    } catch {
+      // Session storage can be unavailable in restricted browser contexts.
+    }
+  }, []);
 
   useEffect(() => {
     if (authLoading || !user || busy || accountError) return;
@@ -226,9 +235,9 @@ function AuthPage() {
   }
 
   return (
-    <div className="auth-screen h-dvh w-full overflow-hidden bg-[#050505] text-[#f5f5f0]">
-      <div className="relative h-dvh w-full overflow-hidden bg-[#050505]">
-        <div className="grid h-dvh w-full lg:grid-cols-2">
+    <div className="auth-screen min-h-dvh w-full bg-[#050505] text-[#f5f5f0]">
+      <div className="relative min-h-dvh w-full bg-[#050505]">
+        <div className="grid min-h-dvh w-full lg:grid-cols-2">
           <section className="relative hidden overflow-hidden border-r border-white/10 bg-[#0b0d0b] lg:flex lg:min-h-dvh lg:flex-col lg:justify-between lg:p-14 xl:p-20">
             <div className="relative z-10 flex items-center gap-3 font-display text-[1.65rem] font-bold tracking-tight">
               <Flame className="size-9 stroke-[2.2] text-[#c7ff00]" />
@@ -259,7 +268,7 @@ function AuthPage() {
             </div>
           </section>
 
-          <main className="flex h-dvh flex-col overflow-hidden px-6 py-5 sm:px-10 sm:py-8 lg:justify-center lg:px-14 lg:py-12 xl:px-20">
+          <main className="flex min-h-dvh flex-col px-6 py-5 sm:px-10 sm:py-8 lg:justify-center lg:px-14 lg:py-12 xl:px-20">
             <div className="mx-auto w-full max-w-[620px] animate-rise">
               <div className="mb-7 flex items-center sm:mb-10 lg:hidden">
                 <Link
@@ -323,7 +332,16 @@ function AuthPage() {
                         required
                         autoComplete="email"
                         value={email}
-                        onChange={(event) => setEmail(event.target.value)}
+                        onChange={(event) => {
+                          const nextEmail = event.target.value;
+                          setEmail(nextEmail);
+                          try {
+                            if (nextEmail) window.sessionStorage.setItem(AUTH_EMAIL_SESSION_KEY, nextEmail);
+                            else window.sessionStorage.removeItem(AUTH_EMAIL_SESSION_KEY);
+                          } catch {
+                            // Keep the sign-in form usable if session storage is unavailable.
+                          }
+                        }}
                         placeholder="you@example.com"
                         className="h-12 rounded-none border-0 border-b border-white/15 bg-transparent px-0 text-base text-[#f5f5f0] placeholder:text-white/30 shadow-none focus-visible:border-[#c7ff00] focus-visible:ring-0 sm:h-14 sm:text-lg"
                       />
