@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { motion } from "motion/react";
+import { motion, useReducedMotion } from "motion/react";
 import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -8,7 +8,7 @@ import {
   sendEmailVerification,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
-import { Eye, EyeOff, Flame, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Flame, Loader2, MessageSquareText, ShieldCheck } from "lucide-react";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { AUTH_EMAIL_SESSION_KEY } from "@/lib/auth-email";
 import { Button } from "@/components/ui/button";
@@ -45,6 +45,49 @@ export const Route = createFileRoute("/auth")({
   }),
   component: AuthPage,
 });
+
+function MobileAuthVisual() {
+  const reduceMotion = useReducedMotion();
+  const animate = !reduceMotion;
+
+  return (
+    <div
+      aria-hidden="true"
+      className="relative isolate flex min-h-40 flex-1 items-center justify-center overflow-hidden lg:hidden"
+    >
+      <div className="absolute inset-x-5 top-1/2 -z-10 h-px bg-gradient-to-r from-transparent via-[#c7ff00]/20 to-transparent" />
+      <div className="absolute inset-0 -z-10 bg-[radial-gradient(ellipse_at_50%_52%,_rgba(199,255,0,0.055),_transparent_58%)]" />
+
+      <div className="relative flex size-[clamp(9rem,46vw,16rem)] items-center justify-center">
+        <motion.div
+          animate={animate ? { rotate: 360 } : undefined}
+          transition={animate ? { duration: 34, repeat: Infinity, ease: "linear" } : undefined}
+          className="absolute inset-0 rounded-full border border-dashed border-[#c7ff00]/20"
+        >
+          <span className="absolute left-[16%] top-[18%] size-2 rounded-full bg-[#c7ff00] shadow-[0_0_18px_5px_rgba(199,255,0,.24)]" />
+          <span className="absolute bottom-[13%] right-[12%] size-1.5 rounded-full bg-teal-300/80 shadow-[0_0_16px_4px_rgba(94,234,212,.22)]" />
+        </motion.div>
+        <div className="absolute inset-[12%] rounded-full border border-white/[0.07]" />
+        <motion.div
+          animate={animate ? { scale: [1, 1.045, 1] } : undefined}
+          transition={animate ? { duration: 4.5, repeat: Infinity, ease: "easeInOut" } : undefined}
+          className="relative flex size-[4.25rem] items-center justify-center rounded-[1.4rem] border border-[#c7ff00]/25 bg-[#10140a] text-[#c7ff00] shadow-[0_0_65px_-22px_rgba(199,255,0,.42)]"
+        >
+          <MessageSquareText className="size-7 stroke-[1.5]" />
+          <span className="absolute -bottom-2 -right-2 flex size-7 items-center justify-center rounded-xl border border-teal-300/25 bg-[#0b1110] text-teal-200">
+            <ShieldCheck className="size-4" />
+          </span>
+        </motion.div>
+      </div>
+
+      <div className="absolute inset-x-1 bottom-3 flex items-center justify-center gap-2.5 text-[9px] font-medium uppercase tracking-[0.2em] text-white/35">
+        <span>Kenyan voices</span>
+        <span className="size-1 rounded-full bg-[#c7ff00]/70" />
+        <span>Private by design</span>
+      </div>
+    </div>
+  );
+}
 
 function authErrorCode(error: unknown) {
   return error && typeof error === "object" && "code" in error
@@ -235,10 +278,10 @@ function AuthPage() {
   }
 
   return (
-    <div className="auth-screen min-h-dvh w-full bg-[#050505] text-[#f5f5f0]">
-      <div className="relative min-h-dvh w-full bg-[#050505]">
-        <div className="grid min-h-dvh w-full lg:grid-cols-2">
-          <section className="relative hidden overflow-hidden border-r border-white/10 bg-[#0b0d0b] lg:flex lg:min-h-dvh lg:flex-col lg:justify-between lg:p-14 xl:p-20">
+    <div className="auth-screen h-dvh w-full overflow-hidden bg-[#050505] text-[#f5f5f0]">
+      <div className="relative h-dvh w-full overflow-hidden bg-[#050505]">
+        <div className="grid h-dvh min-h-0 w-full lg:grid-cols-2">
+          <section className="relative hidden h-dvh min-h-0 overflow-hidden border-r border-white/10 bg-[#0b0d0b] lg:flex lg:flex-col lg:justify-between lg:p-14 xl:p-20">
             <div className="relative z-10 flex items-center gap-3 font-display text-[1.65rem] font-bold tracking-tight">
               <Flame className="size-9 stroke-[2.2] text-[#c7ff00]" />
               <span>Candid<span className="text-[#c7ff00]">.</span></span>
@@ -268,8 +311,8 @@ function AuthPage() {
             </div>
           </section>
 
-          <main className="flex min-h-dvh flex-col px-6 py-5 sm:px-10 sm:py-8 lg:justify-center lg:px-14 lg:py-12 xl:px-20">
-            <div className="mx-auto w-full max-w-[620px] animate-rise">
+          <main className="flex h-dvh min-h-0 flex-col overflow-y-auto overscroll-contain px-6 py-5 sm:px-10 sm:py-8 lg:justify-center lg:px-14 lg:py-12 xl:px-20">
+            <div className="mx-auto flex min-h-[calc(100dvh-2.5rem)] w-full max-w-[620px] flex-col animate-rise sm:min-h-[calc(100dvh-4rem)] lg:my-auto lg:min-h-0">
               <div className="mb-7 flex items-center sm:mb-10 lg:hidden">
                 <Link
                   to="/"
@@ -400,10 +443,7 @@ function AuthPage() {
                 </div>
 
               </div>
-              <footer className="mt-8 flex max-w-[680px] flex-col gap-3 text-xs text-white/40 sm:mt-14 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:text-sm">
-                <p className="flex items-center gap-3"><span aria-hidden>⌑</span> Your space. Safe and secure.</p>
-                <div className="flex items-center gap-5"><span>© 2026 Candid</span><Link to="/privacy" className="hover:text-white">Privacy</Link><Link to="/guidelines" className="hover:text-white">Terms</Link></div>
-              </footer>
+              <MobileAuthVisual />
             </div>
           </main>
         </div>

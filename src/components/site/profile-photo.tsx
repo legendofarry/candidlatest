@@ -102,10 +102,12 @@ export function ProfileCoverPicker({
   coverUrl,
   onSaved,
   editable = true,
+  largeMobileText = false,
 }: {
   coverUrl?: string | null;
   onSaved: (coverUrl: string) => void;
   editable?: boolean;
+  largeMobileText?: boolean;
 }) {
   const savePhoto = useServerFn(saveMyProfilePhoto);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -189,7 +191,7 @@ export function ProfileCoverPicker({
               disabled={uploading}
               onClick={() => inputRef.current?.click()}
               aria-label={coverUrl ? "Change cover photo" : "Add cover photo"}
-              className="absolute bottom-3 right-3 z-10 h-9 rounded-full border border-white/20 bg-background/90 px-3 shadow-lg backdrop-blur"
+              className={`absolute bottom-3 right-3 z-10 rounded-full border border-white/20 bg-background/90 px-3 shadow-lg backdrop-blur ${largeMobileText ? "h-11 text-base sm:h-9 sm:text-sm" : "h-9"}`}
             >
               {uploading ? (
                 <Loader2 className="size-4 animate-spin" />
@@ -203,7 +205,7 @@ export function ProfileCoverPicker({
         {error ? (
           <p
             role="alert"
-            className="absolute bottom-14 right-3 z-10 max-w-[80%] rounded-lg bg-destructive px-3 py-2 text-xs text-destructive-foreground shadow-lg"
+            className={`absolute bottom-14 right-3 z-10 max-w-[80%] rounded-lg bg-destructive px-3 py-2 text-destructive-foreground shadow-lg ${largeMobileText ? "text-sm sm:text-xs" : "text-xs"}`}
           >
             {error}
           </p>
@@ -240,6 +242,7 @@ export function ProfilePhotoPicker({
   onSaved,
   compact = false,
   avatarOnly = false,
+  largeMobileText = false,
   avatarClassName = "",
 }: {
   photoUrl?: string | null | undefined;
@@ -247,6 +250,7 @@ export function ProfilePhotoPicker({
   onSaved: (photoUrl: string) => void;
   compact?: boolean;
   avatarOnly?: boolean;
+  largeMobileText?: boolean;
   avatarClassName?: string;
 }) {
   const savePhoto = useServerFn(saveMyProfilePhoto);
@@ -437,28 +441,28 @@ export function ProfilePhotoPicker({
   }
 
   const photoActionsBody = (
-    <>
+    <div className="w-full min-w-0 space-y-4">
       <p
         role="note"
-        className="rounded-xl border border-border bg-secondary/50 p-3 text-sm leading-relaxed text-muted-foreground"
+        className={`rounded-xl border border-border bg-secondary/50 p-3 leading-relaxed text-muted-foreground ${largeMobileText ? "text-base sm:text-sm" : "text-sm"}`}
       >
         Your profile photo is public and appears beside your posts and comments. A real photo could
         make you recognizable even when you use an alias. Adding a photo is optional; you can use an
         illustration or leave it blank.
       </p>
-      <div className="flex flex-col items-center gap-4 py-2">
+      <div className="flex min-w-0 flex-col items-center gap-4 py-2">
         <ProfileAvatar
           photoUrl={previewUrl ?? photoUrl}
           initials={initials}
           className="size-36 border-2 border-border shadow-sm"
         />
         {file ? (
-          <p className="max-w-full truncate text-sm text-muted-foreground">{file.name}</p>
+          <p className={`max-w-full truncate text-muted-foreground ${largeMobileText ? "text-base sm:text-sm" : "text-sm"}`}>{file.name}</p>
         ) : null}
       </div>
       {!file ? (
         <div className="space-y-2">
-          <p className="text-sm font-medium">Choose a character avatar</p>
+          <p className={`font-medium ${largeMobileText ? "text-base sm:text-sm" : "text-sm"}`}>Choose a character avatar</p>
           <div className="grid grid-cols-6 gap-2">
             {PRESET_AVATARS.map((id) => {
               const url = presetAvatarUrl(id);
@@ -477,19 +481,21 @@ export function ProfilePhotoPicker({
               );
             })}
           </div>
-          {savingPreset ? <p className="text-xs text-muted-foreground">Saving avatar…</p> : null}
+          {savingPreset ? <p className={`text-muted-foreground ${largeMobileText ? "text-sm sm:text-xs" : "text-xs"}`}>Saving avatar…</p> : null}
         </div>
       ) : null}
       {error ? (
-        <p role="alert" className="text-sm text-destructive">
+        <p role="alert" className={`text-destructive ${largeMobileText ? "text-base sm:text-sm" : "text-sm"}`}>
           {error}
         </p>
       ) : null}
-    </>
+    </div>
   );
 
   const photoActionsFooter = (
-    <DialogFooter className="gap-2 sm:flex-row sm:justify-center sm:space-x-0 [&>button]:w-full sm:[&>button]:w-auto">
+    <DialogFooter
+      className={`min-w-0 gap-2 sm:flex-row sm:flex-wrap sm:justify-center sm:space-x-0 [&>button]:w-full sm:[&>button]:w-auto ${largeMobileText ? "sm:flex-col sm:items-stretch sm:[&>button]:h-10 sm:[&>button]:w-full sm:[&>button]:flex-none [&>button]:h-12 [&>button]:text-base sm:[&>button]:text-sm" : ""}`}
+    >
       {file ? (
         <>
           {!uploading ? (
@@ -582,7 +588,7 @@ export function ProfilePhotoPicker({
         {!avatarOnly ? (
           <div className="min-w-0">
             <p className="font-medium">{photoUrl ? "Profile photo" : "Add a profile photo"}</p>
-            <p className="text-xs text-muted-foreground">
+            <p className={`text-muted-foreground ${largeMobileText ? "text-base leading-6 sm:text-xs sm:leading-normal" : "text-xs"}`}>
               {compact
                 ? "Tap photo to view or update"
                 : "Optional · tap photo to view or update · images up to 20 MB"}
@@ -635,7 +641,7 @@ export function ProfilePhotoPicker({
         </Drawer>
       ) : (
         <Dialog open={actionsOpen} onOpenChange={setActionsOpen}>
-          <DialogContent className="max-w-sm">
+          <DialogContent className="w-[calc(100vw-2rem)] min-w-0 max-w-lg">
             <DialogHeader>
               <DialogTitle>{file ? "Update profile photo" : "Profile photo"}</DialogTitle>
               <DialogDescription>

@@ -261,12 +261,16 @@ function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-dvh w-full bg-muted/30 px-4 py-5 sm:px-6 sm:py-8 lg:px-8">
-      <div className="mx-auto w-full max-w-2xl">
-        <header className="mb-8 flex items-center justify-between">
-          <div className="flex items-center gap-2 font-display text-sm font-semibold">
-            <span className="flex size-8 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <Flame className="size-4" />
+    <main className="relative isolate min-h-dvh w-full overflow-hidden bg-muted/30 px-4 py-5 sm:px-6 sm:py-8 lg:px-8 lg:py-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute -right-40 -top-48 size-[32rem] rounded-full bg-primary/[0.045] blur-3xl"
+      />
+      <div className="relative mx-auto w-full max-w-2xl lg:max-w-6xl">
+        <header className="mb-8 flex items-center justify-between border-b border-border/70 pb-5 sm:mb-10 sm:pb-6">
+          <div className="flex items-center gap-2 font-display text-base font-semibold sm:text-sm">
+            <span className="flex size-9 items-center justify-center rounded-xl bg-primary text-primary-foreground sm:size-8">
+              <Flame className="size-5 sm:size-4" />
             </span>
             Candid
           </div>
@@ -274,25 +278,26 @@ function OnboardingPage() {
             <button
               type="button"
               onClick={() => void navigate({ to: "/profile" })}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="inline-flex min-h-11 items-center gap-2 text-sm text-muted-foreground hover:text-foreground sm:min-h-0 sm:text-xs"
             >
               <ArrowLeft className="size-3.5" /> Cancel edit
             </button>
           ) : (
-            <span className="text-xs text-muted-foreground">Your account</span>
+            <span className="text-sm text-muted-foreground sm:text-xs">Your account</span>
           )}
         </header>
-        <div>
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,0.88fr)_minmax(0,1.12fr)] lg:items-start lg:gap-10 xl:gap-16">
+          <div>
           <motion.div
             initial={{ opacity: 0, y: 18 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.55, ease: [0.22, 1, 0.36, 1] }}
             className="mb-7"
           >
-            <p className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+            <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-primary sm:text-xs">
               {editUsername ? "Update your public username" : `Account setup · ${step + 1} of 3`}
             </p>
-            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+            <h1 className="max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] lg:leading-[1.08] xl:text-5xl">
               {step === 0
                 ? !usernameAcknowledged
                   ? "Your username is public"
@@ -307,7 +312,7 @@ function OnboardingPage() {
                     : "Add a cover photo"
                   : "Add your links"}
             </h1>
-            <p className="mt-2 max-w-lg text-sm leading-6 text-muted-foreground">
+            <p className="mt-3 max-w-lg text-base leading-7 text-muted-foreground sm:text-base">
               {step === 0
                 ? !usernameAcknowledged
                   ? "The username you choose can identify you to other members when you post a story or comment. Your email and legal name are not displayed, but avoid using your real name or details that could identify you."
@@ -325,19 +330,25 @@ function OnboardingPage() {
           </motion.div>
 
           {!editUsername ? (
-            <div className="mb-5 flex gap-2" aria-label={`Profile setup step ${step + 1} of 3`}>
-              {[0, 1, 2].map((index) => (
-                <div key={index} className="h-1 flex-1 overflow-hidden rounded-full bg-secondary">
-                  <motion.div
-                    className="h-full rounded-full bg-primary"
-                    initial={false}
-                    animate={{ width: step >= index ? "100%" : "0%" }}
-                    transition={{ duration: 0.45, ease: "easeOut" }}
-                  />
+            <div className="mb-6 grid grid-cols-3 gap-3 lg:mt-8 lg:mb-0" aria-label={`Profile setup step ${step + 1} of 3`}>
+              {["Username", "Profile", "Links"].map((label, index) => (
+                <div key={label} className="min-w-0">
+                  <div className="h-1 overflow-hidden rounded-full bg-secondary">
+                    <motion.div
+                      className="h-full rounded-full bg-primary"
+                      initial={false}
+                      animate={{ width: step >= index ? "100%" : "0%" }}
+                      transition={{ duration: 0.45, ease: "easeOut" }}
+                    />
+                  </div>
+                  <span className={`mt-2 block truncate text-sm font-medium sm:text-[11px] ${step === index ? "text-foreground" : "text-muted-foreground/70"}`}>
+                    0{index + 1} <span className="hidden sm:inline">· {label}</span>
+                  </span>
                 </div>
               ))}
             </div>
           ) : null}
+          </div>
 
           <AnimatePresence mode="wait" initial={false}>
             {step === 0 ? (
@@ -347,7 +358,7 @@ function OnboardingPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
+                className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l lg:border-border lg:bg-transparent lg:py-0 lg:pr-0 lg:pl-8 lg:shadow-none xl:pl-12"
               >
                 {!usernameAcknowledged ? (
                   <div className="space-y-5">
@@ -358,14 +369,10 @@ function OnboardingPage() {
                       <h2 className="mt-4 text-xl font-semibold tracking-tight">
                         Your name, your choice
                       </h2>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      <p className="mt-2 text-base leading-7 text-muted-foreground sm:text-sm sm:leading-6">
                         Your username appears next to the stories and comments you share. Other
                         members may recognize it, so choose a name you’re comfortable using
                         publicly.
-                      </p>
-                      <p className="mt-3 text-sm leading-6 text-muted-foreground">
-                        Your email and legal name are not shown. Still, avoid usernames or story
-                        details that could identify you if you want to stay private.
                       </p>
                     </div>
                     <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-border bg-background p-4 transition-colors hover:bg-secondary/40">
@@ -377,12 +384,12 @@ function OnboardingPage() {
                         }
                         className="mt-1 size-4 accent-primary"
                       />
-                      <span className="text-sm leading-5">
+                      <span className="text-base leading-6 sm:text-sm sm:leading-5">
                         I understand that my username can be seen on my stories and comments.
                       </span>
                     </label>
                     <Button
-                      className="w-full glow-primary"
+                      className="h-12 w-full text-base glow-primary sm:h-10 sm:text-sm"
                       disabled={!usernameAcknowledgementChecked}
                       onClick={() => setUsernameAcknowledged(true)}
                     >
@@ -406,7 +413,7 @@ function OnboardingPage() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold">I’ll choose my own</span>
-                        <span className="mt-1 block text-sm text-muted-foreground">
+                        <span className="mt-1 block text-base text-muted-foreground sm:text-sm">
                           Pick a unique username you want to post under.
                         </span>
                       </span>
@@ -426,7 +433,7 @@ function OnboardingPage() {
                       </span>
                       <span className="min-w-0 flex-1">
                         <span className="block font-semibold">Let Candid choose for me</span>
-                        <span className="mt-1 block text-sm text-muted-foreground">
+                        <span className="mt-1 block text-base text-muted-foreground sm:text-sm">
                           We’ll suggest available names you can pick from.
                         </span>
                       </span>
@@ -448,13 +455,13 @@ function OnboardingPage() {
                         setSuggestionError(null);
                         setMessage(null);
                       }}
-                      className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+                      className="inline-flex min-h-11 items-center gap-2 text-base text-muted-foreground hover:text-foreground sm:min-h-0 sm:text-sm"
                     >
                       <ArrowLeft className="size-4" /> Choose another option
                     </button>
                     {usernameChoice === "own" ? (
                       <div className="space-y-3">
-                        <Label htmlFor="username">Your unique username</Label>
+                        <Label htmlFor="username" className="text-base sm:text-sm">Your unique username</Label>
                         <div className="flex items-center gap-2 rounded-xl border border-input bg-background px-3 focus-within:border-primary">
                           <AtSign className="size-4 shrink-0 text-muted-foreground" />
                           <Input
@@ -466,22 +473,22 @@ function OnboardingPage() {
                             value={username}
                             onChange={(event) => setUsername(event.target.value)}
                             placeholder="yourname"
-                            className="border-0 bg-transparent px-0 focus-visible:ring-0"
+                            className="border-0 bg-transparent px-0 text-base focus-visible:ring-0 sm:text-sm"
                           />
                         </div>
-                        <p className="text-xs leading-5 text-muted-foreground">
+                        <p className="text-base leading-7 text-muted-foreground sm:text-xs sm:leading-5">
                           Use 3–20 letters, numbers, dots, or underscores. Don’t use your real name
                           if you want to stay anonymous.
                         </p>
                       </div>
                     ) : (
                       <div className="space-y-3">
-                        <p className="text-sm font-medium">Username ideas</p>
-                        <p className="text-xs text-muted-foreground">
+                        <p className="text-base font-medium sm:text-sm">Username ideas</p>
+                        <p className="text-base text-muted-foreground sm:text-xs">
                           We’ll check availability when you select one.
                         </p>
                         {loadingSuggestions ? (
-                          <div className="flex items-center gap-2 rounded-xl bg-secondary/50 p-4 text-sm text-muted-foreground">
+                          <div className="flex items-center gap-2 rounded-xl bg-secondary/50 p-4 text-base text-muted-foreground sm:text-sm">
                             <Loader2 className="size-4 animate-spin" /> Generating username ideas…
                           </div>
                         ) : usernameSuggestions.length ? (
@@ -493,7 +500,7 @@ function OnboardingPage() {
                                 aria-pressed={username === suggestion}
                                 onClick={() => setUsername(suggestion)}
                                 className={cn(
-                                  "rounded-xl border px-4 py-3 text-left font-medium transition-colors",
+                                  "min-h-12 rounded-xl border px-4 py-3 text-left text-base font-medium transition-colors sm:text-sm",
                                   username === suggestion
                                     ? "border-primary bg-primary/10 text-foreground ring-1 ring-primary/30"
                                     : "border-border bg-background hover:border-primary/50",
@@ -505,7 +512,7 @@ function OnboardingPage() {
                           </div>
                         ) : null}
                         {suggestionError ? (
-                          <p role="status" className="text-sm text-muted-foreground">
+                          <p role="status" className="text-base text-muted-foreground sm:text-sm">
                             {suggestionError}
                           </p>
                         ) : null}
@@ -514,6 +521,7 @@ function OnboardingPage() {
                           variant="outline"
                           onClick={() => void generateAliases()}
                           disabled={loadingSuggestions}
+                          className="h-11 text-base sm:h-9 sm:text-sm"
                         >
                           <Sparkles className="size-4" /> Generate more
                         </Button>
@@ -522,7 +530,7 @@ function OnboardingPage() {
                     {username ? (
                       <p
                         aria-live="polite"
-                        className={`text-sm ${status === "available" ? "text-verified" : status === "taken" || status === "invalid" ? "text-destructive" : "text-muted-foreground"}`}
+                        className={`text-base sm:text-sm ${status === "available" ? "text-verified" : status === "taken" || status === "invalid" ? "text-destructive" : "text-muted-foreground"}`}
                       >
                         {status === "checking"
                           ? "Checking username availability…"
@@ -536,7 +544,7 @@ function OnboardingPage() {
                     {submitError ? (
                       <div
                         role="alert"
-                        className="flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-sm text-danger"
+                        className="flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-base text-danger sm:text-sm"
                       >
                         <AlertCircle className="mt-0.5 size-4 shrink-0" />
                         <p className="min-w-0 break-words">{submitError}</p>
@@ -544,7 +552,7 @@ function OnboardingPage() {
                     ) : null}
                     {editUsername ? (
                       <Button
-                        className="w-full glow-primary"
+                      className="h-12 w-full text-base glow-primary sm:h-10 sm:text-sm"
                         disabled={status !== "available" || saving}
                         onClick={() => void saveAliasChange()}
                       >
@@ -553,7 +561,7 @@ function OnboardingPage() {
                       </Button>
                     ) : (
                       <Button
-                        className="w-full glow-primary"
+                      className="h-12 w-full text-base glow-primary sm:h-10 sm:text-sm"
                         disabled={status !== "available" || saving}
                         onClick={() => setStep(1)}
                       >
@@ -570,13 +578,15 @@ function OnboardingPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
+                className="space-y-5 rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l lg:border-border lg:bg-transparent lg:py-0 lg:pr-0 lg:pl-8 lg:shadow-none xl:pl-12"
               >
                 {mediaStage === "profile" ? (
                   <>
                     <ProfilePhotoPicker
                       photoUrl={photoUrl}
                       initials={(user?.email?.[0] ?? "C").toUpperCase()}
+                      largeMobileText
+                      avatarClassName="size-28 border-2 border-border sm:size-20"
                       onSaved={(nextPhotoUrl) => {
                         setPhotoUrl(nextPhotoUrl);
                         setMediaStage("cover");
@@ -594,14 +604,14 @@ function OnboardingPage() {
                     <button
                       type="button"
                       onClick={() => setMediaStage("cover")}
-                      className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                      className="min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:min-h-0 sm:text-xs"
                     >
                       Skip profile photo
                     </button>
                     <button
                       type="button"
                       onClick={() => setStep(0)}
-                      className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                      className="min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:min-h-0 sm:text-xs"
                     >
                       Back to username
                     </button>
@@ -610,8 +620,8 @@ function OnboardingPage() {
                   <>
                     <div className="space-y-2">
                       <div>
-                        <p className="text-sm font-medium">Your cover photo</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
+                        <p className="text-base font-medium sm:text-sm">Your cover photo</p>
+                        <p className="mt-1 text-base leading-7 text-muted-foreground sm:text-xs sm:leading-normal">
                           This appears across the top of your public profile. You can change it
                           anytime.
                         </p>
@@ -619,6 +629,7 @@ function OnboardingPage() {
                       <div className="relative h-32 overflow-hidden rounded-2xl border border-border bg-secondary sm:h-40">
                         <ProfileCoverPicker
                           coverUrl={coverUrl}
+                          largeMobileText
                           onSaved={(nextCoverUrl) => {
                             setCoverUrl(nextCoverUrl);
                             if (user) {
@@ -635,7 +646,7 @@ function OnboardingPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Button className="flex-1 glow-primary" onClick={() => setStep(2)}>
+                      <Button className="h-12 flex-1 text-base glow-primary sm:h-10 sm:text-sm" onClick={() => setStep(2)}>
                         {coverUrl ? "Continue" : "Continue without cover photo"}{" "}
                         <ArrowRight className="size-4" />
                       </Button>
@@ -643,7 +654,7 @@ function OnboardingPage() {
                     <button
                       type="button"
                       onClick={() => setMediaStage("profile")}
-                      className="w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                      className="min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:min-h-0 sm:text-xs"
                     >
                       Back to profile photo
                     </button>
@@ -657,7 +668,7 @@ function OnboardingPage() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -24 }}
                 transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
-                className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6"
+                className="rounded-2xl border border-border bg-card p-4 shadow-sm sm:p-6 lg:rounded-none lg:border-y-0 lg:border-r-0 lg:border-l lg:border-border lg:bg-transparent lg:py-0 lg:pr-0 lg:pl-8 lg:shadow-none xl:pl-12"
               >
                 <div className="space-y-3">
                   {SOCIAL_FIELDS.map((field, index) => (
@@ -675,7 +686,7 @@ function OnboardingPage() {
                           setSocials((prev) => ({ ...prev, [field.key]: event.target.value }))
                         }
                         placeholder={`${field.label} — ${field.placeholder}`}
-                        className="border-0 bg-transparent px-0 focus-visible:ring-0"
+                        className="border-0 bg-transparent px-0 text-base focus-visible:ring-0 sm:text-sm"
                       />
                     </motion.div>
                   ))}
@@ -684,7 +695,7 @@ function OnboardingPage() {
                 {submitError ? (
                   <div
                     role="alert"
-                    className="mt-4 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-sm text-danger"
+                    className="mt-4 flex items-start gap-2 rounded-xl border border-danger/25 bg-danger/5 p-3 text-base text-danger sm:text-sm"
                   >
                     <AlertCircle className="mt-0.5 size-4 shrink-0" />
                     <p className="min-w-0 break-words">{submitError}</p>
@@ -692,7 +703,7 @@ function OnboardingPage() {
                 ) : null}
 
                 <Button
-                  className="mt-6 w-full glow-primary"
+                  className="mt-6 h-12 w-full text-base glow-primary sm:h-10 sm:text-sm"
                   disabled={saving}
                   onClick={() => void submit()}
                 >
@@ -703,14 +714,14 @@ function OnboardingPage() {
                   type="button"
                   disabled={saving}
                   onClick={() => void submit(false)}
-                  className="mt-3 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50"
+                  className="mt-3 min-h-11 w-full text-center text-base text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50 sm:min-h-0 sm:text-sm"
                 >
                   Skip links and finish
                 </button>
                 <button
                   type="button"
                   onClick={() => setStep(1)}
-                  className="mt-3 w-full text-center text-xs text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+                  className="mt-3 min-h-11 w-full text-center text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline sm:min-h-0 sm:text-xs"
                 >
                   Back
                 </button>
@@ -718,7 +729,7 @@ function OnboardingPage() {
             )}
           </AnimatePresence>
         </div>
-        <footer className="mt-6 pb-2 text-center text-xs leading-5 text-muted-foreground">
+        <footer className="mt-6 pb-2 text-center text-sm leading-6 text-muted-foreground sm:text-xs sm:leading-5">
           Your alias appears publicly. Candid cannot guarantee complete anonymity.
         </footer>
       </div>
