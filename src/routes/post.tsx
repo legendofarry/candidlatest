@@ -168,6 +168,7 @@ function WorkplaceStoryComposer() {
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
   const [anonymous, setAnonymous] = useState(false);
+  const [shareToFeed, setShareToFeed] = useState(true);
   const [aiGeneratingField, setAiGeneratingField] = useState<"title" | "body" | null>(null);
   const [wouldReturn, setWouldReturn] = useState<boolean | null>(null);
   const [publishError, setPublishError] = useState("");
@@ -211,6 +212,7 @@ function WorkplaceStoryComposer() {
         setTitle(story.title);
         setBody(story.body);
         setWouldReturn(story.would_work_again);
+        setShareToFeed(story.share_to_feed !== false);
         setEditLoaded(true);
       })
       .catch((error: unknown) => {
@@ -404,6 +406,17 @@ function WorkplaceStoryComposer() {
     );
   }
 
+  if (account.data?.accountType === "company" && !isEditing) {
+    return (
+      <main className="mx-auto min-h-[65dvh] max-w-2xl px-5 py-16 sm:px-8">
+        <p className="text-xs font-semibold uppercase tracking-[0.18em] text-primary">Company account</p>
+        <h1 className="mt-3 font-display text-3xl font-semibold tracking-tight">Worker stories belong to workers</h1>
+        <p className="mt-3 text-sm leading-6 text-muted-foreground">Company accounts can’t publish or edit independent exit stories. If your company account is verified and has Premium, share an official update in your company community. Your replies are always labeled as official.</p>
+        <div className="mt-6 flex flex-wrap gap-3"><Button asChild className="rounded-full"><Link to="/company/setup">Company workspace <ArrowRight className="size-4" /></Link></Button><Button asChild variant="outline" className="rounded-full"><Link to="/companies">Browse company stories</Link></Button></div>
+      </main>
+    );
+  }
+
   const steps = ["Employer", "What happened", "Your role", "Your story", "Review"];
 
   const matches = findCompanyMatches(companyName, filters.companies, 5);
@@ -520,6 +533,7 @@ function WorkplaceStoryComposer() {
         tenure: tenure || null,
         industry: industry || company.industry || null,
         would_work_again: wouldReturn,
+        share_to_feed: shareToFeed,
         ...(isEditing ? {} : { is_anonymous: anonymous }),
       };
       const result = isEditing
@@ -1153,6 +1167,13 @@ function WorkplaceStoryComposer() {
                                 review.
                               </li>
                             </ul>
+
+                            {account.data?.membership.tier === "premium" || account.data?.membership.tier === "gold" ? (
+                              <label className="flex cursor-pointer items-start gap-3 border-y border-border py-3 text-sm">
+                                <input type="checkbox" checked={shareToFeed} onChange={(event) => setShareToFeed(event.target.checked)} disabled={isEditing} className="mt-1 size-4 accent-primary" />
+                                <span><span className="block font-medium text-foreground">Also include this story in the main feed</span><span className="mt-1 block text-xs leading-5 text-muted-foreground">When off, it remains on the company page and company community. Premium lets you choose where it appears.</span></span>
+                              </label>
+                            ) : null}
 
                             <Button
                               className="w-full glow-primary"

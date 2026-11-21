@@ -27,6 +27,7 @@ type Props = {
   score: Score | undefined;
   descriptor: string | null | undefined;
   stories: Array<{ created_at?: string | null }>;
+  actionsInSidebar?: boolean;
 };
 
 const num = (value: unknown) => (value === null || value === undefined || value === "" ? null : Number(value));
@@ -45,7 +46,7 @@ export function getCompanySignal(score: Score | undefined) {
   return { tone: "neutral" as const, label: "Mixed experiences reported" };
 }
 
-export function CompanyHero({ company, score, descriptor, stories }: Props) {
+export function CompanyHero({ company, score, descriptor, stories, actionsInSidebar = false }: Props) {
   const fetchBrand = useServerFn(getCompanyBrandInfo);
   const discovered = useQuery({
     queryKey: ["company-brand", company.id],
@@ -98,7 +99,11 @@ export function CompanyHero({ company, score, descriptor, stories }: Props) {
         />
       </div>
 
-      <div className="grid gap-7 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+      <div
+        className={`grid gap-7 ${
+          actionsInSidebar ? "lg:grid-cols-1" : "md:grid-cols-[minmax(0,1fr)_auto] md:items-center"
+        }`}
+      >
         <div className="min-w-0">
           <div className="flex items-start gap-4">
             <BrandMark name={company.name} logoUrl={logoUrl} fallbackLogoUrl={fallbackLogoUrl} accent={accent} status={status} />
@@ -130,7 +135,11 @@ export function CompanyHero({ company, score, descriptor, stories }: Props) {
           </div>
         </div>
 
-        <div className="flex items-center justify-between gap-5 md:flex-col md:items-end">
+        <div
+          className={`flex items-center justify-between gap-5 ${
+            actionsInSidebar ? "lg:hidden" : "md:flex-col md:items-end"
+          }`}
+        >
           <ScoreRing value={overall} accent={accent} />
           <CompanyWatchButton companyId={company.id} companySlug={company.slug} companyName={company.name} variant="hero" />
         </div>
@@ -154,12 +163,12 @@ function BrandMark({ name, logoUrl, fallbackLogoUrl, accent, status }: { name: s
         className="relative grid size-[4.5rem] place-items-center overflow-hidden rounded-[1.4rem] border border-border/60 md:size-20"
         style={
           src
-            ? { background: "oklch(0.99 0 0)" }
+            ? { background: accent }
             : { background: `linear-gradient(140deg, ${accent}, color-mix(in oklab, ${accent} 45%, black))` }
         }
       >
         {src ? (
-          <img src={src} alt="" className="size-[88%] object-contain" onError={() => setFailed((list) => [...list, src])} />
+          <img src={src} alt="" className="size-[88%] scale-[1.15] object-contain" onError={() => setFailed((list) => [...list, src])} />
         ) : (
           <span className="font-display text-2xl font-bold tracking-tight" style={{ color: "oklch(0.99 0 0)" }}>
             {getCompanyMonogram(name)}

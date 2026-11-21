@@ -79,6 +79,7 @@ export type ProfileRecord = {
   account_action_at?: string | null;
   account_action_expires_at?: string | null;
   onboarded_at?: string | null;
+  last_active_at?: string | null;
   subscription_tier?: "basic" | "premium" | "gold";
   subscription_status?: "active" | "cancelled" | "expired" | "past_due";
   subscription_provider?: string | null;
@@ -115,6 +116,8 @@ export type StoryRecord = {
   area?: string | null;
   /** Employer stays linked internally while the public story can hide its identity. */
   company_public?: boolean;
+  /** Whether this story appears in the main feed; company pages remain available either way. */
+  feed_visibility?: "feed" | "company_only";
   company_location_suggestion?: string | null;
   workplace_lat?: number | null;
   workplace_lng?: number | null;
@@ -439,8 +442,17 @@ function isPlaceholderCompanyName(name: string | null | undefined) {
 
 function isDiscoverableCompany(company: CompanyRecord) {
   // A worker story can reference an employer without putting that business
-  // in the public company directory. Moderators explicitly publish listings.
+  // in the public directory. A publicly attributed feed story makes it
+  // discoverable so readers can follow the story to its company community.
   return isPublicCompany(company);
+}
+
+function isPublicFeedStory(story: StoryRecord) {
+  return (
+    story.status === "published" &&
+    story.feed_visibility !== "company_only" &&
+    story.company_public !== false
+  );
 }
 
 function includeKnownEmployers(
@@ -499,7 +511,7 @@ async function calculateCompanyScores() {
 
   const storiesByCompany = new Map<string, StoryRecord[]>();
   for (const story of stories) {
-    if (!story.company_id || story.status !== "published") continue;
+    if (!story.company_id || !isPublicFeedStory(story)) continue;
     const list = storiesByCompany.get(story.company_id) ?? [];
     list.push(story);
     storiesByCompany.set(story.company_id, list);
@@ -515,58 +527,62 @@ async function calculateCompanyScores() {
   const profileByCompany = new Map(
     profiles.map((profile) => [profile.company_id, profile] as const),
   );
-  // Stories stay visible in the feed. Directory listings require moderator approval.
-  return directoryCompanies.filter(isDiscoverableCompany).map<CompanyScoreRecord>((company) => {
-    const companyStories = storiesByCompany.get(company.id) ?? [];
-    const companyRatings = ratingsByCompany.get(company.id) ?? [];
+  return directoryCompanies
+    .filter(
+      (company) =>
+        isDiscoverableCompany(company) || (storiesByCompany.get(company.id)?.length ?? 0) > 0,
+    )
+    .map<CompanyScoreRecord>((company) => {
+      const companyStories = storiesByCompany.get(company.id) ?? [];
+      const companyRatings = ratingsByCompany.get(company.id) ?? [];
 
-    const metricFields: Array<
-      keyof Pick<
-        CompanyRatingRecord,
-        "pay_on_time" | "compliance" | "respect" | "workload" | "growth"
-      >
-    > = ["pay_on_time", "compliance", "respect", "workload", "growth"];
+      const metricFields: Array<
+        keyof Pick<
+          CompanyRatingRecord,
+          "pay_on_time" | "compliance" | "respect" | "workload" | "growth"
+        >
+      > = ["pay_on_time", "compliance", "respect", "workload", "growth"];
 
-    const metricAverages = Object.fromEntries(
-      metricFields.map((field) => [
-        field,
-        average(companyRatings.map((rating) => Number(rating[field]))),
-      ]),
-    ) as Record<(typeof metricFields)[number], number | null>;
+      const metricAverages = Object.fromEntries(
+        metricFields.map((field) => [
+          field,
+          average(companyRatings.map((rating) => Number(rating[field]))),
+        ]),
+      ) as Record<(typeof metricFields)[number], number | null>;
 
-    const overall = average(
-      metricFields
-        .map((field) => metricAverages[field])
-        .filter((value): value is number => typeof value === "number"),
-    );
-    const wouldWorkAgainPct =
-      companyRatings.length === 0
-        ? null
-        : (companyRatings.filter((rating) => rating.would_work_again).length /
-            companyRatings.length) *
-          100;
+      const overall = average(
+        metricFields
+          .map((field) => metricAverages[field])
+          .filter((value): value is number => typeof value === "number"),
+      );
+      const wouldWorkAgainPct =
+        companyRatings.length === 0
+          ? null
+          : (companyRatings.filter((rating) => rating.would_work_again).length /
+              companyRatings.length) *
+            100;
 
-    const profile = profileByCompany.get(company.id);
+      const profile = profileByCompany.get(company.id);
 
-    return {
-      company_id: company.id,
-      name: company.name,
-      slug: company.slug,
-      verified: Boolean(company.verified),
-      industry: company.industry,
-      county: company.county,
-      story_count: companyStories.length,
-      rating_count: companyRatings.length,
-      pay_on_time: metricAverages.pay_on_time,
-      compliance: metricAverages.compliance,
-      respect: metricAverages.respect,
-      workload: metricAverages.workload,
-      growth: metricAverages.growth,
-      overall,
-      would_work_again_pct: wouldWorkAgainPct,
-      descriptor: profile?.descriptor ?? null,
-    } as CompanyScoreRecord & { descriptor: string | null };
-  });
+      return {
+        company_id: company.id,
+        name: company.name,
+        slug: company.slug,
+        verified: Boolean(company.verified),
+        industry: company.industry,
+        county: company.county,
+        story_count: companyStories.length,
+        rating_count: companyRatings.length,
+        pay_on_time: metricAverages.pay_on_time,
+        compliance: metricAverages.compliance,
+        respect: metricAverages.respect,
+        workload: metricAverages.workload,
+        growth: metricAverages.growth,
+        overall,
+        would_work_again_pct: wouldWorkAgainPct,
+        descriptor: profile?.descriptor ?? null,
+      } as CompanyScoreRecord & { descriptor: string | null };
+    });
 }
 
 export function buildCompanyScores() {
@@ -866,7 +882,15 @@ async function calculateFilterOptionsData() {
   const stories = storySnapshot.docs.map((doc) => toRecord<StoryRecord>(doc));
   const curatedCompanies = getKnownKenyanEmployerDirectoryEntries();
   const directoryCompanies = includeKnownEmployers(allCompanies, curatedCompanies);
-  const companies = directoryCompanies.filter(isDiscoverableCompany);
+  const companiesWithFeedStories = new Set(
+    stories
+      .filter(isPublicFeedStory)
+      .map((story) => story.company_id)
+      .filter((companyId): companyId is string => Boolean(companyId)),
+  );
+  const companies = directoryCompanies.filter(
+    (company) => isDiscoverableCompany(company) || companiesWithFeedStories.has(company.id),
+  );
   const industries = [
     ...new Set(companies.map((company) => company.industry).filter(Boolean)),
   ].sort() as string[];
@@ -1013,6 +1037,7 @@ async function calculatePublicStories(input: {
   const candidates = storySnapshot.docs
     .map((doc) => ({ story: toRecord<StoryRecord>(doc), updateTime: doc.updateTime }))
     .filter(({ story }) => story.status === "published")
+    .filter(({ story }) => story.feed_visibility !== "company_only")
     .filter(
       ({ story }) =>
         !exclusions.stories.has(story.id) &&

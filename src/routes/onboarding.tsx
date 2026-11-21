@@ -8,6 +8,8 @@ import {
   ArrowLeft,
   AlertCircle,
   AtSign,
+  Building2,
+  Check,
   Flame,
   Globe,
   Instagram,
@@ -15,6 +17,7 @@ import {
   Loader2,
   Music2,
   Pencil,
+  Search,
   ShieldCheck,
   Sparkles,
   X as XIcon,
@@ -34,6 +37,7 @@ import {
   getUsernameSuggestions,
   updateMyUsername,
 } from "@/lib/onboarding.functions";
+import { getFilterOptions } from "@/lib/public.functions";
 
 export const Route = createFileRoute("/onboarding")({
   validateSearch: (search: Record<string, unknown>) => ({
@@ -81,8 +85,9 @@ function OnboardingPage() {
   const complete = useServerFn(completeOnboarding);
   const updateUsername = useServerFn(updateMyUsername);
   const state = useServerFn(getOnboardingState);
+  const loadCompanies = useServerFn(getFilterOptions);
 
-  const [step, setStep] = useState<0 | 1 | 2>(0);
+  const [step, setStep] = useState<0 | 1 | 2 | 3>(0);
   const [mediaStage, setMediaStage] = useState<"profile" | "cover">("profile");
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [coverUrl, setCoverUrl] = useState<string | null>(null);
@@ -104,6 +109,15 @@ function OnboardingPage() {
   });
   const [saving, setSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [accountType, setAccountType] = useState<"individual" | "company">("individual");
+  const [companyOptions, setCompanyOptions] = useState<Array<{
+    id: string;
+    name: string;
+    slug: string;
+    industry: string | null;
+  }>>([]);
+  const [selectedCompanyIds, setSelectedCompanyIds] = useState<string[]>([]);
+  const [companySearch, setCompanySearch] = useState("");
   const requestId = useRef(0);
 
   useEffect(() => {
@@ -126,6 +140,9 @@ function OnboardingPage() {
         if (!active) return;
         setPhotoUrl(result.photoUrl);
         setCoverUrl(result.coverUrl);
+        const storedAccountType = window.sessionStorage.getItem("candid:signup-account-type");
+        setAccountType(storedAccountType === "company" || result.accountType === "company" ? "company" : "individual");
+        setSelectedCompanyIds(result.companyIds.map((company) => company.company_id));
         setMediaStage(result.photoUrl ? "cover" : "profile");
         if (!result.needsOnboarding && !editUsername) navigate({ to: "/" });
       })
@@ -137,6 +154,31 @@ function OnboardingPage() {
       active = false;
     };
   }, [loading, user, navigate, state, editUsername]);
+
+  useEffect(() => {
+    let active = true;
+    void loadCompanies()
+      .then((result) => {
+        if (!active) return;
+        setCompanyOptions(
+          result.companies
+            .filter((company) => Boolean(company.id && company.name && company.slug))
+            .map((company) => ({
+              id: company.id,
+              name: company.name,
+              slug: company.slug,
+              industry: company.industry ?? null,
+            }))
+            .sort((a, b) => a.name.localeCompare(b.name)),
+        );
+      })
+      .catch(() => {
+        if (active) setCompanyOptions([]);
+      });
+    return () => {
+      active = false;
+    };
+  }, [loadCompanies]);
 
   async function generateAliases() {
     setLoadingSuggestions(true);
@@ -222,6 +264,9 @@ function OnboardingPage() {
       const result = await complete({
         data: {
           username: username.trim().toLowerCase(),
+          accountType,
+          companyIds: accountType === "company" ? [] : selectedCompanyIds,
+          joinGroupIds: accountType !== "company" ? selectedCompanyIds : [],
           socials: {
             x: includeSocials ? socials.x.trim() || null : null,
             instagram: includeSocials ? socials.instagram.trim() || null : null,
@@ -237,7 +282,13 @@ function OnboardingPage() {
         setStep(0);
         return;
       }
-      navigate({ to: "/" });
+      try {
+        if (accountType === "company") window.sessionStorage.setItem("candid:company-account-created", "1");
+        window.sessionStorage.removeItem("candid:signup-account-type");
+      } catch {
+        // Keep onboarding usable if browser storage is unavailable.
+      }
+      navigate({ to: accountType === "company" ? "/company/setup" : "/" });
     } catch (error) {
       const reason = error instanceof Error ? error.message : "Could not save your username";
       if (/verify your email|email verification required/i.test(reason)) {
@@ -295,7 +346,7 @@ function OnboardingPage() {
             className="mb-7"
           >
             <p className="mb-2 text-sm font-semibold uppercase tracking-[0.14em] text-primary sm:text-xs">
-              {editUsername ? "Update your public username" : `Account setup · ${step + 1} of 3`}
+              {editUsername ? "Update your public username" : `Account setup · ${step + 1} of 4`}
             </p>
             <h1 className="max-w-xl text-3xl font-semibold tracking-tight sm:text-4xl lg:text-[2.75rem] lg:leading-[1.08] xl:text-5xl">
               {step === 0
@@ -310,7 +361,9 @@ function OnboardingPage() {
                   ? mediaStage === "profile"
                     ? "Add a profile photo"
                     : "Add a cover photo"
-                  : "Add your links"}
+                : step === 2
+                  ? "Add your links"
+                  : "Where have you worked?"}
             </h1>
             <p className="mt-3 max-w-lg text-base leading-7 text-muted-foreground sm:text-base">
               {step === 0
@@ -325,13 +378,15 @@ function OnboardingPage() {
                   ? mediaStage === "profile"
                     ? "Choose a profile photo or character avatar. This is optional, and you can add one later."
                     : "Choose a cover photo for the top of your public profile. This is optional, and you can change it anytime."
-                  : "Social links are optional. Add any you want people to find on your profile."}
+                : step === 2
+                  ? "Social links are optional. Add any you want people to find on your profile."
+                  : "Choose employers you have worked for. This list stays private on your account; you can search every company in Candid."}
             </p>
           </motion.div>
 
           {!editUsername ? (
-            <div className="mb-6 grid grid-cols-3 gap-3 lg:mt-8 lg:mb-0" aria-label={`Profile setup step ${step + 1} of 3`}>
-              {["Username", "Profile", "Links"].map((label, index) => (
+            <div className="mb-6 grid grid-cols-4 gap-3 lg:mt-8 lg:mb-0" aria-label={`Profile setup step ${step + 1} of 4`}>
+              {["Username", "Profile", "Links", "Companies"].map((label, index) => (
                 <div key={label} className="min-w-0">
                   <div className="h-1 overflow-hidden rounded-full bg-secondary">
                     <motion.div
@@ -661,7 +716,7 @@ function OnboardingPage() {
                   </>
                 )}
               </motion.section>
-            ) : (
+            ) : step === 2 ? (
               <motion.section
                 key="socials"
                 initial={{ opacity: 0, x: 24 }}
@@ -705,18 +760,17 @@ function OnboardingPage() {
                 <Button
                   className="mt-6 h-12 w-full text-base glow-primary sm:h-10 sm:text-sm"
                   disabled={saving}
-                  onClick={() => void submit()}
+                  onClick={() => setStep(3)}
                 >
-                  {saving ? <Loader2 className="size-4 animate-spin" /> : null}
-                  {saving ? "Finishing setup…" : `Enter Candid as @${username}`}
+                  Continue to companies <ArrowRight className="size-4" />
                 </Button>
                 <button
                   type="button"
                   disabled={saving}
-                  onClick={() => void submit(false)}
+                  onClick={() => setStep(3)}
                   className="mt-3 min-h-11 w-full text-center text-base text-muted-foreground underline-offset-4 hover:text-foreground hover:underline disabled:opacity-50 sm:min-h-0 sm:text-sm"
                 >
-                  Skip links and finish
+                  Skip links
                 </button>
                 <button
                   type="button"
@@ -725,6 +779,96 @@ function OnboardingPage() {
                 >
                   Back
                 </button>
+              </motion.section>
+            ) : (
+              <motion.section
+                key="companies"
+                initial={{ opacity: 0, x: 24 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -24 }}
+                transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
+                className="space-y-5 border-y border-border py-5 lg:border-y-0 lg:border-l lg:py-0 lg:pl-8 xl:pl-12"
+              >
+                {accountType === "company" ? (
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-4 border-b border-border pb-5">
+                      <span className="flex size-12 shrink-0 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+                        <Building2 className="size-6" />
+                      </span>
+                      <div>
+                        <h2 className="text-lg font-semibold">Company accounts skip work history</h2>
+                        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                          You can request access to an existing company page next. It stays read-only until Candid verifies the request.
+                        </p>
+                      </div>
+                    </div>
+                    <Button className="h-12 w-full text-base glow-primary sm:h-11 sm:text-sm" disabled={saving} onClick={() => void submit()}>
+                      {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                      {saving ? "Setting up your account…" : "Finish company account setup"}
+                      {!saving ? <ArrowRight className="size-4" /> : null}
+                    </Button>
+                    <button type="button" onClick={() => setStep(2)} className="min-h-11 w-full text-sm text-muted-foreground hover:text-foreground">Back</button>
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      <p className="text-sm font-semibold">Select your employers</p>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">Optional · only you can see this work-history list.</p>
+                    </div>
+                    <label className="relative block">
+                      <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        value={companySearch}
+                        onChange={(event) => setCompanySearch(event.target.value)}
+                        placeholder="Search every company…"
+                        className="h-12 rounded-full pl-11"
+                      />
+                    </label>
+                    <div className="max-h-[min(45dvh,26rem)] overflow-y-auto border-y border-border" role="listbox" aria-label="Companies you have worked for" aria-multiselectable="true">
+                      {companyOptions
+                        .filter((company) => company.name.toLocaleLowerCase().includes(companySearch.trim().toLocaleLowerCase()))
+                        .slice(0, 100)
+                        .map((company) => {
+                          const selected = selectedCompanyIds.includes(company.id);
+                          return (
+                            <button
+                              key={company.id}
+                              type="button"
+                              role="option"
+                              aria-selected={selected}
+                              onClick={() => setSelectedCompanyIds((current) => selected
+                                ? current.filter((id) => id !== company.id)
+                                : current.length >= 20 ? current : [...current, company.id])}
+                              className="flex min-h-16 w-full items-center gap-3 border-b border-border/70 px-2 text-left transition-colors hover:bg-secondary/50"
+                            >
+                              <span className={cn("flex size-10 shrink-0 items-center justify-center rounded-xl", selected ? "bg-primary text-primary-foreground" : "bg-secondary text-muted-foreground")}>
+                                {selected ? <Check className="size-5" /> : <Building2 className="size-5" />}
+                              </span>
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium">{company.name}</span>
+                                <span className="block truncate text-xs text-muted-foreground">{company.industry ?? "Company"} · #{company.slug}</span>
+                              </span>
+                              {selected ? <span className="text-xs text-primary">Selected</span> : null}
+                            </button>
+                          );
+                        })}
+                      {!companyOptions.length ? <p className="px-2 py-6 text-sm text-muted-foreground">Company list is loading or temporarily unavailable.</p> : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{selectedCompanyIds.length} selected · categories come from the company directory.</p>
+                    {selectedCompanyIds.length ? (
+                      <p className="border-y border-border py-4 text-xs leading-5 text-muted-foreground">
+                        You’ll join each selected company group. Other group members can see your membership, but your private work-history list stays hidden. You can leave any group later.
+                      </p>
+                    ) : null}
+                    {submitError ? <p role="alert" className="text-sm text-danger">{submitError}</p> : null}
+                    <Button className="h-12 w-full text-base glow-primary sm:h-11 sm:text-sm" disabled={saving} onClick={() => void submit()}>
+                      {saving ? <Loader2 className="size-4 animate-spin" /> : null}
+                      {saving ? "Finishing setup…" : selectedCompanyIds.length ? `Finish as @${username}` : "Skip and finish setup"}
+                      {!saving ? <ArrowRight className="size-4" /> : null}
+                    </Button>
+                    <button type="button" disabled={saving} onClick={() => setStep(2)} className="min-h-11 w-full text-sm text-muted-foreground hover:text-foreground">Back to links</button>
+                  </>
+                )}
               </motion.section>
             )}
           </AnimatePresence>

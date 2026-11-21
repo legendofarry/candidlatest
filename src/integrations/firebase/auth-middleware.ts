@@ -1,7 +1,7 @@
 import { createMiddleware } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { getFirebaseAuth, getFirestoreDb } from "@/lib/firebase.server";
-import { DEFAULT_MEMBERSHIP } from "@/lib/membership";
+import { DEFAULT_MEMBERSHIP, getEffectiveMembershipTier } from "@/lib/membership";
 
 const welcomedUsers = new Set<string>();
 
@@ -124,5 +124,26 @@ export const requireVerifiedFirebaseAuth = createMiddleware({ type: "function" }
       throw new Error("Verify your email before contributing. Open /verify-email to continue.");
     }
 
+    return next();
+  });
+
+/** Applies the free company-account read-only boundary to community contributions. */
+export const requireCommunityContributionAuth = createMiddleware({ type: "function" })
+  .middleware([requireVerifiedFirebaseAuth])
+  .server(async ({ next, context }) => {
+    const snapshot = await context.db.collection("profiles").doc(context.userId).get();
+    const profile = snapshot.data() as {
+      account_type?: string;
+      subscription_tier?: string;
+      subscription_status?: string;
+      subscription_source?: string;
+      subscription_period_ends_at?: string | null;
+    } | undefined;
+    if (
+      profile?.account_type === "company" &&
+      getEffectiveMembershipTier(profile as Parameters<typeof getEffectiveMembershipTier>[0]) === "basic"
+    ) {
+      throw new Error("Free company accounts can read public Candid pages. Premium is required to contribute.");
+    }
     return next();
   });

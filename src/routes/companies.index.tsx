@@ -147,7 +147,7 @@ function CompaniesPage() {
                 resetVisibleCount();
               }}
               placeholder="Search employers..."
-              className="h-12 w-full rounded-full border border-border bg-[#f1f1ee] pl-12 pr-4 text-base text-foreground placeholder:text-muted-foreground focus:outline-none"
+              className="h-12 w-full rounded-full border border-border bg-[#f1f1ee] pl-12 pr-4 text-base text-slate-950 placeholder:text-slate-500 focus:outline-none"
             />
           </label>
           <div className="mt-3 flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -282,22 +282,39 @@ function CompaniesPage() {
       </div>
 
       <div className="hidden md:block">
-        <header>
-          <div className="flex flex-wrap items-end justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-semibold md:text-4xl">Company directory</h1>
-              <p className="mt-2 max-w-2xl text-muted-foreground">
+        <header className="relative isolate overflow-hidden border-y border-border/70 py-7 lg:py-9">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute -right-16 -top-32 size-96 rounded-full bg-[radial-gradient(circle,_rgba(199,255,0,0.12),_transparent_68%)]"
+          />
+          <div className="relative flex flex-wrap items-end justify-between gap-x-10 gap-y-6">
+            <div className="max-w-3xl">
+              <p className="inline-flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-primary">
+                <span className="size-1.5 rounded-full bg-primary shadow-[0_0_14px_rgba(199,255,0,.7)]" />
+                Candid · Employer directory
+              </p>
+              <h1 className="mt-3 font-display text-4xl font-semibold tracking-[-0.045em] lg:text-5xl">
+                Company directory<span className="text-primary">.</span>
+              </h1>
+              <p className="mt-3 max-w-2xl text-base leading-7 text-muted-foreground">
                 Every employer Kenyans have tagged here, with culture scores from member ratings and
                 AI-researched background.
               </p>
             </div>
             <div className="flex shrink-0 gap-2">
-              <Button asChild variant="outline">
+              <Button
+                asChild
+                variant="outline"
+                className="h-11 rounded-xl border-border/80 bg-background/60 px-4"
+              >
                 <Link to="/companies/watched">
                   <Bell className="size-4" /> Watched
                 </Link>
               </Button>
-              <Button asChild variant="outline">
+              <Button
+                asChild
+                className="h-11 rounded-xl bg-primary px-4 font-semibold text-primary-foreground shadow-[0_8px_30px_-12px_rgba(199,255,0,.65)] hover:bg-primary/90"
+              >
                 <Link to="/compare">
                   <Scale className="size-4" /> Compare employers
                 </Link>
@@ -307,6 +324,7 @@ function CompaniesPage() {
         </header>
 
         <FilterBar
+          className="md:mx-0 md:rounded-2xl md:border md:border-border/70 md:bg-background/90 md:px-4 md:py-3 md:shadow-sm"
           query={q}
           onQueryChange={(value) => {
             setQ(value);
@@ -380,6 +398,21 @@ function CompaniesPage() {
         </section>
       ) : (
         <>
+          <div className="mb-3 mt-7 hidden items-end justify-between gap-4 border-b border-border/70 pb-3 md:flex">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-primary">
+                Candid directory
+              </p>
+              <h2 className="mt-1 font-display text-xl font-semibold tracking-tight">
+                Employers to explore
+              </h2>
+            </div>
+            <p className="pb-1 text-sm text-muted-foreground">
+              <span className="font-semibold text-foreground">{formatCount(visibleRows.length)}</span>
+              {" employers shown · "}
+              {formatCount(rows.length)} matching
+            </p>
+          </div>
           <div className="space-y-3 md:hidden">
             {visibleRows.map((company) => {
               const score = company.overall === null ? null : Number(company.overall);
@@ -455,7 +488,7 @@ function CompaniesPage() {
             })}
           </div>
 
-          <div className="hidden md:grid md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          <div className="hidden gap-4 md:grid md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
             {visibleRows.map((company, index) => {
               const brand = getCompanyBrand(company.name);
               return (
@@ -463,37 +496,60 @@ function CompaniesPage() {
                   key={company.company_id}
                   to="/companies/$slug"
                   params={{ slug: company.slug ?? "" }}
-                  className="animate-rise rounded-2xl border border-border border-t-2 border-t-transparent bg-card p-5 transition-transform hover:-translate-y-0.5"
+                  className="group relative flex min-h-[218px] flex-col overflow-hidden rounded-[1.35rem] border border-border/80 border-t-2 border-t-transparent bg-card/70 p-5 transition-all duration-300 hover:-translate-y-1 hover:border-primary/35 hover:bg-card hover:shadow-[0_18px_48px_-30px_rgba(199,255,0,.24)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 animate-rise"
                   style={{
                     animationDelay: `${Math.min(index, 8) * 50}ms`,
                     ...(brand ? { borderTopColor: brand.color } : {}),
                   }}
                 >
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <CompanyLogo name={company.name} sizeClassName="size-12" />
-                      <div className="min-w-0">
-                        <h2 className="flex items-center gap-1.5 font-semibold">
-                          {company.name}
-                          {company.verified ? <CompanyVerifiedBadge /> : null}
-                        </h2>
-                        <p className="text-xs text-muted-foreground">
-                          {company.industry} · {company.county}
-                        </p>
-                      </div>
+                  <div className="flex items-start gap-3.5">
+                    <CompanyLogo name={company.name} sizeClassName="size-14 rounded-2xl" />
+                    <div className="min-w-0 flex-1 pt-0.5">
+                      <h2 className="flex items-center gap-1.5 pr-1 font-display text-lg font-semibold leading-tight tracking-tight group-hover:text-primary">
+                        <span className="line-clamp-2">{company.name}</span>
+                        {company.verified ? <CompanyVerifiedBadge /> : null}
+                      </h2>
+                      <p className="mt-1.5 line-clamp-1 text-xs text-muted-foreground">
+                        {company.industry || "Industry not listed"}
+                        <span className="mx-1.5 text-border">·</span>
+                        {company.county || "Kenya"}
+                      </p>
                     </div>
                     <ScoreBadge value={company.overall} />
                   </div>
                   {company.descriptor ? (
-                    <p className="mt-3 text-sm text-muted-foreground">{company.descriptor}</p>
+                    <p className="mt-4 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">
+                      {company.descriptor}
+                    </p>
+                  ) : (
+                    <p className="mt-4 min-h-10 text-sm leading-5 text-muted-foreground">
+                      Explore workplace stories and ratings from Candid members.
+                    </p>
+                  )}
+                  {company.would_work_again_pct !== null ? (
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {Math.round(Number(company.would_work_again_pct))}%
+                      </span>{" "}
+                      would work here again
+                    </p>
                   ) : null}
-                  <p className="mt-3 text-xs text-muted-foreground">
-                    {formatCount(company.story_count)} stories · {formatCount(company.rating_count)}{" "}
-                    ratings
-                    {company.would_work_again_pct !== null
-                      ? ` · ${Math.round(Number(company.would_work_again_pct))}% would work here again`
-                      : ""}
-                  </p>
+                  <div className="mt-auto flex items-end justify-between gap-3 border-t border-border/70 pt-4">
+                    <p className="text-xs text-muted-foreground">
+                      <span className="font-semibold text-foreground">
+                        {formatCount(company.story_count)}
+                      </span>{" "}
+                      stories
+                      <span className="mx-1.5 text-border">·</span>
+                      <span className="font-semibold text-foreground">
+                        {formatCount(company.rating_count)}
+                      </span>{" "}
+                      ratings
+                    </p>
+                    <span className="flex size-8 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-all group-hover:border-primary/40 group-hover:bg-primary group-hover:text-primary-foreground">
+                      <ArrowUpRight className="size-4" />
+                    </span>
+                  </div>
                 </Link>
               );
             })}

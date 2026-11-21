@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useInfiniteQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useMemo, useState, type ReactNode } from "react";
@@ -17,6 +17,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/hooks/useAuth";
+import { SplitVisualPanel } from "@/components/site/split-visual-panel";
+import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { deleteStory, editComment, deleteComment } from "@/lib/actions.functions";
 import { getMyContributions } from "@/lib/social.functions";
 import { notify as toast } from "@/lib/notifications-store";
@@ -82,6 +84,7 @@ type ContributionCursor = {
 } | null;
 
 function MyContributionsPage() {
+  const navigate = useNavigate();
   const { user, loading } = useAuth();
   const queryClient = useQueryClient();
   const fetchContributions = useServerFn(getMyContributions);
@@ -198,17 +201,33 @@ function MyContributionsPage() {
   ] as const;
 
   return (
-    <main className="min-h-dvh bg-background pb-32 md:pb-16">
-      <div className="mx-auto w-full max-w-3xl px-4 pt-4 sm:px-6 md:pt-10">
-        <header className="flex flex-col gap-5">
+    <main className="min-h-dvh bg-background pb-32 md:h-dvh md:overflow-hidden md:pb-0">
+      <FloatingBackButton
+        onClick={() => navigate({ to: "/profile" })}
+        className="hidden md:inline-flex"
+        label="Back to profile"
+      />
+      <div className="md:grid md:h-full md:grid-cols-[minmax(280px,0.86fr)_1.14fr]">
+        <SplitVisualPanel
+          eyebrow="Your voice matters"
+          title={
+            <>
+              Every story helps <span className="text-primary">work improve.</span>
+            </>
+          }
+          description="Manage what you have shared and see how your experience shapes the conversation."
+        />
+        <section className="min-h-screen min-w-0 overflow-y-auto px-4 pb-16 pt-3 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
+      <div className="mx-auto w-full max-w-5xl space-y-5 pb-8 md:space-y-8">
+        <header className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between md:gap-4">
           <Link
             to="/profile"
-            className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground"
+            className="inline-flex w-fit items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground md:hidden"
           >
             <ArrowLeft className="size-4" /> Profile
           </Link>
           <div className="flex items-end justify-between gap-4">
-            <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">
+            <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl md:text-2xl">
               My contributions
             </h1>
             <Button asChild className="hidden h-11 rounded-full px-5 md:inline-flex">
@@ -219,71 +238,98 @@ function MyContributionsPage() {
           </div>
         </header>
 
-        <div className="sticky top-16 z-30 -mx-4 mt-6 space-y-3 bg-background/95 px-4 pb-3 pt-1 backdrop-blur-md sm:-mx-6 sm:px-6">
-          <div className="flex items-center gap-3">
-            <div
-              role="tablist"
-              className="grid flex-1 grid-cols-3 rounded-full bg-secondary/70 p-1 md:flex md:flex-none md:gap-1"
-            >
+        <div className="grid gap-8 lg:grid-cols-[10rem_minmax(0,1fr)]">
+          <nav aria-label="Contribution types" className="hidden lg:block">
+            <div className="sticky top-8 space-y-1 border-l border-border pl-3">
               {tabs.map(([value, label, count]) => (
                 <button
                   key={value}
                   type="button"
-                  role="tab"
-                  aria-selected={category === value}
+                  aria-pressed={category === value}
                   onClick={() => setCategory(value)}
                   className={cn(
-                    "min-h-10 rounded-full px-4 text-sm transition-colors",
+                    "flex w-full items-center justify-between gap-2 py-2 text-left text-sm transition-colors",
                     category === value
-                      ? "bg-background font-semibold text-foreground shadow-sm"
-                      : "font-medium text-muted-foreground hover:text-foreground",
+                      ? "font-medium text-foreground"
+                      : "text-muted-foreground hover:text-foreground",
                   )}
                 >
-                  {label}
-                  <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">
+                  <span>{label}</span>
+                  <span className="text-xs tabular-nums text-muted-foreground">
                     {formatCount(count)}
                   </span>
                 </button>
               ))}
             </div>
-            <label className="relative hidden min-w-0 flex-1 md:block">
-              <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(event) => setSearch(event.target.value)}
-                placeholder="Search"
-                className="h-11 rounded-full border-0 bg-secondary/50 pl-10 shadow-none focus-visible:ring-1"
-              />
-            </label>
-          </div>
-          <label className="relative block md:hidden">
-            <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search your contributions"
-              className="h-11 rounded-full border-0 bg-secondary/50 pl-10 shadow-none focus-visible:ring-1"
-            />
-          </label>
-          <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-6 sm:px-6 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
-            {statuses.map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setStatus(value)}
-                aria-pressed={status === value}
-                className={cn(
-                  "min-h-9 shrink-0 rounded-full border px-4 text-sm transition-colors",
-                  status === value
-                    ? "border-foreground bg-foreground font-semibold text-background"
-                    : "border-border bg-card font-medium text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
+          </nav>
+
+          <div className="min-w-0">
+            <div className="sticky top-16 z-30 -mx-4 mt-6 space-y-3 bg-background/95 px-4 pb-3 pt-1 backdrop-blur-md sm:-mx-10 sm:px-10 md:top-0 md:mx-0 md:px-0">
+              <div className="flex items-center gap-3">
+                <div
+                  role="tablist"
+                  aria-label="Contribution types"
+                  className="grid flex-1 grid-cols-3 rounded-full bg-secondary/70 p-1 md:flex md:flex-none md:gap-1 lg:hidden"
+                >
+                  {tabs.map(([value, label, count]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      role="tab"
+                      aria-selected={category === value}
+                      onClick={() => setCategory(value)}
+                      className={cn(
+                        "min-h-10 rounded-full px-4 text-sm transition-colors",
+                        category === value
+                          ? "bg-background font-semibold text-foreground shadow-sm"
+                          : "font-medium text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {label}
+                      <span className="ml-1.5 text-xs tabular-nums text-muted-foreground">
+                        {formatCount(count)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+                <label className="relative hidden min-w-0 flex-1 md:block">
+                  <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    value={search}
+                    onChange={(event) => setSearch(event.target.value)}
+                    placeholder="Search"
+                    className="h-11 rounded-full border-0 bg-secondary/50 pl-10 shadow-none focus-visible:ring-1"
+                  />
+                </label>
+              </div>
+              <label className="relative block md:hidden">
+                <Search className="absolute left-3.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(event) => setSearch(event.target.value)}
+                  placeholder="Search your contributions"
+                  className="h-11 rounded-full border-0 bg-secondary/50 pl-10 shadow-none focus-visible:ring-1"
+                />
+              </label>
+              <div className="-mx-4 flex gap-2 overflow-x-auto px-4 [scrollbar-width:none] sm:-mx-10 sm:px-10 md:mx-0 md:px-0 [&::-webkit-scrollbar]:hidden">
+                {statuses.map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setStatus(value)}
+                    aria-pressed={status === value}
+                    className={cn(
+                      "min-h-9 shrink-0 rounded-full border px-4 text-sm transition-colors",
+                      status === value
+                        ? "border-foreground bg-foreground font-semibold text-background"
+                        : "border-border bg-card font-medium text-muted-foreground hover:text-foreground",
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
         <section className="mt-2">
           {contributions.isPending ? (
@@ -364,6 +410,10 @@ function MyContributionsPage() {
               </Button>
             </div>
           ) : null}
+        </section>
+          </div>
+        </div>
+      </div>
         </section>
       </div>
 

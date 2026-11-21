@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { motion } from "motion/react";
 import {
   BadgeCheck,
+  Building2,
   ChevronDown,
   ChevronRight,
   Link2,
@@ -47,8 +48,12 @@ import {
 import { MembershipBadge } from "@/components/site/membership-badge";
 import { AccountSwitcher } from "@/components/site/account-switcher";
 import { ProfileSettingsSheet } from "@/components/site/profile-settings-sheet";
+import { SplitVisualPanel } from "@/components/site/split-visual-panel";
 import { getPublicProfile } from "@/lib/messaging.functions";
+import { cn } from "@/lib/utils";
 import { useIsMobile } from "@/hooks/use-mobile";
+
+type ProfileSection = "overview" | "following" | "saved" | "contributions" | "account";
 
 export const Route = createFileRoute("/profile")({
   head: () => ({
@@ -74,6 +79,7 @@ function ProfilePage() {
   const [confirmSignOut, setConfirmSignOut] = useState(false);
   const [accountSwitcherOpen, setAccountSwitcherOpen] = useState(false);
   const [profileSettingsOpen, setProfileSettingsOpen] = useState(false);
+  const [activeProfileSection, setActiveProfileSection] = useState<ProfileSection>("overview");
 
   const fetchOnboardingState = useServerFn(getOnboardingState);
   const onboarding = useQuery({
@@ -114,6 +120,13 @@ function ProfilePage() {
   const socialLinks = socials
     ? (Object.entries(socials) as [string, string | null][]).filter(([, value]) => Boolean(value))
     : [];
+  const profileSections: { value: ProfileSection; label: string }[] = [
+    { value: "overview", label: "Overview" },
+    { value: "following", label: "Following" },
+    { value: "saved", label: "Saved" },
+    ...(user ? [{ value: "contributions" as const, label: "Contributions" }] : []),
+    { value: "account", label: "Account" },
+  ];
 
   const fetchVerification = useServerFn(getVerificationState);
   const claimBadgeFn = useServerFn(claimVerificationBadge);
@@ -154,8 +167,11 @@ function ProfilePage() {
       ? `anon-${user.uid.slice(0, 6)}`
       : "Guest";
   return (
-    <div className="min-h-screen bg-background">
-      <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
+    <div className="min-h-screen bg-background md:h-dvh md:overflow-hidden">
+      <FloatingBackButton
+        onClick={() => navigate({ to: "/" })}
+        className="hidden md:inline-flex"
+      />
       {user ? (
         <AccountSwitcher
           open={accountSwitcherOpen}
@@ -194,24 +210,39 @@ function ProfilePage() {
           }}
         />
       ) : null}
-      <section className="min-h-screen px-3 pb-4 sm:px-5 md:px-8 md:py-8">
+      <section className="min-h-screen md:h-dvh md:min-h-0">
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: "easeOut" }}
-          className="mx-auto w-full max-w-5xl space-y-4 pb-8 md:space-y-6"
+          className="mx-auto w-full max-w-5xl space-y-4 px-3 pb-8 sm:px-5 md:mx-0 md:grid md:h-full md:max-w-none md:grid-cols-[minmax(280px,0.86fr)_1.14fr] md:gap-0 md:space-y-0 md:px-0 md:pb-0"
         >
+          <SplitVisualPanel
+            eyebrow="The Candid community"
+            title={
+              <>
+                Your voice can <span className="text-primary">change work.</span>
+              </>
+            }
+            description="Honest stories help people choose better workplaces — and help employers make real change."
+          />
+
+          <div className="min-w-0 md:h-dvh md:overflow-x-hidden md:overflow-y-auto md:overscroll-contain md:bg-background/90 md:px-8 md:pb-8 md:pt-16 lg:px-12">
+            <div className="mx-auto w-full max-w-5xl space-y-4 pb-8 md:space-y-6 md:pb-10">
+          <p className="hidden text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground md:block">
+            Your profile
+          </p>
           <motion.section
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.06, ease: "easeOut" }}
-            className="relative -mx-3 overflow-hidden rounded-none border-y border-x-0 border-border bg-card pb-4 shadow-sm sm:mx-0 sm:rounded-3xl sm:border-x md:glass-card md:p-0"
+            className="relative -mx-3 overflow-hidden rounded-none border-y border-x-0 border-border bg-card pb-4 shadow-sm sm:mx-0 sm:rounded-3xl sm:border-x md:mx-0 md:overflow-visible md:rounded-none md:border-0 md:border-b md:border-border md:bg-transparent md:pb-5 md:shadow-none lg:pb-6"
           >
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               transition={{ duration: 0.5 }}
-              className="relative h-[170px] overflow-hidden sm:h-56 md:h-64"
+              className="relative h-[170px] overflow-hidden sm:h-56 md:hidden"
             >
               <ProfileCoverPicker
                 coverUrl={onboarding.data?.coverUrl ?? null}
@@ -228,18 +259,18 @@ function ProfilePage() {
                 }}
               />
             </motion.div>
-            <div className="relative px-4 pb-4 sm:px-6 md:px-8 md:pb-6">
+            <div className="relative px-4 pb-4 sm:px-6 md:px-0 md:pb-0">
               <motion.div
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.45, delay: 0.08 }}
-                className="-mt-10 flex flex-wrap items-end gap-3 sm:-mt-12 sm:flex-nowrap sm:gap-4"
+                className="-mt-10 flex flex-wrap items-end gap-3 sm:-mt-12 sm:flex-nowrap sm:gap-4 md:mt-0 md:items-center md:gap-3"
               >
                 {user ? (
                   <ProfilePhotoPicker
                     compact
                     avatarOnly
-                    avatarClassName="size-20 border-4 border-card shadow-lg md:size-24"
+                    avatarClassName="size-20 border-4 border-card shadow-lg md:size-14 md:border-0 md:shadow-none lg:size-16"
                     photoUrl={onboarding.data?.photoUrl}
                     initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
                     onSaved={(photoUrl) => {
@@ -257,7 +288,7 @@ function ProfilePage() {
                   <ProfileAvatar
                     photoUrl={onboarding.data?.photoUrl}
                     initials={(handle.replace("@", "")[0] ?? "U").toUpperCase()}
-                    className="size-20 shrink-0 border-4 border-card shadow-lg md:size-24"
+                    className="size-20 shrink-0 border-4 border-card shadow-lg md:size-14 md:border-0 md:shadow-none lg:size-16"
                   />
                 )}
                 <div className="min-w-0">
@@ -298,7 +329,7 @@ function ProfilePage() {
                     ) : null}
                   </h1>
                   <p className="truncate text-sm text-muted-foreground">
-                    {loading ? "Checking your session…" : user ? "" : "Not signed in"}
+                    {loading ? "Checking your session…" : user?.email ?? "Not signed in"}
                   </p>
                 </div>
                 {user && !onboarding.data?.username && !onboarding.isLoading ? (
@@ -315,8 +346,8 @@ function ProfilePage() {
                 ) : null}
               </motion.div>
               {user && onboarding.data?.username ? (
-                <div className="mt-4 grid grid-cols-1 gap-2 border-t border-border pt-4">
-                  <Button asChild className="h-11 rounded-xl">
+                <div className="mt-4 grid grid-cols-1 gap-2 border-t border-border pt-4 md:mt-3 md:w-fit md:border-0 md:pt-0">
+                  <Button asChild className="h-11 rounded-xl md:h-10 md:rounded-full md:px-5 md:text-sm">
                     <Link to="/post">
                       <PenLine className="size-4" /> Share a story
                     </Link>
@@ -349,8 +380,10 @@ function ProfilePage() {
             </div>
           </motion.section>
 
+          <div className="space-y-5 md:hidden">
+
           {socialLinks.length > 0 ? (
-            <section className="rounded-2xl border border-border bg-card p-4 sm:p-5">
+            <section id="profile-links" className="scroll-mt-8 rounded-2xl border border-border bg-card p-4 sm:p-5 md:rounded-none md:border-0 md:bg-transparent md:p-0">
               <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
                 Links
               </h2>
@@ -371,11 +404,20 @@ function ProfilePage() {
             </section>
           ) : null}
 
-          <FollowedStories username={onboarding.data?.username ?? null} />
-          <SavedCommunityPosts />
+          <div id="profile-following" className="scroll-mt-8">
+            <FollowedStories username={onboarding.data?.username ?? null} />
+          </div>
+          <div id="profile-saved" className="scroll-mt-8">
+            <SavedCommunityPosts />
+          </div>
 
-          {user ? <ContributionsPanel /> : null}
+          {user ? (
+            <div id="profile-contributions" className="scroll-mt-8">
+              <ContributionsPanel />
+            </div>
+          ) : null}
 
+          <div id="profile-account" className="scroll-mt-8 space-y-5">
           {askAccountType ? (
             <SettingsGroup title="One quick question">
               <div className="px-4 py-3">
@@ -411,6 +453,26 @@ function ProfilePage() {
             transition={{ duration: 0.4, delay: 0.18, ease: "easeOut" }}
             className="grid divide-y divide-border sm:grid-cols-2 sm:gap-3 sm:divide-y-0"
           >
+            {user ? (
+              <Button
+                asChild
+                variant="outline"
+                className="h-auto min-h-14 justify-between rounded-none border-0 bg-transparent px-0 py-3 text-left shadow-none hover:bg-secondary/30 md:min-h-16 md:rounded-xl md:border md:bg-background md:px-4"
+              >
+                <Link to="/my-companies">
+                  <span className="flex min-w-0 items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <Building2 className="size-4" />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block font-medium">My companies</span>
+                      <span className="mt-0.5 block truncate text-xs font-normal text-muted-foreground">Private work history and group access</span>
+                    </span>
+                  </span>
+                  <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
+                </Link>
+              </Button>
+            ) : null}
             <Button
               asChild
               variant="outline"
@@ -450,6 +512,162 @@ function ProfilePage() {
               </Button>
             ) : null}
           </motion.div>
+          </div>
+
+          <div className="hidden md:block">
+            <nav
+              aria-label="Profile sections"
+              className="mb-6 flex gap-5 overflow-x-auto border-b border-border lg:hidden"
+            >
+              {profileSections.map((section) => (
+                <button
+                  key={section.value}
+                  type="button"
+                  aria-pressed={activeProfileSection === section.value}
+                  onClick={() => setActiveProfileSection(section.value)}
+                  className={cn(
+                    "shrink-0 border-b-2 py-3 text-sm transition-colors",
+                    activeProfileSection === section.value
+                      ? "border-primary font-medium text-foreground"
+                      : "border-transparent text-muted-foreground hover:text-foreground",
+                  )}
+                >
+                  {section.label}
+                </button>
+              ))}
+            </nav>
+
+            <div className="grid gap-8 lg:grid-cols-[10rem_minmax(0,1fr)]">
+              <nav aria-label="Profile sections" className="hidden lg:block">
+                <div className="sticky top-8 space-y-1 border-l border-border pl-3">
+                  {profileSections.map((section) => (
+                    <button
+                      key={section.value}
+                      type="button"
+                      aria-pressed={activeProfileSection === section.value}
+                      onClick={() => setActiveProfileSection(section.value)}
+                      className={cn(
+                        "block w-full py-2 text-left text-sm transition-colors",
+                        activeProfileSection === section.value
+                          ? "font-medium text-foreground"
+                          : "text-muted-foreground hover:text-foreground",
+                      )}
+                    >
+                      {section.label}
+                    </button>
+                  ))}
+                </div>
+              </nav>
+
+              <div className="min-w-0">
+                {activeProfileSection === "overview" ? (
+                  <section className="space-y-3">
+                    <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      Public links
+                    </h2>
+                    {socialLinks.length > 0 ? (
+                      <div className="flex flex-wrap gap-2">
+                        {socialLinks.map(([key, value]) => (
+                          <a
+                            key={key}
+                            href={value ?? undefined}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center gap-2 rounded-full bg-secondary/70 px-3 py-2 text-sm text-primary transition-colors hover:bg-primary/10"
+                          >
+                            <Link2 className="size-3.5" />
+                            <span className="capitalize">{key}</span>
+                          </a>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        Add links to your profile from profile settings.
+                      </p>
+                    )}
+                  </section>
+                ) : null}
+
+                {activeProfileSection === "following" ? (
+                  <FollowedStories username={onboarding.data?.username ?? null} />
+                ) : null}
+
+                {activeProfileSection === "saved" ? <SavedCommunityPosts /> : null}
+
+                {activeProfileSection === "contributions" && user ? <ContributionsPanel /> : null}
+
+                {activeProfileSection === "account" ? (
+                  <div className="space-y-5">
+                    {askAccountType ? (
+                      <SettingsGroup title="One quick question">
+                        <div className="px-4 py-3">
+                          <p className="text-sm font-medium">
+                            Are you here as a worker or an employer?
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            Employers get a reply tool and a company page; workers can share
+                            workplace stories under their Candid handle.
+                          </p>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            <Button
+                              size="sm"
+                              disabled={savingType}
+                              onClick={() => void chooseAccountType("individual")}
+                            >
+                              I am a worker
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={savingType}
+                              onClick={() => void chooseAccountType("company")}
+                            >
+                              I represent a company
+                            </Button>
+                          </div>
+                        </div>
+                      </SettingsGroup>
+                    ) : null}
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="h-12 w-full justify-between rounded-xl border-border bg-card px-4"
+                    >
+                      <Link to="/my-companies">
+                        <span className="flex items-center gap-3"><Building2 className="size-4 text-primary" /> My companies</span>
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      </Link>
+                    </Button>
+                    <Button
+                      asChild
+                      variant="outline"
+                      className="h-12 w-full justify-between rounded-xl border-border bg-card px-4"
+                    >
+                      <Link to="/settings">
+                        <span className="flex items-center gap-3">
+                          <Settings className="size-4 text-primary" /> Account settings
+                        </span>
+                        <ChevronRight className="size-4 text-muted-foreground" />
+                      </Link>
+                    </Button>
+                    {user ? (
+                      <Button
+                        variant="outline"
+                        className="h-12 w-full justify-start gap-3 rounded-xl border-danger/20 bg-card px-4 text-danger hover:bg-danger/5 hover:text-danger"
+                        onClick={() => setConfirmSignOut(true)}
+                      >
+                        <LogOut className="size-4" /> Sign out
+                      </Button>
+                    ) : null}
+                  </div>
+                ) : null}
+              </div>
+            </div>
+          </div>
+          </div>
+          </div>
+          </div>
+        </motion.div>
 
           {isMobile ? (
             <Drawer open={confirmSignOut} onOpenChange={setConfirmSignOut}>
@@ -504,7 +722,6 @@ function ProfilePage() {
               </AlertDialogContent>
             </AlertDialog>
           )}
-        </motion.div>
       </section>
     </div>
   );

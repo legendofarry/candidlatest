@@ -53,6 +53,7 @@ import { getUnreadMessages } from "@/lib/messaging.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { requiresEmailVerification } from "@/lib/email-verification";
 import { getOnboardingState } from "@/lib/onboarding.functions";
+import { recordCompanyCommunityActivityAction } from "@/lib/company-groups.functions";
 import { useServerNotificationsSync } from "@/hooks/use-server-notifications";
 import { usePushRegistrationSync } from "@/hooks/use-push-registration-sync";
 import { hasCredentialFor, requestLock } from "@/lib/biometrics";
@@ -142,6 +143,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const companyProfileRoute = /^\/companies\/[^/]+\/?$/.test(pathname);
   const needsEmailVerification = requiresEmailVerification(user);
   const routeConversationId = pathname.match(/^\/messages\/([^/]+)\/?$/)?.[1];
   const selectedConversationId = useSelectedConversationId();
@@ -165,6 +167,11 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     hydratePreferences();
   }, []);
+  const recordActivity = useServerFn(recordCompanyCommunityActivityAction);
+  useEffect(() => {
+    if (!user) return;
+    void recordActivity().catch(() => undefined);
+  }, [recordActivity, user?.uid]);
   const canLock = Boolean(user && prefs.biometricUnlock && hasCredentialFor(user.uid));
   const fetchProfile = useServerFn(getOnboardingState);
   const { data: accountProfile } = useQuery({
@@ -187,7 +194,9 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
     "/auth",
     "/post",
     "/support",
+    "/billing",
     "/profile",
+    "/my-contributions",
     "/settings",
     "/onboarding",
     "/verify-email",
@@ -203,6 +212,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
   const directConversationRoute = /^\/messages\/[^/]+$/.test(pathname);
   const headerBack =
     (nested && (!standaloneDesktopRoute || pathname === "/support" || pathname === "/settings")) ||
+    pathname === "/billing" ||
     pathname === "/profile" ||
     pathname === "/post";
 
@@ -353,7 +363,12 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <NotificationBanners />
       <NotificationsOverlay />
       <BadgeClaimModal />
-      {fullscreenRoute || messagesInboxRoute ? null : (
+      {
+        fullscreenRoute ||
+        messagesInboxRoute ||
+        notificationsOpen ||
+        messagePanelOpen ||
+        (pathname === "/billing" && !isMobile) ? null : (
         <SupportChat
           raised={dockRoots.includes(pathname)}
           mobileVisible={
@@ -365,6 +380,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
       <header
         className={cn(
           "sticky top-0 z-[80] border-b border-border glass-card",
+          companyProfileRoute && "md:ml-72",
           standaloneDesktopRoute && "md:hidden",
           fullscreenRoute && "hidden",
           messagesInboxRoute && "hidden",
@@ -372,7 +388,25 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         )}
       >
         <div className="app-shell flex h-16 items-center gap-3">
-          {headerBack ? (
+          {companyProfileRoute ? (
+            <>
+              <button
+                type="button"
+                onClick={handleBrandTap}
+                aria-label="Candid home"
+                className="hidden items-center gap-2 md:flex"
+              >
+                <Flame className="size-5 text-primary" />
+                <span className="font-display text-lg font-semibold tracking-tight">Candid</span>
+              </button>
+              <div className="flex min-w-0 items-center gap-2 md:hidden">
+                <BackButton compact label="All companies" />
+                <span className="truncate font-display text-base font-semibold tracking-tight">
+                  Company
+                </span>
+              </div>
+            </>
+          ) : headerBack ? (
             <div className="flex min-w-0 items-center gap-2">
               <BackButton compact label={nestedTitle(pathname)} />
               <span className="truncate font-display text-base font-semibold tracking-tight">
@@ -510,6 +544,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
             "fixed bottom-0 left-0 z-30 hidden w-72 flex-col border-r border-border bg-card/95 px-4 pb-4 pt-6 shadow-sm backdrop-blur md:flex",
             messagesInboxRoute ? "top-0" : "top-16",
             standaloneDesktopRoute && "md:hidden",
+            companyProfileRoute && "md:hidden",
           )}
         >
           <nav className="space-y-7" aria-label="Main navigation">
@@ -519,7 +554,15 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               </p>
               <div className="space-y-1">
                 {primaryNav.map((item) => (
-                  <SidebarLink key={item.to} item={item} active={pathname === item.to} />
+                  <SidebarLink
+                    key={item.to}
+                    item={item}
+                    active={
+                      item.to === "/companies"
+                        ? pathname.startsWith(item.to)
+                        : pathname === item.to
+                    }
+                  />
                 ))}
               </div>
             </div>
@@ -626,6 +669,7 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
         <main
           className={cn(
             "min-w-0 md:pb-10 md:pl-80",
+            companyProfileRoute && "md:pl-72",
             fullscreenRoute ||
               messagesInboxRoute ||
               pathname === "/post" ||
@@ -646,6 +690,8 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
               "h-dvh overflow-hidden md:h-[calc(100dvh-4rem)] xl:h-auto xl:overflow-visible",
             standaloneDesktopRoute &&
               "md:fixed md:inset-0 md:z-[90] md:overflow-y-auto md:bg-background md:p-0",
+            pathname === "/profile" && "md:overflow-hidden",
+            pathname === "/my-contributions" && "md:overflow-hidden",
           )}
         >
           <BiometricGate>{children}</BiometricGate>
@@ -657,19 +703,6 @@ export function SiteShell({ children }: { children: React.ReactNode }) {
           </footer>
         ) : null}
       </div>
-      {messagePanelOpen ? (
-        <button
-          type="button"
-          aria-label="Close drawer"
-          className={cn(
-            "fixed inset-0 z-[80] hidden bg-background/45 backdrop-blur-sm",
-            activeConversationId ? "xl:block" : "md:block",
-          )}
-          onClick={() => {
-            closeMessages();
-          }}
-        />
-      ) : null}
       <RightWorkspace
         open={messagePanelOpen}
         title="Messages"
@@ -824,6 +857,7 @@ function SidebarLink({
   return (
     <Link
       to={item.to}
+      aria-current={active ? "page" : undefined}
       className={cn(
         "group flex min-h-12 items-center gap-3 rounded-xl px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground",
         active && "bg-primary/10 text-foreground shadow-sm ring-1 ring-primary/20",
@@ -863,9 +897,9 @@ function RightWorkspace({
   if (!open) return null;
   return (
     <aside
-      style={adjacent ? { right: "calc(32rem + 2.25rem)" } : undefined}
+      style={adjacent ? { right: "32rem" } : undefined}
       className={cn(
-        "fixed bottom-6 right-6 top-28 z-[90] hidden w-[32rem] animate-[desktop-drawer-in_220ms_cubic-bezier(0.16,1,0.3,1)] overflow-hidden rounded-3xl border border-border bg-card shadow-2xl md:flex md:flex-col",
+        "fixed inset-y-0 right-0 z-[90] hidden w-[32rem] animate-[desktop-drawer-in_220ms_cubic-bezier(0.16,1,0.3,1)] overflow-hidden border-l border-border bg-background md:flex md:flex-col",
         desktopOnly && "md:hidden xl:flex",
       )}
     >

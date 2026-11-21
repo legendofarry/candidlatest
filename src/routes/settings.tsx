@@ -8,8 +8,6 @@ import { EmailAuthProvider, linkWithCredential } from "firebase/auth";
 import {
   ChevronRight,
   Fingerprint,
-  Settings2,
-  ShieldCheck,
   EyeOff,
   Gem,
   RotateCcw,
@@ -41,6 +39,7 @@ import {
 import { FloatingBackButton } from "@/components/site/floating-back-button";
 import { claimOfficialCandidAccount, getOnboardingState } from "@/lib/onboarding.functions";
 import { ProfilePhotoPicker } from "@/components/site/profile-photo";
+import { SplitVisualPanel } from "@/components/site/split-visual-panel";
 import { getMyFeedPreferences, updateFeedPreference } from "@/lib/social.functions";
 
 export const Route = createFileRoute("/settings")({
@@ -166,63 +165,12 @@ function SettingsPage() {
     <div className="min-h-screen bg-background md:h-dvh md:overflow-hidden">
       <FloatingBackButton onClick={() => navigate({ to: "/" })} className="hidden md:inline-flex" />
       <div className="grid min-h-screen md:h-dvh md:min-h-0 md:grid-cols-[minmax(280px,0.86fr)_1.14fr]">
-        <section className="relative hidden min-h-screen overflow-hidden bg-[#132523] px-7 py-16 text-white md:flex md:h-dvh md:items-center lg:px-12 lg:py-24">
-          <div className="absolute inset-0 bg-[linear-gradient(145deg,#182c28_0%,#17212c_55%,#29271d_100%)]" />
-          <div className="absolute inset-0 opacity-20" aria-hidden>
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_20%_15%,#65c5a1,transparent_40%),radial-gradient(ellipse_at_85%_90%,#e2ac63,transparent_42%)]" />
-          </div>
-          <div className="relative mx-auto w-full max-w-lg">
-            <div className="flex items-center gap-2 text-sm font-medium text-emerald-200">
-              <Settings2 className="size-4" /> Your space, your rules
-            </div>
-            <h1 className="mt-5 max-w-md text-4xl font-semibold leading-tight">
-              Set Candid up the way you work.
-            </h1>
-            <p className="mt-3 max-w-md text-sm leading-6 text-white/70">
-              Your privacy, appearance, notifications and account access live here.
-            </p>
-            <div className="relative mt-14 h-64 overflow-hidden rounded-2xl border border-white/15 bg-white/[0.06] p-6 shadow-2xl backdrop-blur-sm">
-              <motion.div
-                className="absolute left-8 right-8 top-8 rounded-xl border border-white/15 bg-[#16211f] p-4"
-                animate={{ y: [0, -8, 0], rotate: [0, -1, 0] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "easeInOut" }}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-lg bg-emerald-300/15 text-emerald-200">
-                    <ShieldCheck className="size-5" />
-                  </span>
-                  <div className="flex-1">
-                    <div className="h-2 w-28 rounded-full bg-white/75" />
-                    <div className="mt-2 h-1.5 w-40 rounded-full bg-white/25" />
-                  </div>
-                  <span className="h-5 w-9 rounded-full bg-emerald-400/80 p-1">
-                    <span className="ml-auto block size-3 rounded-full bg-white" />
-                  </span>
-                </div>
-              </motion.div>
-              <motion.div
-                className="absolute bottom-7 left-12 right-12 rounded-xl border border-white/15 bg-[#202425] p-4"
-                animate={{ y: [0, 7, 0] }}
-                transition={{ duration: 4.5, repeat: Infinity, ease: "easeInOut", delay: 0.4 }}
-              >
-                <div className="flex items-center gap-3">
-                  <span className="flex size-9 items-center justify-center rounded-lg bg-amber-300/15 text-amber-200">
-                    <Fingerprint className="size-5" />
-                  </span>
-                  <div className="flex-1">
-                    <div className="h-2 w-24 rounded-full bg-white/75" />
-                    <div className="mt-2 h-1.5 w-32 rounded-full bg-white/25" />
-                  </div>
-                  <div className="flex gap-1">
-                    <i className="size-1.5 rounded-full bg-white/50" />
-                    <i className="size-1.5 rounded-full bg-white/50" />
-                    <i className="size-1.5 rounded-full bg-white/50" />
-                  </div>
-                </div>
-              </motion.div>
-            </div>
-          </div>
-        </section>
+        <SplitVisualPanel
+          eyebrow="Your space, your rules"
+          title="Set Candid up the way you work."
+          description="Your privacy, appearance, notifications and account access live here."
+          titleLevel={1}
+        />
 
         <section className="min-h-screen overflow-y-auto px-4 pb-16 pt-3 sm:px-10 md:h-dvh md:min-h-0 md:px-8 md:pt-16 lg:px-12">
           <motion.div

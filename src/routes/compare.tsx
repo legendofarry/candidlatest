@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useQuery, useQueryClient, useSuspenseQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import {
   ArrowUpRight,
@@ -49,6 +49,10 @@ const compareQuery = queryOptions({
 
 export const Route = createFileRoute("/compare")({
   loader: ({ context }) => context.queryClient.ensureQueryData(compareQuery),
+  validateSearch: (search: Record<string, unknown>) => ({
+    companyId: typeof search.companyId === "string" ? search.companyId : undefined,
+    compareWith: typeof search.compareWith === "string" ? search.compareWith : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Compare employers | Candid" },
@@ -62,6 +66,7 @@ export const Route = createFileRoute("/compare")({
 });
 
 function ComparePage() {
+  const { companyId: requestedCompanyId, compareWith: requestedCompareWith } = Route.useSearch();
   const { user } = useAuth();
   const getMembership = useServerFn(getOnboardingState);
   const membershipQuery = useQuery({
@@ -95,6 +100,20 @@ function ComparePage() {
       .slice(0, 2)
       .map((company) => company.company_id),
   );
+
+  useEffect(() => {
+    const requestedIds = [requestedCompareWith, requestedCompanyId].filter((id): id is string =>
+      Boolean(id && companies.some((company) => company.company_id === id)),
+    );
+    if (requestedIds.length === 0) {
+      return;
+    }
+    setSelected((current) => {
+      const requestedSet = new Set(requestedIds);
+      const others = current.filter((id) => !requestedSet.has(id));
+      return [...requestedIds, ...others].slice(0, maxComparedCompanies);
+    });
+  }, [companies, maxComparedCompanies, requestedCompanyId, requestedCompareWith]);
 
   function changeCompany(index: number, id: string) {
     setSelected((current) => current.map((item, itemIndex) => (itemIndex === index ? id : item)));

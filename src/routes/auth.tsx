@@ -8,7 +8,7 @@ import {
   sendEmailVerification,
 } from "firebase/auth";
 import { notify as toast } from "@/lib/notifications-store";
-import { Eye, EyeOff, Flame, Loader2, MessageSquareText, ShieldCheck } from "lucide-react";
+import { Building2, Eye, EyeOff, Flame, Loader2, MessageSquareText, ShieldCheck, UserRound } from "lucide-react";
 import { firebaseAuth } from "@/integrations/firebase/client";
 import { AUTH_EMAIL_SESSION_KEY } from "@/lib/auth-email";
 import { Button } from "@/components/ui/button";
@@ -146,6 +146,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const { user, loading: authLoading } = useAuth();
   const [mode, setMode] = useState<"signin" | "signup">("signin");
+  const [signupAccountType, setSignupAccountType] = useState<"individual" | "company">("individual");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -243,6 +244,7 @@ function AuthPage() {
     setBusy(true);
     try {
       if (mode === "signup") {
+        window.sessionStorage.setItem("candid:signup-account-type", signupAccountType);
         const credential = await createUserWithEmailAndPassword(firebaseAuth, email.trim(), password);
         try {
           await sendEmailVerification(credential.user, verificationActionSettings());
@@ -365,6 +367,32 @@ function AuthPage() {
                     </div>
                   ) : null}
                   <form onSubmit={submit} className="max-w-[680px] space-y-6 sm:space-y-8">
+                    {mode === "signup" ? (
+                      <fieldset className="space-y-3">
+                        <legend className="text-base font-medium text-[#f5f5f0] sm:text-lg">What kind of account are you creating?</legend>
+                        <div className="grid grid-cols-2 gap-3">
+                          {([
+                            ["individual", "Individual", "Share as a worker", UserRound],
+                            ["company", "Company", "Represent an employer", Building2],
+                          ] as const).map(([value, title, description, Icon]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              aria-pressed={signupAccountType === value}
+                              onClick={() => setSignupAccountType(value)}
+                              className={`min-h-28 border px-4 py-4 text-left transition-colors ${signupAccountType === value ? "border-[#c7ff00]/70 bg-[#c7ff00]/[0.07]" : "border-white/15 bg-white/[0.02] hover:border-white/30"}`}
+                            >
+                              <Icon className={`size-5 ${signupAccountType === value ? "text-[#c7ff00]" : "text-white/55"}`} />
+                              <span className="mt-3 block text-sm font-semibold text-[#f5f5f0]">{title}</span>
+                              <span className="mt-1 block text-xs leading-5 text-white/45">{description}</span>
+                            </button>
+                          ))}
+                        </div>
+                        {signupAccountType === "company" ? (
+                          <p className="text-xs leading-5 text-white/45">Company accounts can read public stories. Claiming a company page requires review; official contributions require verification and Premium.</p>
+                        ) : null}
+                      </fieldset>
+                    ) : null}
                     <div className="space-y-3">
                       <Label htmlFor="email" className="text-base font-medium text-[#f5f5f0] sm:text-lg">
                         Email address
@@ -444,6 +472,10 @@ function AuthPage() {
 
               </div>
               <MobileAuthVisual />
+              <footer className="mt-auto flex max-w-[680px] flex-col gap-3 pt-8 text-xs text-white/40 sm:flex-row sm:items-center sm:justify-between sm:gap-5 sm:pt-14 sm:text-sm lg:mt-8 lg:pt-0 xl:mt-14">
+                <p className="flex items-center gap-3"><span aria-hidden>⌑</span> Your space. Safe and secure.</p>
+                <div className="flex items-center gap-5"><span>© 2026 Candid</span><Link to="/privacy" className="hover:text-white">Privacy</Link><Link to="/guidelines" className="hover:text-white">Terms</Link></div>
+              </footer>
             </div>
           </main>
         </div>

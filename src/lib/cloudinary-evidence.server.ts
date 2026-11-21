@@ -46,6 +46,37 @@ export function createAuthenticatedImageUrl(publicId: string, format: string, ex
   });
 }
 
+/** Permanently removes an authenticated evidence image from Cloudinary. */
+export async function destroyAuthenticatedImage(publicId: string) {
+  const config = getCloudinaryEvidenceConfig();
+  const timestamp = String(Math.floor(Date.now() / 1000));
+  const params = {
+    invalidate: "true",
+    public_id: publicId,
+    timestamp,
+    type: "authenticated",
+  };
+  const signature = await signCloudinaryParams(params, config.apiSecret);
+  const form = new FormData();
+  form.set("api_key", config.apiKey);
+  form.set("public_id", params.public_id);
+  form.set("timestamp", timestamp);
+  form.set("type", params.type);
+  form.set("invalidate", params.invalidate);
+  form.set("signature", signature);
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${encodeURIComponent(config.cloudName)}/image/destroy`,
+    { method: "POST", body: form },
+  );
+  const result = (await response.json().catch(() => ({}))) as {
+    result?: string;
+    error?: { message?: string };
+  };
+  if (!response.ok || !["ok", "not found"].includes(result.result ?? "")) {
+    throw new Error(result.error?.message || "The private evidence image could not be removed.");
+  }
+}
+
 export async function verifyCloudinaryUploadResponse(input: {
   publicId: string;
   version: number;

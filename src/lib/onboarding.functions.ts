@@ -37,6 +37,7 @@ export const getOnboardingState = createServerFn({ method: "POST" })
       photoUrl: profile?.photo_url ?? null,
       coverUrl: profile?.cover_url ?? null,
       pinnedStoryIds: Array.isArray(profile?.pinned_story_ids) ? profile.pinned_story_ids : [],
+      companyIds: await (await import("./company-groups.server")).readMyCompanyWorkHistory(context.userId),
       usernameChangedAt: profile?.username_changed_at ?? null,
       socials: profile?.socials ?? null,
       accountType: profile?.account_type ?? "unknown",
@@ -91,12 +92,19 @@ export const completeOnboarding = createServerFn({ method: "POST" })
       .object({
         username: z.string().max(40),
         socials: socialSchema,
+        accountType: z.enum(["individual", "company"]).optional(),
+        companyIds: z.array(z.string().min(1).max(120)).max(20).default([]),
+        joinGroupIds: z.array(z.string().min(1).max(120)).max(20).default([]),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const { claimUsername } = await import("./onboarding.server");
-    return claimUsername(context.userId, data.username, data.socials);
+    return claimUsername(context.userId, data.username, data.socials, {
+      accountType: data.accountType,
+      companyIds: data.companyIds,
+      joinGroupIds: data.joinGroupIds,
+    });
   });
 
 /** One-time, verified-email action that links the owner's login to @candid. */

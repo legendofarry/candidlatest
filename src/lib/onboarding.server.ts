@@ -236,6 +236,11 @@ export async function claimUsername(
   userId: string,
   rawUsername: string,
   socials: SocialLinks,
+  options: {
+    accountType?: "individual" | "company";
+    companyIds?: string[];
+    joinGroupIds?: string[];
+  } = {},
 ): Promise<{ ok: boolean; reason?: string; profile?: OnboardingProfile }> {
   const username = normalizeUsername(rawUsername);
   const validity = validateUsername(username);
@@ -274,7 +279,7 @@ export async function claimUsername(
           county: previous?.county ?? null,
           role_label: previous?.role_label ?? null,
           banned: previous?.banned ?? false,
-          account_type: previous?.account_type ?? "unknown",
+          account_type: options.accountType ?? previous?.account_type ?? "unknown",
           subscription_tier: previous?.subscription_tier ?? DEFAULT_MEMBERSHIP.subscription_tier,
           subscription_status:
             previous?.subscription_status ?? DEFAULT_MEMBERSHIP.subscription_status,
@@ -303,6 +308,9 @@ export async function claimUsername(
     }
     throw error;
   }
+
+  const { saveMyCompanyWorkHistory } = await import("./company-groups.server");
+  await saveMyCompanyWorkHistory(userId, options.companyIds ?? [], options.joinGroupIds ?? []);
 
   const profile = await readProfile(userId);
   try {

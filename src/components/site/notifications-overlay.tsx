@@ -640,17 +640,17 @@ export function NotificationsOverlay() {
         {open ? (
           <motion.div
             key="notifications-overlay"
-            className="pointer-events-none fixed inset-0 z-[90] flex flex-col pt-0 md:items-end md:justify-start md:pt-28 md:pr-6 xl:flex-row-reverse xl:items-start xl:gap-3"
+            className="pointer-events-none fixed inset-0 z-[90] flex flex-col pt-0 md:items-end md:justify-start md:pt-0 md:pr-0 xl:flex-row-reverse xl:items-start xl:gap-0"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.18 }}
             role="dialog"
-            aria-modal="true"
+            aria-modal={isMobile ? true : undefined}
             aria-label="Notifications"
           >
             <motion.div
-              className="pointer-events-auto absolute inset-0 bg-background/75 backdrop-blur-sm md:bg-background/45"
+              className="pointer-events-auto absolute inset-0 bg-background/75 backdrop-blur-sm md:hidden"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -663,7 +663,7 @@ export function NotificationsOverlay() {
             <motion.div
               ref={panelRef}
               tabIndex={-1}
-              className="pointer-events-auto relative flex h-full w-full flex-col outline-none sm:mx-auto sm:my-6 sm:h-[calc(100%-3rem)] sm:max-w-2xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:bg-card/70 sm:shadow-2xl md:m-0 md:h-[calc(100vh-8rem)] md:w-[min(44rem,calc(100vw-3rem))] md:max-w-none md:bg-card md:shadow-2xl xl:shrink-0"
+              className="pointer-events-auto relative flex h-full w-full flex-col outline-none sm:mx-auto sm:my-6 sm:h-[calc(100%-3rem)] sm:max-w-2xl sm:overflow-hidden sm:rounded-3xl sm:border sm:border-border sm:bg-card/70 sm:shadow-2xl md:m-0 md:h-dvh md:w-[min(32rem,100vw)] md:max-w-none md:rounded-none md:border-0 md:border-l md:border-border md:bg-background md:shadow-xl xl:shrink-0"
               initial={{ y: 32, opacity: 0, x: 0, scale: 0.98 }}
               animate={{ y: 0, opacity: 1, x: 0, scale: 1 }}
               exit={{ y: 24, opacity: 0, x: 40, scale: 0.98 }}
@@ -850,7 +850,7 @@ export function NotificationsOverlay() {
             {view.name === "detail" ? (
               <motion.section
                 aria-label="Notification details"
-                className="pointer-events-auto relative hidden h-[calc(100vh-8rem)] w-[32rem] shrink-0 flex-col overflow-hidden rounded-3xl border border-border bg-card shadow-2xl xl:flex"
+                className="pointer-events-auto relative hidden h-dvh w-[min(32rem,100vw)] shrink-0 flex-col overflow-hidden border-l border-border bg-background shadow-xl xl:flex"
                 initial={{ x: 48, opacity: 0 }}
                 animate={{ x: 0, opacity: 1 }}
                 exit={{ x: 32, opacity: 0 }}

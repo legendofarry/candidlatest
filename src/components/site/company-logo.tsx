@@ -17,26 +17,27 @@ export function CompanyLogo({
   const [imageFailed, setImageFailed] = useState(false);
   const brand = getCompanyBrand(name);
   const logoUrl = brand?.logoPath ? getCompanyBrandLogoUrl(brand.domain, brand.logoPath) : null;
+  const accent = getCompanyAccent(name);
 
   if (logoUrl && !imageFailed) {
     return (
       <span
         className={cn(
-          "flex shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white",
+          "flex shrink-0 items-center justify-center overflow-hidden rounded-xl",
           sizeClassName,
         )}
+        style={{ backgroundColor: accent }}
       >
         <img
           src={logoUrl}
           alt=""
-          className="size-full object-contain"
+          className="size-full scale-[1.15] object-contain"
           onError={() => setImageFailed(true)}
         />
       </span>
     );
   }
 
-  const accent = getCompanyAccent(name);
   return (
     <span
       className={cn(

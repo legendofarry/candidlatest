@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { queryOptions, useInfiniteQuery, useQuery, useSuspenseQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { AnimatePresence } from "motion/react";
+import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   Activity,
   Navigation,
@@ -100,6 +100,17 @@ function FeedPage() {
   const fetchLens = useServerFn(getLensStories);
   const [activeDiscussion, setActiveDiscussion] = useState<PublicStory | null>(null);
   const [pulseSheetOpen, setPulseSheetOpen] = useState(false);
+  const [heroSlide, setHeroSlide] = useState<"pulse" | "story">("pulse");
+  const [heroPaused, setHeroPaused] = useState(false);
+  const reduceMotion = useReducedMotion();
+
+  useEffect(() => {
+    if (reduceMotion || heroPaused) return;
+    const timer = window.setInterval(() => {
+      setHeroSlide((current) => (current === "pulse" ? "story" : "pulse"));
+    }, 8500);
+    return () => window.clearInterval(timer);
+  }, [heroPaused, reduceMotion]);
   const { visibleCount, expandBy, resetVisibleCount } = useAutoCollapsingCount(20);
 
   /**
@@ -220,53 +231,157 @@ function FeedPage() {
     sort !== "new" ||
     lens !== null;
 
+  const mostDiscussedList = (className: string, desktop: boolean) => (
+    <ul className={className}>
+      {filters.companies.slice(0, desktop ? 4 : 6).map((company) => (
+        <li key={company.slug}>
+          <Link
+            to="/companies/$slug"
+            params={{ slug: company.slug }}
+            className={desktop
+              ? "flex min-h-11 items-center justify-between gap-2 rounded-xl px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-primary"
+              : "text-muted-foreground hover:text-primary"}
+          >
+            <span className={desktop ? "min-w-0 break-words leading-5" : ""}>{company.name}</span>
+            {company.verified ? (
+              <CompanyVerifiedBadge className={desktop ? "shrink-0" : "ml-1 align-middle"} />
+            ) : null}
+          </Link>
+        </li>
+      ))}
+    </ul>
+  );
+  const renderMostDiscussed = (desktop: boolean) =>
+    desktop ? (
+      <aside className="hidden min-h-[280px] flex-col rounded-3xl border border-border bg-card/80 p-5 lg:flex xl:p-6">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <TrendingUp className="size-4 text-primary" /> Most discussed
+        </h2>
+        {mostDiscussedList("mt-4 flex-1 space-y-1", true)}
+      </aside>
+    ) : (
+      <aside className="mt-8 grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2 lg:hidden">
+        <div className="rounded-2xl border border-border bg-card p-4">
+          <h2 className="flex items-center gap-2 text-sm font-semibold">
+            <TrendingUp className="size-4 text-primary" /> Most discussed
+          </h2>
+          {mostDiscussedList("mt-3 space-y-2 text-sm", false)}
+        </div>
+      </aside>
+    );
+
   return (
     <div className="space-y-5 md:space-y-8">
-      <section className="mesh-hero animate-fade relative overflow-hidden rounded-3xl border border-border p-4 sm:p-6 md:p-12">
-        <div className="grid items-center gap-4 lg:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)] lg:gap-12">
-          <div>
-            <h1 className="max-w-3xl text-3xl font-semibold leading-[1.05] sm:text-4xl md:text-6xl">
-              The <span className="text-gradient">real reasons</span> Kenyans left their jobs.
-            </h1>
-            <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:text-base md:text-lg">
-              <span className="sm:hidden">
-                Workplace stories, employer ratings and salary insights across Kenya.
-              </span>
-              <span className="hidden sm:inline">
-                Exit stories, red-flag scores and salary honesty for employers across Nairobi,
-                Mombasa, Kisumu and beyond. Research a company before you sign — or tell the story
-                nobody let you tell at your exit interview.
-              </span>
-            </p>
-            <div className="mt-4 flex flex-wrap gap-3 sm:mt-6">
-              <Button asChild size="lg" className="glow-primary">
-                <Link to="/post">
-                  <PenLine className="size-4" /> Share your exit story
-                </Link>
-              </Button>
-              <Button asChild size="lg" variant="outline" className="hidden sm:inline-flex">
-                <Link to="/companies">Browse companies</Link>
-              </Button>
-            </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.55fr)_minmax(260px,0.75fr)] lg:items-stretch lg:gap-5 xl:gap-6">
+        <section className="mesh-hero animate-fade relative overflow-hidden rounded-3xl border border-border p-4 sm:p-6 md:p-12 lg:min-h-[340px] lg:p-5 xl:p-6">
+        <div className="lg:hidden">
+          <h1 className="max-w-3xl text-3xl font-semibold leading-[1.05] sm:text-4xl md:text-6xl">
+            The <span className="text-gradient">real reasons</span> Kenyans left their jobs.
+          </h1>
+          <p className="mt-3 max-w-2xl text-sm text-muted-foreground sm:mt-4 sm:text-base md:text-lg">
+            Workplace stories, employer ratings and salary insights across Kenya.
+          </p>
+          <div className="mt-4 flex flex-wrap gap-3 sm:mt-6">
+            <Button asChild size="lg" className="glow-primary">
+              <Link to="/post">
+                <PenLine className="size-4" /> Share your exit story
+              </Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="hidden sm:inline-flex">
+              <Link to="/companies">Browse companies</Link>
+            </Button>
           </div>
-          <div className="hidden lg:block">
-            <CandidPulse
-              onReason={(reason) => {
-                setQ(reason);
-                scrollToFeed();
-              }}
-              onStories={() => {
-                setSort("new");
-                scrollToFeed();
-              }}
-              onThisWeek={() => {
-                setSort("trending");
-                scrollToFeed();
-              }}
+        </div>
+
+        <div
+          className="relative hidden h-full min-h-[280px] lg:block xl:min-h-[300px]"
+          aria-label="Candid highlights"
+          role="region"
+          aria-roledescription="carousel"
+          onMouseEnter={() => setHeroPaused(true)}
+          onMouseLeave={() => setHeroPaused(false)}
+          onFocusCapture={() => setHeroPaused(true)}
+          onBlurCapture={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+              setHeroPaused(false);
+            }
+          }}
+        >
+          <AnimatePresence mode="wait" initial={false}>
+            {heroSlide === "pulse" ? (
+              <motion.div
+                key="pulse"
+                initial={{ opacity: 0, x: 28 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -28 }}
+                transition={{ duration: reduceMotion ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-0 flex items-center justify-center px-2 pb-8"
+              >
+                <div className="h-full w-full">
+                  <CandidPulse
+                    compactDesktop
+                    onReason={(reason) => {
+                      setQ(reason);
+                      scrollToFeed();
+                    }}
+                    onStories={() => {
+                      setSort("new");
+                      scrollToFeed();
+                    }}
+                    onThisWeek={() => {
+                      setSort("trending");
+                      scrollToFeed();
+                    }}
+                  />
+                </div>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="story"
+                initial={{ opacity: 0, x: 28 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -28 }}
+                transition={{ duration: reduceMotion ? 0 : 0.45, ease: [0.22, 1, 0.36, 1] }}
+                className="absolute inset-0 flex flex-col items-start justify-center px-5 pb-6 xl:px-10"
+              >
+                <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-primary">
+                  Workplace stories across Kenya
+                </p>
+                <h1 className="max-w-none text-[clamp(2rem,3vw,3rem)] font-semibold leading-[1.04] tracking-tight">
+                  Why Kenyans <span className="block text-gradient">leave their jobs.</span>
+                </h1>
+                <p className="mt-3 max-w-xl text-sm leading-6 text-muted-foreground xl:text-base">
+                  Anonymous workplace stories and salary insights from across Kenya.
+                </p>
+                <Button asChild size="lg" className="mt-5 glow-primary">
+                  <Link to="/post">
+                    <PenLine className="size-4" /> Share your exit story
+                  </Link>
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 items-center gap-2" aria-label="Choose hero slide">
+            <button
+              type="button"
+              onClick={() => setHeroSlide("pulse")}
+              aria-label="Show Candid Pulse"
+              aria-pressed={heroSlide === "pulse"}
+              className={`h-1.5 rounded-full transition-all ${heroSlide === "pulse" ? "w-8 bg-primary" : "w-2 bg-foreground/25 hover:bg-foreground/50"}`}
+            />
+            <button
+              type="button"
+              onClick={() => setHeroSlide("story")}
+              aria-label="Show story introduction"
+              aria-pressed={heroSlide === "story"}
+              className={`h-1.5 rounded-full transition-all ${heroSlide === "story" ? "w-8 bg-primary" : "w-2 bg-foreground/25 hover:bg-foreground/50"}`}
             />
           </div>
         </div>
-      </section>
+        </section>
+        {renderMostDiscussed(true)}
+      </div>
 
       <FreePackageBanner />
 
@@ -282,7 +397,7 @@ function FeedPage() {
           <span className="block text-xs font-semibold sm:text-sm">Candid Pulse</span>
           <span className="block truncate text-xs text-muted-foreground">
             <span className="sm:hidden">Live workplace signals</span>
-            <span className="hidden sm:inline">Live workplace signals from across Kenya</span>
+            <span className="hidden sm:inline">Anonymous workplace stories and salary insights from across Kenya.</span>
           </span>
         </span>
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -478,31 +593,7 @@ function FeedPage() {
           ) : null}
         </AnimatePresence>
       </div>
-      {!activeDiscussion ? (
-        <aside className="mt-8 grid gap-4 border-t border-border/70 pt-6 sm:grid-cols-2">
-          <div className="rounded-2xl border border-border bg-card p-4">
-            <h2 className="flex items-center gap-2 text-sm font-semibold">
-              <TrendingUp className="size-4 text-primary" /> Most discussed
-            </h2>
-            <ul className="mt-3 space-y-2 text-sm">
-              {filters.companies.slice(0, 6).map((company) => (
-                <li key={company.slug}>
-                  <Link
-                    to="/companies/$slug"
-                    params={{ slug: company.slug }}
-                    className="text-muted-foreground hover:text-primary"
-                  >
-                    {company.name}
-                    {company.verified ? (
-                      <CompanyVerifiedBadge className="ml-1 align-middle" />
-                    ) : null}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </aside>
-      ) : null}
+      {!activeDiscussion ? renderMostDiscussed(false) : null}
     </div>
   );
 }

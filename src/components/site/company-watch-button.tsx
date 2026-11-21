@@ -19,7 +19,7 @@ export function CompanyWatchButton({
   companyId: string;
   companySlug: string;
   companyName: string;
-  variant?: "default" | "hero" | "compact";
+  variant?: "default" | "hero" | "compact" | "sidebar";
 }) {
   const { user } = useAuth();
   const queryClient = useQueryClient();
@@ -48,8 +48,17 @@ export function CompanyWatchButton({
   });
 
   const size =
-    variant === "hero" ? "h-11 px-5 text-sm" : variant === "compact" ? "h-8 px-3 text-xs" : "h-9 px-4 text-sm";
-  const idle = "border border-border bg-background/60 text-foreground backdrop-blur-md hover:border-primary/60 hover:text-primary";
+    variant === "sidebar"
+      ? "h-14 w-full rounded-2xl px-5 text-base"
+      : variant === "hero"
+        ? "h-11 px-5 text-sm"
+        : variant === "compact"
+          ? "h-8 px-3 text-xs"
+          : "h-9 px-4 text-sm";
+  const idle =
+    variant === "sidebar"
+      ? "border border-transparent bg-primary text-primary-foreground shadow-[0_12px_32px_-14px_var(--primary)] hover:brightness-105"
+      : "border border-border bg-background/60 text-foreground backdrop-blur-md hover:border-primary/60 hover:text-primary";
 
   if (!user || !user.emailVerified) {
     return (
@@ -91,7 +100,7 @@ export function CompanyWatchButton({
         <Crosshair key="off" className="size-4 transition-transform duration-500 group-hover:rotate-90" />
       )}
       <span className="relative">
-        {watch.isError ? "Retry" : watching ? "Tracking" : variant === "compact" ? "Track" : "Track company"}
+        {watch.isError ? "Retry" : watching ? "Untrack" : variant === "compact" ? "Track" : "Track company"}
       </span>
     </button>
   );

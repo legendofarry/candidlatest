@@ -362,9 +362,9 @@ export function SupportChat({
           <MessageCircle className="size-[21px] transition-transform duration-300 group-hover:scale-110" />
           <span className="absolute right-1 top-1 size-2 rounded-full border-2 border-primary bg-emerald-300" />
         </span>
-        <span className="hidden pr-1 text-left md:block">
+        <span className="hidden text-left md:block">
           <span className="block text-sm font-semibold leading-4">
-            {open ? "Close chat" : "Chat with us"}
+            {open ? "Close chat" : ""}
           </span>
         </span>
       </Button>

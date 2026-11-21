@@ -3,6 +3,7 @@ import { z } from "zod";
 import {
   requireFirebaseAuth,
   requireVerifiedFirebaseAuth,
+  requireCommunityContributionAuth,
 } from "@/integrations/firebase/auth-middleware";
 import {
   generateId,
@@ -239,7 +240,7 @@ export const findOrCreateCompany = createServerFn({ method: "POST" })
   });
 
 export const createStory = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -253,6 +254,7 @@ export const createStory = createServerFn({ method: "POST" })
         area: z.string().max(100).nullable().default(null),
         company_public: z.boolean().default(true),
         is_anonymous: z.boolean().default(false),
+        share_to_feed: z.boolean().default(true),
         company_location_suggestion: z.string().url().max(500).nullable().default(null),
         tenure: z.string().max(40).nullable().default(null),
         industry: z.string().max(80).nullable().default(null),
@@ -285,6 +287,14 @@ export const createStory = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
+    const postingProfile = await queryFirst<ProfileRecord>("profiles", "id", context.userId);
+    if (postingProfile?.account_type === "company") {
+      throw new Error("Company accounts can publish official updates from their company community, not worker exit stories.");
+    }
+    const canChooseFeed = postingProfile ? ["premium", "gold"].includes(getEffectiveMembershipTier(postingProfile)) : false;
+    if (!canChooseFeed && !data.share_to_feed) {
+      throw new Error("Keeping a story out of the main feed is a Premium feature.");
+    }
     const company = await queryFirst<CompanyRecord>("companies", "id", data.company_id);
     if (!company) throw new Error("Company not found");
     validateEmployerName(company.name);
@@ -363,6 +373,7 @@ export const createStory = createServerFn({ method: "POST" })
       county: data.county,
       area: data.area?.trim() || null,
       company_public: true,
+      feed_visibility: canChooseFeed && !data.share_to_feed ? "company_only" : "feed",
       company_location_suggestion: data.company_location_suggestion,
       workplace_lat: workplaceCoordinates?.lat ?? null,
       workplace_lng: workplaceCoordinates?.lng ?? null,
@@ -543,11 +554,12 @@ export const getStoryForEdit = createServerFn({ method: "POST" })
       tenure: story.tenure,
       industry: story.industry,
       would_work_again: story.would_work_again,
+      share_to_feed: story.feed_visibility !== "company_only",
     };
   });
 
 export const updateStory = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -565,11 +577,20 @@ export const updateStory = createServerFn({ method: "POST" })
         tenure: z.string().max(40).nullable().default(null),
         industry: z.string().max(80).nullable().default(null),
         would_work_again: z.boolean().nullable().default(null),
+        share_to_feed: z.boolean().default(true),
       })
       .parse(input),
   )
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
+    const postingProfile = await queryFirst<ProfileRecord>("profiles", "id", context.userId);
+    if (postingProfile?.account_type === "company") {
+      throw new Error("Company accounts can publish official updates from their company community, not worker exit stories.");
+    }
+    const canChooseFeed = postingProfile ? ["premium", "gold"].includes(getEffectiveMembershipTier(postingProfile)) : false;
+    if (!canChooseFeed && !data.share_to_feed) {
+      throw new Error("Keeping a story out of the main feed is a Premium feature.");
+    }
     const storyRef = db.collection("stories").doc(data.story_id);
     const [storySnapshot, company] = await Promise.all([
       storyRef.get(),
@@ -618,6 +639,7 @@ export const updateStory = createServerFn({ method: "POST" })
       county: data.county,
       area: data.area?.trim() || null,
       company_public: true,
+      feed_visibility: canChooseFeed && !data.share_to_feed ? "company_only" : "feed",
       company_location_suggestion: data.company_location_suggestion,
       workplace_lat: workplaceCoordinates?.lat ?? null,
       workplace_lng: workplaceCoordinates?.lng ?? null,
@@ -667,7 +689,7 @@ export const updateStory = createServerFn({ method: "POST" })
 
 /** Removes a member's story from public and company views while retaining its moderation record. */
 export const deleteStory = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) => z.object({ story_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
@@ -702,7 +724,7 @@ export const deleteStory = createServerFn({ method: "POST" })
   });
 
 export const castVote = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) =>
     z.object({ story_id: z.string().uuid(), kind: z.enum(["up", "metoo"]) }).parse(input),
   )
@@ -746,7 +768,7 @@ export const castVote = createServerFn({ method: "POST" })
   });
 
 export const addComment = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -911,7 +933,7 @@ export const addComment = createServerFn({ method: "POST" })
 
 /** Toggles a like on a comment or reply. */
 export const likeComment = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) => z.object({ comment_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
@@ -972,7 +994,7 @@ export const likeComment = createServerFn({ method: "POST" })
   });
 
 export const editComment = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) =>
     z
       .object({ comment_id: z.string().uuid(), body: z.string().trim().min(2).max(2000) })
@@ -999,7 +1021,7 @@ export const editComment = createServerFn({ method: "POST" })
   });
 
 export const deleteComment = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) => z.object({ comment_id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     const db = context.db ?? getFirestoreDb();
@@ -1036,7 +1058,7 @@ export const deleteComment = createServerFn({ method: "POST" })
   });
 
 export const updateStoryLocation = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1170,7 +1192,7 @@ export const submitReport = createServerFn({ method: "POST" })
   });
 
 export const rateCompany = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) =>
     z
       .object({
@@ -1205,7 +1227,7 @@ export const rateCompany = createServerFn({ method: "POST" })
   });
 
 export const submitSalary = createServerFn({ method: "POST" })
-  .middleware([requireVerifiedFirebaseAuth])
+  .middleware([requireCommunityContributionAuth])
   .inputValidator((input: unknown) =>
     z
       .object({

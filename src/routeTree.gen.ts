@@ -18,6 +18,9 @@ import { Route as DownloadRouteImport } from './routes/download'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as GuidelinesRouteImport } from './routes/guidelines'
 import { Route as LeaderboardsRouteImport } from './routes/leaderboards'
+import { Route as ModeratorForumRouteImport } from './routes/moderator-forum'
+import { Route as ModeratorVerificationRouteImport } from './routes/moderator-verification'
+import { Route as MyCompaniesRouteImport } from './routes/my-companies'
 import { Route as MyContributionsRouteImport } from './routes/my-contributions'
 import { Route as NotificationsRouteImport } from './routes/notifications'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
@@ -30,10 +33,14 @@ import { Route as SearchRouteImport } from './routes/search'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as SupportRouteImport } from './routes/support'
 import { Route as VerifyEmailRouteImport } from './routes/verify-email'
+import { Route as AdminCompanyApplicationsRouteImport } from './routes/admin.company-applications'
+import { Route as AdminModeratorApplicationsRouteImport } from './routes/admin.moderator-applications'
 import { Route as BillingCheckoutRouteImport } from './routes/billing.checkout'
 import { Route as CompaniesIndexRouteImport } from './routes/companies.index'
 import { Route as CompaniesSlugRouteImport } from './routes/companies.$slug'
 import { Route as CompaniesWatchedRouteImport } from './routes/companies.watched'
+import { Route as CompanyGroupsSlugRouteImport } from './routes/company-groups.$slug'
+import { Route as CompanySetupRouteImport } from './routes/company.setup'
 import { Route as MessagesIndexRouteImport } from './routes/messages.index'
 import { Route as MessagesIdRouteImport } from './routes/messages.$id'
 import { Route as SalariesIndexRouteImport } from './routes/salaries.index'
@@ -93,6 +100,21 @@ const GuidelinesRoute = GuidelinesRouteImport.update({
 const LeaderboardsRoute = LeaderboardsRouteImport.update({
   id: '/leaderboards',
   path: '/leaderboards',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModeratorForumRoute = ModeratorForumRouteImport.update({
+  id: '/moderator-forum',
+  path: '/moderator-forum',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModeratorVerificationRoute = ModeratorVerificationRouteImport.update({
+  id: '/moderator-verification',
+  path: '/moderator-verification',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyCompaniesRoute = MyCompaniesRouteImport.update({
+  id: '/my-companies',
+  path: '/my-companies',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyContributionsRoute = MyContributionsRouteImport.update({
@@ -155,6 +177,18 @@ const VerifyEmailRoute = VerifyEmailRouteImport.update({
   path: '/verify-email',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminCompanyApplicationsRoute =
+  AdminCompanyApplicationsRouteImport.update({
+    id: '/admin/company-applications',
+    path: '/admin/company-applications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
+const AdminModeratorApplicationsRoute =
+  AdminModeratorApplicationsRouteImport.update({
+    id: '/admin/moderator-applications',
+    path: '/admin/moderator-applications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const BillingCheckoutRoute = BillingCheckoutRouteImport.update({
   id: '/checkout',
   path: '/checkout',
@@ -173,6 +207,16 @@ const CompaniesSlugRoute = CompaniesSlugRouteImport.update({
 const CompaniesWatchedRoute = CompaniesWatchedRouteImport.update({
   id: '/companies/watched',
   path: '/companies/watched',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompanyGroupsSlugRoute = CompanyGroupsSlugRouteImport.update({
+  id: '/company-groups/$slug',
+  path: '/company-groups/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CompanySetupRoute = CompanySetupRouteImport.update({
+  id: '/company/setup',
+  path: '/company/setup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MessagesIndexRoute = MessagesIndexRouteImport.update({
@@ -261,6 +305,9 @@ export interface FileRoutesByFullPath {
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
+  '/moderator-forum': typeof ModeratorForumRoute
+  '/moderator-verification': typeof ModeratorVerificationRoute
+  '/my-companies': typeof MyCompaniesRoute
   '/my-contributions': typeof MyContributionsRoute
   '/notifications': typeof NotificationsRoute
   '/onboarding': typeof OnboardingRoute
@@ -273,9 +320,13 @@ export interface FileRoutesByFullPath {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/admin/company-applications': typeof AdminCompanyApplicationsRoute
+  '/admin/moderator-applications': typeof AdminModeratorApplicationsRoute
   '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/watched': typeof CompaniesWatchedRoute
+  '/company-groups/$slug': typeof CompanyGroupsSlugRoute
+  '/company/setup': typeof CompanySetupRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
@@ -303,6 +354,9 @@ export interface FileRoutesByTo {
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
+  '/moderator-forum': typeof ModeratorForumRoute
+  '/moderator-verification': typeof ModeratorVerificationRoute
+  '/my-companies': typeof MyCompaniesRoute
   '/my-contributions': typeof MyContributionsRoute
   '/notifications': typeof NotificationsRoute
   '/onboarding': typeof OnboardingRoute
@@ -314,9 +368,13 @@ export interface FileRoutesByTo {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/admin/company-applications': typeof AdminCompanyApplicationsRoute
+  '/admin/moderator-applications': typeof AdminModeratorApplicationsRoute
   '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/watched': typeof CompaniesWatchedRoute
+  '/company-groups/$slug': typeof CompanyGroupsSlugRoute
+  '/company/setup': typeof CompanySetupRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
@@ -345,6 +403,9 @@ export interface FileRoutesById {
   '/forgot-password': typeof ForgotPasswordRoute
   '/guidelines': typeof GuidelinesRoute
   '/leaderboards': typeof LeaderboardsRoute
+  '/moderator-forum': typeof ModeratorForumRoute
+  '/moderator-verification': typeof ModeratorVerificationRoute
+  '/my-companies': typeof MyCompaniesRoute
   '/my-contributions': typeof MyContributionsRoute
   '/notifications': typeof NotificationsRoute
   '/onboarding': typeof OnboardingRoute
@@ -357,9 +418,13 @@ export interface FileRoutesById {
   '/settings': typeof SettingsRoute
   '/support': typeof SupportRoute
   '/verify-email': typeof VerifyEmailRoute
+  '/admin/company-applications': typeof AdminCompanyApplicationsRoute
+  '/admin/moderator-applications': typeof AdminModeratorApplicationsRoute
   '/billing/checkout': typeof BillingCheckoutRoute
   '/companies/$slug': typeof CompaniesSlugRoute
   '/companies/watched': typeof CompaniesWatchedRoute
+  '/company-groups/$slug': typeof CompanyGroupsSlugRoute
+  '/company/setup': typeof CompanySetupRoute
   '/messages/$id': typeof MessagesIdRoute
   '/salaries/$slug': typeof SalariesSlugRoute
   '/stories/$id': typeof StoriesIdRoute
@@ -389,6 +454,9 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
+    | '/moderator-forum'
+    | '/moderator-verification'
+    | '/my-companies'
     | '/my-contributions'
     | '/notifications'
     | '/onboarding'
@@ -401,9 +469,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/verify-email'
+    | '/admin/company-applications'
+    | '/admin/moderator-applications'
     | '/billing/checkout'
     | '/companies/$slug'
     | '/companies/watched'
+    | '/company-groups/$slug'
+    | '/company/setup'
     | '/messages/$id'
     | '/salaries/$slug'
     | '/stories/$id'
@@ -431,6 +503,9 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
+    | '/moderator-forum'
+    | '/moderator-verification'
+    | '/my-companies'
     | '/my-contributions'
     | '/notifications'
     | '/onboarding'
@@ -442,9 +517,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/verify-email'
+    | '/admin/company-applications'
+    | '/admin/moderator-applications'
     | '/billing/checkout'
     | '/companies/$slug'
     | '/companies/watched'
+    | '/company-groups/$slug'
+    | '/company/setup'
     | '/messages/$id'
     | '/salaries/$slug'
     | '/stories/$id'
@@ -472,6 +551,9 @@ export interface FileRouteTypes {
     | '/forgot-password'
     | '/guidelines'
     | '/leaderboards'
+    | '/moderator-forum'
+    | '/moderator-verification'
+    | '/my-companies'
     | '/my-contributions'
     | '/notifications'
     | '/onboarding'
@@ -484,9 +566,13 @@ export interface FileRouteTypes {
     | '/settings'
     | '/support'
     | '/verify-email'
+    | '/admin/company-applications'
+    | '/admin/moderator-applications'
     | '/billing/checkout'
     | '/companies/$slug'
     | '/companies/watched'
+    | '/company-groups/$slug'
+    | '/company/setup'
     | '/messages/$id'
     | '/salaries/$slug'
     | '/stories/$id'
@@ -515,6 +601,9 @@ export interface RootRouteChildren {
   ForgotPasswordRoute: typeof ForgotPasswordRoute
   GuidelinesRoute: typeof GuidelinesRoute
   LeaderboardsRoute: typeof LeaderboardsRoute
+  ModeratorForumRoute: typeof ModeratorForumRoute
+  ModeratorVerificationRoute: typeof ModeratorVerificationRoute
+  MyCompaniesRoute: typeof MyCompaniesRoute
   MyContributionsRoute: typeof MyContributionsRoute
   NotificationsRoute: typeof NotificationsRoute
   OnboardingRoute: typeof OnboardingRoute
@@ -527,8 +616,12 @@ export interface RootRouteChildren {
   SettingsRoute: typeof SettingsRoute
   SupportRoute: typeof SupportRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
+  AdminCompanyApplicationsRoute: typeof AdminCompanyApplicationsRoute
+  AdminModeratorApplicationsRoute: typeof AdminModeratorApplicationsRoute
   CompaniesSlugRoute: typeof CompaniesSlugRoute
   CompaniesWatchedRoute: typeof CompaniesWatchedRoute
+  CompanyGroupsSlugRoute: typeof CompanyGroupsSlugRoute
+  CompanySetupRoute: typeof CompanySetupRoute
   MessagesIdRoute: typeof MessagesIdRoute
   StoriesIdRoute: typeof StoriesIdRoute
   UUsernameRoute: typeof UUsernameRoute
@@ -608,6 +701,27 @@ declare module '@tanstack/react-router' {
       path: '/leaderboards'
       fullPath: '/leaderboards'
       preLoaderRoute: typeof LeaderboardsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/moderator-forum': {
+      id: '/moderator-forum'
+      path: '/moderator-forum'
+      fullPath: '/moderator-forum'
+      preLoaderRoute: typeof ModeratorForumRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/moderator-verification': {
+      id: '/moderator-verification'
+      path: '/moderator-verification'
+      fullPath: '/moderator-verification'
+      preLoaderRoute: typeof ModeratorVerificationRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-companies': {
+      id: '/my-companies'
+      path: '/my-companies'
+      fullPath: '/my-companies'
+      preLoaderRoute: typeof MyCompaniesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-contributions': {
@@ -694,6 +808,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof VerifyEmailRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/company-applications': {
+      id: '/admin/company-applications'
+      path: '/admin/company-applications'
+      fullPath: '/admin/company-applications'
+      preLoaderRoute: typeof AdminCompanyApplicationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/admin/moderator-applications': {
+      id: '/admin/moderator-applications'
+      path: '/admin/moderator-applications'
+      fullPath: '/admin/moderator-applications'
+      preLoaderRoute: typeof AdminModeratorApplicationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/billing/checkout': {
       id: '/billing/checkout'
       path: '/checkout'
@@ -720,6 +848,20 @@ declare module '@tanstack/react-router' {
       path: '/companies/watched'
       fullPath: '/companies/watched'
       preLoaderRoute: typeof CompaniesWatchedRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/company-groups/$slug': {
+      id: '/company-groups/$slug'
+      path: '/company-groups/$slug'
+      fullPath: '/company-groups/$slug'
+      preLoaderRoute: typeof CompanyGroupsSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/company/setup': {
+      id: '/company/setup'
+      path: '/company/setup'
+      fullPath: '/company/setup'
+      preLoaderRoute: typeof CompanySetupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/messages/': {
@@ -865,6 +1007,9 @@ const rootRouteChildren: RootRouteChildren = {
   ForgotPasswordRoute: ForgotPasswordRoute,
   GuidelinesRoute: GuidelinesRoute,
   LeaderboardsRoute: LeaderboardsRoute,
+  ModeratorForumRoute: ModeratorForumRoute,
+  ModeratorVerificationRoute: ModeratorVerificationRoute,
+  MyCompaniesRoute: MyCompaniesRoute,
   MyContributionsRoute: MyContributionsRoute,
   NotificationsRoute: NotificationsRoute,
   OnboardingRoute: OnboardingRoute,
@@ -877,8 +1022,12 @@ const rootRouteChildren: RootRouteChildren = {
   SettingsRoute: SettingsRoute,
   SupportRoute: SupportRoute,
   VerifyEmailRoute: VerifyEmailRoute,
+  AdminCompanyApplicationsRoute: AdminCompanyApplicationsRoute,
+  AdminModeratorApplicationsRoute: AdminModeratorApplicationsRoute,
   CompaniesSlugRoute: CompaniesSlugRoute,
   CompaniesWatchedRoute: CompaniesWatchedRoute,
+  CompanyGroupsSlugRoute: CompanyGroupsSlugRoute,
+  CompanySetupRoute: CompanySetupRoute,
   MessagesIdRoute: MessagesIdRoute,
   StoriesIdRoute: StoriesIdRoute,
   UUsernameRoute: UUsernameRoute,

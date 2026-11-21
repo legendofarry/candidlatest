@@ -7,6 +7,7 @@ import {
   ChevronRight,
   CreditCard,
   Flame,
+  ReceiptText,
   RotateCw,
   Sparkles,
   WalletCards,
@@ -31,6 +32,8 @@ import { switchMyMembership } from "@/lib/membership.functions";
 import { useAuth } from "@/hooks/useAuth";
 import { cn } from "@/lib/utils";
 import { subscribeBillingMenuAction } from "@/lib/billing-menu";
+import { FloatingBackButton } from "@/components/site/floating-back-button";
+import { SplitVisualPanel } from "@/components/site/split-visual-panel";
 
 export const Route = createFileRoute("/billing")({
   head: () => ({ meta: [{ title: "Billing & packages | Candid" }] }),
@@ -137,13 +140,25 @@ function BillingPage() {
 
   return (
     <>
-      <main className="min-h-screen bg-background pb-16">
-        <div className="mx-auto w-full max-w-6xl px-2 pt-8 sm:px-6 md:px-12 md:pt-12">
-          <header className="max-w-3xl">
+      <main className="min-h-screen bg-background pb-16 md:h-dvh md:overflow-hidden md:pb-0">
+        <FloatingBackButton
+          onClick={() => navigate({ to: "/profile" })}
+          className="hidden md:inline-flex"
+          label="Back to profile"
+        />
+        <div className="md:grid md:h-full md:grid-cols-[minmax(280px,0.86fr)_1.14fr]">
+          <SplitVisualPanel
+            eyebrow="Candid membership"
+            title="Make work better, together."
+            description="Choose the Candid package that fits you and help keep workplace stories honest and accessible."
+          />
+          <section className="min-h-screen min-w-0 md:h-dvh md:min-h-0 md:overflow-x-hidden md:overflow-y-auto md:overscroll-contain md:px-8 md:pb-8 md:pt-16 lg:px-12">
+        <div className="mx-auto w-full max-w-5xl px-2 pt-8 sm:px-6 md:px-0 md:pt-0">
+          <header className="max-w-5xl">
             <div className="flex items-center gap-2 text-sm font-medium text-primary">
               <WalletCards className="size-4" /> Billing &amp; packages
             </div>
-            <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl">
+            <h1 className="mt-4 font-display text-4xl font-semibold tracking-tight sm:text-5xl md:text-3xl lg:text-4xl">
               {isOfficial ? "Official Candid access" : "Your membership"}
             </h1>
           </header>
@@ -163,7 +178,7 @@ function BillingPage() {
 
           {data ? (
             <>
-              <section className="mt-8 grid gap-4 lg:grid-cols-[1.2fr_.8fr]">
+              <section className="mt-8 grid gap-8 lg:grid-cols-[minmax(0,1.1fr)_minmax(15rem,.9fr)] lg:gap-10">
                 <article className="rounded-[1.7rem] border bg-card p-4 shadow-sm sm:p-5">
                   <div className="mb-3 flex items-center justify-between px-1">
                     <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
@@ -368,6 +383,85 @@ function BillingPage() {
                     </Button>
                   ) : null}
                 </article>
+                <aside className="hidden min-h-[22rem] flex-col justify-between border-l border-border py-3 pl-6 lg:flex">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-[.18em] text-muted-foreground">
+                      Membership details
+                    </p>
+                    <div className="mt-5">
+                      <p className="text-sm text-muted-foreground">Current package</p>
+                      <p className="mt-1 font-display text-2xl font-semibold">
+                        {capitalize(currentTier)}
+                      </p>
+                    </div>
+                    <dl className="mt-6 space-y-4 text-sm">
+                      <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+                        <dt className="text-muted-foreground">Status</dt>
+                        <dd className="font-medium">
+                          {statusLabel(membership?.status, membership?.source)}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-3 border-b border-border pb-3">
+                        <dt className="text-muted-foreground">Account</dt>
+                        <dd className="font-medium">{isOfficial ? "Official" : "Member"}</dd>
+                      </div>
+                      <div className="flex items-center justify-between gap-3">
+                        <dt className="text-muted-foreground">
+                          {membership?.source === "paid"
+                            ? membership.cancelAtPeriodEnd
+                              ? "Access ends"
+                              : "Renews"
+                            : "Access"}
+                        </dt>
+                        <dd className="text-right font-medium">
+                          {membership?.periodEndsAt
+                            ? formatDate(membership.periodEndsAt)
+                            : membership?.source === "paid"
+                              ? "No expiry"
+                              : "Ongoing"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+                  <div className="mt-8 space-y-2">
+                    <Button
+                      variant="outline"
+                      className="w-full justify-between rounded-xl"
+                      onClick={() => setBillingSheet("payment-method")}
+                    >
+                      <span className="flex items-center gap-2">
+                        <CreditCard className="size-4 text-primary" /> Payment details
+                      </span>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      className="w-full justify-between rounded-xl"
+                      onClick={() => setBillingSheet("payment-history")}
+                    >
+                      <span className="flex items-center gap-2">
+                        <ReceiptText className="size-4 text-primary" /> Payment history
+                      </span>
+                      <ChevronRight className="size-4 text-muted-foreground" />
+                    </Button>
+                  </div>
+                </aside>
+                <div className="hidden grid-cols-2 gap-2 md:grid lg:hidden">
+                  <Button
+                    variant="outline"
+                    className="justify-start rounded-xl"
+                    onClick={() => setBillingSheet("payment-method")}
+                  >
+                    <CreditCard className="size-4 text-primary" /> Payment details
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="justify-start rounded-xl"
+                    onClick={() => setBillingSheet("payment-history")}
+                  >
+                    <ReceiptText className="size-4 text-primary" /> Payment history
+                  </Button>
+                </div>
               </section>
 
               {!isOfficial ? (
@@ -488,6 +582,8 @@ function BillingPage() {
               ) : null}
             </>
           ) : null}
+        </div>
+          </section>
         </div>
       </main>
       <Drawer

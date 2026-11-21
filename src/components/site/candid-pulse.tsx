@@ -97,9 +97,10 @@ type PulseProps = {
   onReason?: (reason: string) => void;
   onStories?: () => void;
   onThisWeek?: () => void;
+  compactDesktop?: boolean;
 };
 
-export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}) {
+export function CandidPulse({ onReason, onStories, onThisWeek, compactDesktop = false }: PulseProps = {}) {
   const spotlight = useScrollSpotlight();
   const [hydrated, setHydrated] = useState(false);
   const { data, isPending, isError } = useQuery({
@@ -115,19 +116,22 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
   const unavailable = hydrated && (isError || (!isPending && data === null));
 
   const maxReason = Math.max(1, ...(pulse?.topReasons ?? []).map((row) => row.count));
+  const topReasons = (pulse?.topReasons ?? []).slice(0, compactDesktop ? 3 : undefined);
+  const pulseStatClass = compactDesktop
+    ? `${statClass} min-h-[76px] px-3 py-3 xl:px-4`
+    : statClass;
 
   return (
     <div
       ref={spotlight}
-      className="signal-panel dark relative mx-auto w-full max-w-md origin-center will-change-transform xl:max-w-none"
+      className={`signal-panel dark relative mx-auto w-full origin-center will-change-transform ${compactDesktop ? "h-full max-w-none" : "max-w-md xl:max-w-none"}`}
       aria-label="Candid Pulse — live workplace signals"
     >
-      <div className="signal-grid absolute inset-0 rounded-3xl" />
+      {compactDesktop ? null : <div className="signal-grid absolute inset-0 rounded-3xl" />}
       <div
-        className="relative overflow-hidden rounded-3xl border border-white/10 bg-[oklch(0.135_0.014_285)] p-5 text-foreground shadow-2xl shadow-black/30 backdrop-blur-sm transition-shadow xl:p-7"
-        style={{
-          boxShadow:
-            "0 25px 60px -15px color-mix(in oklab, var(--primary) calc(var(--spot, 0) * 45%), transparent)",
+        className={`relative overflow-hidden text-foreground ${compactDesktop ? "flex h-full min-h-0 flex-col rounded-none border-0 bg-transparent p-0 shadow-none backdrop-blur-0" : "rounded-3xl border border-white/10 bg-[oklch(0.135_0.014_285)] p-5 shadow-2xl shadow-black/30 backdrop-blur-sm transition-shadow xl:p-7"}`}
+        style={compactDesktop ? undefined : {
+          boxShadow: "0 25px 60px -15px color-mix(in oklab, var(--primary) calc(var(--spot, 0) * 45%), transparent)",
         }}
       >
         <div className="flex items-center justify-between text-xs xl:text-sm">
@@ -148,27 +152,27 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
           </button>
         </div>
 
-        <p className="mt-2 text-sm leading-relaxed text-muted-foreground xl:mt-3 xl:text-sm">
+        <p className={`mt-2 text-sm leading-relaxed text-muted-foreground xl:mt-3 xl:text-sm ${compactDesktop ? "hidden" : ""}`}>
           {unavailable ? "Live community data is unavailable right now." : "Live workplace signals from across Kenya."}
         </p>
 
-        <div className="mt-4 grid grid-cols-3 gap-2 xl:mt-5 xl:gap-3">
-          <button type="button" className={statClass} onClick={onStories}>
+        <div className={`${compactDesktop ? "mt-4 grid grid-cols-3 gap-3 xl:mt-5 xl:gap-4" : "mt-4 grid grid-cols-3 gap-2 xl:mt-5 xl:gap-3"} ${compactDesktop && unavailable ? "hidden" : ""}`}>
+          <button type="button" className={pulseStatClass} onClick={onStories}>
             <StatInner label="Stories" value={pulse?.storiesTotal ?? null} />
           </button>
-          <button type="button" className={statClass} onClick={onThisWeek}>
+          <button type="button" className={pulseStatClass} onClick={onThisWeek}>
             <StatInner label="This week" value={pulse?.storiesLast7Days ?? null} />
           </button>
-          <Link to="/companies" className={statClass}>
+          <Link to="/companies" className={pulseStatClass}>
             <StatInner label="Employers" value={pulse?.companies ?? null} />
           </Link>
         </div>
 
-        <div className="mt-4 space-y-2 xl:mt-5 xl:space-y-3">
+        <div className={`${compactDesktop ? "mt-4 flex-1 space-y-2 xl:mt-5 xl:space-y-3" : "mt-4 space-y-2 xl:mt-5 xl:space-y-3"} ${compactDesktop && unavailable ? "hidden" : ""}`}>
           <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
             Common reasons in recent stories
           </p>
-          {(pulse?.topReasons ?? []).length === 0 ? (
+          {topReasons.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               {unavailable
                 ? "Reasons could not be loaded. Try again in a moment."
@@ -177,12 +181,12 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
                   : "No reason breakdown is available yet."}
             </p>
           ) : (
-            (pulse?.topReasons ?? []).map((row) => (
+            topReasons.map((row) => (
               <button
                 type="button"
                 key={row.reason}
                 onClick={() => onReason?.(row.reason)}
-                className="group block w-full space-y-1.5 rounded-xl px-2 py-1.5 text-left transition hover:bg-white/5 active:scale-[0.98]"
+                className={`group block w-full text-left transition hover:bg-white/5 active:scale-[0.98] ${compactDesktop ? "space-y-1 rounded-lg px-1 py-0.5" : "space-y-1.5 rounded-xl px-2 py-1.5"}`}
               >
                 <div className="flex items-center justify-between gap-2 text-sm">
                   <span className="truncate capitalize text-foreground/90">{row.reason}</span>
@@ -191,7 +195,7 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
                     <ChevronRight className="size-3.5 transition-transform group-hover:translate-x-0.5" />
                   </span>
                 </div>
-                <div className="h-2.5 overflow-hidden rounded-full bg-white/10 xl:h-2">
+                <div className={`overflow-hidden rounded-full bg-white/10 ${compactDesktop ? "h-1.5" : "h-2.5 xl:h-2"}`}>
                   <div
                     className="h-full rounded-full bg-primary transition-[width] duration-700 ease-out"
                     style={{ width: `${Math.round((row.count / maxReason) * 100)}%` }}
@@ -202,7 +206,7 @@ export function CandidPulse({ onReason, onStories, onThisWeek }: PulseProps = {}
           )}
         </div>
 
-        <div className="mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs xl:mt-5 xl:px-4 xl:py-3 xl:text-sm">
+        <div className={`mt-4 flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-xs xl:mt-5 xl:px-4 xl:py-3 xl:text-sm ${compactDesktop ? "hidden" : ""}`}>
           <span className="flex items-center gap-1.5 text-muted-foreground">
             <MapPin className="size-3.5 text-verified" /> {pulse ? formatCount(pulse.counties) : "—"}{" "}
             counties in recent stories
